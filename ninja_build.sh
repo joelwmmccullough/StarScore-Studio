@@ -106,7 +106,7 @@ function do_build() {
         -DCMAKE_SKIP_RPATH="${MUSESCORE_NO_RPATH}" \
         -DMUSE_COMPILE_USE_UNITY="${MUSESCORE_COMPILE_USE_UNITY}"
 
-    ninja -j $JOBS
+    ninja -j $JOBS ${NINJA_EXTRA_ARGS}
 }
 
 case $TARGET in

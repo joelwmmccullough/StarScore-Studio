@@ -15,6 +15,9 @@ concurrency:
 env:
   DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
 
+permissions:
+  contents: write
+
 jobs:
   macos_arm64:
     runs-on: macos-26
@@ -30,6 +33,7 @@ jobs:
         BUILD_NUMBER=$(cat ./build.artifacts/env/build_number.env)
         echo "BUILD_NUMBER=$BUILD_NUMBER" | tee -a $GITHUB_ENV
         echo "STARSCORE_ARCHS=arm64" | tee -a $GITHUB_ENV
+        echo "NINJA_EXTRA_ARGS=-k 0" | tee -a $GITHUB_ENV
 
     - name: Restore ccache files
       id: restore-ccache
@@ -61,7 +65,21 @@ jobs:
 
     - name: Build
       run: |
-        bash ./buildscripts/ci/macos/build.sh -n ${{ env.BUILD_NUMBER }} --crash_log_url "''"
+        set -o pipefail
+        bash ./buildscripts/ci/macos/build.sh -n ${{ env.BUILD_NUMBER }} --crash_log_url "''" 2>&1 | tee build.log
+
+    - name: Publish build errors to the ci-logs branch
+      if: failure()
+      run: |
+        mkdir -p /tmp/ci-logs
+        { echo "run ${{ github.run_number }} commit ${{ github.sha }}"; grep -n -E "error:|Error |FAILED:|undefined|cannot find|No such file" build.log | head -300; echo; echo "---- tail ----"; tail -150 build.log; } > /tmp/ci-logs/build-errors.txt || true
+        cd /tmp/ci-logs
+        git init -q
+        git config user.name "StarScore CI"
+        git config user.email "ci@users.noreply.github.com"
+        git add build-errors.txt
+        git commit -q -m "build errors for run ${{ github.run_number }}"
+        git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:ci-logs
 
     - name: Show ccache stats
       if: always()
