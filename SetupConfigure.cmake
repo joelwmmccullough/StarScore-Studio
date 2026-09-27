@@ -101,6 +101,9 @@ if(BUILD_CONFIGURATION STREQUAL "APP-PORTABLE")
     set(WIN_PORTABLE ON)
 endif()
 
+# StarScore Studio: never offer MuseScore updates
+set(MUSE_MODULE_UPDATE OFF)
+
 if (WIN_PORTABLE)
     set(MUSE_MODULE_UPDATE OFF)
 endif()

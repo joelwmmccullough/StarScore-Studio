@@ -18,13 +18,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>. 
 
-set(MUSE_APP_NAME_HUMAN_READABLE "MuseScore Studio")
-set(MUSE_APP_NAME_MACHINE_READABLE "MuseScoreStudio")
+set(MUSE_APP_NAME_HUMAN_READABLE "StarScore Studio")
+set(MUSE_APP_NAME_MACHINE_READABLE "StarScoreStudio")
 
 set(MUSE_APP_NAME_HUMAN_READABLE_COMPAT "MuseScore")
 set(MUSE_APP_NAME_MACHINE_READABLE_COMPAT "MuseScore")
 
-set(MUSE_APP_GUI_IDENTIFIER org.musescore.${MUSE_APP_NAME_MACHINE_READABLE_COMPAT})
+set(MUSE_APP_GUI_IDENTIFIER com.starsign.StarScoreStudio)
 
 set(MUSE_APP_VERSION_MAJOR "4")
 set(MUSE_APP_VERSION_MINOR "7")

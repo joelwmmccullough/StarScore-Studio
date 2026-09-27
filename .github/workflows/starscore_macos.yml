@@ -1,0 +1,93 @@
+name: 'StarScore Studio: macOS build'
+
+# Builds an Apple Silicon (arm64) StarScore Studio .dmg on every push to the
+# starscore branch, or on demand from the Actions tab.
+
+on:
+  push:
+    branches: [ starscore ]
+  workflow_dispatch:
+
+concurrency:
+  group: starscore-macos-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+
+jobs:
+  macos_arm64:
+    runs-on: macos-26
+    timeout-minutes: 300
+    steps:
+    - name: Clone repository
+      uses: actions/checkout@v6
+
+    - name: Configure workflow
+      run: |
+        bash ./buildscripts/ci/tools/make_build_mode_env.sh -e workflow_dispatch -m stable
+        bash ./buildscripts/ci/tools/make_build_number.sh
+        BUILD_NUMBER=$(cat ./build.artifacts/env/build_number.env)
+        echo "BUILD_NUMBER=$BUILD_NUMBER" | tee -a $GITHUB_ENV
+        echo "STARSCORE_ARCHS=arm64" | tee -a $GITHUB_ENV
+
+    - name: Restore ccache files
+      id: restore-ccache
+      uses: actions/cache/restore@v5
+      with:
+        path: ${{ github.workspace }}/.ccache
+        key: starscore-${{runner.os}}-${{runner.arch}}-ccache-
+        restore-keys: starscore-${{runner.os}}-${{runner.arch}}-ccache-
+
+    - name: Setup ccache
+      run: |
+        brew install ccache
+        bash ./buildscripts/ci/tools/setup_ccache_config.sh
+
+    - name: Install Qt
+      run: |
+        bash ./buildscripts/ci/macos/install_qt.sh
+
+    - name: Download dependencies
+      run: |
+        bash ./buildscripts/ci/macos/download_dependencies.sh
+
+    - name: Generate _en.ts files
+      env:
+        LUPDATE_ARGS: ""
+        POSTPROCESS_ARGS: "--warn-only"
+      run: |
+        bash ./tools/translations/run_lupdate.sh
+
+    - name: Build
+      run: |
+        bash ./buildscripts/ci/macos/build.sh -n ${{ env.BUILD_NUMBER }} --crash_log_url "''"
+
+    - name: Show ccache stats
+      if: always()
+      run: ccache -sv
+
+    - name: Package
+      run: |
+        bash ./buildscripts/ci/macos/package.sh --signpass "''" --signsecret "''" --user "" --password "" --team-id ""
+
+    - name: Upload artifacts on GitHub
+      uses: actions/upload-artifact@v6
+      with:
+        name: StarScore-Studio-mac-arm64-${{ github.run_number }}
+        path: ./build.artifacts/*.dmg
+        retention-days: 30
+
+    - name: Prepare ccache files for saving
+      id: prepare-save-ccache
+      if: always()
+      run: |
+        ccache --recompress 10
+        echo "CCACHE_TIMESTAMP=$(date -u +"%F-%T")" | tee -a $GITHUB_OUTPUT
+
+    - name: Save ccache files
+      if: always()
+      uses: actions/cache/save@v5
+      with:
+        key: ${{ steps.restore-ccache.outputs.cache-primary-key }}${{ steps.prepare-save-ccache.outputs.CCACHE_TIMESTAMP }}
+        path: ${{ github.workspace }}/.ccache

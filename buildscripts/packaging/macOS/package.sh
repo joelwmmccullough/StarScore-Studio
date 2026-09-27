@@ -97,7 +97,9 @@ if $DO_SIGN; then
         rm -f "$APP_ZIP"
     fi
 else
-    echo "Skipping code signing"
+    # StarScore Studio: ad-hoc sign so the Apple Silicon build launches without a Developer ID
+    echo "Ad-hoc signing"
+    codesign --force --deep -s - "${APP_PATH}"
 fi
 
 ################################################################
