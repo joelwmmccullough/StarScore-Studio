@@ -17,6 +17,7 @@
 #include "modularity/imoduleinterface.h"
 #include "global/io/path.h"
 #include "global/types/ret.h"
+#include "global/types/retval.h"
 #include "global/async/notification.h"
 
 namespace mu::project {

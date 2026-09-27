@@ -22,7 +22,8 @@
 #include "engraving/dom/staff.h"
 
 #include "notation/inotationparts.h"
-#include "notation/internal/excerptnotation.h"
+#include "notation/iexcerptnotation.h"
+#include "notation/inotationelements.h"
 
 #include "inotationproject.h"
 
@@ -70,6 +71,20 @@ void StarScoreService::listenCurrentProject()
     master->notation()->undoStack()->stackChanged().onNotify(this, [this]() {
         m_changed.notify();
     });
+}
+
+//! The engraving Excerpt behind an (initialised) part book, or nullptr
+static mu::engraving::Excerpt* starscoreExcerptOf(const IExcerptNotationPtr& excerptNotation)
+{
+    if (!excerptNotation || !excerptNotation->isInited()) {
+        return nullptr;
+    }
+    INotationPtr notation = excerptNotation->notation();
+    if (!notation || !notation->elements()) {
+        return nullptr;
+    }
+    mu::engraving::Score* score = notation->elements()->msScore();
+    return score ? score->excerpt() : nullptr;
 }
 
 // ---------------------------------------------------------------------------
@@ -595,22 +610,51 @@ const StarScoreSectionTemplate* StarScoreService::sectionTemplate(const QString&
 void StarScoreService::addPartBooksFor(const QStringList& partIds)
 {
     IMasterNotationPtr master = globalContext()->currentMasterNotation();
-    if (!master || partIds.isEmpty()) {
+    engraving::MasterScore* ms = masterScore();
+    if (!master || !ms || partIds.isEmpty()) {
         return;
     }
 
+    // MuseScore offers one "potential" part book per instrument that has none yet, in score order
+    std::set<QString> covered;
+    for (const IExcerptNotationPtr& e : master->excerpts()) {
+        if (engraving::Excerpt* ex = starscoreExcerptOf(e)) {
+            covered.insert(QString::fromStdString(ex->initialPartId().toStdString()));
+        }
+    }
+    std::vector<engraving::Part*> uncovered;
+    for (engraving::Part* p : ms->parts()) {
+        if (!covered.count(idText(p))) {
+            uncovered.push_back(p);
+        }
+    }
+
+    const ExcerptNotationList& potential = master->potentialExcerpts();
     ExcerptNotationList excerpts = master->excerpts();
     bool added = false;
 
-    for (const IExcerptNotationPtr& potential : master->potentialExcerpts()) {
-        auto impl = std::dynamic_pointer_cast<ExcerptNotation>(potential);
-        if (!impl || !impl->excerpt()) {
-            continue;
+    if (potential.size() == uncovered.size()) {
+        for (size_t i = 0; i < potential.size(); ++i) {
+            if (partIds.contains(idText(uncovered[i]))) {
+                excerpts.push_back(potential[i]);
+                added = true;
+            }
         }
-        const QString initialPart = QString::fromStdString(impl->excerpt()->initialPartId().toStdString());
-        if (partIds.contains(initialPart)) {
-            excerpts.push_back(potential);
-            added = true;
+    } else {
+        // Fallback: match by name
+        QStringList wanted;
+        for (engraving::Part* p : uncovered) {
+            if (partIds.contains(idText(p))) {
+                wanted << p->partName().toQString();
+            }
+        }
+        for (const IExcerptNotationPtr& e : potential) {
+            const int idx = wanted.indexOf(e->name());
+            if (idx >= 0) {
+                wanted.removeAt(idx);
+                excerpts.push_back(e);
+                added = true;
+            }
         }
     }
 
@@ -1346,12 +1390,12 @@ Ret StarScoreService::exportArrangement(const QString& arrangementId, const io::
     // Part books: keep those whose instruments all belong to the arrangement
     ExcerptNotationList keptExcerpts;
     for (const IExcerptNotationPtr& e : master->excerpts()) {
-        auto impl = std::dynamic_pointer_cast<ExcerptNotation>(e);
-        if (!impl || !impl->excerpt() || !impl->excerpt()->excerptScore()) {
+        engraving::Excerpt* ex = starscoreExcerptOf(e);
+        if (!ex || !ex->excerptScore()) {
             continue;
         }
         bool allKept = true;
-        for (engraving::Part* p : impl->excerpt()->excerptScore()->parts()) {
+        for (engraving::Part* p : ex->excerptScore()->parts()) {
             engraving::Part* mp = nullptr;
             for (engraving::Staff* staff : p->staves()) {
                 if (engraving::Staff* linked = staff->findLinkedInScore(ms)) {
