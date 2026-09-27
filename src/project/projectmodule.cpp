@@ -40,6 +40,7 @@
 #include "internal/notationreadersregister.h"
 #include "internal/notationwritersregister.h"
 #include "internal/projectrwregister.h"
+#include "internal/starscore/starscoreservice.h"
 
 #ifdef Q_OS_MAC
 #include "internal/platform/macos/macosrecentfilescontroller.h"
@@ -71,6 +72,7 @@ void ProjectModule::registerExports()
     m_engravingPluginAPIHelper = std::make_shared<EngravingPluginAPIHelper>(iocContext());
     m_convertFileToScoreService = std::make_shared<ConvertFileToScoreService>(iocContext());
     m_convertFileToScoreScenario = std::make_shared<ConvertFileToScoreScenario>(iocContext());
+    m_starScoreService = std::make_shared<StarScoreService>(iocContext());
 
 #ifdef Q_OS_MAC
     m_recentFilesController = std::make_shared<MacOSRecentFilesController>();
@@ -99,6 +101,7 @@ void ProjectModule::registerExports()
     ioc()->registerExport<INotationReadersRegister>(moduleName(), new NotationReadersRegister());
     ioc()->registerExport<INotationWritersRegister>(moduleName(), new NotationWritersRegister());
     ioc()->registerExport<IProjectRWRegister>(moduleName(), new ProjectRWRegister());
+    ioc()->registerExport<IStarScoreService>(moduleName(), m_starScoreService);
 }
 
 void ProjectModule::resolveImports()
@@ -121,6 +124,9 @@ void ProjectModule::resolveImports()
         ir->registerQmlUri(Uri("musescore://project/upload/progress"), "MuseScore.Project", "UploadProgressDialog");
         ir->registerQmlUri(Uri("musescore://project/upload/success"), "MuseScore.Project", "ProjectUploadedDialog");
         ir->registerQmlUri(Uri("musescore://project/audiogenerationsettings"), "MuseScore.Project", "AudioGenerationSettingsDialog");
+        ir->registerQmlUri(Uri("musescore://starscore/new"), "MuseScore.Project", "NewStarScoreDialog");
+        ir->registerQmlUri(Uri("musescore://starscore/edit"), "MuseScore.Project", "StarScoreEditDialog");
+        ir->registerQmlUri(Uri("musescore://starscore/copylayout"), "MuseScore.Project", "CopyLayoutDialog");
     }
 
     auto er = ioc()->resolve<muse::extensions::IExtensionsExecPointsRegister>(moduleName());
@@ -149,6 +155,7 @@ void ProjectModule::onInit(const IApplication::RunMode& mode)
 
     m_convertFileToScoreService->init();
     m_convertFileToScoreScenario->init();
+    m_starScoreService->init();
 }
 
 void ProjectModule::onDelayedInit()

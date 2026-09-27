@@ -41,9 +41,21 @@ const UiActionList ProjectUiActions::m_actions = {
     UiAction("file-new",
              mu::context::UiCtxAny,
              mu::context::CTX_ANY,
-             TranslatableString("action", "&New…"),
-             TranslatableString("action", "New"),
+             TranslatableString("action", "&New StarScore…"),
+             TranslatableString("action", "New StarScore"),
              IconCode::Code::NEW_FILE
+             ),
+    UiAction("file-new-musescore",
+             mu::context::UiCtxAny,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "New score (MuseScore wizard)…"),
+             TranslatableString("action", "New score with the MuseScore wizard")
+             ),
+    UiAction("starscore-copy-layout",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Copy layout breaks to other parts…"),
+             TranslatableString("action", "Copy layout breaks to other parts")
              ),
     UiAction("file-close",
              mu::context::UiCtxAny,

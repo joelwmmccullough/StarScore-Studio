@@ -79,6 +79,7 @@ public:
 
     QString displayName() const override;
     muse::async::Notification displayNameChanged() const override;
+    void setDisplayNameOverride(const QString& name) override;
 
     bool isCloudProject() const override;
     const CloudProjectInfo& cloudInfo() const override;
@@ -144,6 +145,7 @@ private:
     mutable CloudAudioInfo m_cloudAudioInfo;
 
     muse::io::path_t m_path;
+    QString m_displayNameOverride;
     muse::async::Notification m_pathChanged;
     muse::async::Notification m_displayNameChanged;
 

@@ -198,6 +198,7 @@ MenuItem* AppMenuModel::makeFileMenu()
 
     MenuItemList fileItems {
         makeMenuItem("file-new"),
+        makeMenuItem("file-new-musescore"),
         makeMenuItem("file-open"),
         makeMenu(TranslatableString("appshell/menu/file", "Open &recent"), recentScoresList, "menu-file-open", openRecentEnabled),
         makeMenuItem("file-close"),
@@ -357,6 +358,7 @@ MenuItem* AppMenuModel::makeFormatMenu()
     MenuItemList formatItems {
         makeMenuItem("edit-style"),
         makeMenuItem("page-settings"),
+        makeMenuItem("starscore-copy-layout"),
         makeSeparator(),
         makeMenuItem("measures-per-system"),
         makeMenu(TranslatableString("appshell/menu/format", "Str&etch"), stretchItems, "menu-stretch"),

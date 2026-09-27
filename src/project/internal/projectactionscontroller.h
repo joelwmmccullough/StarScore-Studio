@@ -114,7 +114,7 @@ private:
     notation::INotationInteractionPtr currentInteraction() const;
     notation::INotationSelectionPtr currentNotationSelection() const;
 
-    void newProject();
+    void newProject(bool museScoreWizard = false);
 
     void openProject(const muse::actions::ActionData& args);
     muse::Ret openProject(const muse::io::path_t& path, const QString& displayNameOverride = QString());

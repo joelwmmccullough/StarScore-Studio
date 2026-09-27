@@ -434,6 +434,10 @@ muse::async::Notification NotationProject::pathChanged() const
 
 QString NotationProject::displayName() const
 {
+    if (!m_displayNameOverride.isEmpty()) {
+        return m_displayNameOverride;
+    }
+
     if (isNewlyCreated()) {
         if (m_path.empty()) {
             QString workTitle = m_masterNotation->notation()->workTitle();
@@ -449,13 +453,23 @@ QString NotationProject::displayName() const
         return m_cloudInfo.name;
     }
 
-    bool isSuffixInteresting = io::suffix(m_path) != engraving::MSCZ;
+    bool isSuffixInteresting = io::suffix(m_path) != engraving::MSCZ && io::suffix(m_path) != engraving::STARSCORE;
     return io::filename(m_path, isSuffixInteresting).toQString();
 }
 
 muse::async::Notification NotationProject::displayNameChanged() const
 {
     return m_displayNameChanged;
+}
+
+void NotationProject::setDisplayNameOverride(const QString& name)
+{
+    if (m_displayNameOverride == name) {
+        return;
+    }
+
+    m_displayNameOverride = name;
+    m_displayNameChanged.notify();
 }
 
 bool NotationProject::isCloudProject() const
@@ -805,7 +819,7 @@ Ret NotationProject::makeBackup(muse::io::path_t filePath)
 {
     TRACEFUNC;
 
-    if (io::suffix(filePath) != engraving::MSCZ) {
+    if (io::suffix(filePath) != engraving::MSCZ && io::suffix(filePath) != engraving::STARSCORE) {
         LOGW() << "backup allowed only for MSCZ, currently: " << filePath;
         return make_ret(Ret::Code::Ok);
     }
@@ -1190,6 +1204,11 @@ ProjectMeta NotationProject::metaInfo() const
             continue;
         }
 
+        // StarScore Studio: the arrangements/sections data is managed by the StarScore bar, not Project properties
+        if (tag == muse::String(u"starscore")) {
+            continue;
+        }
+
         meta.additionalTags[tag] = value.toQString();
     }
 
@@ -1221,6 +1240,12 @@ void NotationProject::setMetaInfo(const ProjectMeta& meta, bool undoable)
     }
 
     MasterScore* score = m_masterNotation->masterScore();
+
+    // StarScore Studio: keep the arrangements/sections data, which Project properties doesn't show
+    const String starScoreData = score->metaTag(u"starscore");
+    if (!starScoreData.isEmpty()) {
+        tags[u"starscore"] = starScoreData;
+    }
 
     if (undoable) {
         m_masterNotation->notation()->undoStack()->prepareChanges(TranslatableString("undoableAction", "Edit project properties"));

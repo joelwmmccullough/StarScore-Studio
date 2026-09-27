@@ -47,9 +47,12 @@ static const std::string MSCX = "mscx";
 //! This is a XML file that stores all files from the ZIP container by concatenation (excluding binaries)
 static const std::string MSCS = "mscs";
 
+//! StarScore Studio: a .starscore is an .mscz zip container whose score carries an arrangements list
+static const std::string STARSCORE = "starscore";
+
 inline bool isMuseScoreFile(const std::string& suffix)
 {
-    return suffix == MSCZ || suffix == MSCX || suffix == MSCS || suffix == MSCZ_BACKUP;
+    return suffix == MSCZ || suffix == MSCX || suffix == MSCS || suffix == MSCZ_BACKUP || suffix == STARSCORE;
 }
 
 enum class MscIoMode : unsigned char {
@@ -61,7 +64,7 @@ enum class MscIoMode : unsigned char {
 
 inline MscIoMode mscIoModeBySuffix(const std::string& suffix)
 {
-    if (suffix == MSCZ || suffix == MSCZ_BACKUP) {
+    if (suffix == MSCZ || suffix == MSCZ_BACKUP || suffix == STARSCORE) {
         return MscIoMode::Zip;
     } else if (suffix == MSCX) {
         return MscIoMode::Dir;

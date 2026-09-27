@@ -60,6 +60,14 @@ qt_add_qml_module(project_qml
         internal/ScoresPage/scorespagemodel.h
         internal/ScoresPage/scorethumbnailloader.cpp
         internal/ScoresPage/scorethumbnailloader.h
+        internal/StarScore/starscorebarmodel.cpp
+        internal/StarScore/starscorebarmodel.h
+        internal/StarScore/starscoreeditmodel.cpp
+        internal/StarScore/starscoreeditmodel.h
+        internal/StarScore/copylayoutmodel.cpp
+        internal/StarScore/copylayoutmodel.h
+        internal/StarScore/newstarscoremodel.cpp
+        internal/StarScore/newstarscoremodel.h
     QML_FILES
         AlsoShareAudioComDialog.qml
         AskSaveLocationTypeDialog.qml
@@ -132,6 +140,10 @@ qt_add_qml_module(project_qml
         ScoresPage.qml
         ScoresView.qml
         UploadProgressDialog.qml
+        StarScoreBar.qml
+        StarScoreEditDialog.qml
+        CopyLayoutDialog.qml
+        NewStarScoreDialog.qml
     RESOURCES
         internal/Migration/migration.png
         internal/SaveToCloud/images/Cloud.png
@@ -160,4 +172,5 @@ target_include_directories(project_qml PRIVATE
     internal/Properties
     internal/ScoresPage
     internal/ConvertFileToScore
+    internal/StarScore
 )

@@ -35,6 +35,7 @@ import MuseScore.Palette
 import MuseScore.Inspector
 import MuseScore.InstrumentsScene
 import MuseScore.Playback
+import MuseScore.Project
 
 DockPage {
     id: root
@@ -587,22 +588,44 @@ DockPage {
         }
     ]
 
-    central: NotationView {
-        id: notationView
-        name: "MainNotationView"
+    central: FocusScope {
+        id: centralArea
 
-        isNavigatorVisible: root.pageModel.isNavigatorVisible
-        isBraillePanelVisible: root.pageModel.isBraillePanelVisible
-        isMainView: true
+        // DockPage reads the central item's navigationSection
+        readonly property alias navigationSection: notationView.navigationSection
 
-        Component.onCompleted: {
-            root.notationView = notationView.paintView
+        // StarScore Studio: arrangements / sections bar above the score
+        StarScoreBar {
+            id: starScoreBar
 
-            root.setDefaultNavigationControl(notationView.defaultNavigationControl)
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            height: implicitHeight
         }
 
-        Component.onDestruction: {
-            root.setDefaultNavigationControl(null)
+        NotationView {
+            id: notationView
+            name: "MainNotationView"
+
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: starScoreBar.bottom
+            anchors.bottom: parent.bottom
+
+            isNavigatorVisible: root.pageModel.isNavigatorVisible
+            isBraillePanelVisible: root.pageModel.isBraillePanelVisible
+            isMainView: true
+
+            Component.onCompleted: {
+                root.notationView = notationView.paintView
+
+                root.setDefaultNavigationControl(notationView.defaultNavigationControl)
+            }
+
+            Component.onDestruction: {
+                root.setDefaultNavigationControl(null)
+            }
         }
     }
 

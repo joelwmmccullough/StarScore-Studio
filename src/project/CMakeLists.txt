@@ -44,6 +44,7 @@ target_sources(project PRIVATE
     iprojectwriter.h
     iconvertfiletoscorescenario.h
     iconvertfiletoscoreservice.h
+    istarscoreservice.h
 
     types/projecttypes.h
     types/projectmeta.h
@@ -96,6 +97,11 @@ target_sources(project PRIVATE
     internal/projectfileinfoprovider.h
     internal/projectrwregister.cpp
     internal/projectrwregister.h
+
+    internal/starscore/starscoreservice.cpp
+    internal/starscore/starscoreservice.h
+    internal/starscore/starscoreengraving.cpp
+    internal/starscore/starscoreengraving.h
 )
 
 if (OS_IS_MAC)

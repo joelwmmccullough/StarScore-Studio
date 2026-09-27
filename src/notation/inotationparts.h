@@ -54,6 +54,15 @@ public:
     virtual void setParts(const PartInstrumentList& instruments, const ScoreOrder& order) = 0;
     virtual void setScoreOrder(const ScoreOrder& order) = 0;
     virtual void setPartVisible(const muse::ID& partId, bool visible) = 0;
+
+    //! StarScore Studio: show/hide several parts as one undo step
+    virtual void setPartsVisible(const std::vector<std::pair<muse::ID, bool> >& changes, const muse::TranslatableString& actionName)
+    {
+        (void)actionName;
+        for (const auto& change : changes) {
+            setPartVisible(change.first, change.second);
+        }
+    }
     virtual bool setVoiceVisible(const muse::ID& staffId, int voiceIndex, bool visible) = 0;
     virtual void setStaffVisible(const muse::ID& staffId, bool visible) = 0;
     virtual void setPartSharpFlat(const muse::ID& partId, const SharpFlat& sharpFlat) = 0;

@@ -63,7 +63,11 @@ static constexpr int SAVE_AS_BTN_ID    = RETRY_SAVE_BTN_ID + 1;
 
 void ProjectActionsController::init()
 {
-    dispatcher()->reg(this, "file-new", this, &ProjectActionsController::newProject);
+    dispatcher()->reg(this, "file-new", [this]() { newProject(false); });
+    dispatcher()->reg(this, "file-new-musescore", [this]() { newProject(true); });
+    dispatcher()->reg(this, "starscore-copy-layout", [this]() {
+        interactive()->open(Uri("musescore://starscore/copylayout"));
+    });
     dispatcher()->reg(this, "file-open", this, &ProjectActionsController::openProject);
 
     dispatcher()->reg(this, "file-close", [this]() {
@@ -131,6 +135,7 @@ bool ProjectActionsController::canReceiveAction(const ActionCode& code) const
     if (!currentNotationProject()) {
         static const std::unordered_set<ActionCode> DONT_REQUIRE_OPEN_PROJECT {
             "file-new",
+            "file-new-musescore",
             "file-open",
             "file-import-pdf",
             "file-import-audio-to-score",
@@ -651,7 +656,7 @@ bool ProjectActionsController::isAnyProjectOpened() const
     return false;
 }
 
-void ProjectActionsController::newProject()
+void ProjectActionsController::newProject(bool museScoreWizard)
 {
     //! NOTE This method is synchronous,
     //! but inside `multiwindowsProvider` there can be an event loop
@@ -670,7 +675,7 @@ void ProjectActionsController::newProject()
 
     if (globalContext()->currentProject()) {
         if (multiwindowsProvider()->isHasWindowWithoutProject()) {
-            multiwindowsProvider()->activateWindowWithoutProject({ "file-new" });
+            multiwindowsProvider()->activateWindowWithoutProject({ museScoreWizard ? "file-new-musescore" : "file-new" });
             return;
         }
         QStringList args;
@@ -679,7 +684,9 @@ void ProjectActionsController::newProject()
         return;
     }
 
-    auto promise = interactive()->open(NEW_SCORE_URI);
+    // StarScore Studio: File → New makes a StarScore; MuseScore's own wizard is "file-new-musescore"
+    static const muse::Uri NEW_STARSCORE_URI("musescore://starscore/new");
+    auto promise = interactive()->open(museScoreWizard ? NEW_SCORE_URI : NEW_STARSCORE_URI);
     promise.onResolve(this, [this](const Val&) {
         extensionsProvider()->performPointAsync(EXEC_ONPOST_PROJECT_CREATED);
 
@@ -1899,10 +1906,11 @@ void ProjectActionsController::printScore()
 
 async::Promise<io::path_t> ProjectActionsController::selectScoreOpeningFile() const
 {
-    std::string allExt = "*.mscz *.mxl *.musicxml *.xml *.mid *.midi *.kar *.md *.mgu *.sgu *.cap *.capx "
+    std::string allExt = "*.starscore *.mscz *.mxl *.musicxml *.xml *.mid *.midi *.kar *.md *.mgu *.sgu *.cap *.capx "
                          "*.ove *.scw *.bmw *.bww *.gtp *.gp3 *.gp4 *.gp5 *.gpx *.gp *.ptb *.mei *.mnx *.json *.tef *.mscx *.mscs *.mscz~";
 
     std::vector<std::string> filter { muse::trc("project", "All supported files") + " (" + allExt + ")",
+                                      muse::trc("project", "StarScore files") + " (*.starscore)",
                                       muse::trc("project", "MuseScore files") + " (*.mscz)",
                                       muse::trc("project", "MusicXML files") + " (*.mxl *.musicxml *.xml)",
                                       muse::trc("project", "MIDI files") + " (*.mid *.midi *.kar)",

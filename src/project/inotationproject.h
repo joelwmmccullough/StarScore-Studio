@@ -45,6 +45,9 @@ public:
     virtual QString displayName() const = 0;
     virtual muse::async::Notification displayNameChanged() const = 0;
 
+    //! StarScore Studio: arrangements inside a .starscore show "<song> — <arrangement>" instead of their working-file name
+    virtual void setDisplayNameOverride(const QString& name) { (void)name; }
+
     virtual muse::Ret load(const muse::io::path_t& path, const OpenParams& params = {}, const std::string& format = "") = 0;
     virtual muse::Ret createNew(const ProjectCreateOptions& projectInfo) = 0;
 

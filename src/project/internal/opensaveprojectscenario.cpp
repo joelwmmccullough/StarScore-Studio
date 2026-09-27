@@ -101,9 +101,13 @@ RetVal<muse::io::path_t> OpenSaveProjectScenario::askLocalPath(INotationProjectP
         filenameAddition = " - " + muse::trc("project/save", "selection");
     }
 
-    muse::io::path_t defaultPath = configuration()->defaultSavingFilePath(project, filenameAddition);
+    // StarScore Studio: new scores and "Save as" default to .starscore
+    const bool preferStarScore = saveMode == SaveMode::SaveAs || project->isNewlyCreated();
+    muse::io::path_t defaultPath = configuration()->defaultSavingFilePath(project, filenameAddition,
+                                                                          preferStarScore ? engraving::STARSCORE : std::string());
 
     std::vector<std::string> filter {
+        muse::trc("project", "StarScore file") + " (*.starscore)",
         muse::trc("project", "MuseScore file") + " (*.mscz)",
         muse::trc("project", "Uncompressed MuseScore folder (experimental)")
 #ifdef Q_OS_MAC

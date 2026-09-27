@@ -286,6 +286,42 @@ void NotationParts::setPartVisible(const ID& partId, bool visible)
     notifyAboutPartChanged(part);
 }
 
+void NotationParts::setPartsVisible(const std::vector<std::pair<muse::ID, bool> >& changes, const TranslatableString& actionName)
+{
+    TRACEFUNC;
+
+    std::vector<Part*> changedParts;
+    bool anyShown = false;
+
+    for (const auto& change : changes) {
+        Part* part = partModifiable(change.first);
+        if (part && part->show() != change.second) {
+            changedParts.push_back(part);
+            anyShown |= change.second;
+        }
+    }
+
+    if (changedParts.empty()) {
+        return;
+    }
+
+    startEdit(actionName);
+
+    for (Part* part : changedParts) {
+        mu::engraving::EditPart::setPartVisible(score(), part, !part->show());
+    }
+
+    if (anyShown) {
+        EditSystemLocks::removeSystemLocksContainingMMRests(score());
+    }
+
+    apply();
+
+    for (Part* part : changedParts) {
+        notifyAboutPartChanged(part);
+    }
+}
+
 void NotationParts::setPartSharpFlat(const ID& partId, const SharpFlat& sharpFlat)
 {
     TRACEFUNC;

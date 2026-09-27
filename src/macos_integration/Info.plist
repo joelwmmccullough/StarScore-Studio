@@ -30,6 +30,7 @@
 			<true/>
 			<key>QLSupportedContentTypes</key>
 			<array>
+				<string>com.starsign.starscore</string>
 				<string>org.musescore.mscz</string>
 				<string>org.musescore.mscx</string>
 				<string>org.musescore.mscs</string>
