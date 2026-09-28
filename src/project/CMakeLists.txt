@@ -106,6 +106,7 @@ target_sources(project PRIVATE
     internal/starscore/starscorehouse.h
     internal/starscore/starscorecompare.cpp
     internal/starscore/starscoreimport.cpp
+    internal/starscore/starscoremixer.cpp
     internal/starscore/starscoreengraving.h
 )
 
@@ -148,4 +149,5 @@ qt_add_resources(project project_starscore_resources
         /
     FILES
         resources/starscore/Starsign_2.5.mss
+        resources/starscore/mixer_defaults.json
 )

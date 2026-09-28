@@ -114,6 +114,20 @@ public:
 
     virtual void applyProfile(const SoundProfileName& profileName) = 0;
 
+    //! StarScore Studio: default mixer settings for tracks (sound, volume, pan, sends, mute)
+    struct TrackMixSetting {
+        bool setInput = false;
+        bool autoInput = false;                      // the active sound profile's choice for this instrument
+        muse::audio::AudioResourceMeta resource;
+        bool setOutput = false;
+        float volumeDb = 0.f;
+        float balance = 0.f;
+        std::vector<float> auxSends;                 // send amounts, one per aux channel (0 = off)
+        bool setMute = false;
+        bool mute = false;
+    };
+    virtual void applyTrackMixSettings(const std::map<engraving::InstrumentTrackId, TrackMixSetting>& settings) = 0;
+
     virtual void setNotation(notation::INotationPtr notation) = 0;
     virtual void setIsExportingAudio(bool exporting) = 0;
 

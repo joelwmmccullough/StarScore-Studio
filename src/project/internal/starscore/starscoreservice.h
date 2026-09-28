@@ -169,6 +169,9 @@ private:
     QStringList onSectionIds(const Data& data) const;
     std::vector<mu::engraving::Part*> masterPartsOf(const mu::engraving::Excerpt* excerpt) const;
     void addPartBooksFor(const QStringList& partIds);
+    int applyStylesOnly(const QStringList& partIds);
+    //! Sound, volume, pan, reverb and mute for each instrument, from the defaults in mixer_defaults.json
+    void applyMixerDefaults(const QStringList& partIds);
     void standardizeImported();
     //! Name the new parts, hide default-hidden parts/staves, make part books; returns the new section
     StarScoreSection finishNewParts(const std::vector<mu::engraving::Part*>& newParts,

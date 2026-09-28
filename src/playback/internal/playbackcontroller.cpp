@@ -571,6 +571,7 @@ void PlaybackController::onNotationChanged()
 
 void PlaybackController::onPartChanged(const Part* part)
 {
+    (void)part;
     if (!m_notation->hasVisibleParts()) {
         pause();
     }
@@ -580,18 +581,9 @@ void PlaybackController::onPartChanged(const Part* part)
         return;
     }
 
-    for (const InstrumentTrackId& instrumentTrackId : part->instrumentTrackIdList()) {
-        auto soloMuteState = trackSoloMuteState(instrumentTrackId);
-        soloMuteState.mute = !part->show();
-        setTrackSoloMuteState(instrumentTrackId, soloMuteState);
-    }
-
-    if (part->hasChordSymbol()) {
-        InstrumentTrackId chordSymbolsTrackId = notationPlayback()->chordSymbolsTrackId(part->id());
-        auto chordsSoloMuteState = trackSoloMuteState(chordSymbolsTrackId);
-        chordsSoloMuteState.mute = !part->show();
-        setTrackSoloMuteState(chordSymbolsTrackId, chordsSoloMuteState);
-    }
+    // StarScore Studio: showing an instrument only unmutes what hiding it muted, so tracks muted on purpose
+    // (e.g. the lead sheet piano, chord-symbol tracks) stay muted
+    applyHiddenInstrumentMutes();
 }
 
 void PlaybackController::onSelectionChanged()
@@ -1896,4 +1888,59 @@ void PlaybackController::releaseHiddenInstrumentMutes()
         }
     }
     m_hiddenAutoMuted.clear();
+}
+
+void PlaybackController::applyTrackMixSettings(const std::map<InstrumentTrackId, TrackMixSetting>& settings)
+{
+    project::IProjectAudioSettingsPtr audioSettingsPtr = audioSettings();
+    if (!audioSettingsPtr || !notationPlayback()) {
+        return;
+    }
+
+    for (const auto& [instrumentTrackId, s] : settings) {
+        auto trackIt = m_instrumentTrackIdMap.find(instrumentTrackId);
+        const bool loaded = trackIt != m_instrumentTrackIdMap.end();
+
+        if (s.setInput) {
+            AudioInputParams in;
+            if (s.autoInput) {
+                const SoundProfile& profile = profilesRepo()->profile(audioSettingsPtr->activeSoundProfile());
+                const mpe::PlaybackData& playbackData = notationPlayback()->trackPlaybackData(instrumentTrackId);
+                in = { profile.findResource(playbackData.setupData), {} };
+            } else {
+                in = { s.resource, {} };
+            }
+            if (in.isValid()) {
+                if (loaded) {
+                    playback()->setInputParams(m_currentSequenceId, trackIt->second, in);
+                } else {
+                    audioSettingsPtr->setTrackInputParams(instrumentTrackId, in);
+                }
+            }
+        }
+
+        if (s.setOutput) {
+            AudioOutputParams out = trackOutputParams(instrumentTrackId);
+            out.volume = s.volumeDb;
+            out.balance = s.balance;
+            for (size_t i = 0; i < s.auxSends.size(); ++i) {
+                if (out.auxSends.size() <= i) {
+                    out.auxSends.resize(i + 1);
+                }
+                out.auxSends[i].signalAmount = s.auxSends[i];
+                out.auxSends[i].active = s.auxSends[i] > 0.f;
+            }
+            if (loaded) {
+                playback()->setOutputParams(m_currentSequenceId, trackIt->second, out);
+            } else {
+                audioSettingsPtr->setTrackOutputParams(instrumentTrackId, out);
+            }
+        }
+
+        if (s.setMute) {
+            auto state = trackSoloMuteState(instrumentTrackId);
+            state.mute = s.mute;
+            setTrackSoloMuteState(instrumentTrackId, state);
+        }
+    }
 }

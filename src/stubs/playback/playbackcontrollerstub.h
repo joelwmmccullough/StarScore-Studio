@@ -85,6 +85,7 @@ public:
     muse::Progress loadingProgress() const override;
 
     void applyProfile(const SoundProfileName& profileName) override;
+    void applyTrackMixSettings(const std::map<engraving::InstrumentTrackId, TrackMixSetting>&) override {}
 
     void setNotation(notation::INotationPtr notation) override;
     void setIsExportingAudio(bool exporting) override;

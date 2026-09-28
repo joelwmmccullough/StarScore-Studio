@@ -122,6 +122,7 @@ public:
     muse::Progress loadingProgress() const override;
 
     void applyProfile(const SoundProfileName& profileName) override;
+    void applyTrackMixSettings(const std::map<engraving::InstrumentTrackId, TrackMixSetting>& settings) override;
 
     void setNotation(notation::INotationPtr notation) override;
     void setMasterNotation(notation::IMasterNotationPtr masterNotation);

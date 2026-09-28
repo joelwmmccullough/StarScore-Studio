@@ -1768,6 +1768,13 @@ void StarScoreService::setStyleRules(const std::vector<StarScoreStyleRule>& rule
 
 int StarScoreService::applyStyles(const QStringList& partIds)
 {
+    const int restyled = applyStylesOnly(partIds);
+    applyMixerDefaults(partIds);
+    return restyled;
+}
+
+int StarScoreService::applyStylesOnly(const QStringList& partIds)
+{
     IMasterNotationPtr master = globalContext()->currentMasterNotation();
     engraving::MasterScore* ms = masterScore();
     if (!master || !ms) {

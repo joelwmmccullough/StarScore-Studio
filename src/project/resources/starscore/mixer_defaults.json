@@ -1,0 +1,2240 @@
+{
+ "comment": "StarScore mixer defaults from Joel's tuned 'Starsign Mixer Test' (28 Sep 2026). Key: section template|instrument id|nth of that instrument in the section[|chords][|1ten = 6/7-Horn with one tenor]. in = sound (resourceMeta) or 'auto' (the active sound profile's choice, i.e. Muse Sounds). aux = send amounts (first aux has the reverb). mute only where the default is fixed.",
+ "aux": [
+  {
+   "out": {
+    "balance": 0,
+    "fxChain": {
+     "0": {
+      "active": true,
+      "chainOrder": 0,
+      "resourceMeta": {
+       "attributes": {},
+       "hasNativeEditorSupport": true,
+       "id": "Muse Reverb",
+       "type": "muse_plugin",
+       "vendor": "Muse"
+      },
+      "unitConfiguration": {}
+     }
+    },
+    "volumeDb": 0
+   },
+   "soloMuteState": {
+    "mute": false,
+    "solo": false
+   }
+  },
+  {
+   "out": {
+    "balance": 0,
+    "fxChain": {},
+    "volumeDb": 0
+   },
+   "soloMuteState": {
+    "mute": false,
+    "solo": false
+   }
+  }
+ ],
+ "tracks": {
+  "lead-sheet|piano|1": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "lead-sheet|piano|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "2-horn|bb-trumpet|1": {
+   "volumeDb": -6,
+   "balance": -0.03,
+   "aux": [
+    0.3,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "playbackSetupData": "last.last.last",
+     "presetBank": "0",
+     "presetName": "Trumpet",
+     "presetProgram": "56",
+     "soundFontName": "MS Basic"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "MS Basic\\0\\56",
+    "type": "fluid_soundfont",
+    "vendor": "Fluid"
+   }
+  },
+  "2-horn|bb-trumpet|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "2-horn|tenor-saxophone|1": {
+   "volumeDb": 1.2999999523162842,
+   "balance": 0.03,
+   "aux": [
+    0.2,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Woodwinds",
+     "museName": "Tenor Sax",
+     "musePack": "Muse Woodwinds",
+     "museUID": "131",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.saxophone.tenor"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "131",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "2-horn|tenor-saxophone|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "3-horn|bb-trumpet|1": {
+   "volumeDb": -6,
+   "balance": 0,
+   "aux": [
+    0.3,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "playbackSetupData": "last.last.last",
+     "presetBank": "0",
+     "presetName": "Trumpet",
+     "presetProgram": "56",
+     "soundFontName": "MS Basic"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "MS Basic\\0\\56",
+    "type": "fluid_soundfont",
+    "vendor": "Fluid"
+   }
+  },
+  "3-horn|bb-trumpet|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "3-horn|alto-saxophone|1": {
+   "volumeDb": -5.300000190734863,
+   "balance": -0.05,
+   "aux": [
+    0.2,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Woodwinds",
+     "museName": "Alto Sax",
+     "musePack": "Muse Woodwinds",
+     "museUID": "130",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.saxophone.alto"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "130",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "3-horn|alto-saxophone|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "3-horn|tenor-saxophone|1": {
+   "volumeDb": -2,
+   "balance": 0.05,
+   "aux": [
+    0.2,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Woodwinds",
+     "museName": "Tenor Sax",
+     "musePack": "Muse Woodwinds",
+     "museUID": "131",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.saxophone.tenor"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "131",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "3-horn|tenor-saxophone|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "3-horn|bb-bass-clarinet|1": {
+   "volumeDb": 2,
+   "balance": 0.0,
+   "aux": [
+    0.1,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Woodwinds",
+     "museName": "Bass Clarinet",
+     "musePack": "Muse Woodwinds",
+     "museUID": "128",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.clarinet.bass:in_b_flat"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "128",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "3-horn|bb-bass-clarinet|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "4-horn|bb-trumpet|1": {
+   "volumeDb": -6,
+   "balance": 0,
+   "aux": [
+    0.3,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "playbackSetupData": "last.last.last",
+     "presetBank": "0",
+     "presetName": "Trumpet",
+     "presetProgram": "56",
+     "soundFontName": "MS Basic"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "MS Basic\\0\\56",
+    "type": "fluid_soundfont",
+    "vendor": "Fluid"
+   }
+  },
+  "4-horn|bb-trumpet|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "4-horn|alto-saxophone|1": {
+   "volumeDb": 0,
+   "balance": -0.05,
+   "aux": [
+    0.2,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Woodwinds",
+     "museName": "Alto Sax",
+     "musePack": "Muse Woodwinds",
+     "museUID": "130",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.saxophone.alto"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "130",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "4-horn|alto-saxophone|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "4-horn|tenor-saxophone|1": {
+   "volumeDb": 0,
+   "balance": 0.05,
+   "aux": [
+    0.2,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Woodwinds",
+     "museName": "Tenor Sax",
+     "musePack": "Muse Woodwinds",
+     "museUID": "131",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.saxophone.tenor"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "131",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "4-horn|tenor-saxophone|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "4-horn|trombone|1": {
+   "volumeDb": 2.700000047683716,
+   "balance": 0,
+   "aux": [
+    0.06,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Brass",
+     "museName": "Trombone",
+     "musePack": "Muse Brass",
+     "museUID": "112",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.trombone"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "112",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "4-horn|trombone|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "4-horn|bb-bass-clarinet|1": {
+   "volumeDb": 2,
+   "balance": 0.0,
+   "aux": [
+    0.1,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Woodwinds",
+     "museName": "Bass Clarinet",
+     "musePack": "Muse Woodwinds",
+     "museUID": "128",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.clarinet.bass:in_b_flat"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "128",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "4-horn|bb-bass-clarinet|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "5-horn|bb-trumpet|1": {
+   "volumeDb": -6,
+   "balance": -0.05,
+   "aux": [
+    0.3,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "playbackSetupData": "last.last.last",
+     "presetBank": "0",
+     "presetName": "Trumpet",
+     "presetProgram": "56",
+     "soundFontName": "MS Basic"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "MS Basic\\0\\56",
+    "type": "fluid_soundfont",
+    "vendor": "Fluid"
+   }
+  },
+  "5-horn|bb-trumpet|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "5-horn|bb-trumpet|2": {
+   "volumeDb": -6,
+   "balance": 0.05,
+   "aux": [
+    0.3,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "playbackSetupData": "last.last.last",
+     "presetBank": "0",
+     "presetName": "Trumpet",
+     "presetProgram": "56",
+     "soundFontName": "MS Basic"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "MS Basic\\0\\56",
+    "type": "fluid_soundfont",
+    "vendor": "Fluid"
+   }
+  },
+  "5-horn|bb-trumpet|2|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "5-horn|alto-saxophone|1": {
+   "volumeDb": 0,
+   "balance": -0.05,
+   "aux": [
+    0.2,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Woodwinds",
+     "museName": "Alto Sax",
+     "musePack": "Muse Woodwinds",
+     "museUID": "130",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.saxophone.alto"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "130",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "5-horn|alto-saxophone|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "5-horn|tenor-saxophone|1": {
+   "volumeDb": 0,
+   "balance": 0.05,
+   "aux": [
+    0.2,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Woodwinds",
+     "museName": "Tenor Sax",
+     "musePack": "Muse Woodwinds",
+     "museUID": "131",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.saxophone.tenor"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "131",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "5-horn|tenor-saxophone|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "5-horn|trombone|1": {
+   "volumeDb": 2.700000047683716,
+   "balance": 0,
+   "aux": [
+    0.06,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Brass",
+     "museName": "Trombone",
+     "musePack": "Muse Brass",
+     "museUID": "112",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.trombone"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "112",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "5-horn|trombone|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "5-horn|bb-bass-clarinet|1": {
+   "volumeDb": 2,
+   "balance": 0.0,
+   "aux": [
+    0.1,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Woodwinds",
+     "museName": "Bass Clarinet",
+     "musePack": "Muse Woodwinds",
+     "museUID": "128",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.clarinet.bass:in_b_flat"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "128",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "5-horn|bb-bass-clarinet|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "6-horn|bb-trumpet|1": {
+   "volumeDb": -6,
+   "balance": -0.05,
+   "aux": [
+    0.3,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "playbackSetupData": "last.last.last",
+     "presetBank": "0",
+     "presetName": "Trumpet",
+     "presetProgram": "56",
+     "soundFontName": "MS Basic"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "MS Basic\\0\\56",
+    "type": "fluid_soundfont",
+    "vendor": "Fluid"
+   }
+  },
+  "6-horn|bb-trumpet|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "6-horn|bb-trumpet|2": {
+   "volumeDb": -6,
+   "balance": 0.05,
+   "aux": [
+    0.3,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "playbackSetupData": "last.last.last",
+     "presetBank": "0",
+     "presetName": "Trumpet",
+     "presetProgram": "56",
+     "soundFontName": "MS Basic"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "MS Basic\\0\\56",
+    "type": "fluid_soundfont",
+    "vendor": "Fluid"
+   }
+  },
+  "6-horn|bb-trumpet|2|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "6-horn|bb-clarinet|1": {
+   "volumeDb": 0,
+   "balance": 0.0,
+   "aux": [
+    0.2,
+    0.3
+   ],
+   "in": "auto"
+  },
+  "6-horn|bb-clarinet|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "6-horn|alto-saxophone|1": {
+   "volumeDb": 0,
+   "balance": 0.0,
+   "aux": [
+    0.2,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Woodwinds",
+     "museName": "Alto Sax",
+     "musePack": "Muse Woodwinds",
+     "museUID": "130",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.saxophone.alto"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "130",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "6-horn|alto-saxophone|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "6-horn|tenor-saxophone|1": {
+   "volumeDb": 0,
+   "balance": -0.05,
+   "aux": [
+    0.2,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Woodwinds",
+     "museName": "Tenor Sax",
+     "musePack": "Muse Woodwinds",
+     "museUID": "131",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.saxophone.tenor"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "131",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "6-horn|tenor-saxophone|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "6-horn|trombone|1": {
+   "volumeDb": 2.700000047683716,
+   "balance": 0,
+   "aux": [
+    0.06,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Brass",
+     "museName": "Trombone",
+     "musePack": "Muse Brass",
+     "museUID": "112",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.trombone"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "112",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "6-horn|trombone|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "6-horn|soprano-saxophone|1": {
+   "volumeDb": 0,
+   "balance": 0.0,
+   "aux": [
+    0.2,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Woodwinds",
+     "museName": "Soprano Sax",
+     "musePack": "Muse Woodwinds",
+     "museUID": "129",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.saxophone.soprano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "129",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "6-horn|soprano-saxophone|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "6-horn|tenor-saxophone|2": {
+   "volumeDb": 0,
+   "balance": 0.05,
+   "aux": [
+    0.2,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Woodwinds",
+     "museName": "Tenor Sax",
+     "musePack": "Muse Woodwinds",
+     "museUID": "131",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.saxophone.tenor"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "131",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "6-horn|tenor-saxophone|2|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "6-horn|bb-bass-clarinet|1": {
+   "volumeDb": 2,
+   "balance": 0.0,
+   "aux": [
+    0.1,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Woodwinds",
+     "museName": "Bass Clarinet",
+     "musePack": "Muse Woodwinds",
+     "museUID": "128",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.clarinet.bass:in_b_flat"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "128",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "6-horn|bb-bass-clarinet|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "6-horn|flute|1": {
+   "volumeDb": 0,
+   "balance": 0.0,
+   "aux": [
+    0.4,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Woodwinds",
+     "museName": "Flute 1",
+     "musePack": "Muse Woodwinds",
+     "museUID": "118",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.flute.primary"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "118",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "7-horn|bb-trumpet|1": {
+   "volumeDb": -6,
+   "balance": -0.05,
+   "aux": [
+    0.3,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "playbackSetupData": "last.last.last",
+     "presetBank": "0",
+     "presetName": "Trumpet",
+     "presetProgram": "56",
+     "soundFontName": "MS Basic"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "MS Basic\\0\\56",
+    "type": "fluid_soundfont",
+    "vendor": "Fluid"
+   }
+  },
+  "7-horn|bb-trumpet|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "7-horn|bb-trumpet|2": {
+   "volumeDb": -6,
+   "balance": 0.05,
+   "aux": [
+    0.3,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "playbackSetupData": "last.last.last",
+     "presetBank": "0",
+     "presetName": "Trumpet",
+     "presetProgram": "56",
+     "soundFontName": "MS Basic"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "MS Basic\\0\\56",
+    "type": "fluid_soundfont",
+    "vendor": "Fluid"
+   }
+  },
+  "7-horn|bb-trumpet|2|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "7-horn|bb-clarinet|1": {
+   "volumeDb": 0,
+   "balance": 0.0,
+   "aux": [
+    0.2,
+    0.3
+   ],
+   "in": "auto"
+  },
+  "7-horn|bb-clarinet|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "7-horn|alto-saxophone|1": {
+   "volumeDb": 0,
+   "balance": 0.0,
+   "aux": [
+    0.2,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Woodwinds",
+     "museName": "Alto Sax",
+     "musePack": "Muse Woodwinds",
+     "museUID": "130",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.saxophone.alto"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "130",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "7-horn|alto-saxophone|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "7-horn|tenor-saxophone|1": {
+   "volumeDb": 0,
+   "balance": -0.05,
+   "aux": [
+    0.2,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Woodwinds",
+     "museName": "Tenor Sax",
+     "musePack": "Muse Woodwinds",
+     "museUID": "131",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.saxophone.tenor"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "131",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "7-horn|tenor-saxophone|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "7-horn|trombone|1": {
+   "volumeDb": 2.700000047683716,
+   "balance": 0,
+   "aux": [
+    0.06,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Brass",
+     "museName": "Trombone",
+     "musePack": "Muse Brass",
+     "museUID": "112",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.trombone"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "112",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "7-horn|trombone|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "7-horn|bass-trombone|1": {
+   "volumeDb": 2.700000047683716,
+   "balance": 0.0,
+   "aux": [
+    0.06,
+    0.3
+   ],
+   "in": "auto"
+  },
+  "7-horn|bass-trombone|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "7-horn|soprano-saxophone|1": {
+   "volumeDb": 0,
+   "balance": 0.0,
+   "aux": [
+    0.2,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Woodwinds",
+     "museName": "Soprano Sax",
+     "musePack": "Muse Woodwinds",
+     "museUID": "129",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.saxophone.soprano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "129",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "7-horn|soprano-saxophone|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "7-horn|tenor-saxophone|2": {
+   "volumeDb": 0,
+   "balance": 0.05,
+   "aux": [
+    0.2,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Woodwinds",
+     "museName": "Tenor Sax",
+     "musePack": "Muse Woodwinds",
+     "museUID": "131",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.saxophone.tenor"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "131",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "7-horn|tenor-saxophone|2|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "7-horn|flute|1": {
+   "volumeDb": 0,
+   "balance": 0.0,
+   "aux": [
+    0.4,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Woodwinds",
+     "museName": "Flute 1",
+     "musePack": "Muse Woodwinds",
+     "museUID": "118",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.flute.primary"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "118",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "7-horn|bb-bass-clarinet|1": {
+   "volumeDb": 2,
+   "balance": 0.0,
+   "aux": [
+    0.1,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Woodwinds",
+     "museName": "Bass Clarinet",
+     "musePack": "Muse Woodwinds",
+     "museUID": "128",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.clarinet.bass:in_b_flat"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "128",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "7-horn|bb-bass-clarinet|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "2-horn-any|c-trumpet|1": {
+   "volumeDb": -6,
+   "balance": -0.03,
+   "aux": [
+    0.29,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "playbackSetupData": "last.last.last",
+     "presetBank": "0",
+     "presetName": "Trumpet",
+     "presetProgram": "56",
+     "soundFontName": "MS Basic"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "MS Basic\\0\\56",
+    "type": "fluid_soundfont",
+    "vendor": "Fluid"
+   }
+  },
+  "2-horn-any|c-trumpet|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "2-horn-any|trombone|1": {
+   "volumeDb": 1.2999999523162842,
+   "balance": 0.03,
+   "aux": [
+    0.2,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Woodwinds",
+     "museName": "Tenor Sax",
+     "musePack": "Muse Woodwinds",
+     "museUID": "131",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.saxophone.tenor"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "131",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "2-horn-any|trombone|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "3-horn-any|c-trumpet|1": {
+   "volumeDb": -6,
+   "balance": 0,
+   "aux": [
+    0.3,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "playbackSetupData": "last.last.last",
+     "presetBank": "0",
+     "presetName": "Trumpet",
+     "presetProgram": "56",
+     "soundFontName": "MS Basic"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "MS Basic\\0\\56",
+    "type": "fluid_soundfont",
+    "vendor": "Fluid"
+   }
+  },
+  "3-horn-any|c-trumpet|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "3-horn-any|flute|1": {
+   "volumeDb": 0,
+   "balance": 0.0,
+   "aux": [
+    0.4,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Woodwinds",
+     "museName": "Flute 1",
+     "musePack": "Muse Woodwinds",
+     "museUID": "118",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.flute.primary"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "118",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "3-horn-any|flute|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "3-horn-any|c-trumpet|2": {
+   "volumeDb": -5.300000190734863,
+   "balance": -0.05,
+   "aux": [
+    0.2,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Woodwinds",
+     "museName": "Alto Sax",
+     "musePack": "Muse Woodwinds",
+     "museUID": "130",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.saxophone.alto"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "130",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "3-horn-any|c-trumpet|2|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "3-horn-any|trombone|1": {
+   "volumeDb": -2,
+   "balance": 0.05,
+   "aux": [
+    0.2,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Woodwinds",
+     "museName": "Tenor Sax",
+     "musePack": "Muse Woodwinds",
+     "museUID": "131",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.saxophone.tenor"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "131",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "3-horn-any|trombone|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "rhythm|electric-guitar|1": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.4,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Guitars Vol 1",
+     "museName": "Electric LP - Clean",
+     "musePack": "Muse Guitars Vol. 1",
+     "museUID": "13014",
+     "museVendorName": "Muse",
+     "playbackSetupData": "strings.guitar.plucked:electric"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "13014",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "rhythm|electric-guitar|1|chords": {
+   "volumeDb": -5.300000190734863,
+   "balance": -0.11,
+   "aux": [
+    0.22,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Guitars Vol 1",
+     "museName": "Electric SC - Clean",
+     "musePack": "Muse Guitars Vol. 1",
+     "museUID": "13017",
+     "museVendorName": "Muse",
+     "playbackSetupData": "strings.guitar.plucked:electric"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "13017",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": false
+  },
+  "rhythm|piano|1": {
+   "volumeDb": -1.2999999523162842,
+   "balance": 0,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "rhythm|piano|1|chords": {
+   "volumeDb": -5.300000190734863,
+   "balance": 0.17,
+   "aux": [
+    0.15,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Keys",
+     "museName": "Grand Piano",
+     "musePack": "Muse Keys",
+     "museUID": "167",
+     "museVendorName": "Muse",
+     "playbackSetupData": "keyboards.piano"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "167",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": false
+  },
+  "rhythm|bass-guitar|1": {
+   "volumeDb": -2.700000047683716,
+   "balance": 0,
+   "aux": [
+    0.04,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Guitars Vol 1",
+     "museName": "Electric Bass",
+     "musePack": "Muse Guitars Vol. 1",
+     "museUID": "13013",
+     "museVendorName": "Muse",
+     "playbackSetupData": "strings.bass_guitar.plucked:electric"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "13013",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "rhythm|bass-guitar|1|chords": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.4,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Guitars Vol 1",
+     "museName": "Acoustic Nylon",
+     "musePack": "Muse Guitars Vol. 1",
+     "museUID": "13010",
+     "museVendorName": "Muse",
+     "playbackSetupData": "strings.guitar.plucked:acoustic:nylon"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "13010",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "rhythm|drumset|1": {
+   "volumeDb": -7.300000190734863,
+   "balance": 0,
+   "aux": [
+    0.14,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Percussion",
+     "museName": "GM Drum Kit",
+     "musePack": "Muse Percussion",
+     "museUID": "188",
+     "museVendorName": "Muse",
+     "playbackSetupData": "percussions.synthesizer.percussive:electric"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "188",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "rhythm|congas|1": {
+   "volumeDb": 0,
+   "balance": 0,
+   "aux": [
+    0.1,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Percussion",
+     "museName": "Congas",
+     "musePack": "Muse Percussion",
+     "museUID": "181",
+     "museVendorName": "Muse",
+     "playbackSetupData": "percussions.conga"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "181",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   },
+   "mute": true
+  },
+  "6-horn|alto-saxophone|1|1ten": {
+   "volumeDb": 0,
+   "balance": -0.05,
+   "aux": [
+    0.2,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Woodwinds",
+     "museName": "Alto Sax",
+     "musePack": "Muse Woodwinds",
+     "museUID": "130",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.saxophone.alto"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "130",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "6-horn|tenor-saxophone|1|1ten": {
+   "volumeDb": 0,
+   "balance": 0.05,
+   "aux": [
+    0.2,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Woodwinds",
+     "museName": "Tenor Sax",
+     "musePack": "Muse Woodwinds",
+     "museUID": "131",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.saxophone.tenor"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "131",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "7-horn|alto-saxophone|1|1ten": {
+   "volumeDb": 0,
+   "balance": -0.05,
+   "aux": [
+    0.2,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Woodwinds",
+     "museName": "Alto Sax",
+     "musePack": "Muse Woodwinds",
+     "museUID": "130",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.saxophone.alto"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "130",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  },
+  "7-horn|tenor-saxophone|1|1ten": {
+   "volumeDb": 0,
+   "balance": 0.05,
+   "aux": [
+    0.2,
+    0.3
+   ],
+   "in": {
+    "attributes": {
+     "museCategory": "Muse Woodwinds",
+     "museName": "Tenor Sax",
+     "musePack": "Muse Woodwinds",
+     "museUID": "131",
+     "museVendorName": "Muse",
+     "playbackSetupData": "winds.saxophone.tenor"
+    },
+    "hasNativeEditorSupport": false,
+    "id": "131",
+    "type": "muse_sampler_sound_pack",
+    "vendor": "MuseSounds"
+   }
+  }
+ }
+}
