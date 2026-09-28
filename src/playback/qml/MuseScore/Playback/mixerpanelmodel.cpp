@@ -195,6 +195,11 @@ void MixerPanelModel::loadItems()
     }
     for (auto it = instrumentTrackIdMap.cbegin(); it != instrumentTrackIdMap.cend(); ++it) {
         if (notationPlayback()->isChordSymbolsTrack(it->first)) {
+            // StarScore Studio: a staff's chord-symbol track follows that instrument's visibility
+            const Part* part = masterNotationParts()->part(it->first.partId);
+            if (part && !part->show()) {
+                continue;
+            }
             addInstrumentTrack(it->first);
         }
     }
