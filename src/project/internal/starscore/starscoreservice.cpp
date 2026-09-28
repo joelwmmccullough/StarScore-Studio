@@ -1633,31 +1633,34 @@ void StarScoreService::saveStyleSettings(const StyleSettings& settings)
     }
 }
 
-//! Copies the bundled Starsign 2.0 style next to the settings and makes it the default
-//! part-score style. Done once per bundled version, so a default chosen later is kept.
+//! Copies the bundled Starsign style next to the settings and makes it the default part-score style.
+//! Done once per bundled version. A default the user chose themselves (not an older bundled one) is kept.
 void StarScoreService::installBuiltinDefaultStyle()
 {
-    static const int BUILTIN_STYLE_VERSION = 1;
+    static const int BUILTIN_STYLE_VERSION = 2;   // 1 = Starsign 2.0, 2 = Starsign 2.1
 
     const QString dir = globalConfiguration()->userAppDataPath().appendingComponent("StarScoreStyles").toQString();
-    const QString target = dir + "/Starsign 2.0.mss";
+    const QString target = dir + "/Starsign 2.1.mss";
 
     StyleSettings settings = loadStyleSettings();
-    const bool firstInstall = settings.builtinStyleVersion < BUILTIN_STYLE_VERSION;
-    if (!firstInstall && QFileInfo::exists(target)) {
+    const bool newVersion = settings.builtinStyleVersion < BUILTIN_STYLE_VERSION;
+    if (!newVersion && QFileInfo::exists(target)) {
         return;
     }
 
     QDir().mkpath(dir);
     QFile::remove(target);
-    if (!QFile::copy(":/resources/starscore/Starsign_2.0.mss", target)) {
+    if (!QFile::copy(":/resources/starscore/Starsign_2.1.mss", target)) {
         LOGE() << "Could not install the built-in StarScore style";
         return;
     }
     QFile::setPermissions(target, QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ReadGroup | QFileDevice::ReadOther);
 
-    if (firstInstall) {
-        settings.defaultStyle = target;
+    if (newVersion) {
+        const bool usingBundled = settings.defaultStyle.isEmpty() || settings.defaultStyle.startsWith(dir + "/Starsign ");
+        if (usingBundled) {
+            settings.defaultStyle = target;
+        }
         settings.builtinStyleVersion = BUILTIN_STYLE_VERSION;
         saveStyleSettings(settings);
     }
