@@ -463,6 +463,19 @@ class ChordList : public std::map<int, ChordDescription>
     OBJECT_ALLOCATOR(engraving, ChordList)
 
 public:
+    //! StarScore: whether the chord file defines a token with this name
+    bool hasToken(const String& name) const
+    {
+        for (const ChordToken& ct : chordTokenList) {
+            for (const String& n : ct.names) {
+                if (n == name) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     std::vector<ChordFont> fonts;
     std::vector<RenderActionPtr > renderListRoot;
     std::vector<RenderActionPtr > renderListFunction;

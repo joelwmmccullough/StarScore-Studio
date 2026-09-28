@@ -1661,11 +1661,26 @@ const std::vector<RenderActionPtr >& ParsedChord::renderList(const ChordList* cl
         std::vector<RenderActionPtr > rl;
         std::vector<ChordToken> definedTokens;
         bool found = false;
+
+        // StarScore: a minor quality followed by a major seventh (m^7, -Maj7, mΔ7) looks up the chord
+        // file's "starscore-minmaj" token, so it can print "m" instead of the minor dash there
+        String lookup = n;
+        if (tok.tokenClass == ChordTokenClass::QUALITY
+            && (n == u"m" || n == u"mi" || n == u"min" || n == u"minor" || n == u"-")) {
+            const auto nextIt = std::next(tokIt);
+            if (nextIt != m_tokenList.end() && !nextIt->names.empty()) {
+                static const std::set<String> MAJOR_SEVENTH { u"^", u"t", u"M", u"Ma", u"Maj", u"ma", u"maj", u"major", u"\u0394" };
+                if (MAJOR_SEVENTH.count(nextIt->names.front()) && cl && cl->hasToken(u"starscore-minmaj")) {
+                    lookup = u"starscore-minmaj";
+                }
+            }
+        }
+
         // potential definitions for token
         if (cl) {
             for (const ChordToken& ct : cl->chordTokenList) {
                 for (const String& ctn : ct.names) {
-                    if (ctn == n) {
+                    if (ctn == lookup) {
                         definedTokens.push_back(ct);
                     }
                 }
