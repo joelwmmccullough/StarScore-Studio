@@ -1642,9 +1642,14 @@ const std::vector<RenderActionPtr >& ParsedChord::renderList(const ChordList* cl
     bool adjust = cl ? cl->autoAdjust() : false;
     bool firstModifierToken = true;
     bool closingParenPending = false;
+    bool starscoreSkipToken = false;   // the major-seventh token already drawn as part of a minor-major symbol
     for (auto tokIt = m_tokenList.begin(); tokIt != m_tokenList.end(); tokIt++) {
         const ChordToken& tok = *tokIt;
         const String n = tok.names.front();
+        if (starscoreSkipToken) {
+            starscoreSkipToken = false;
+            continue;
+        }
         if ((n == u"/" || n == u"," || n == u"\\") && stackSusOrAdd) {
             continue;
         }
@@ -1672,6 +1677,7 @@ const std::vector<RenderActionPtr >& ParsedChord::renderList(const ChordList* cl
                 static const std::set<String> MAJOR_SEVENTH { u"^", u"t", u"M", u"Ma", u"Maj", u"ma", u"maj", u"major", u"\u0394" };
                 if (MAJOR_SEVENTH.count(nextIt->names.front()) && cl && cl->hasToken(u"starscore-minmaj")) {
                     lookup = u"starscore-minmaj";
+                    starscoreSkipToken = true;
                 }
             }
         }

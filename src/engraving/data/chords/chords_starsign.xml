@@ -35,6 +35,16 @@
     <sym code="0xE87C" name="dslash"/>
   </font>
 
+  <!-- StarScore Jost's own triangles: major seventh (U+E000) and minor-major seventh, a triangle with a bar
+       through the middle (U+E001); named here so they don't depend on the style's chord font -->
+  <font family="StarScore Jost">
+    <sym code="0xE000" name="tri"/>
+    <sym code="0xE001" name="trimin"/>
+  </font>
+  <font class="modifier" family="StarScore Jost">
+    <sym code="0xE000" name="stri"/>
+  </font>
+
   <font class="extension">
     <sym value="0" name="e0"/>
     <sym value="1" name="e1"/>
@@ -119,10 +129,10 @@
     <render>sc:0.89 m:0.03:-0.22 bb m:0.02:0.22 sc:1.123596</render>
     </token>
 
-  <!-- minor-major seventh: "m" rather than the dash, so it can't be misread -->
+  <!-- minor-major seventh: one symbol, a triangle with a bar through it (replaces m^ / -^) -->
   <token class="quality">
     <name>starscore-minmaj</name>
-    <render>m:0.05:0 sc:0.71 m:0:-0.5 m m:0:0.5 sc:1.408451</render>
+    <render>m:0.05:0 sc:0.71 m:0:-0.5 trimin m:0:0.5 sc:1.408451</render>
     </token>
   <token class="quality">
     <name>-</name>
@@ -183,7 +193,7 @@
   <token class="quality">
     <name>^</name>
     <name>t</name>
-    <render>m:0.05:0 sc:0.71 m:0:-0.5 triangle m:0:0.5 sc:1.408451</render>
+    <render>m:0.05:0 sc:0.71 m:0:-0.5 tri m:0:0.5 sc:1.408451</render>
     </token>
   <token class="quality">
     <name>o</name>
@@ -427,11 +437,11 @@
     </token>
   <token class="modifier">
     <name>^</name>
-    <render>m:0.02:0 striangle m:0.02:0</render>
+    <render>m:0.02:0 stri m:0.02:0</render>
     </token>
   <token class="modifier">
     <name>t</name>
-    <render>m:0.02:0 striangle m:0.02:0</render>
+    <render>m:0.02:0 stri m:0.02:0</render>
     </token>
 
   <renderRoot>:n :a</renderRoot>
