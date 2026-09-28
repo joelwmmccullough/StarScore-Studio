@@ -35,7 +35,7 @@ SOURCES = [
     (1, "Bravura", "fonts/bravura/BravuraText.otf", 0xE873, 0xE874),
     (2, "Petaluma", "fonts/petaluma/PetalumaText.otf", 0xE873, 0xE874),
     (3, "Leland", "fonts/leland/LelandText.otf", 0xE873, 0xE874),
-    (4, "MuseJazz", "fonts/musejazz/MuseJazzText.otf", 0xE18A, 0xE181),
+    (4, "MuseJazz", "fonts/musejazz/MuseJazzText.otf", 0xE18A, 0x2D),
     (5, "Finale Maestro", "fonts/finalemaestro/FinaleMaestroText-Regular.otf", 0xE873, 0xE874),
     (6, "Finale Broadway", "fonts/finalebroadway/FinaleBroadwayText.otf", 0xE873, None),
 ]
