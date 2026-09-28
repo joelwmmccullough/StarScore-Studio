@@ -20,11 +20,11 @@ namespace mu::project::starscore {
 double houseStaffHeightMm(const mu::engraving::Score* score, bool partBook);
 
 //! Applies all house settings. Must be called inside a command (prepareChanges/commitChanges).
-void applyHouseStyle(mu::engraving::Score* score, bool partBook);
+void applyHouseStyle(mu::engraving::Score* score, bool partBook, const QString& version);
 
-//! Prints the copyright text (where the version goes) at the bottom of every page, not just the first.
-//! Must be called inside a command.
-void applyVersionFooter(mu::engraving::Score* score);
+//! Writes "Version x.y.z" into the footer text (Starsign 2.2 has "Version 1.0.0" above $C), replacing the
+//! version already there, or adding it on a line above the centre footer. Must be called inside a command.
+void applyVersionFooter(mu::engraving::Score* score, const QString& version);
 
 //! "Version 4.0.1" <-> "4.0.1"
 QString versionFromCopyright(const QString& copyright);   // empty when there is none

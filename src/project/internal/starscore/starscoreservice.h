@@ -124,6 +124,7 @@ public:
         std::vector<StarScoreSection> sections;
         std::vector<StarScoreArrangement> arrangements;
         std::vector<StarScoreSolo> solos;
+        QString version;   // "4.0.1"; printed in the footer
     };
 
     // (de)serialisation of the "starscore" meta tag; public for tests

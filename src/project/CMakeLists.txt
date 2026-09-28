@@ -141,10 +141,10 @@ if (MUE_BUILD_PROJECT_QML)
     add_subdirectory(qml/MuseScore/Project)
 endif()
 
-# StarScore: built-in default part-score style (Starsign 2.1)
+# StarScore: built-in default part-score style (Starsign 2.2)
 qt_add_resources(project project_starscore_resources
     PREFIX
         /
     FILES
-        resources/starscore/Starsign_2.1.mss
+        resources/starscore/Starsign_2.2.mss
 )

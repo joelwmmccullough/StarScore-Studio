@@ -200,6 +200,8 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
         }
     }
 
+    data.version = root.value("scoreVersion").toString();
+
     for (const QJsonValue& v : root.value("arrangements").toArray()) {
         const QJsonObject o = v.toObject();
         StarScoreArrangement a;
@@ -262,6 +264,9 @@ QString StarScoreService::toJson(const Data& data)
     root["version"] = 1;
     root["sections"] = sections;
     root["arrangements"] = arrangements;
+    if (!data.version.isEmpty()) {
+        root["scoreVersion"] = data.version;
+    }
     if (!solos.isEmpty()) {
         root["solos"] = solos;
     }
@@ -1681,10 +1686,10 @@ void StarScoreService::saveStyleSettings(const StyleSettings& settings)
 //! Done once per bundled version. A default the user chose themselves (not an older bundled one) is kept.
 void StarScoreService::installBuiltinDefaultStyle()
 {
-    static const int BUILTIN_STYLE_VERSION = 2;   // 1 = Starsign 2.0, 2 = Starsign 2.1
+    static const int BUILTIN_STYLE_VERSION = 3;   // 1 = Starsign 2.0, 2 = 2.1, 3 = 2.2
 
     const QString dir = globalConfiguration()->userAppDataPath().appendingComponent("StarScoreStyles").toQString();
-    const QString target = dir + "/Starsign 2.1.mss";
+    const QString target = dir + "/Starsign 2.2.mss";
 
     StyleSettings settings = loadStyleSettings();
     const bool newVersion = settings.builtinStyleVersion < BUILTIN_STYLE_VERSION;
@@ -1694,7 +1699,7 @@ void StarScoreService::installBuiltinDefaultStyle()
 
     QDir().mkpath(dir);
     QFile::remove(target);
-    if (!QFile::copy(":/resources/starscore/Starsign_2.1.mss", target)) {
+    if (!QFile::copy(":/resources/starscore/Starsign_2.2.mss", target)) {
         LOGE() << "Could not install the built-in StarScore style";
         return;
     }
@@ -1744,6 +1749,7 @@ int StarScoreService::applyStyles(const QStringList& partIds)
 
     const StyleSettings settings = loadStyleSettings();
     const Data data = load();
+    const QString version = scoreVersion();
 
     auto usable = [](const QString& path) {
         return !path.isEmpty() && QFileInfo::exists(path);
@@ -1763,7 +1769,7 @@ int StarScoreService::applyStyles(const QStringList& partIds)
         }
         engraving::Score* score = n->elements()->msScore();
         n->undoStack()->prepareChanges(TranslatableString::untranslatable("StarScore house style"));
-        starscore::applyHouseStyle(score, partBook);
+        starscore::applyHouseStyle(score, partBook, version);
         n->undoStack()->commitChanges();
         n->notationChanged().notify();
         return true;
@@ -2614,7 +2620,7 @@ void StarScoreService::syncArrangementScores()
                 n->style()->loadStyle(settings.defaultStyle, true);
             }
             n->undoStack()->prepareChanges(TranslatableString::untranslatable("StarScore house style"));
-            starscore::applyHouseStyle(n->elements()->msScore(), false);
+            starscore::applyHouseStyle(n->elements()->msScore(), false, scoreVersion());
             n->undoStack()->commitChanges();
         }
     }

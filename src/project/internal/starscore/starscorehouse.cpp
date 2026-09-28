@@ -62,26 +62,36 @@ static void starscoreSet(Score* score, Sid id, const PropertyValue& value)
     }
 }
 
-void applyVersionFooter(Score* score)
+void applyVersionFooter(Score* score, const QString& version)
 {
-    if (!score) {
+    if (!score || version.isEmpty()) {
         return;
+    }
+    static const QRegularExpression re("Version\\s+\\d+\\.\\d+\\.\\d+", QRegularExpression::CaseInsensitiveOption);
+    const QString text = "Version " + version;
+
+    bool found = false;
+    for (Sid id : { Sid::oddFooterL, Sid::oddFooterC, Sid::oddFooterR, Sid::evenFooterL, Sid::evenFooterC, Sid::evenFooterR }) {
+        QString v = score->style().styleSt(id).toQString();
+        if (re.match(v).hasMatch()) {
+            v.replace(re, text);
+            starscoreSet(score, id, String::fromQString(v));
+            found = true;
+        }
+    }
+    if (!found) {
+        const QString odd = score->style().styleSt(Sid::oddFooterC).toQString();
+        starscoreSet(score, Sid::oddFooterC, String::fromQString(odd.isEmpty() ? text : text + "\n" + odd));
+        if (score->style().styleB(Sid::footerOddEven)) {
+            const QString even = score->style().styleSt(Sid::evenFooterC).toQString();
+            starscoreSet(score, Sid::evenFooterC, String::fromQString(even.isEmpty() ? text : text + "\n" + even));
+        }
     }
     starscoreSet(score, Sid::showFooter, true);
     starscoreSet(score, Sid::footerFirstPage, true);
-    // $c = copyright on every page ($C is the first page only)
-    for (Sid id : { Sid::oddFooterC, Sid::evenFooterC }) {
-        String v = score->style().styleSt(id);
-        if (v.contains(u"$C")) {
-            v.replace(u"$C", u"$c");
-        } else if (!v.contains(u"$c")) {
-            v = v.isEmpty() ? String(u"$c") : v + u" $c";
-        }
-        starscoreSet(score, id, v);
-    }
 }
 
-void applyHouseStyle(Score* score, bool partBook)
+void applyHouseStyle(Score* score, bool partBook, const QString& version)
 {
     if (!score) {
         return;
@@ -106,8 +116,8 @@ void applyHouseStyle(Score* score, bool partBook)
     starscoreSet(score, Sid::chordModifierAdjust, -0.5);
     starscoreSet(score, Sid::chordDescriptionFile, String(u"chords_starsign.xml"));
 
-    // Version at the bottom of every page
-    applyVersionFooter(score);
+    // Version in the footer
+    applyVersionFooter(score, version);
 
     // Title frame on page 1: 15 sp tall
     MeasureBase* first = score->first();

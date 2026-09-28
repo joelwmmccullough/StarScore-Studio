@@ -513,12 +513,13 @@
     <oddHeaderR>$p</oddHeaderR>
     <showFooter>1</showFooter>
     <footerFirstPage>1</footerFirstPage>
-    <footerOddEven>1</footerOddEven>
+    <footerOddEven>0</footerOddEven>
     <evenFooterL></evenFooterL>
-    <evenFooterC>$C</evenFooterC>
+    <evenFooterC>$c</evenFooterC>
     <evenFooterR></evenFooterR>
     <oddFooterL></oddFooterL>
-    <oddFooterC>$C</oddFooterC>
+    <oddFooterC>Version 1.0.0
+$C</oddFooterC>
     <oddFooterR></oddFooterR>
     <voltaPosAbove x="0" y="-3"/>
     <voltaHook>2.2</voltaHook>
@@ -994,7 +995,7 @@
     <dynamicsFrameBgColor r="255" g="255" b="255" a="0"/>
     <dynamicsPosition>center</dynamicsPosition>
     <expressionFontFace>Futura</expressionFontFace>
-    <expressionFontSize>9</expressionFontSize>
+    <expressionFontSize>8</expressionFontSize>
     <expressionLineSpacing>1</expressionLineSpacing>
     <expressionFontSpatiumDependent>1</expressionFontSpatiumDependent>
     <expressionFontStyle>2</expressionFontStyle>
@@ -1400,8 +1401,8 @@
     <headerFrameFgColor r="0" g="0" b="0" a="255"/>
     <headerFrameBgColor r="255" g="255" b="255" a="0"/>
     <headerPosition>center</headerPosition>
-    <footerFontFace>Petaluma Script</footerFontFace>
-    <footerFontSize>9</footerFontSize>
+    <footerFontFace>TT Modernoir VF Trial</footerFontFace>
+    <footerFontSize>11</footerFontSize>
     <footerLineSpacing>1</footerLineSpacing>
     <footerFontSpatiumDependent>0</footerFontSpatiumDependent>
     <footerFontStyle>0</footerFontStyle>
@@ -1416,7 +1417,7 @@
     <footerFrameBgColor r="255" g="255" b="255" a="0"/>
     <footerPosition>center</footerPosition>
     <copyrightFontFace>TT Modernoir Trial</copyrightFontFace>
-    <copyrightFontSize>9</copyrightFontSize>
+    <copyrightFontSize>11</copyrightFontSize>
     <copyrightLineSpacing>1</copyrightLineSpacing>
     <copyrightFontSpatiumDependent>0</copyrightFontSpatiumDependent>
     <copyrightFontStyle>0</copyrightFontStyle>

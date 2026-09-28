@@ -751,9 +751,14 @@ QString StarScoreService::scoreVersion() const
         return QString("1.0.0");
     }
     engraving::MasterScore* ms = project->masterNotation()->masterScore();
-    const QString fromScore = starscore::versionFromCopyright(ms->metaTag(u"copyright").toQString());
-    if (!fromScore.isEmpty()) {
-        return fromScore;
+    const Data data = loadFrom(ms);
+    if (!data.version.isEmpty()) {
+        return data.version;
+    }
+    // Earlier builds put it in the copyright text
+    const QString fromCopyright = starscore::versionFromCopyright(ms->metaTag(u"copyright").toQString());
+    if (!fromCopyright.isEmpty()) {
+        return fromCopyright;
     }
 
     const QString fileBase = QFileInfo(project->path().toQString()).completeBaseName();
@@ -776,27 +781,24 @@ void StarScoreService::setScoreVersion(const QString& version)
     IMasterNotationPtr master = project->masterNotation();
     engraving::MasterScore* ms = master->masterScore();
 
-    const String text = String::fromQString(starscore::copyrightWithVersion(ms->metaTag(u"copyright").toQString(), version));
+    Data data = loadFrom(ms);
+    data.version = version;
+    storeTo(ms, data, project);
 
-    auto update = [&](INotationPtr n, engraving::Score* score) {
-        if (!score) {
+    auto update = [&](INotationPtr n) {
+        if (!n) {
             return;
         }
-        score->setMetaTag(u"copyright", text);
-        if (n) {
-            n->undoStack()->prepareChanges(TranslatableString::untranslatable("Version footer"));
-            starscore::applyVersionFooter(score);
-            n->undoStack()->commitChanges();
-            n->notationChanged().notify();
-        } else {
-            score->update();
-        }
+        n->undoStack()->prepareChanges(TranslatableString::untranslatable("Version"));
+        starscore::applyVersionFooter(n->elements()->msScore(), version);
+        n->undoStack()->commitChanges();
+        n->notationChanged().notify();
     };
 
-    update(master->notation(), ms);
+    update(master->notation());
     for (const IExcerptNotationPtr& e : master->excerpts()) {
-        if (e->isInited() && e->notation()) {
-            update(e->notation(), e->notation()->elements()->msScore());
+        if (e->isInited()) {
+            update(e->notation());
         }
     }
     project->markAsUnsaved();
