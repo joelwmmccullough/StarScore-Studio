@@ -5,6 +5,7 @@
  * let the user confirm them, optionally standardize the file, and save it as a new .starscore.
  */
 #include "starscoreservice.h"
+#include "starscoreengraving.h"
 
 #include <algorithm>
 #include <map>
@@ -20,6 +21,8 @@
 #include "engraving/dom/measure.h"
 #include "engraving/dom/segment.h"
 #include "engraving/dom/chord.h"
+#include "engraving/rw/xmlreader.h"
+#include "engraving/dom/select.h"
 
 #include "notation/inotationparts.h"
 #include "notation/iexcerptnotation.h"
@@ -353,6 +356,7 @@ Ret StarScoreService::applyImport(const std::map<QString, QString>& sectionByPar
         applyStyles();
     }
 
+    setImportedRhythmStatus();
     syncArrangementScores();
     m_changed.notify();
     return make_ok();
@@ -524,6 +528,77 @@ void StarScoreService::standardizeImported()
         }
         store(d);
     }
+
+    // Rhythm section in the usual order: keys, guitar, bass, drums, percussion (an electric piano takes the
+    // piano's place, a bass synth the bass guitar's)
+    static const QStringList ROLE_ORDER { "keys", "guitar", "bass", "drums", "percussion" };
+    const Data after = load();
+    for (const StarScoreSection& s : after.sections) {
+        if (s.templateKey != "rhythm" && s.templateKey != "bigband-rhythm") {
+            continue;
+        }
+        std::vector<engraving::Part*> current;
+        for (engraving::Part* p : ms->parts()) {
+            if (s.partIds.contains(idText(p))) {
+                current.push_back(p);
+            }
+        }
+        std::vector<engraving::Part*> wanted = current;
+        std::stable_sort(wanted.begin(), wanted.end(), [](const engraving::Part* a, const engraving::Part* b) {
+            auto rank = [](const engraving::Part* p) {
+                const int r = int(ROLE_ORDER.indexOf(importRhythmRole(p->instrumentId().toQString())));
+                return r < 0 ? 99 : r;
+            };
+            return rank(a) < rank(b);
+        });
+        if (wanted == current || wanted.size() < 2) {
+            continue;
+        }
+        // put each one right after the previous, starting from where the section begins
+        master->parts()->moveParts({ wanted.front()->id() }, current.front()->id(), INotationParts::InsertMode::Before);
+        for (size_t i = 1; i < wanted.size(); ++i) {
+            master->parts()->moveParts({ wanted[i]->id() }, wanted[i - 1]->id(), INotationParts::InsertMode::After);
+        }
+    }
+}
+
+void StarScoreService::setImportedRhythmStatus()
+{
+    engraving::MasterScore* ms = masterScore();
+    if (!ms) {
+        return;
+    }
+    Data data = load();
+    bool changed = false;
+    for (StarScoreSection& s : data.sections) {
+        if (s.templateKey != "rhythm" && s.templateKey != "bigband-rhythm") {
+            continue;
+        }
+        bool coreDone = true;          // guitar and bass written out
+        bool someUseLead = false;      // drums, percussion or keys not written out
+        bool anyCore = false;
+        for (const engraving::Part* p : ms->parts()) {
+            if (!s.partIds.contains(idText(p))) {
+                continue;
+            }
+            const QString role = importRhythmRole(p->instrumentId().toQString());
+            const bool unfinished = starscore::partLooksUnfinished(ms, p);
+            if (role == "guitar" || role == "bass") {
+                anyCore = true;
+                coreDone &= !unfinished;
+            } else if (unfinished) {
+                someUseLead = true;
+            }
+        }
+        // Guitar and bass finished, drums / percussion / keys (some of them) left to the lead sheet
+        if (anyCore && coreDone && someUseLead) {
+            s.status = StarScoreStatus::FinishedLeadSheetParts;
+            changed = true;
+        }
+    }
+    if (changed) {
+        store(data);
+    }
 }
 
 void StarScoreService::saveAsNewStarScore()
@@ -543,4 +618,78 @@ void StarScoreService::saveAsNewStarScore()
         project->setPath(dir.appendingComponent(base).appendingSuffix("starscore"));
     }
     m_changed.notify();
+}
+
+void StarScoreService::fillAnyHornsFromStandard(const StarScoreSection& anySection)
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    engraving::MasterScore* ms = masterScore();
+    if (!master || !ms || !ms->firstMeasure()) {
+        return;
+    }
+
+    // "3-horn-any" takes its music from "3-horn", "2-horn-any" from "2-horn"
+    const QString standardKey = QString(anySection.templateKey).remove("-any");
+    const Data data = load();
+    const StarScoreSection* standard = nullptr;
+    for (const StarScoreSection& s : data.sections) {
+        if (s.templateKey == standardKey && !s.partIds.isEmpty()) {
+            standard = &s;
+            break;
+        }
+    }
+    if (!standard) {
+        return;
+    }
+
+    auto partsInOrder = [&](const QStringList& ids) {
+        std::vector<engraving::Part*> out;
+        for (engraving::Part* p : ms->parts()) {
+            if (ids.contains(idText(p))) {
+                out.push_back(p);
+            }
+        }
+        return out;
+    };
+    const std::vector<engraving::Part*> sources = partsInOrder(standard->partIds);
+    const std::vector<engraving::Part*> chairs = partsInOrder(anySection.partIds);
+
+    // Chairs in order (Horn 1, Horn 2, Horn 3) take the standard section's parts in order (trumpet, alto, tenor);
+    // the flute stand-in for Horn 1 gets Horn 1's music
+    std::vector<std::pair<engraving::Part*, engraving::Part*> > copies;   // from, to
+    size_t next = 0;
+    for (engraving::Part* chair : chairs) {
+        if (chair->instrumentId() == u"flute") {
+            if (!sources.empty()) {
+                copies.emplace_back(sources.front(), chair);
+            }
+            continue;
+        }
+        if (next < sources.size()) {
+            copies.emplace_back(sources[next++], chair);
+        }
+    }
+    if (copies.empty()) {
+        return;
+    }
+
+    engraving::Segment* start = ms->firstMeasure()->first(engraving::SegmentType::ChordRest);
+    master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Fill Any Horns from the standard section"));
+    for (const auto& [from, to] : copies) {
+        if (from->staves().empty() || to->staves().empty()) {
+            continue;
+        }
+        const engraving::staff_idx_t src = from->staves().front()->idx();
+        const engraving::staff_idx_t dst = to->staves().front()->idx();
+        engraving::Selection sel(ms);
+        sel.setRange(start, nullptr, src, src + 1);
+        const ByteArray mime = sel.mimeData();
+        if (mime.empty()) {
+            continue;
+        }
+        engraving::XmlReader reader(mime);
+        ms->pasteStaff(reader, start, dst);
+    }
+    master->notation()->undoStack()->commitChanges();
+    master->notation()->notationChanged().notify();
 }

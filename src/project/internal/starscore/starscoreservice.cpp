@@ -967,6 +967,10 @@ RetVal<QString> StarScoreService::createSection(const QString& templateKey, cons
 
     applyStyles(section.partIds);
 
+    if (section.templateKey.endsWith("-horn-any")) {
+        fillAnyHornsFromStandard(section);
+    }
+
     if (!missing.isEmpty()) {
         LOGW() << "[starscore] skipped unknown instruments: " << missing.join(", ");
     }

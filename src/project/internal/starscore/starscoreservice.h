@@ -173,6 +173,9 @@ private:
     //! Sound, volume, pan, reverb and mute for each instrument, from the defaults in mixer_defaults.json
     void applyMixerDefaults(const QStringList& partIds);
     void standardizeImported();
+    void setImportedRhythmStatus();
+    //! A new "N-Horn Any" section starts with the music of the "N-Horn" section, chair by chair
+    void fillAnyHornsFromStandard(const StarScoreSection& anySection);
     //! Name the new parts, hide default-hidden parts/staves, make part books; returns the new section
     StarScoreSection finishNewParts(const std::vector<mu::engraving::Part*>& newParts,
                                     const std::vector<StarScoreInstrument>& instruments);

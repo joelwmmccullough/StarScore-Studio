@@ -409,3 +409,27 @@ QString checkRanges(const Score* score)
     return lines.join("\n");
 }
 }
+
+bool mu::project::starscore::partLooksUnfinished(const mu::engraving::Score* score, const mu::engraving::Part* part)
+{
+    using namespace mu::engraving;
+    if (!score || !part || part->staves().empty()) {
+        return false;
+    }
+    const track_idx_t first = part->startTrack();
+    const track_idx_t last = part->endTrack();
+    int bars = 0;
+    int withNotes = 0;
+    for (const Measure* m = score->firstMeasure(); m; m = m->nextMeasure()) {
+        ++bars;
+        bool found = false;
+        for (const Segment* seg = m->first(SegmentType::ChordRest); seg && !found; seg = seg->next(SegmentType::ChordRest)) {
+            for (track_idx_t t = first; t < last && !found; ++t) {
+                const EngravingItem* e = seg->element(t);
+                found = e && e->isChord();
+            }
+        }
+        withNotes += found ? 1 : 0;
+    }
+    return bars > 0 && withNotes * 5 < bars;
+}

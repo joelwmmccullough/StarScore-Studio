@@ -12,6 +12,7 @@
 namespace mu::engraving {
 class Score;
 class MasterScore;
+class Part;
 }
 
 namespace mu::project::starscore {
@@ -40,6 +41,9 @@ LayoutCopyResult copyLayout(const mu::engraving::Score* source, const std::vecto
 //! to the default colour. Works on the selected notes, or the whole score when nothing is selected.
 //! Must be called inside a command (startCmd/endCmd). Returns the number of notes changed.
 int colorNotes(mu::engraving::Score* score, bool colorize);
+
+//! True when the instrument has notes in fewer than a fifth of the bars (an empty or barely started part)
+bool partLooksUnfinished(const mu::engraving::Score* score, const mu::engraving::Part* part);
 
 //! Additive time signature, e.g. numerators {4,4,4,3} over 8: bars of 4/8, 4/8, 4/8, 3/8, repeating.
 //! The first bar shows "4+4+4+3 / 8"; the following changes are hidden. Runs from `start` to the end

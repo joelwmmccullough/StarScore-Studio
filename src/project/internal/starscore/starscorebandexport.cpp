@@ -297,8 +297,9 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
                 }
                 addFile("1 Rhythm", name, { pid }, false);
                 // "Finished, drums/percussion/keys use the lead sheet": only guitar and bass sheets ticked by default
+                // (a drums, percussion or keys sheet that is actually written out is still exported)
                 if (sec.status == StarScoreStatus::FinishedLeadSheetParts && role != "Guitar" && role != "Bass"
-                    && role != "Bass Synth") {
+                    && role != "Bass Synth" && starscore::partLooksUnfinished(ms, p)) {
                     plan.files.back().defaultUnchecked = true;
                 }
             }
