@@ -129,6 +129,15 @@ void PlaybackController::init()
 
     m_onlineSoundsController->regActions();
 
+    // StarScore Studio: switching "mute hidden instruments" on mutes them now; off unmutes the ones it muted
+    configuration()->muteHiddenInstrumentsChanged().onReceive(this, [this](bool mute) {
+        if (mute) {
+            applyHiddenInstrumentMutes();
+        } else {
+            releaseHiddenInstrumentMutes();
+        }
+    });
+
     globalContext()->currentNotationChanged().onNotify(this, [this]() {
         onNotationChanged();
     });
@@ -1702,7 +1711,9 @@ void PlaybackController::setNotation(notation::INotationPtr notation)
         m_notation->interaction()->selectionChanged().disconnect(this);
         m_notation->interaction()->textEditingEnded().disconnect(this);
         m_notation->soloMuteState()->trackSoloMuteStateChanged().disconnect(this);
+        m_notation->notationChanged().disconnect(this);
     }
+    m_hiddenAutoMuted.clear();
 
     m_notation = notation;
 
@@ -1720,6 +1731,13 @@ void PlaybackController::setNotation(notation::INotationPtr notation)
     }
 
     updateSoloMuteStates();
+    applyHiddenInstrumentMutes();
+
+    // StarScore Studio: sections are shown and hidden through the master score's parts, which doesn't always
+    // reach the part-changed notifications below, so check visibility after every change
+    m_notation->notationChanged().onNotify(this, [this]() {
+        applyHiddenInstrumentMutes();
+    });
 
     NotifyList<const Part*> partList = m_notation->parts()->partList();
 
@@ -1833,4 +1851,49 @@ muse::Progress PlaybackController::onlineSoundsProcessingProgress() const
 muse::audio::secs_t PlaybackController::playedTickToSecs(int tick) const
 {
     return secs_t(notationPlayback()->playedTickToSec(tick));
+}
+
+void PlaybackController::applyHiddenInstrumentMutes()
+{
+    if (!m_notation || !notationPlayback() || !configuration()->muteHiddenInstruments()) {
+        return;
+    }
+
+    for (const Part* part : m_notation->parts()->partList()) {
+        std::vector<InstrumentTrackId> ids;
+        for (const InstrumentTrackId& id : part->instrumentTrackIdList()) {
+            ids.push_back(id);
+        }
+        if (part->hasChordSymbol()) {
+            ids.push_back(notationPlayback()->chordSymbolsTrackId(part->id()));
+        }
+
+        const bool hidden = !part->show();
+        for (const InstrumentTrackId& id : ids) {
+            auto state = trackSoloMuteState(id);
+            if (hidden && !state.mute) {
+                state.mute = true;
+                setTrackSoloMuteState(id, state);
+                m_hiddenAutoMuted.insert(id);
+            } else if (!hidden && state.mute && m_hiddenAutoMuted.count(id)) {
+                state.mute = false;
+                setTrackSoloMuteState(id, state);
+                m_hiddenAutoMuted.erase(id);
+            } else if (!hidden) {
+                m_hiddenAutoMuted.erase(id);
+            }
+        }
+    }
+}
+
+void PlaybackController::releaseHiddenInstrumentMutes()
+{
+    for (const InstrumentTrackId& id : m_hiddenAutoMuted) {
+        auto state = trackSoloMuteState(id);
+        if (state.mute) {
+            state.mute = false;
+            setTrackSoloMuteState(id, state);
+        }
+    }
+    m_hiddenAutoMuted.clear();
 }

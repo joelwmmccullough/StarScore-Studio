@@ -22,6 +22,8 @@
 
 #pragma once
 
+#include <set>
+
 #include "modularity/ioc.h"
 #include "async/asyncable.h"
 #include "actions/iactionsdispatcher.h"
@@ -213,6 +215,10 @@ private:
     void setupSequencePlayer();
 
     void updateSoloMuteStates();
+    // StarScore Studio: mute every instrument (and its chord-symbol track) hidden in the score, whenever the
+    // "mute hidden instruments" setting is on; unmute the ones this muted once they are shown again
+    void applyHiddenInstrumentMutes();
+    void releaseHiddenInstrumentMutes();
     void updateAuxMuteStates();
 
     using TrackAddFinished = std::function<void ()>;
@@ -261,6 +267,7 @@ private:
 
     bool m_isExportingAudio = false;
     bool m_isRangeSelection = false;
+    std::set<engraving::InstrumentTrackId> m_hiddenAutoMuted;
 
     DrumsetLoader m_drumsetLoader;
     std::unique_ptr<OnlineSoundsController> m_onlineSoundsController;
