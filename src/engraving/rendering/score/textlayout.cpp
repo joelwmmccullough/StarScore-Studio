@@ -357,6 +357,7 @@ void TextLayout::layoutTextBlock(TextBlock* item, const TextBase* t)
             }
 
             double yOffset = musicSymbolBaseLineAdjust(item, t, f, fi);
+            yOffset += f.inlineAccidentalRaise(t);   // StarScore
             f.pos.ry() -= yOffset;
 
             RectF textBRect = fm.tightBoundingRect(f.text).translated(f.pos);

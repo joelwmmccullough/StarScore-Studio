@@ -856,6 +856,61 @@ bool TextFragment::operator ==(const TextFragment& f) const
 //   font
 //---------------------------------------------------------
 
+// StarScore: accidentals in running text
+static bool starscoreIsAccidentalChar(char16_t c)
+{
+    return (c >= 0xE260 && c <= 0xE26F) || (c >= 0x266D && c <= 0x266F) || (c >= 0xED60 && c <= 0xED64);
+}
+
+static constexpr double STARSCORE_ACC_HEIGHT = 0.92;   // accidental height, in capital heights of the text
+static constexpr double STARSCORE_ACC_LIFT = 0.08;     // bottom of the accidental above the baseline, same unit
+
+// Capital height of the text around a symbol fragment, in the same units as the fragment's font
+static double starscoreTextCapHeight(const TextFragment& f, const TextBase* t)
+{
+    Font textFont;
+    textFont.setFamily(t->family(), Font::Type::Unknown);
+    double size = f.format.fontSize();
+    if (t->sizeIsSpatiumDependent()) {
+        const double scaling = t->isInstrumentName()
+                               ? toInstrumentName(t)->largestStaffSpatium() / t->defaultSpatium()
+                               : t->spatium() / t->defaultSpatium();
+        size *= scaling;
+    }
+    if (size <= 0.0) {
+        return 0.0;
+    }
+    textFont.setPointSizeF(size * t->mag());
+    return FontMetrics::capHeight(textFont);
+}
+
+bool TextFragment::isInlineAccidental(const TextBase* t) const
+{
+    if (!t || text.isEmpty() || format.fontFamily() != "ScoreText" || !t->hasSymbolSize()) {
+        return false;
+    }
+    for (size_t i = 0; i < text.size(); ++i) {
+        if (!starscoreIsAccidentalChar(text.at(i).unicode())) {
+            return false;
+        }
+    }
+    return true;
+}
+
+double TextFragment::inlineAccidentalRaise(const TextBase* t) const
+{
+    if (!isInlineAccidental(t)) {
+        return 0.0;
+    }
+    const double cap = starscoreTextCapHeight(*this, t);
+    if (cap <= 0.0) {
+        return 0.0;
+    }
+    const RectF glyph = FontMetrics(font(t)).tightBoundingRect(text);
+    // move up so the glyph's bottom sits a little above the baseline
+    return glyph.bottom() + STARSCORE_ACC_LIFT * cap;
+}
+
 Font TextFragment::font(const TextBase* t) const
 {
     Font font;
@@ -923,6 +978,15 @@ Font TextFragment::font(const TextBase* t) const
     assert(m > 0.0);
 
     font.setPointSizeF(m * t->mag());
+
+    // StarScore: size an inline accidental from the surrounding text's capital height
+    if (fontType == Font::Type::MusicSymbolText && isInlineAccidental(t)) {
+        const double cap = starscoreTextCapHeight(*this, t);
+        const double glyphHeight = FontMetrics(font).tightBoundingRect(text).height();
+        if (cap > 0.0 && glyphHeight > 0.0) {
+            font.setPointSizeF(font.pointSizeF() * (STARSCORE_ACC_HEIGHT * cap) / glyphHeight);
+        }
+    }
     return font;
 }
 

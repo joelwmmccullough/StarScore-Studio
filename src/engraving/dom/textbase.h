@@ -236,6 +236,12 @@ public:
 
     TextFragment split(int column);
     muse::draw::Font font(const TextBase*) const;
+
+    //! StarScore Studio: an accidental written inside ordinary text ("Trumpet in B♭") is sized from the
+    //! surrounding text's capital height instead of the fixed musical-symbol size, so it matches any font.
+    //! Returns how far to move the fragment up so the accidental sits slightly above the baseline, or 0.
+    bool isInlineAccidental(const TextBase*) const;
+    double inlineAccidentalRaise(const TextBase*) const;
     int columns() const;
     void changeFormat(FormatId id, const FormatValue& data);
 

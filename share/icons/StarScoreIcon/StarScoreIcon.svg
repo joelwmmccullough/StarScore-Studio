@@ -1,6 +1,6 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
 <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#B98CFF"/><stop offset="1" stop-color="#7A2EF0"/></linearGradient></defs>
-<path d="M182,42 L702,42 L872,212 L872,952 Q872,982 842,982 L182,982 Q152,982 152,952 L152,72 Q152,42 182,42 Z" fill="#000000" stroke="#8B3DFF" stroke-width="28" stroke-linejoin="round"/>
+<path d="M182,42 L702,42 L872,212 L872,952 Q872,982 842,982 L182,982 Q152,982 152,952 L152,72 Q152,42 182,42 Z" fill="#1E0A3C" stroke="#8B3DFF" stroke-width="28" stroke-linejoin="round"/>
 <path d="M702,42 L702,188 Q702,212 726,212 L872,212 Z" fill="#8B3DFF"/>
 <line x1="222" y1="430" x2="802" y2="430" stroke="#B48CFF" stroke-width="16" stroke-linecap="round" opacity="0.55"/><line x1="222" y1="486" x2="802" y2="486" stroke="#B48CFF" stroke-width="16" stroke-linecap="round" opacity="0.55"/><line x1="222" y1="542" x2="802" y2="542" stroke="#B48CFF" stroke-width="16" stroke-linecap="round" opacity="0.55"/><line x1="222" y1="598" x2="802" y2="598" stroke="#B48CFF" stroke-width="16" stroke-linecap="round" opacity="0.55"/><line x1="222" y1="654" x2="802" y2="654" stroke="#B48CFF" stroke-width="16" stroke-linecap="round" opacity="0.55"/>
 <polygon points="512.0,310.0 573.7,475.1 749.8,482.7 611.9,592.4 658.9,762.3 512.0,665.0 365.1,762.3 412.1,592.4 274.2,482.7 450.3,475.1" fill="#8B3DFF" stroke="#000" stroke-width="24" stroke-linejoin="round"/>
