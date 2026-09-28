@@ -39,7 +39,7 @@ StyledDialogView {
             text: qsTrc("starscore", "Styles are MuseScore style files (.mss, made with Format → Style → Save style). "
                         + "They cover page size, margins, staff size and spacing, fonts and text styles. "
                         + "The default style is applied to every part score (the main score is left alone); then the matching rule below is applied on top. "
-                        + "Starsign 2.0 is the built-in default. "
+                        + "Starsign 2.1 is the built-in default. "
                         + "Styles are applied when a section is created, when a new StarScore is made, and when you click Apply.")
         }
 
