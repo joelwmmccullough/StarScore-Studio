@@ -305,7 +305,7 @@
     <romanNumeralPosBelow x="0" y="3.5"/>
     <nashvilleNumberPosAbove x="0" y="-2.5"/>
     <nashvilleNumberPosBelow x="0" y="3.5"/>
-    <chordSymbolAFontFace>Finale Broadway</chordSymbolAFontFace>
+    <chordSymbolAFontFace>StarScore Jost</chordSymbolAFontFace>
     <chordSymbolAFontSize>15</chordSymbolAFontSize>
     <chordSymbolALineSpacing>1</chordSymbolALineSpacing>
     <chordSymbolAFontSpatiumDependent>1</chordSymbolAFontSpatiumDependent>
@@ -415,16 +415,16 @@
     <lowerCaseMinorChords>0</lowerCaseMinorChords>
     <lowerCaseBassNotes>0</lowerCaseBassNotes>
     <allCapsNoteNames>0</allCapsNoteNames>
-    <chordStyle>jazz</chordStyle>
+    <chordStyle>custom</chordStyle>
     <chordsXmlFile>0</chordsXmlFile>
-    <chordDescriptionFile>chords_jazz.xml</chordDescriptionFile>
-    <chordExtensionMag>1</chordExtensionMag>
-    <chordExtensionAdjust>0</chordExtensionAdjust>
-    <chordModifierMag>1</chordModifierMag>
-    <chordModifierAdjust>0</chordModifierAdjust>
+    <chordDescriptionFile>chords_starsign.xml</chordDescriptionFile>
+    <chordExtensionMag>0.71</chordExtensionMag>
+    <chordExtensionAdjust>-0.5</chordExtensionAdjust>
+    <chordModifierMag>0.71</chordModifierMag>
+    <chordModifierAdjust>-0.5</chordModifierAdjust>
     <verticallyStackModifiers>0</verticallyStackModifiers>
     <chordStackedModifierMag>0.75</chordStackedModifierMag>
-    <chordBassNoteStagger>1</chordBassNoteStagger>
+    <chordBassNoteStagger>0</chordBassNoteStagger>
     <chordBassNoteScale>1</chordBassNoteScale>
     <polychordDividerThickness>0.11</polychordDividerThickness>
     <polychordDividerSpacing>0.4</polychordDividerSpacing>
@@ -518,9 +518,8 @@
     <evenFooterC>$c</evenFooterC>
     <evenFooterR></evenFooterR>
     <oddFooterL></oddFooterL>
-    <oddFooterC>Version 1.0.0
-$C</oddFooterC>
-    <oddFooterR></oddFooterR>
+    <oddFooterC>$C</oddFooterC>
+    <oddFooterR>Version 1.0.0</oddFooterR>
     <voltaPosAbove x="0" y="-3"/>
     <voltaHook>2.2</voltaHook>
     <voltaLineWidth>0.16</voltaLineWidth>
@@ -995,7 +994,7 @@ $C</oddFooterC>
     <dynamicsFrameBgColor r="255" g="255" b="255" a="0"/>
     <dynamicsPosition>center</dynamicsPosition>
     <expressionFontFace>Futura</expressionFontFace>
-    <expressionFontSize>8</expressionFontSize>
+    <expressionFontSize>9</expressionFontSize>
     <expressionLineSpacing>1</expressionLineSpacing>
     <expressionFontSpatiumDependent>1</expressionFontSpatiumDependent>
     <expressionFontStyle>2</expressionFontStyle>
@@ -1146,11 +1145,11 @@ $C</oddFooterC>
     <translatorFrameFgColor r="0" g="0" b="0" a="255"/>
     <translatorFrameBgColor r="255" g="255" b="255" a="0"/>
     <translatorPosition>left</translatorPosition>
-    <systemTextFontFace>Jost</systemTextFontFace>
-    <systemTextFontSize>10</systemTextFontSize>
+    <systemTextFontFace>TT Modernoir VF Trial</systemTextFontFace>
+    <systemTextFontSize>13</systemTextFontSize>
     <systemTextLineSpacing>1</systemTextLineSpacing>
     <systemTextFontSpatiumDependent>1</systemTextFontSpatiumDependent>
-    <systemTextFontStyle>0</systemTextFontStyle>
+    <systemTextFontStyle>1</systemTextFontStyle>
     <systemTextColor r="0" g="0" b="0" a="255"/>
     <systemTextAlign>center,baseline</systemTextAlign>
     <systemTextOffsetType>1</systemTextOffsetType>
@@ -1417,7 +1416,7 @@ $C</oddFooterC>
     <footerFrameBgColor r="255" g="255" b="255" a="0"/>
     <footerPosition>center</footerPosition>
     <copyrightFontFace>TT Modernoir Trial</copyrightFontFace>
-    <copyrightFontSize>11</copyrightFontSize>
+    <copyrightFontSize>9</copyrightFontSize>
     <copyrightLineSpacing>1</copyrightLineSpacing>
     <copyrightFontSpatiumDependent>0</copyrightFontSpatiumDependent>
     <copyrightFontStyle>0</copyrightFontStyle>
@@ -1973,6 +1972,6 @@ $C</oddFooterC>
     <palmMuteBeginFilledArrowWidth>0.85</palmMuteBeginFilledArrowWidth>
     <palmMuteEndFilledArrowHeight>1</palmMuteEndFilledArrowHeight>
     <palmMuteEndFilledArrowWidth>0.85</palmMuteEndFilledArrowWidth>
-    <spatium>1.75</spatium>
+    <spatium>1.625</spatium>
     </Style>
   </museScore>

@@ -80,11 +80,12 @@ void applyVersionFooter(Score* score, const QString& version)
         }
     }
     if (!found) {
-        const QString odd = score->style().styleSt(Sid::oddFooterC).toQString();
-        starscoreSet(score, Sid::oddFooterC, String::fromQString(odd.isEmpty() ? text : text + "\n" + odd));
+        // No version in the footer yet: put it in the right-hand footer box, as Starsign 2.3 does
+        const QString odd = score->style().styleSt(Sid::oddFooterR).toQString();
+        starscoreSet(score, Sid::oddFooterR, String::fromQString(odd.isEmpty() ? text : text + "\n" + odd));
         if (score->style().styleB(Sid::footerOddEven)) {
-            const QString even = score->style().styleSt(Sid::evenFooterC).toQString();
-            starscoreSet(score, Sid::evenFooterC, String::fromQString(even.isEmpty() ? text : text + "\n" + even));
+            const QString even = score->style().styleSt(Sid::evenFooterR).toQString();
+            starscoreSet(score, Sid::evenFooterR, String::fromQString(even.isEmpty() ? text : text + "\n" + even));
         }
     }
     starscoreSet(score, Sid::showFooter, true);
@@ -101,20 +102,7 @@ void applyHouseStyle(Score* score, bool partBook, const QString& version)
     const double mm = houseStaffHeightMm(score, partBook);
     starscoreSet(score, Sid::spatium, mm / 4.0 * DPMM);
 
-    // Chord symbols: the CourseCreator / Songbook design (see chords_starsign.xml)
-    starscoreSet(score, Sid::chordSymbolAFontFace, String(u"StarScore Jost"));
-    starscoreSet(score, Sid::chordSymbolAFontStyle, int(FontStyle::Normal));
-    starscoreSet(score, Sid::chordSymbolAFontSize, 15.0);
-    starscoreSet(score, Sid::chordStyle, ChordStylePreset::CUSTOM);
-    starscoreSet(score, Sid::chordsXmlFile, false);
-    starscoreSet(score, Sid::verticallyStackModifiers, false);
-    starscoreSet(score, Sid::chordBassNoteStagger, false);
-    starscoreSet(score, Sid::chordBassNoteScale, 1.0);
-    starscoreSet(score, Sid::chordExtensionMag, 0.71);
-    starscoreSet(score, Sid::chordExtensionAdjust, -0.5);
-    starscoreSet(score, Sid::chordModifierMag, 0.71);
-    starscoreSet(score, Sid::chordModifierAdjust, -0.5);
-    starscoreSet(score, Sid::chordDescriptionFile, String(u"chords_starsign.xml"));
+    // Chord symbols (font, size, chords_starsign.xml, superscript sizes) come from the style file (Starsign 2.3+)
 
     // Version in the footer
     applyVersionFooter(score, version);

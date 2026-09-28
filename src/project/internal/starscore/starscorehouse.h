@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: GPL-3.0-only
  *
  * StarScore Studio — house settings that a .mss style file can't hold, applied after the style:
- * first-page frame height, staff size by kind of score, chord symbol design, and the version footer.
+ * first-page frame height, subtitle offset, staff size by kind of score, and the version footer.
  */
 #pragma once
 
@@ -22,8 +22,8 @@ double houseStaffHeightMm(const mu::engraving::Score* score, bool partBook);
 //! Applies all house settings. Must be called inside a command (prepareChanges/commitChanges).
 void applyHouseStyle(mu::engraving::Score* score, bool partBook, const QString& version);
 
-//! Writes "Version x.y.z" into the footer text (Starsign 2.2 has "Version 1.0.0" above $C), replacing the
-//! version already there, or adding it on a line above the centre footer. Must be called inside a command.
+//! Writes "Version x.y.z" into the footer text (Starsign 2.3 has "Version 1.0.0" in the right-hand box),
+//! replacing the version already there, or adding it to the right-hand box. Must be called inside a command.
 void applyVersionFooter(mu::engraving::Score* score, const QString& version);
 
 //! "Version 4.0.1" <-> "4.0.1"
