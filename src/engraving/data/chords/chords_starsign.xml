@@ -121,7 +121,7 @@
 
   <token class="quality">
     <name>-</name>
-    <render>m:0.05:0 sc:0.84 m:0:-0.42 minus m:0:0.42 sc:1.190476</render>
+    <render>m:0.05:0 sc:1.05 m:0:-0.38 minus m:0:0.38 sc:0.952381 m:0.02:0</render>
     </token>
   <token class="quality">
     <name>m</name>
