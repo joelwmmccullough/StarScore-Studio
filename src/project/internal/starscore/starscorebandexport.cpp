@@ -397,7 +397,7 @@ Ret StarScoreService::writePdf(const INotationPtr& notation, const QString& path
     const ViewMode oldMode = notation->painting()->viewMode();
     notation->painting()->setViewMode(ViewMode::PAGE);
 
-    io::FileStream out(io::path_t(path));
+    io::FileStream out { io::path_t(path) };
     Ret ret = make_ret(Ret::Code::UnknownError);
     if (out.open(io::IODevice::WriteOnly)) {
         INotationWriter::Options options { { INotationWriter::OptionKey::UNIT_TYPE, Val(INotationWriter::UnitType::PER_PART) } };
