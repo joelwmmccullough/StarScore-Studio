@@ -32,10 +32,7 @@ enum class StarScoreStatus {
     Sketch,
     InProgress,
     NeedsReview,
-    Finished,
-    //! Rhythm sections only: lead sheet, guitar and bass are finished; drums, percussion and keys play from the
-    //! lead sheet, so their own sheets are left out of the band export by default. Counts as finished.
-    FinishedLeadSheetParts
+    Finished
 };
 
 //! A section is a named group of instruments inside the one score: "Lead Sheet", "3-Horn Section",
@@ -53,6 +50,9 @@ struct StarScoreSection
     bool on = true;          // derived, not stored
     QStringList partIds;     // muse::ID of each part, as text
     QStringList shownPartIds;  // parts to show when the section is turned on
+    //! Rhythm sections marked Finished: players that read from the lead sheet instead of their own sheet
+    //! ("drums", "percussion", "keys"); those sheets start unticked in the band export
+    QStringList skipSheets;
 };
 
 //! An arrangement is a named set of sections, e.g. "3-Horn Standard" = Lead Sheet + 3-Horn Section + Rhythm Section.
@@ -266,6 +266,8 @@ public:
                                                 const std::vector<StarScoreInstrument>& instruments) = 0;
     virtual muse::RetVal<QString> createSectionFromParts(const QString& name, const QStringList& partIds) = 0;
     virtual void setSectionStatus(const QString& sectionId, StarScoreStatus status) = 0;
+    //! which: "drums", "percussion" or "keys"
+    virtual void setSectionSkipSheet(const QString& sectionId, const QString& which, bool skip) = 0;
     virtual void renameSection(const QString& sectionId, const QString& name) = 0;
     virtual void setSectionParts(const QString& sectionId, const QStringList& partIds) = 0;
     virtual void moveSection(const QString& sectionId, int newIndex) = 0;

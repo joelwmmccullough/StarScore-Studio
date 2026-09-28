@@ -66,6 +66,7 @@ public:
                                         const std::vector<StarScoreInstrument>& instruments) override;
     muse::RetVal<QString> createSectionFromParts(const QString& name, const QStringList& partIds) override;
     void setSectionStatus(const QString& sectionId, StarScoreStatus status) override;
+    void setSectionSkipSheet(const QString& sectionId, const QString& which, bool skip) override;
     void renameSection(const QString& sectionId, const QString& name) override;
     void setSectionParts(const QString& sectionId, const QStringList& partIds) override;
     void moveSection(const QString& sectionId, int newIndex) override;
@@ -173,7 +174,6 @@ private:
     //! Sound, volume, pan, reverb and mute for each instrument, from the defaults in mixer_defaults.json
     void applyMixerDefaults(const QStringList& partIds);
     void standardizeImported();
-    void setImportedRhythmStatus();
     //! A new "N-Horn Any" section starts with the music of the "N-Horn" section, chair by chair
     void fillAnyHornsFromStandard(const StarScoreSection& anySection);
     //! Name the new parts, hide default-hidden parts/staves, make part books; returns the new section

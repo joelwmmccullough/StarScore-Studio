@@ -296,11 +296,22 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
                     name += " (" + p->partName().toQString() + ")";
                 }
                 addFile("1 Rhythm", name, { pid }, false);
-                // "Finished, drums/percussion/keys use the lead sheet": only guitar and bass sheets ticked by default
-                // (a drums, percussion or keys sheet that is actually written out is still exported)
-                if (sec.status == StarScoreStatus::FinishedLeadSheetParts && role != "Guitar" && role != "Bass"
-                    && role != "Bass Synth" && starscore::partLooksUnfinished(ms, p)) {
-                    plan.files.back().defaultUnchecked = true;
+                // Finished rhythm section with "No Drums / Percussion / Keys Sheet": that player reads the lead
+                // sheet, so the sheet starts unticked
+                if (sec.status == StarScoreStatus::Finished && !sec.skipSheets.isEmpty()) {
+                    const QString id = p->instrumentId().toQString();
+                    QString kind;
+                    if (id == "drumset" || id == "drum-kit") {
+                        kind = "drums";
+                    } else if (id == "congas" || id == "bongos" || id == "percussion" || id == "timbales" || id == "cajon"
+                               || id.contains("shaker") || id.contains("tambourine") || id.contains("cowbell")) {
+                        kind = "percussion";
+                    } else if (role != "Guitar" && role != "Bass" && role != "Bass Synth") {
+                        kind = "keys";
+                    }
+                    if (!kind.isEmpty() && sec.skipSheets.contains(kind)) {
+                        plan.files.back().defaultUnchecked = true;
+                    }
                 }
             }
             continue;

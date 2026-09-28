@@ -135,7 +135,6 @@ QString StarScoreService::statusKey(StarScoreStatus status)
     case StarScoreStatus::InProgress: return "in-progress";
     case StarScoreStatus::NeedsReview: return "needs-review";
     case StarScoreStatus::Finished: return "finished";
-    case StarScoreStatus::FinishedLeadSheetParts: return "finished-lead-sheet-parts";
     }
     return "in-progress";
 }
@@ -151,7 +150,7 @@ StarScoreStatus StarScoreService::statusFromKey(const QString& key)
     } else if (key == "finished") {
         return StarScoreStatus::Finished;
     } else if (key == "finished-lead-sheet-parts") {
-        return StarScoreStatus::FinishedLeadSheetParts;
+        return StarScoreStatus::Finished;   // an earlier test build's status; its sheet choices are read in fromJson
     }
     return StarScoreStatus::InProgress;
 }
@@ -179,6 +178,12 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
         s.name = o.value("name").toString();
         s.templateKey = o.value("template").toString("custom");
         s.status = statusFromKey(o.value("status").toString());
+        for (const QJsonValue& v : o.value("skipSheets").toArray()) {
+            s.skipSheets << v.toString();
+        }
+        if (o.value("status").toString() == "finished-lead-sheet-parts" && s.skipSheets.isEmpty()) {
+            s.skipSheets = { "drums", "percussion", "keys" };
+        }
         for (const QJsonValue& p : o.value("parts").toArray()) {
             s.partIds << p.toString();
         }
@@ -236,6 +241,9 @@ QString StarScoreService::toJson(const Data& data)
         o["status"] = statusKey(s.status);
         o["parts"] = QJsonArray::fromStringList(s.partIds);
         o["shown"] = QJsonArray::fromStringList(s.shownPartIds);
+        if (!s.skipSheets.isEmpty()) {
+            o["skipSheets"] = QJsonArray::fromStringList(s.skipSheets);
+        }
         sections.append(o);
     }
 
@@ -481,8 +489,7 @@ StarScoreStatus StarScoreService::arrangementStatus(const QString& arrangementId
         for (const StarScoreSection& s : data.sections) {
             if (a.sectionIds.contains(s.id)) {
                 any = true;
-                // "finished, drums/percussion/keys use the lead sheet" counts as finished
-                result = std::min(result, std::min(s.status, StarScoreStatus::Finished));
+                result = std::min(result, s.status);
             }
         }
     }
@@ -1130,6 +1137,23 @@ void StarScoreService::setSectionStatus(const QString& sectionId, StarScoreStatu
         }
     }
     store(data);
+}
+
+void StarScoreService::setSectionSkipSheet(const QString& sectionId, const QString& which, bool skip)
+{
+    Data data = load();
+    for (StarScoreSection& s : data.sections) {
+        if (s.id != sectionId) {
+            continue;
+        }
+        s.skipSheets.removeAll(which);
+        if (skip) {
+            s.skipSheets << which;
+        }
+        store(data);
+        m_changed.notify();
+        return;
+    }
 }
 
 void StarScoreService::renameSection(const QString& sectionId, const QString& name)

@@ -160,7 +160,6 @@ QString StarScoreBarModel::statusColor(int status) const
     case StarScoreStatus::InProgress: return "#F29B30";
     case StarScoreStatus::NeedsReview: return "#3C8CE7";
     case StarScoreStatus::Finished: return "#3FB05A";
-    case StarScoreStatus::FinishedLeadSheetParts: return "#2FA58F";
     }
     return "#8A8A8A";
 }
@@ -173,8 +172,6 @@ QString StarScoreBarModel::statusName(int status) const
     case StarScoreStatus::InProgress: return muse::qtrc("starscore", "In progress");
     case StarScoreStatus::NeedsReview: return muse::qtrc("starscore", "Needs review");
     case StarScoreStatus::Finished: return muse::qtrc("starscore", "Finished");
-    case StarScoreStatus::FinishedLeadSheetParts:
-        return muse::qtrc("starscore", "Finished \u2014 drums, percussion and keys use the lead sheet");
     }
     return QString();
 }
@@ -182,8 +179,7 @@ QString StarScoreBarModel::statusName(int status) const
 QVariantList StarScoreBarModel::statusSubmenu(const QString& prefix, int current, bool rhythm) const
 {
     QVariantList items;
-    const int last = rhythm ? int(StarScoreStatus::FinishedLeadSheetParts) : int(StarScoreStatus::Finished);
-    for (int i = 0; i <= last; ++i) {
+    for (int i = 0; i <= int(StarScoreStatus::Finished); ++i) {
         items << QVariantMap {
             { "id", prefix + QString::number(i) }, { "title", statusName(i) },
             { "checkable", true }, { "checked", i == current }, { "enabled", true }
@@ -213,16 +209,36 @@ QVariantList StarScoreBarModel::sectionMenu(const QString& id) const
 {
     int status = 0;
     bool rhythm = false;
+    QStringList skip;
     for (const StarScoreSection& s : starScore()->sections()) {
         if (s.id == id) {
             status = int(s.status);
             rhythm = s.templateKey == "rhythm" || s.templateKey == "bigband-rhythm";
+            skip = s.skipSheets;
+        }
+    }
+
+    QVariantList statusItems = statusSubmenu("sec-status:" + id + ":", status, rhythm);
+    if (rhythm) {
+        // Finished rhythm section: players who read from the lead sheet get no sheet of their own by default
+        const bool finished = status == int(StarScoreStatus::Finished);
+        statusItems << QVariantMap {};
+        const std::vector<std::pair<QString, QString> > sheets {
+            { "percussion", muse::qtrc("starscore", "No Percussion Sheet") },
+            { "drums", muse::qtrc("starscore", "No Drums Sheet") },
+            { "keys", muse::qtrc("starscore", "No Keys Sheet") },
+        };
+        for (const auto& [key, title] : sheets) {
+            statusItems << QVariantMap {
+                { "id", "sec-skip:" + id + ":" + key }, { "title", title },
+                { "checkable", true }, { "checked", finished && skip.contains(key) }, { "enabled", finished }
+            };
         }
     }
 
     return {
         QVariantMap { { "id", "sec-solo:" + id }, { "title", muse::qtrc("starscore", "Show only this section") }, { "enabled", true } },
-        QVariantMap { { "title", muse::qtrc("starscore", "Status") }, { "subitems", statusSubmenu("sec-status:" + id + ":", status, rhythm) },
+        QVariantMap { { "title", muse::qtrc("starscore", "Status") }, { "subitems", statusItems },
                       { "enabled", true } },
         QVariantMap {},
         QVariantMap { { "id", "sec-edit:" + id }, { "title", muse::qtrc("starscore", "Choose instruments…") }, { "enabled", true } },
@@ -440,6 +456,17 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
     } else if (action == "sec-status") {
         const int c = arg.lastIndexOf(':');
         starScore()->setSectionStatus(arg.left(c), static_cast<StarScoreStatus>(arg.mid(c + 1).toInt()));
+    } else if (action == "sec-skip") {
+        const int c = arg.lastIndexOf(':');
+        const QString sectionId = arg.left(c);
+        const QString which = arg.mid(c + 1);
+        bool skipped = false;
+        for (const StarScoreSection& s : starScore()->sections()) {
+            if (s.id == sectionId) {
+                skipped = s.skipSheets.contains(which);
+            }
+        }
+        starScore()->setSectionSkipSheet(sectionId, which, !skipped);
     } else if (action == "sec-edit") {
         openEditDialog("section", arg);
     } else if (action == "sec-rename") {

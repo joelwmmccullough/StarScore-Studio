@@ -356,7 +356,6 @@ Ret StarScoreService::applyImport(const std::map<QString, QString>& sectionByPar
         applyStyles();
     }
 
-    setImportedRhythmStatus();
     syncArrangementScores();
     m_changed.notify();
     return make_ok();
@@ -559,45 +558,6 @@ void StarScoreService::standardizeImported()
         for (size_t i = 1; i < wanted.size(); ++i) {
             master->parts()->moveParts({ wanted[i]->id() }, wanted[i - 1]->id(), INotationParts::InsertMode::After);
         }
-    }
-}
-
-void StarScoreService::setImportedRhythmStatus()
-{
-    engraving::MasterScore* ms = masterScore();
-    if (!ms) {
-        return;
-    }
-    Data data = load();
-    bool changed = false;
-    for (StarScoreSection& s : data.sections) {
-        if (s.templateKey != "rhythm" && s.templateKey != "bigband-rhythm") {
-            continue;
-        }
-        bool coreDone = true;          // guitar and bass written out
-        bool someUseLead = false;      // drums, percussion or keys not written out
-        bool anyCore = false;
-        for (const engraving::Part* p : ms->parts()) {
-            if (!s.partIds.contains(idText(p))) {
-                continue;
-            }
-            const QString role = importRhythmRole(p->instrumentId().toQString());
-            const bool unfinished = starscore::partLooksUnfinished(ms, p);
-            if (role == "guitar" || role == "bass") {
-                anyCore = true;
-                coreDone &= !unfinished;
-            } else if (unfinished) {
-                someUseLead = true;
-            }
-        }
-        // Guitar and bass finished, drums / percussion / keys (some of them) left to the lead sheet
-        if (anyCore && coreDone && someUseLead) {
-            s.status = StarScoreStatus::FinishedLeadSheetParts;
-            changed = true;
-        }
-    }
-    if (changed) {
-        store(data);
     }
 }
 
