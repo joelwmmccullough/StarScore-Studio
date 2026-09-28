@@ -80,12 +80,12 @@ void applyVersionFooter(Score* score, const QString& version)
         }
     }
     if (!found) {
-        // No version in the footer yet: put it on its own line at the top of the centre footer box, as Starsign 2.5 does
-        const QString odd = score->style().styleSt(Sid::oddFooterC).toQString();
-        starscoreSet(score, Sid::oddFooterC, String::fromQString(odd.isEmpty() ? text : text + "\n" + odd));
+        // No version in the footer yet: put it in the right-hand footer box, as Starsign 2.3 does
+        const QString odd = score->style().styleSt(Sid::oddFooterR).toQString();
+        starscoreSet(score, Sid::oddFooterR, String::fromQString(odd.isEmpty() ? text : text + "\n" + odd));
         if (score->style().styleB(Sid::footerOddEven)) {
-            const QString even = score->style().styleSt(Sid::evenFooterC).toQString();
-            starscoreSet(score, Sid::evenFooterC, String::fromQString(even.isEmpty() ? text : text + "\n" + even));
+            const QString even = score->style().styleSt(Sid::evenFooterR).toQString();
+            starscoreSet(score, Sid::evenFooterR, String::fromQString(even.isEmpty() ? text : text + "\n" + even));
         }
     }
     starscoreSet(score, Sid::showFooter, true);
@@ -101,6 +101,9 @@ void applyHouseStyle(Score* score, bool partBook, const QString& version)
     // Staff size
     const double mm = houseStaffHeightMm(score, partBook);
     starscoreSet(score, Sid::spatium, mm / 4.0 * DPMM);
+
+    // Multimeasure rests are always on in Starsign scores and parts
+    starscoreSet(score, Sid::createMultiMeasureRests, true);
 
     // Chord symbols (font, size, chords_starsign.xml, superscript sizes) come from the style file (Starsign 2.3+)
 
