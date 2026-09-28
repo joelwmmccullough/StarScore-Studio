@@ -152,8 +152,10 @@ private:
     struct StyleSettings {
         QString bandFolder;
         QString defaultStyle;
+        int builtinStyleVersion = 0;
         std::vector<StarScoreStyleRule> rules;
     };
+    void installBuiltinDefaultStyle();
     StyleSettings loadStyleSettings() const;
     void saveStyleSettings(const StyleSettings& settings);
 

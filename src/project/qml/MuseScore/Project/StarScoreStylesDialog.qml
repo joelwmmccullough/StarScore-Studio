@@ -38,11 +38,12 @@ StyledDialogView {
             horizontalAlignment: Text.AlignLeft
             text: qsTrc("starscore", "Styles are MuseScore style files (.mss, made with Format → Style → Save style). "
                         + "They cover page size, margins, staff size and spacing, fonts and text styles. "
-                        + "The default style is applied to the main score and every part book first; then the first matching rule below is applied on top. "
+                        + "The default style is applied to every part score (the main score is left alone); then the matching rule below is applied on top. "
+                        + "Starsign 2.0 is the built-in default. "
                         + "Styles are applied when a section is created, when a new StarScore is made, and when you click Apply.")
         }
 
-        StyledTextLabel { text: qsTrc("starscore", "Default style for all scores"); font: ui.theme.bodyBoldFont }
+        StyledTextLabel { text: qsTrc("starscore", "Default style for all part scores"); font: ui.theme.bodyBoldFont }
 
         RowLayout {
             Layout.fillWidth: true

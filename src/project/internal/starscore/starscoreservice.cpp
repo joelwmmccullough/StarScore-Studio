@@ -62,6 +62,8 @@ StarScoreService::StarScoreService(const modularity::ContextPtr& iocCtx)
 
 void StarScoreService::init()
 {
+    installBuiltinDefaultStyle();
+
     globalContext()->currentProjectChanged().onNotify(this, [this]() {
         onCurrentProjectChanged();
         listenCurrentProject();
@@ -1570,6 +1572,7 @@ StarScoreService::StyleSettings StarScoreService::loadStyleSettings() const
     const QJsonObject root = QJsonDocument::fromJson(file.readAll()).object();
     settings.defaultStyle = root.value("defaultStyle").toString();
     settings.bandFolder = root.value("bandFolder").toString();
+    settings.builtinStyleVersion = root.value("builtinStyleVersion").toInt();
     for (const QJsonValue& v : root.value("rules").toArray()) {
         const QJsonObject o = v.toObject();
         settings.rules.push_back({ o.value("section").toString(), o.value("part").toString(), o.value("style").toString() });
@@ -1590,11 +1593,42 @@ void StarScoreService::saveStyleSettings(const StyleSettings& settings)
     QJsonObject root;
     root["defaultStyle"] = settings.defaultStyle;
     root["bandFolder"] = settings.bandFolder;
+    root["builtinStyleVersion"] = settings.builtinStyleVersion;
     root["rules"] = rules;
 
     QFile file(globalConfiguration()->userAppDataPath().appendingComponent("starscore_styles.json").toQString());
     if (file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
         file.write(QJsonDocument(root).toJson());
+    }
+}
+
+//! Copies the bundled Starsign 2.0 style next to the settings and makes it the default
+//! part-score style. Done once per bundled version, so a default chosen later is kept.
+void StarScoreService::installBuiltinDefaultStyle()
+{
+    static const int BUILTIN_STYLE_VERSION = 1;
+
+    const QString dir = globalConfiguration()->userAppDataPath().appendingComponent("StarScoreStyles").toQString();
+    const QString target = dir + "/Starsign 2.0.mss";
+
+    StyleSettings settings = loadStyleSettings();
+    const bool firstInstall = settings.builtinStyleVersion < BUILTIN_STYLE_VERSION;
+    if (!firstInstall && QFileInfo::exists(target)) {
+        return;
+    }
+
+    QDir().mkpath(dir);
+    QFile::remove(target);
+    if (!QFile::copy(":/resources/starscore/Starsign_2.0.mss", target)) {
+        LOGE() << "Could not install the built-in StarScore style";
+        return;
+    }
+    QFile::setPermissions(target, QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ReadGroup | QFileDevice::ReadOther);
+
+    if (firstInstall) {
+        settings.defaultStyle = target;
+        settings.builtinStyleVersion = BUILTIN_STYLE_VERSION;
+        saveStyleSettings(settings);
     }
 }
 
@@ -1638,12 +1672,6 @@ int StarScoreService::applyStyles(const QStringList& partIds)
     };
 
     int restyled = 0;
-
-    if (partIds.isEmpty() && usable(settings.defaultStyle)) {
-        if (master->notation()->style()->loadStyle(settings.defaultStyle, true)) {
-            ++restyled;
-        }
-    }
 
     for (const IExcerptNotationPtr& e : master->excerpts()) {
         engraving::Excerpt* ex = starscoreExcerptOf(e);
