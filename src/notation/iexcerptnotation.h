@@ -47,6 +47,10 @@ public:
     virtual const muse::String& fileName() const = 0;
 
     virtual INotationPtr notation() = 0;
+
+    //! StarScore Studio: false when every instrument in this part book is hidden in the main score
+    //! (its section is switched off), so it is left out of the parts list and the tabs
+    virtual bool hasVisibleParts() const { return true; }
     virtual IExcerptNotationPtr clone() const = 0;
 };
 }

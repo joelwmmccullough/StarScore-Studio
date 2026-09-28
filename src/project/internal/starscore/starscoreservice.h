@@ -13,6 +13,7 @@
 #include "notation/iinstrumentsrepository.h"
 #include "iprojectcreator.h"
 #include "inotationproject.h"
+#include "inotationwritersregister.h"
 #include "playback/iplaybackcontroller.h"
 #include "global/iglobalconfiguration.h"
 
@@ -31,6 +32,7 @@ class StarScoreService : public IStarScoreService, public muse::Contextable, pub
     muse::ContextInject<context::IGlobalContext> globalContext = { this };
     muse::ContextInject<notation::IInstrumentsRepository> instrumentsRepository = { this };
     muse::ContextInject<playback::IPlaybackController> playbackController = { this };
+    muse::ContextInject<INotationWritersRegister> writers = { this };
 
 public:
     explicit StarScoreService(const muse::modularity::ContextPtr& iocCtx);
@@ -98,6 +100,11 @@ public:
     muse::Ret exportSolo(const QString& soloId, const muse::io::path_t& msczPath) override;
     muse::Ret saveAll() override;
 
+    QString bandFolder() const override;
+    void setBandFolder(const QString& path) override;
+    muse::RetVal<StarScoreBandExportPlan> planBandExport() const override;
+    muse::RetVal<QString> exportToBandFolder() override;
+
     muse::Ret exportArrangement(const QString& arrangementId, const muse::io::path_t& msczPath) override;
 
     struct Data {
@@ -129,6 +136,8 @@ private:
     muse::Ret buildSoloBand(const std::shared_ptr<INotationProject>& soloProject, const StarScoreSolo& solo);
     muse::Ret injectSolos(const muse::io::path_t& starscorePath);
     mu::engraving::Measure* mainMeasureByNumber(int barNumber) const;
+    std::shared_ptr<INotationProject> exportSourceProject() const;
+    muse::Ret writePdf(const notation::INotationPtr& notation, const QString& path) const;
     void applyOnSections(const QStringList& onSectionIds, const QString& actionName);
     QStringList onSectionIds(const Data& data) const;
     std::vector<mu::engraving::Part*> masterPartsOf(const mu::engraving::Excerpt* excerpt) const;
@@ -141,6 +150,7 @@ private:
     static void removePartsKeepingSystemObjects(const notation::IMasterNotationPtr& master, const QStringList& partIdsToRemove);
 
     struct StyleSettings {
+        QString bandFolder;
         QString defaultStyle;
         std::vector<StarScoreStyleRule> rules;
     };

@@ -99,6 +99,7 @@ target_sources(project PRIVATE
     internal/projectrwregister.h
 
     internal/starscore/starscoreservice.cpp
+    internal/starscore/starscorebandexport.cpp
     internal/starscore/starscoreservice.h
     internal/starscore/starscoreengraving.cpp
     internal/starscore/starscoreengraving.h

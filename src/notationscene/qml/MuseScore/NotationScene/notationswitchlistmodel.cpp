@@ -22,6 +22,8 @@
 
 #include "notationswitchlistmodel.h"
 
+#include "notation/inotationparts.h"
+
 #include "log.h"
 
 using namespace mu::notation;
@@ -59,6 +61,10 @@ void NotationSwitchListModel::onCurrentProjectChanged()
         return;
     }
 
+    project->masterNotation()->parts()->partsChanged().onNotify(this, [this]() {
+        loadNotations();
+    });
+
     project->masterNotation()->excerptsChanged().onNotify(this, [this]() {
         loadNotations();
     });
@@ -94,7 +100,8 @@ void NotationSwitchListModel::loadNotations()
     listenNotationOpeningStatus(masterNotation->notation());
 
     for (const IExcerptNotationPtr& excerpt: masterNotation->excerpts()) {
-        if (excerpt->notation()->isOpen()) {
+        // StarScore Studio: no tabs for part books whose sections are switched off
+        if (excerpt->notation()->isOpen() && excerpt->hasVisibleParts()) {
             m_notations << excerpt->notation();
         }
 

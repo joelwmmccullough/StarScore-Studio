@@ -23,6 +23,9 @@
 #include "excerptnotation.h"
 
 #include "engraving/dom/excerpt.h"
+#include "engraving/dom/masterscore.h"
+#include "engraving/dom/part.h"
+#include "engraving/dom/staff.h"
 #include "engraving/editing/editexcerpt.h"
 
 using namespace mu::notation;
@@ -141,4 +144,41 @@ IExcerptNotationPtr ExcerptNotation::clone() const
     copy->markAsCustom();
 
     return std::make_shared<ExcerptNotation>(m_masterNotation, copy, iocContext());
+}
+
+bool ExcerptNotation::hasVisibleParts() const
+{
+    const mu::engraving::Excerpt* ex = excerpt();
+    if (!ex) {
+        return true;
+    }
+
+    const mu::engraving::MasterScore* master = ex->masterScore();
+    std::vector<const mu::engraving::Part*> masterParts;
+
+    if (ex->excerptScore() && master) {
+        for (const mu::engraving::Part* p : ex->excerptScore()->parts()) {
+            for (const mu::engraving::Staff* staff : p->staves()) {
+                if (const mu::engraving::Staff* linked = staff->findLinkedInScore(master)) {
+                    masterParts.push_back(linked->part());
+                    break;
+                }
+            }
+        }
+    }
+    if (masterParts.empty()) {
+        for (const mu::engraving::Part* p : ex->parts()) {
+            masterParts.push_back(p);
+        }
+    }
+    if (masterParts.empty()) {
+        return true;
+    }
+
+    for (const mu::engraving::Part* p : masterParts) {
+        if (p && p->show()) {
+            return true;
+        }
+    }
+    return false;
 }

@@ -72,6 +72,10 @@ void PartListModel::load()
     masterNotation->sortExcerpts(excerpts);
 
     for (const IExcerptNotationPtr& excerpt : excerpts) {
+        // StarScore Studio: only part books of the sections that are showing
+        if (!excerpt->hasVisibleParts()) {
+            continue;
+        }
         m_excerpts.push_back(excerpt);
     }
 

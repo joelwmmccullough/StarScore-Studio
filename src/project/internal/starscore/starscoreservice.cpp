@@ -1569,6 +1569,7 @@ StarScoreService::StyleSettings StarScoreService::loadStyleSettings() const
     }
     const QJsonObject root = QJsonDocument::fromJson(file.readAll()).object();
     settings.defaultStyle = root.value("defaultStyle").toString();
+    settings.bandFolder = root.value("bandFolder").toString();
     for (const QJsonValue& v : root.value("rules").toArray()) {
         const QJsonObject o = v.toObject();
         settings.rules.push_back({ o.value("section").toString(), o.value("part").toString(), o.value("style").toString() });
@@ -1588,6 +1589,7 @@ void StarScoreService::saveStyleSettings(const StyleSettings& settings)
     }
     QJsonObject root;
     root["defaultStyle"] = settings.defaultStyle;
+    root["bandFolder"] = settings.bandFolder;
     root["rules"] = rules;
 
     QFile file(globalConfiguration()->userAppDataPath().appendingComponent("starscore_styles.json").toQString());

@@ -51,6 +51,7 @@ public:
     const muse::String& fileName() const override;
 
     INotationPtr notation() override;
+    bool hasVisibleParts() const override;
     IExcerptNotationPtr clone() const override;
 
 private:

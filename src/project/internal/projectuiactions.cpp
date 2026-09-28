@@ -75,6 +75,12 @@ const UiActionList ProjectUiActions::m_actions = {
              TranslatableString("action", "Add solo transcription…"),
              TranslatableString("action", "Add solo transcription")
              ),
+    UiAction("starscore-export-band",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Export to Sheets and Demos…"),
+             TranslatableString("action", "Export every sheet to the band's Sheets and Demos folder")
+             ),
     UiAction("starscore-color-notes",
              mu::context::UiCtxProjectOpened,
              mu::context::CTX_ANY,

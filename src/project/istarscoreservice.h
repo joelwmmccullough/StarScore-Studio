@@ -128,6 +128,23 @@ struct StarScoreSoloPlan
     QString warning;
 };
 
+//! One PDF the band export will write, relative to the song's folder in "Sheets and Demos"
+struct StarScoreBandFile
+{
+    QString relativePath;        // e.g. "3H Tpt Alt Ten/AMPL - Alto Sax.pdf"
+    QStringList partIds;         // one part = its part book; several = a score of just those instruments
+    bool isScore = false;
+};
+
+struct StarScoreBandExportPlan
+{
+    QString bandFolder;          // .../Sheets and Demos
+    QString songFolder;          // e.g. "1 Amplitudes"
+    QString code;                // e.g. "AMPL"
+    std::vector<StarScoreBandFile> files;
+    QStringList notes;           // things that were skipped, and why
+};
+
 struct StarScorePartInfo
 {
     QString partId;
@@ -226,6 +243,14 @@ public:
     virtual muse::Ret exportSolo(const QString& soloId, const muse::io::path_t& msczPath) = 0;
     //! Save changed solos and the main score (used when Save is pressed while a solo is showing)
     virtual muse::Ret saveAll() = 0;
+
+    // --- export to the band's "Sheets and Demos" folder ---
+    virtual QString bandFolder() const = 0;          // saved choice, or the usual Google Drive location if it exists
+    virtual void setBandFolder(const QString& path) = 0;
+    virtual muse::RetVal<StarScoreBandExportPlan> planBandExport() const = 0;
+    //! Write every PDF in the plan, moving any file it replaces to "Version History/Superseded <date>/".
+    //! Returns a summary.
+    virtual muse::RetVal<QString> exportToBandFolder() = 0;
 
     //! Save a .mscz holding only the instruments and part books of this arrangement's sections.
     virtual muse::Ret exportArrangement(const QString& arrangementId, const muse::io::path_t& msczPath) = 0;
