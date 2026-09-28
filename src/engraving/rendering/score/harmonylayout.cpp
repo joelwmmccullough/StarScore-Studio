@@ -988,6 +988,25 @@ void HarmonyLayout::renderActionSet(Harmony* item, Harmony::LayoutData* ldata, c
             base = 0xE000;
             barred = false;
         }
+        // Right after a root letter with no accidental (B△7, F△7, A△7) the triangle sits a little closer:
+        // the letter's straight right side and the triangle's sloping left side leave a gap that looks wider
+        // than after an accidental (A♭△7)
+        {
+            int textItems = 0;
+            const TextSegment* last = nullptr;
+            for (const HarmonyRenderItem* ri : harmonyCtx.renderItemList) {
+                if (const TextSegment* t = dynamic_cast<const TextSegment*>(ri)) {
+                    ++textItems;
+                    last = t;
+                }
+            }
+            if (textItems == 1 && last && last->text().size() == 1) {
+                const char16_t c = last->text().at(0).unicode();
+                if (c >= u'A' && c <= u'G') {
+                    harmonyCtx.movex(-0.08 * FontMetrics::capHeight(item->font()) * item->mag());
+                }
+            }
+        }
         const String glyph = String(Char(char16_t(base + 2 * variant + (barred ? 1 : 0))));
         TextSegment* tri = new TextSegment(glyph, font, harmonyCtx.x(), harmonyCtx.y(), harmonyCtx.hAlign);
         harmonyCtx.movex(tri->width());

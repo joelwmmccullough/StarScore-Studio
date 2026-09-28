@@ -317,6 +317,30 @@ static std::vector<VoiceNote> starscoreVoiceNotes(const Part* part, const Master
     return out;
 }
 
+//! One staff's notes; "top" is the highest note of each chord, or the lowest when lowest = true
+static std::vector<VoiceNote> starscoreStaffNotes(const Staff* staff, const MasterScore* ms, bool lowest)
+{
+    std::vector<VoiceNote> out;
+    const track_idx_t startTrack = staff->idx() * VOICES;
+    for (track_idx_t track = startTrack; track < startTrack + VOICES; ++track) {
+        for (const Segment* s = ms->firstSegment(SegmentType::ChordRest); s; s = s->next1(SegmentType::ChordRest)) {
+            const EngravingItem* e = s->element(track);
+            if (!e || !e->isChord()) {
+                continue;
+            }
+            const Chord* c = toChord(e);
+            int pitch = lowest ? 1000 : -1;
+            for (const Note* n : c->notes()) {
+                pitch = lowest ? std::min(pitch, n->pitch()) : std::max(pitch, n->pitch());
+            }
+            const int start = s->tick().ticks();
+            out.push_back({ start, start + c->actualTicks().ticks(), pitch });
+        }
+    }
+    std::sort(out.begin(), out.end(), [](const VoiceNote& a, const VoiceNote& b) { return a.start < b.start; });
+    return out;
+}
+
 //! Order of register within a family group; higher value = higher voice
 static int starscoreSaxRank(const QString& fam)
 {
@@ -521,6 +545,90 @@ std::vector<StarScoreVoiceSection> StarScoreService::checkVoiceOrder() const
         if (!vs.rules.empty()) {
             result.push_back(std::move(vs));
         }
+    }
+
+    // Two-staff keyboards (piano, electric piano, organ, …): the left hand stays below the right hand.
+    // Compares the left hand's highest note with the right hand's lowest wherever both hands play.
+    StarScoreVoiceSection keys;
+    keys.section = muse::qtrc("starscore", "Keyboards");
+    keys.barCount = barCount;
+    std::set<QString> inSections;
+    for (const StarScoreSection& sec : data.sections) {
+        for (const QString& pid : sec.partIds) {
+            inSections.insert(pid);
+        }
+    }
+    static const QStringList KEYBOARDS { "piano", "clavinet", "organ", "synth", "keyboard", "harpsichord", "celesta", "accordion" };
+    for (const Part* p : ms->parts()) {
+        if (p->nstaves() != 2 || (!inSections.empty() && !inSections.count(idText(p)))) {
+            continue;
+        }
+        const QString iid = p->instrumentId().toQString();
+        if (std::none_of(KEYBOARDS.begin(), KEYBOARDS.end(), [&](const QString& k) { return iid.contains(k); })) {
+            continue;
+        }
+        const std::vector<VoiceNote> rh = starscoreStaffNotes(p->staves().at(0), ms, true);
+        const std::vector<VoiceNote> lh = starscoreStaffNotes(p->staves().at(1), ms, false);
+        if (rh.empty() || lh.empty()) {
+            continue;
+        }
+
+        const QString name = p->partName().toQString();
+        StarScoreVoiceRule rule;
+        rule.upperPartId = idText(p);
+        rule.lowerPartId = idText(p);
+        rule.strict = true;
+        rule.label = muse::qtrc("starscore", "%1: left hand below right hand").arg(name);
+        rule.bars.assign(barCount, 4);
+        size_t a = 0;
+        size_t b = 0;
+        while (a < rh.size() && b < lh.size()) {
+            const VoiceNote& r = rh[a];
+            const VoiceNote& l = lh[b];
+            const int from = std::max(r.start, l.start);
+            const int to = std::min(r.end, l.end);
+            if (from < to) {
+                const int bar = barOf(from);
+                if (bar >= 0 && bar < barCount) {
+                    int& cell = rule.bars[bar];
+                    if (l.top > r.top) {
+                        cell = 1;
+                    } else if (l.top == r.top) {
+                        if (cell != 1) {
+                            cell = 2;
+                        }
+                    } else if (cell == 4) {
+                        cell = 0;
+                    }
+                }
+            }
+            if (r.end < l.end) {
+                ++a;
+            } else {
+                ++b;
+            }
+        }
+        std::vector<int> crossed;
+        std::vector<int> doubled;
+        for (int bar = 0; bar < barCount; ++bar) {
+            if (rule.bars[bar] == 1) {
+                crossed.push_back(bar + 1);
+            } else if (rule.bars[bar] == 2) {
+                doubled.push_back(bar + 1);
+            }
+        }
+        QStringList bits;
+        if (!crossed.empty()) {
+            bits << muse::qtrc("starscore", "left hand above in bars %1").arg(starscoreBarRanges(crossed));
+        }
+        if (!doubled.empty()) {
+            bits << muse::qtrc("starscore", "hands share a note in bars %1").arg(starscoreBarRanges(doubled));
+        }
+        rule.summary = bits.isEmpty() ? muse::qtrc("starscore", "Always in order") : bits.join("; ");
+        keys.rules.push_back(std::move(rule));
+    }
+    if (!keys.rules.empty()) {
+        result.push_back(std::move(keys));
     }
 
     return result;
