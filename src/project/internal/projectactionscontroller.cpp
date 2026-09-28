@@ -88,6 +88,9 @@ void ProjectActionsController::init()
     dispatcher()->reg(this, "starscore-compare-parts", [this]() {
         interactive()->open(Uri("musescore://starscore/compare"));
     });
+    dispatcher()->reg(this, "starscore-voice-order", [this]() {
+        interactive()->open(Uri("musescore://starscore/voiceorder"));
+    });
     dispatcher()->reg(this, "starscore-check-ranges", [this]() {
         INotationPtr notation = currentNotation();
         if (!notation) {

@@ -155,6 +155,25 @@ struct StarScoreComparison
     std::vector<StarScoreComparedPart> parts;
 };
 
+//! "Check voice order": one rule between two parts of a section. Per bar: 0 = in order, 1 = crossed (the lower
+//! part goes above the upper), 2 = doubling (same pitch), 3 = crossed where that is allowed but not preferred,
+//! 4 = the two parts never sound together in the bar
+struct StarScoreVoiceRule
+{
+    QString upperPartId;
+    QString lowerPartId;
+    QString label;               // e.g. "Trumpet 1 above Alto Saxophone"
+    QString summary;             // e.g. "Crossed in bars 12, 30–31; doubled in bar 7"
+    bool strict = true;
+    std::vector<int> bars;
+};
+struct StarScoreVoiceSection
+{
+    QString section;
+    int barCount = 0;
+    std::vector<StarScoreVoiceRule> rules;
+};
+
 struct StarScoreBandFile
 {
     QString relativePath;        // e.g. "3H Tpt Alt Ten/AMPL - Alto Sax.pdf"
@@ -298,6 +317,9 @@ public:
     //! referenceByInstrument: instrument name (StarScoreComparison::instrument) -> part id to compare the others with (first part when missing)
     virtual std::vector<StarScoreComparison> compareParts(const std::map<QString, QString>& referenceByInstrument) const = 0;
     virtual void selectBar(const QString& partId, int bar) = 0;   // bar is 1-based
+
+    // --- Check the order of the voices within each horn / wind / string section
+    virtual std::vector<StarScoreVoiceSection> checkVoiceOrder() const = 0;
 
     //! Sheets the user un-ticked the last time this song was exported (remembered per song code)
     virtual QStringList bandExportUnticked(const QString& code) const = 0;

@@ -117,6 +117,7 @@ public:
 
     std::vector<StarScoreComparison> compareParts(const std::map<QString, QString>& referenceByInstrument) const override;
     void selectBar(const QString& partId, int bar) override;
+    std::vector<StarScoreVoiceSection> checkVoiceOrder() const override;
 
     muse::Ret exportArrangement(const QString& arrangementId, const muse::io::path_t& msczPath) override;
 

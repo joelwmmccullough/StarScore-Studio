@@ -132,6 +132,7 @@ void ProjectModule::resolveImports()
         ir->registerQmlUri(Uri("musescore://starscore/additivetimesig"), "MuseScore.Project", "AdditiveTimeSigDialog");
         ir->registerQmlUri(Uri("musescore://starscore/exportband"), "MuseScore.Project", "BandExportDialog");
         ir->registerQmlUri(Uri("musescore://starscore/compare"), "MuseScore.Project", "ComparePartsDialog");
+        ir->registerQmlUri(Uri("musescore://starscore/voiceorder"), "MuseScore.Project", "VoiceOrderDialog");
     }
 
     auto er = ioc()->resolve<muse::extensions::IExtensionsExecPointsRegister>(moduleName());

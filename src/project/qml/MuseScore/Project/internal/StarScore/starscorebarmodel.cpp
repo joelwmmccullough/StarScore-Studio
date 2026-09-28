@@ -304,6 +304,7 @@ QVariantList StarScoreBarModel::moreMenu() const
         QVariantMap { { "id", "uncolor-notes" }, { "title", muse::qtrc("starscore", "Remove note colors") }, { "enabled", true } },
         QVariantMap {},
         QVariantMap { { "id", "compare-parts" }, { "title", muse::qtrc("starscore", "Compare parts…") }, { "enabled", true } },
+        QVariantMap { { "id", "voice-order" }, { "title", muse::qtrc("starscore", "Check voice order…") }, { "enabled", true } },
         QVariantMap { { "id", "sync-scores" }, { "title", muse::qtrc("starscore", "Make / update arrangement scores") }, { "enabled", true } },
         QVariantMap { { "id", "check-ranges" }, { "title", muse::qtrc("starscore", "Check instrument ranges") }, { "enabled", true } },
         QVariantMap { { "id", "export-band" }, { "title", muse::qtrc("starscore", "Export to Sheets and Demos…") }, { "enabled", true } },
@@ -512,6 +513,8 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
         interactive()->open(UriQuery(STARSCORE_COPY_LAYOUT_URI.toStdString()));
     } else if (action == "compare-parts") {
         dispatcher()->dispatch("starscore-compare-parts");
+    } else if (action == "voice-order") {
+        dispatcher()->dispatch("starscore-voice-order");
     } else if (action == "sync-scores") {
         starScore()->syncArrangementScores();
     } else if (action == "check-ranges") {

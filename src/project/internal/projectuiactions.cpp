@@ -87,6 +87,12 @@ const UiActionList ProjectUiActions::m_actions = {
              TranslatableString("action", "Compare parts…"),
              TranslatableString("action", "See which bars differ between parts on the same instrument")
              ),
+    UiAction("starscore-voice-order",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Check voice order…"),
+             TranslatableString("action", "Flag bars where parts of a section cross or double")
+             ),
     UiAction("starscore-check-ranges",
              mu::context::UiCtxProjectOpened,
              mu::context::CTX_ANY,
