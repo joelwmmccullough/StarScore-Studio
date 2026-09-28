@@ -12,12 +12,15 @@
 #include "context/iglobalcontext.h"
 #include "notation/iinstrumentsrepository.h"
 #include "iprojectcreator.h"
+#include "inotationproject.h"
+#include "playback/iplaybackcontroller.h"
 #include "global/iglobalconfiguration.h"
 
 namespace mu::engraving {
 class MasterScore;
 class Part;
 class Excerpt;
+class Measure;
 }
 
 namespace mu::project {
@@ -27,6 +30,7 @@ class StarScoreService : public IStarScoreService, public muse::Contextable, pub
     muse::GlobalInject<muse::IGlobalConfiguration> globalConfiguration;
     muse::ContextInject<context::IGlobalContext> globalContext = { this };
     muse::ContextInject<notation::IInstrumentsRepository> instrumentsRepository = { this };
+    muse::ContextInject<playback::IPlaybackController> playbackController = { this };
 
 public:
     explicit StarScoreService(const muse::modularity::ContextPtr& iocCtx);
@@ -78,11 +82,28 @@ public:
     void setStyleRules(const std::vector<StarScoreStyleRule>& rules) override;
     int applyStyles(const QStringList& partIds = {}) override;
 
+    std::vector<StarScoreSolo> solos() const override;
+    QString currentSoloId() const override;
+    bool canAddSolos() const override;
+    bool isSoloProject(const INotationProject* project) const override;
+    bool hasUnsavedSolos() const override;
+    muse::io::path_t mainProjectPath() const override;
+    muse::RetVal<StarScoreSoloPlan> planSolo(const muse::io::path_t& soloFile, int startBar, int endBar) const override;
+    muse::RetVal<QString> addSolo(const muse::io::path_t& soloFile, const QString& name, int startBar, int endBar) override;
+    muse::Ret showSolo(const QString& soloId) override;
+    muse::Ret showMainScore() override;
+    muse::Ret refreshSoloBand(const QString& soloId) override;
+    void renameSolo(const QString& soloId, const QString& name) override;
+    void removeSolo(const QString& soloId) override;
+    muse::Ret exportSolo(const QString& soloId, const muse::io::path_t& msczPath) override;
+    muse::Ret saveAll() override;
+
     muse::Ret exportArrangement(const QString& arrangementId, const muse::io::path_t& msczPath) override;
 
     struct Data {
         std::vector<StarScoreSection> sections;
         std::vector<StarScoreArrangement> arrangements;
+        std::vector<StarScoreSolo> solos;
     };
 
     // (de)serialisation of the "starscore" meta tag; public for tests
@@ -96,6 +117,18 @@ private:
     void listenCurrentProject();
     Data load() const;
     void store(const Data& data);
+    Data loadFrom(const mu::engraving::MasterScore* score) const;
+    void storeTo(mu::engraving::MasterScore* score, const Data& data, const std::shared_ptr<INotationProject>& project);
+
+    // solos
+    void onCurrentProjectChanged();
+    void clearSolos();
+    void extractSolos();
+    muse::io::path_t soloWorkPath(const QString& soloId) const;
+    muse::RetVal<std::shared_ptr<INotationProject> > loadSoloProject(const QString& soloId);
+    muse::Ret buildSoloBand(const std::shared_ptr<INotationProject>& soloProject, const StarScoreSolo& solo);
+    muse::Ret injectSolos(const muse::io::path_t& starscorePath);
+    mu::engraving::Measure* mainMeasureByNumber(int barNumber) const;
     void applyOnSections(const QStringList& onSectionIds, const QString& actionName);
     QStringList onSectionIds(const Data& data) const;
     std::vector<mu::engraving::Part*> masterPartsOf(const mu::engraving::Excerpt* excerpt) const;
@@ -105,6 +138,7 @@ private:
                                     const std::vector<StarScoreInstrument>& instruments);
     const StarScoreSectionTemplate* sectionTemplate(const QString& key) const;
     void removePartsKeepingSystemObjects(const QStringList& partIdsToRemove);
+    static void removePartsKeepingSystemObjects(const notation::IMasterNotationPtr& master, const QStringList& partIdsToRemove);
 
     struct StyleSettings {
         QString defaultStyle;
@@ -117,5 +151,10 @@ private:
     static QString idText(const mu::engraving::Part* part);
 
     muse::async::Notification m_changed;
+
+    std::shared_ptr<INotationProject> m_mainProject;
+    std::map<QString, std::shared_ptr<INotationProject> > m_soloProjects;
+    QString m_workDir;
+    bool m_switching = false;
 };
 }

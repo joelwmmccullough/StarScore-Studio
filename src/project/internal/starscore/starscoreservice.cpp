@@ -16,11 +16,20 @@
 #include <QJsonObject>
 #include <QRegularExpression>
 #include <QUuid>
+#include <QStandardPaths>
+#include <cmath>
 
 #include "engraving/dom/masterscore.h"
 #include "engraving/dom/excerpt.h"
 #include "engraving/dom/part.h"
 #include "engraving/dom/staff.h"
+#include "engraving/dom/measure.h"
+#include "engraving/dom/segment.h"
+#include "engraving/dom/select.h"
+#include "engraving/rw/xmlreader.h"
+
+#include "serialization/zipreader.h"
+#include "serialization/zipwriter.h"
 
 #include "notation/inotationparts.h"
 #include "notation/iexcerptnotation.h"
@@ -54,6 +63,7 @@ StarScoreService::StarScoreService(const modularity::ContextPtr& iocCtx)
 void StarScoreService::init()
 {
     globalContext()->currentProjectChanged().onNotify(this, [this]() {
+        onCurrentProjectChanged();
         listenCurrentProject();
         m_changed.notify();
     });
@@ -153,6 +163,21 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
         }
     }
 
+    for (const QJsonValue& v : root.value("solos").toArray()) {
+        const QJsonObject o = v.toObject();
+        StarScoreSolo solo;
+        solo.id = o.value("id").toString();
+        solo.name = o.value("name").toString();
+        solo.file = o.value("file").toString();
+        solo.startBar = o.value("startBar").toInt(1);
+        solo.endBar = o.value("endBar").toInt(1);
+        solo.passes = o.value("passes").toInt(1);
+        solo.soloBars = o.value("soloBars").toInt(0);
+        if (!solo.id.isEmpty()) {
+            data.solos.push_back(solo);
+        }
+    }
+
     for (const QJsonValue& v : root.value("arrangements").toArray()) {
         const QJsonObject o = v.toObject();
         StarScoreArrangement a;
@@ -194,10 +219,26 @@ QString StarScoreService::toJson(const Data& data)
         arrangements.append(o);
     }
 
+    QJsonArray solos;
+    for (const StarScoreSolo& solo : data.solos) {
+        QJsonObject o;
+        o["id"] = solo.id;
+        o["name"] = solo.name;
+        o["file"] = solo.file;
+        o["startBar"] = solo.startBar;
+        o["endBar"] = solo.endBar;
+        o["passes"] = solo.passes;
+        o["soloBars"] = solo.soloBars;
+        solos.append(o);
+    }
+
     QJsonObject root;
     root["version"] = 1;
     root["sections"] = sections;
     root["arrangements"] = arrangements;
+    if (!solos.isEmpty()) {
+        root["solos"] = solos;
+    }
 
     return QString::fromUtf8(QJsonDocument(root).toJson(QJsonDocument::Compact));
 }
@@ -210,7 +251,11 @@ mu::engraving::MasterScore* StarScoreService::masterScore() const
 
 StarScoreService::Data StarScoreService::load() const
 {
-    const engraving::MasterScore* ms = masterScore();
+    return loadFrom(masterScore());
+}
+
+StarScoreService::Data StarScoreService::loadFrom(const engraving::MasterScore* ms) const
+{
     if (!ms) {
         return {};
     }
@@ -259,7 +304,11 @@ StarScoreService::Data StarScoreService::load() const
 
 void StarScoreService::store(const Data& data)
 {
-    engraving::MasterScore* ms = masterScore();
+    storeTo(masterScore(), data, globalContext()->currentProject());
+}
+
+void StarScoreService::storeTo(engraving::MasterScore* ms, const Data& data, const INotationProjectPtr& project)
+{
     if (!ms) {
         return;
     }
@@ -267,7 +316,7 @@ void StarScoreService::store(const Data& data)
     const String json = String::fromQString(toJson(data));
     if (ms->metaTag(STARSCORE_META_TAG) != json) {
         ms->setMetaTag(STARSCORE_META_TAG, json);
-        if (INotationProjectPtr project = globalContext()->currentProject()) {
+        if (project) {
             project->markAsUnsaved();
         }
     }
@@ -1026,8 +1075,12 @@ void StarScoreService::moveSection(const QString& sectionId, int newIndex)
 
 void StarScoreService::removePartsKeepingSystemObjects(const QStringList& partIdsToRemove)
 {
-    IMasterNotationPtr master = globalContext()->currentMasterNotation();
-    engraving::MasterScore* ms = masterScore();
+    removePartsKeepingSystemObjects(globalContext()->currentMasterNotation(), partIdsToRemove);
+}
+
+void StarScoreService::removePartsKeepingSystemObjects(const IMasterNotationPtr& master, const QStringList& partIdsToRemove)
+{
+    engraving::MasterScore* ms = master ? master->masterScore() : nullptr;
     if (!master || !ms || partIdsToRemove.isEmpty()) {
         return;
     }
@@ -1640,4 +1693,680 @@ int StarScoreService::applyStyles(const QStringList& partIds)
     }
 
     return restyled;
+}
+
+// ---------------------------------------------------------------------------
+//  Solo transcriptions
+// ---------------------------------------------------------------------------
+
+static const QString STARSCORE_SOLOS_DIR("StarScoreSolos");
+
+void StarScoreService::onCurrentProjectChanged()
+{
+    if (m_switching) {
+        return;
+    }
+
+    INotationProjectPtr current = globalContext()->currentProject();
+    if (!current) {
+        clearSolos();
+        return;
+    }
+
+    if (isSoloProject(current.get()) || current == m_mainProject) {
+        return;
+    }
+
+    clearSolos();
+    m_mainProject = current;
+
+    m_mainProject->saveComplited().onReceive(this, [this](const io::path_t& path, SaveMode mode) {
+        if (mode == SaveMode::Save || mode == SaveMode::SaveAs || mode == SaveMode::SaveCopy) {
+            if (!solos().empty()) {
+                Ret ret = injectSolos(path);
+                if (!ret) {
+                    LOGE() << "[starscore] could not store solos in " << path << ": " << ret.toString();
+                }
+            }
+        }
+    });
+
+    extractSolos();
+}
+
+void StarScoreService::clearSolos()
+{
+    if (m_mainProject) {
+        m_mainProject->saveComplited().disconnect(this);
+    }
+    m_soloProjects.clear();
+    m_mainProject.reset();
+    if (!m_workDir.isEmpty()) {
+        QDir(m_workDir).removeRecursively();
+        m_workDir.clear();
+    }
+}
+
+io::path_t StarScoreService::soloWorkPath(const QString& soloId) const
+{
+    return io::path_t(m_workDir + "/" + soloId + ".mscz");
+}
+
+void StarScoreService::extractSolos()
+{
+    if (!m_mainProject) {
+        return;
+    }
+
+    m_workDir = QDir::tempPath() + "/StarScoreSolos-" + QUuid::createUuid().toString(QUuid::Id128);
+    QDir().mkpath(m_workDir);
+
+    const std::vector<StarScoreSolo> list = solos();
+    if (list.empty() || !QFileInfo::exists(m_mainProject->path().toQString())) {
+        return;
+    }
+
+    ZipReader zip(m_mainProject->path());
+    for (const StarScoreSolo& solo : list) {
+        ByteArray data = zip.fileData(solo.file.toStdString());
+        if (data.empty()) {
+            LOGW() << "[starscore] solo file missing from the .starscore: " << solo.file;
+            continue;
+        }
+        QFile out(soloWorkPath(solo.id).toQString());
+        if (out.open(QIODevice::WriteOnly)) {
+            out.write(data.toQByteArrayNoCopy());
+        }
+    }
+}
+
+std::vector<StarScoreSolo> StarScoreService::solos() const
+{
+    if (!m_mainProject) {
+        return {};
+    }
+    return loadFrom(m_mainProject->masterNotation()->masterScore()).solos;
+}
+
+QString StarScoreService::currentSoloId() const
+{
+    INotationProjectPtr current = globalContext()->currentProject();
+    for (const auto& [id, project] : m_soloProjects) {
+        if (project == current) {
+            return id;
+        }
+    }
+    return QString();
+}
+
+bool StarScoreService::canAddSolos() const
+{
+    return m_mainProject && io::suffix(m_mainProject->path()) == "starscore" && !m_mainProject->isNewlyCreated();
+}
+
+bool StarScoreService::isSoloProject(const INotationProject* project) const
+{
+    for (const auto& [id, p] : m_soloProjects) {
+        if (p.get() == project) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool StarScoreService::hasUnsavedSolos() const
+{
+    for (const auto& [id, p] : m_soloProjects) {
+        if (p->needSave().val) {
+            return true;
+        }
+    }
+    return false;
+}
+
+io::path_t StarScoreService::mainProjectPath() const
+{
+    return m_mainProject ? m_mainProject->path() : io::path_t();
+}
+
+engraving::Measure* StarScoreService::mainMeasureByNumber(int barNumber) const
+{
+    if (!m_mainProject) {
+        return nullptr;
+    }
+    engraving::MasterScore* ms = m_mainProject->masterNotation()->masterScore();
+    for (engraving::Measure* m = ms->firstMeasure(); m; m = m->nextMeasure()) {
+        if (m->no() + 1 == barNumber) {
+            return m;
+        }
+    }
+    return nullptr;
+}
+
+RetVal<StarScoreSoloPlan> StarScoreService::planSolo(const io::path_t& soloFile, int startBar, int endBar) const
+{
+    StarScoreSoloPlan plan;
+    if (!m_mainProject) {
+        return RetVal<StarScoreSoloPlan>::make_ret(Ret::Code::InternalError);
+    }
+
+    INotationProjectPtr probe = projectCreator()->newProject(iocContext());
+    Ret ret = probe->load(soloFile);
+    if (!ret) {
+        return RetVal<StarScoreSoloPlan>::make_ret(ret);
+    }
+    for (engraving::Measure* m = probe->masterNotation()->masterScore()->firstMeasure(); m; m = m->nextMeasure()) {
+        ++plan.soloBars;
+    }
+
+    engraving::Measure* start = mainMeasureByNumber(startBar);
+    if (!start) {
+        plan.warning = muse::qtrc("starscore", "The main score has no bar %1.").arg(startBar);
+        return RetVal<StarScoreSoloPlan>::make_ok(plan);
+    }
+    plan.startBar = startBar;
+
+    engraving::Measure* end = endBar > 0 ? mainMeasureByNumber(endBar) : nullptr;
+    if (!end && start->repeatStart()) {
+        for (engraving::Measure* m = start; m; m = m->nextMeasure()) {
+            if (m->repeatEnd()) {
+                end = m;
+                break;
+            }
+        }
+    }
+
+    if (end) {
+        plan.endBar = end->no() + 1;
+        plan.repeated = end->repeatEnd() || start->repeatStart();
+    } else {
+        plan.endBar = startBar + plan.soloBars - 1;
+        plan.repeated = false;
+        if (!mainMeasureByNumber(plan.endBar)) {
+            plan.warning = muse::qtrc("starscore", "The solo (%1 bars) runs past the end of the main score.").arg(plan.soloBars);
+        }
+    }
+
+    const int sectionBars = std::max(1, plan.endBar - plan.startBar + 1);
+    plan.passes = std::max(1, int(std::ceil(double(plan.soloBars) / sectionBars)));
+    if (plan.soloBars % sectionBars != 0 && plan.warning.isEmpty()) {
+        plan.warning = muse::qtrc("starscore", "The solo's %1 bars don't divide evenly into %2-bar passes; the last pass will be partial.")
+                       .arg(plan.soloBars).arg(sectionBars);
+    }
+
+    if (plan.passes > 1) {
+        plan.summary = muse::qtrc("starscore", "%1-bar solo over bars %2–%3, played %4 times. The band's bars %2–%3 are copied in %4 times.")
+                       .arg(plan.soloBars).arg(plan.startBar).arg(plan.endBar).arg(plan.passes);
+    } else {
+        plan.summary = muse::qtrc("starscore", "%1-bar written-out solo over bars %2–%3. The band's bars %2–%3 are copied in once.")
+                       .arg(plan.soloBars).arg(plan.startBar).arg(plan.endBar);
+    }
+
+    return RetVal<StarScoreSoloPlan>::make_ok(plan);
+}
+
+RetVal<INotationProjectPtr> StarScoreService::loadSoloProject(const QString& soloId)
+{
+    auto it = m_soloProjects.find(soloId);
+    if (it != m_soloProjects.end()) {
+        return RetVal<INotationProjectPtr>::make_ok(it->second);
+    }
+
+    const io::path_t path = soloWorkPath(soloId);
+    if (!QFileInfo::exists(path.toQString())) {
+        return RetVal<INotationProjectPtr>::make_ret(Ret::Code::UnknownError);
+    }
+
+    INotationProjectPtr project = projectCreator()->newProject(iocContext());
+    Ret ret = project->load(path);
+    if (!ret) {
+        return RetVal<INotationProjectPtr>::make_ret(ret);
+    }
+
+    for (const StarScoreSolo& solo : solos()) {
+        if (solo.id == soloId) {
+            project->setDisplayNameOverride(m_mainProject->displayName() + " — " + muse::qtrc("starscore", "Solo: %1").arg(solo.name));
+        }
+    }
+
+    m_soloProjects[soloId] = project;
+    return RetVal<INotationProjectPtr>::make_ok(project);
+}
+
+Ret StarScoreService::buildSoloBand(const INotationProjectPtr& soloProject, const StarScoreSolo& solo)
+{
+    if (!m_mainProject) {
+        return make_ret(Ret::Code::InternalError);
+    }
+
+    IMasterNotationPtr soloMaster = soloProject->masterNotation();
+    engraving::MasterScore* soloScore = soloMaster->masterScore();
+    engraving::MasterScore* mainScore = m_mainProject->masterNotation()->masterScore();
+    const Data mainData = loadFrom(mainScore);
+
+    // 1. The soloist's instruments: the "solo" section, or every instrument on first import
+    Data soloData = loadFrom(soloScore);
+    QStringList soloistIds;
+    for (const StarScoreSection& sec : soloData.sections) {
+        if (sec.templateKey == "solo") {
+            soloistIds = sec.partIds;
+        }
+    }
+    if (soloistIds.isEmpty()) {
+        for (const engraving::Part* p : soloScore->parts()) {
+            soloistIds << idText(p);
+        }
+    }
+
+    // 2. Remove the old band copies
+    QStringList oldBand;
+    for (const engraving::Part* p : soloScore->parts()) {
+        if (!soloistIds.contains(idText(p))) {
+            oldBand << idText(p);
+        }
+    }
+    removePartsKeepingSystemObjects(soloMaster, oldBand);
+
+    // 3. Add one instrument per main-score instrument that belongs to a section
+    struct Mapping {
+        engraving::Part* mainPart = nullptr;
+        QString sectionId;
+    };
+    std::vector<Mapping> planned;
+    PartInstrumentList list;
+    std::set<uint64_t> before;
+    for (const engraving::Part* p : soloScore->parts()) {
+        before.insert(p->id().toUint64());
+        PartInstrument pi;
+        pi.isExistingPart = true;
+        pi.partId = p->id();
+        list << pi;
+    }
+    std::set<QString> used;
+    for (const StarScoreSection& sec : mainData.sections) {
+        for (const QString& pid : sec.partIds) {
+            if (used.count(pid)) {
+                continue;
+            }
+            engraving::Part* mp = mainScore->partById(ID(pid));
+            if (!mp) {
+                continue;
+            }
+            const InstrumentTemplate& tpl = instrumentsRepository()->instrumentTemplate(mp->instrumentId());
+            if (tpl.id.isEmpty()) {
+                continue;
+            }
+            PartInstrument pi;
+            pi.instrumentTemplate = tpl;
+            list << pi;
+            planned.push_back({ mp, sec.id });
+            used.insert(pid);
+        }
+    }
+
+    engraving::ScoreOrder order = soloMaster->parts()->scoreOrder();
+    order.customized = true;
+    soloMaster->parts()->setParts(list, order);
+
+    std::vector<engraving::Part*> added;
+    for (engraving::Part* p : soloScore->parts()) {
+        if (!before.count(p->id().toUint64())) {
+            added.push_back(p);
+        }
+    }
+    if (added.size() != planned.size()) {
+        LOGW() << "[starscore] solo band: expected " << planned.size() << " instruments, got " << added.size();
+    }
+
+    // names and staff visibility follow the main score
+    for (size_t i = 0; i < added.size() && i < planned.size(); ++i) {
+        engraving::Part* sp = added[i];
+        const engraving::Part* mp = planned[i].mainPart;
+        const QString name = mp->partName().toQString();
+        if (!name.isEmpty()) {
+            soloMaster->parts()->setInstrumentName(InstrumentKey { sp->instrumentId(), sp->id(), engraving::Fraction(0, 1) },
+                                                   mp->longName().toQString().isEmpty() ? name : mp->longName().toQString());
+            sp->setPartName(String::fromQString(name));
+        }
+        for (size_t st = 0; st < sp->staves().size() && st < mp->staves().size(); ++st) {
+            if (!mp->staves().at(st)->visible()) {
+                soloMaster->parts()->setStaffVisible(sp->staves().at(st)->id(), false);
+            }
+        }
+    }
+
+    // 4. Copy the band's bars, once per pass
+    engraving::Measure* srcStart = mainMeasureByNumber(solo.startBar);
+    engraving::Measure* srcEnd = mainMeasureByNumber(solo.endBar);
+    if (!srcStart || !srcEnd) {
+        return make_ret(Ret::Code::UnknownError);
+    }
+    const int sectionBars = solo.endBar - solo.startBar + 1;
+    engraving::Segment* srcStartSeg = srcStart->first(engraving::SegmentType::ChordRest);
+    engraving::Segment* srcEndSeg = srcEnd->nextMeasure() ? srcEnd->nextMeasure()->first(engraving::SegmentType::ChordRest) : nullptr;
+
+    std::vector<engraving::Measure*> soloMeasures;
+    for (engraving::Measure* m = soloScore->firstMeasure(); m; m = m->nextMeasure()) {
+        soloMeasures.push_back(m);
+    }
+
+    soloMaster->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Copy band into solo"));
+    for (size_t i = 0; i < added.size() && i < planned.size(); ++i) {
+        engraving::Part* sp = added[i];
+        engraving::Part* mp = planned[i].mainPart;
+        const size_t nStaves = std::min(sp->staves().size(), mp->staves().size());
+        if (nStaves == 0) {
+            continue;
+        }
+        const engraving::staff_idx_t mainStaff = mp->staves().front()->idx();
+        const engraving::staff_idx_t soloStaff = sp->staves().front()->idx();
+
+        engraving::Selection sel(mainScore);
+        sel.setRange(srcStartSeg, srcEndSeg, mainStaff, mainStaff + nStaves);
+        const ByteArray mime = sel.mimeData();
+        if (mime.empty()) {
+            continue;
+        }
+
+        for (int pass = 0; pass < solo.passes; ++pass) {
+            const size_t firstBar = size_t(pass * sectionBars);
+            if (firstBar + size_t(sectionBars) > soloMeasures.size()) {
+                break;   // no room for a full pass
+            }
+            engraving::Segment* dst = soloMeasures[firstBar]->first(engraving::SegmentType::ChordRest);
+            engraving::XmlReader reader(mime);
+            soloScore->pasteStaff(reader, dst, soloStaff);
+        }
+    }
+    soloMaster->notation()->undoStack()->commitChanges();
+
+    // 5. Sections and arrangements for the solo view: the soloist plus a copy of each band section
+    Data newData;
+    StarScoreSection soloSection;
+    soloSection.id = "solo";
+    soloSection.name = muse::qtrc("starscore", "Solo");
+    soloSection.templateKey = "solo";
+    soloSection.status = StarScoreStatus::InProgress;
+    soloSection.partIds = soloistIds;
+    soloSection.shownPartIds = soloistIds;
+    newData.sections.push_back(soloSection);
+
+    for (const StarScoreSection& sec : mainData.sections) {
+        StarScoreSection copy = sec;
+        copy.partIds.clear();
+        copy.shownPartIds.clear();
+        for (size_t i = 0; i < added.size() && i < planned.size(); ++i) {
+            if (planned[i].sectionId == sec.id) {
+                copy.partIds << idText(added[i]);
+                if (sec.shownPartIds.isEmpty() || sec.shownPartIds.contains(idText(planned[i].mainPart))) {
+                    copy.shownPartIds << idText(added[i]);
+                }
+            }
+        }
+        if (!copy.partIds.isEmpty()) {
+            newData.sections.push_back(copy);
+        }
+    }
+    for (const StarScoreArrangement& a : mainData.arrangements) {
+        StarScoreArrangement copy = a;
+        copy.sectionIds.prepend("solo");
+        newData.arrangements.push_back(copy);
+    }
+    storeTo(soloScore, newData, soloProject);
+
+    // 6. Show the soloist and the main score's current arrangement (or everything)
+    QStringList onIds { "solo" };
+    {
+        // which arrangement is showing in the main score?
+        std::vector<StarScoreSection> mainSections = mainData.sections;
+        QStringList mainOn;
+        for (const StarScoreSection& sec : mainSections) {
+            for (const QString& pid : sec.partIds) {
+                const engraving::Part* p = mainScore->partById(ID(pid));
+                if (p && p->show()) {
+                    mainOn << sec.id;
+                    break;
+                }
+            }
+        }
+        onIds << mainOn;
+    }
+    std::vector<std::pair<muse::ID, bool> > vis;
+    for (const StarScoreSection& sec : newData.sections) {
+        const bool on = onIds.contains(sec.id);
+        for (const QString& pid : sec.partIds) {
+            vis.emplace_back(ID(pid), on && (sec.shownPartIds.isEmpty() || sec.shownPartIds.contains(pid)));
+        }
+    }
+    soloMaster->parts()->setPartsVisible(vis, TranslatableString::untranslatable("Show sections"));
+
+    return make_ok();
+}
+
+RetVal<QString> StarScoreService::addSolo(const io::path_t& soloFile, const QString& name, int startBar, int endBar)
+{
+    if (!canAddSolos()) {
+        return RetVal<QString>::make_ret(make_ret(Ret::Code::NotSupported,
+                                                  muse::trc("starscore", "Save the score as a .starscore file first.")));
+    }
+
+    RetVal<StarScoreSoloPlan> plan = planSolo(soloFile, startBar, endBar);
+    if (!plan.ret) {
+        return RetVal<QString>::make_ret(plan.ret);
+    }
+    if (!mainMeasureByNumber(plan.val.startBar) || !mainMeasureByNumber(plan.val.endBar)) {
+        return RetVal<QString>::make_ret(make_ret(Ret::Code::UnknownError, plan.val.warning.toStdString()));
+    }
+
+    Data mainData = loadFrom(m_mainProject->masterNotation()->masterScore());
+    QStringList taken;
+    for (const StarScoreSolo& s : mainData.solos) {
+        taken << s.id;
+    }
+
+    StarScoreSolo solo;
+    solo.id = uniqueId(taken, "solo");
+    solo.name = name.trimmed().isEmpty() ? QFileInfo(soloFile.toQString()).completeBaseName() : name.trimmed();
+    solo.file = STARSCORE_SOLOS_DIR + "/" + solo.id + ".mscz";
+    solo.startBar = plan.val.startBar;
+    solo.endBar = plan.val.endBar;
+    solo.passes = plan.val.passes;
+    solo.soloBars = plan.val.soloBars;
+
+    const QString work = soloWorkPath(solo.id).toQString();
+    QFile::remove(work);
+    if (!QFile::copy(soloFile.toQString(), work)) {
+        return RetVal<QString>::make_ret(Ret::Code::UnknownError);
+    }
+    QFile(work).setPermissions(QFile::ReadOwner | QFile::WriteOwner);
+
+    mainData.solos.push_back(solo);
+    storeTo(m_mainProject->masterNotation()->masterScore(), mainData, m_mainProject);
+
+    RetVal<INotationProjectPtr> project = loadSoloProject(solo.id);
+    if (!project.ret) {
+        return RetVal<QString>::make_ret(project.ret);
+    }
+
+    Ret ret = buildSoloBand(project.val, solo);
+    if (!ret) {
+        return RetVal<QString>::make_ret(ret);
+    }
+    project.val->save(soloWorkPath(solo.id), SaveMode::Save, false);
+
+    return RetVal<QString>::make_ok(solo.id);
+}
+
+Ret StarScoreService::showSolo(const QString& soloId)
+{
+    RetVal<INotationProjectPtr> project = loadSoloProject(soloId);
+    if (!project.ret) {
+        return project.ret;
+    }
+
+    if (INotationPtr n = globalContext()->currentNotation()) {
+        if (n->interaction()->isTextEditingStarted()) {
+            n->interaction()->endEditText();
+        }
+    }
+    if (playbackController()->isPlaying()) {
+        playbackController()->reset();
+    }
+
+    m_switching = true;
+    globalContext()->setCurrentProject(project.val);
+    m_switching = false;
+    listenCurrentProject();
+    m_changed.notify();
+    return make_ok();
+}
+
+Ret StarScoreService::showMainScore()
+{
+    if (!m_mainProject) {
+        return make_ret(Ret::Code::InternalError);
+    }
+    if (INotationPtr n = globalContext()->currentNotation()) {
+        if (n->interaction()->isTextEditingStarted()) {
+            n->interaction()->endEditText();
+        }
+    }
+    if (playbackController()->isPlaying()) {
+        playbackController()->reset();
+    }
+
+    m_switching = true;
+    globalContext()->setCurrentProject(m_mainProject);
+    m_switching = false;
+    listenCurrentProject();
+    m_changed.notify();
+    return make_ok();
+}
+
+Ret StarScoreService::refreshSoloBand(const QString& soloId)
+{
+    for (const StarScoreSolo& solo : solos()) {
+        if (solo.id != soloId) {
+            continue;
+        }
+        RetVal<INotationProjectPtr> project = loadSoloProject(soloId);
+        if (!project.ret) {
+            return project.ret;
+        }
+        Ret ret = buildSoloBand(project.val, solo);
+        project.val->markAsUnsaved();
+        m_changed.notify();
+        return ret;
+    }
+    return make_ret(Ret::Code::UnknownError);
+}
+
+void StarScoreService::renameSolo(const QString& soloId, const QString& name)
+{
+    if (!m_mainProject || name.trimmed().isEmpty()) {
+        return;
+    }
+    Data data = loadFrom(m_mainProject->masterNotation()->masterScore());
+    for (StarScoreSolo& solo : data.solos) {
+        if (solo.id == soloId) {
+            solo.name = name.trimmed();
+        }
+    }
+    storeTo(m_mainProject->masterNotation()->masterScore(), data, m_mainProject);
+    if (auto it = m_soloProjects.find(soloId); it != m_soloProjects.end()) {
+        it->second->setDisplayNameOverride(m_mainProject->displayName() + " — " + muse::qtrc("starscore", "Solo: %1").arg(name.trimmed()));
+    }
+}
+
+void StarScoreService::removeSolo(const QString& soloId)
+{
+    if (!m_mainProject) {
+        return;
+    }
+    if (currentSoloId() == soloId) {
+        showMainScore();
+    }
+    Data data = loadFrom(m_mainProject->masterNotation()->masterScore());
+    data.solos.erase(std::remove_if(data.solos.begin(), data.solos.end(),
+                                    [&](const StarScoreSolo& s) { return s.id == soloId; }), data.solos.end());
+    storeTo(m_mainProject->masterNotation()->masterScore(), data, m_mainProject);
+    m_soloProjects.erase(soloId);
+    QFile::remove(soloWorkPath(soloId).toQString());
+}
+
+Ret StarScoreService::exportSolo(const QString& soloId, const io::path_t& msczPath)
+{
+    RetVal<INotationProjectPtr> project = loadSoloProject(soloId);
+    if (!project.ret) {
+        return project.ret;
+    }
+    return project.val->save(msczPath, SaveMode::SaveCopy, false);
+}
+
+Ret StarScoreService::injectSolos(const io::path_t& starscorePath)
+{
+    // Save changed solos to their working files first
+    for (auto& [id, project] : m_soloProjects) {
+        if (project->needSave().val) {
+            Ret ret = project->save(soloWorkPath(id), SaveMode::Save, false);
+            if (!ret) {
+                return ret;
+            }
+        }
+    }
+
+    const std::vector<StarScoreSolo> list = solos();
+    const QString target = starscorePath.toQString();
+    const QString tmp = target + ".solos-tmp";
+
+    {
+        ZipReader reader(starscorePath);
+        if (reader.hasError()) {
+            return make_ret(Ret::Code::UnknownError);
+        }
+        QFile::remove(tmp);
+        ZipWriter writer(io::path_t(tmp));
+        for (const ZipReader::FileInfo& info : reader.fileInfoList()) {
+            const std::string name = info.filePath.toStdString();
+            if (!info.isFile || QString::fromStdString(name).startsWith(STARSCORE_SOLOS_DIR + "/")) {
+                continue;
+            }
+            writer.addFile(name, reader.fileData(name));
+        }
+        for (const StarScoreSolo& solo : list) {
+            QFile f(soloWorkPath(solo.id).toQString());
+            if (!f.open(QIODevice::ReadOnly)) {
+                LOGW() << "[starscore] missing working copy of solo " << solo.id;
+                continue;
+            }
+            writer.addFile(solo.file.toStdString(), ByteArray::fromQByteArray(f.readAll()));
+        }
+        writer.close();
+        if (writer.hasError()) {
+            QFile::remove(tmp);
+            return make_ret(Ret::Code::UnknownError);
+        }
+    }
+
+    QFile::remove(target);
+    if (!QFile::rename(tmp, target)) {
+        return make_ret(Ret::Code::UnknownError);
+    }
+    return make_ok();
+}
+
+Ret StarScoreService::saveAll()
+{
+    if (!m_mainProject) {
+        return make_ret(Ret::Code::InternalError);
+    }
+
+    if (m_mainProject->needSave().val) {
+        // saving the main score triggers injectSolos() through saveComplited
+        return m_mainProject->save(io::path_t(), SaveMode::Save, true);
+    }
+
+    Ret ret = injectSolos(m_mainProject->path());
+    m_changed.notify();
+    return ret;
 }

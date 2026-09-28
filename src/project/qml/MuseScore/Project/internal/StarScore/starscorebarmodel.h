@@ -28,6 +28,9 @@ class StarScoreBarModel : public QObject, public muse::Contextable, public muse:
     Q_PROPERTY(bool isStarScoreFile READ isStarScoreFile NOTIFY changed)
     Q_PROPERTY(QVariantList arrangements READ arrangements NOTIFY changed)
     Q_PROPERTY(QVariantList sections READ sections NOTIFY changed)
+    Q_PROPERTY(QVariantList solos READ solos NOTIFY changed)
+    Q_PROPERTY(bool isSoloView READ isSoloView NOTIFY changed)
+    Q_PROPERTY(bool canAddSolos READ canAddSolos NOTIFY changed)
 
     QML_ELEMENT
 
@@ -44,6 +47,13 @@ public:
     bool isStarScoreFile() const;
     QVariantList arrangements() const;
     QVariantList sections() const;
+    QVariantList solos() const;
+    bool isSoloView() const;
+    bool canAddSolos() const;
+
+    Q_INVOKABLE void showSolo(const QString& id);
+    Q_INVOKABLE void showMainScore();
+    Q_INVOKABLE QVariantList soloMenu(const QString& id) const;
 
     Q_INVOKABLE void load();
 

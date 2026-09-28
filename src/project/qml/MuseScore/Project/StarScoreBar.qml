@@ -280,6 +280,68 @@ Rectangle {
                 }
             }
         }
+
+        // --- Solos ---
+        RowLayout {
+            Layout.fillWidth: true
+            visible: !root.collapsed && (barModel.solos.length > 0 || barModel.canAddSolos)
+            spacing: 8
+
+            StyledTextLabel {
+                Layout.preferredWidth: 96
+                Layout.alignment: Qt.AlignTop | Qt.AlignLeft
+                Layout.topMargin: 5
+                horizontalAlignment: Text.AlignLeft
+                text: qsTrc("starscore", "Solos")
+                font: ui.theme.bodyBoldFont
+            }
+
+            Flow {
+                Layout.fillWidth: true
+                spacing: 6
+
+                StarScoreChip {
+                    visible: barModel.solos.length > 0
+                    text: qsTrc("starscore", "Main score")
+                    active: !barModel.isSoloView
+                    showDot: false
+                    onLeftClicked: function(mouse) {
+                        barModel.showMainScore()
+                    }
+                }
+
+                Repeater {
+                    model: barModel.solos
+
+                    delegate: StarScoreChip {
+                        required property var modelData
+
+                        text: modelData.name
+                        active: modelData.active
+                        showDot: false
+                        toolTip: modelData.info + "\n" + qsTrc("starscore", "Right-click for options")
+                        menuItemsProvider: function() { return barModel.soloMenu(modelData.id) }
+
+                        onLeftClicked: function(mouse) {
+                            barModel.showSolo(modelData.id)
+                        }
+                        onMenuItemChosen: function(itemId) {
+                            barModel.handleMenuItem(itemId)
+                        }
+                    }
+                }
+
+                StarScoreChip {
+                    visible: barModel.canAddSolos
+                    text: qsTrc("starscore", "+ Add solo transcription")
+                    dashed: true
+                    showDot: false
+                    onLeftClicked: function(mouse) {
+                        barModel.handleMenuItem("solo-add")
+                    }
+                }
+            }
+        }
     }
 
     SeparatorLine {

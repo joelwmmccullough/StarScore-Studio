@@ -74,6 +74,12 @@ void ProjectActionsController::init()
     dispatcher()->reg(this, "starscore-part-styles", [this]() {
         interactive()->open(Uri("musescore://starscore/styles"));
     });
+    dispatcher()->reg(this, "starscore-additive-timesig", [this]() {
+        interactive()->open(Uri("musescore://starscore/additivetimesig"));
+    });
+    dispatcher()->reg(this, "starscore-add-solo", [this]() {
+        interactive()->open(Uri("musescore://starscore/addsolo"));
+    });
     dispatcher()->reg(this, "starscore-color-notes", [this]() { colorNotes(true); });
     dispatcher()->reg(this, "starscore-uncolor-notes", [this]() { colorNotes(false); });
     dispatcher()->reg(this, "file-open", this, &ProjectActionsController::openProject);
@@ -653,6 +659,11 @@ bool ProjectActionsController::isProjectOpened(const muse::io::path_t& scorePath
         return true;
     }
 
+    // StarScore Studio: a solo view belongs to its .starscore
+    if (starScoreService()->isSoloProject(project.get()) && starScoreService()->mainProjectPath() == scorePath) {
+        return true;
+    }
+
     return false;
 }
 
@@ -745,9 +756,15 @@ bool ProjectActionsController::closeOpenedProject(bool goToHome)
         playbackController()->reset();
     }
 
+    // StarScore Studio: closing from a solo view closes the whole .starscore
+    if (starScoreService()->isSoloProject(project.get())) {
+        starScoreService()->showMainScore();
+        project = currentNotationProject();
+    }
+
     bool result = true;
 
-    if (project->needSave().val) {
+    if (project->needSave().val || starScoreService()->hasUnsavedSolos()) {
         IInteractive::Button btn = askAboutSavingScore(project);
 
         if (btn == IInteractive::Button::Cancel) {
@@ -831,6 +848,23 @@ bool ProjectActionsController::saveProject(SaveMode saveMode, SaveLocationType s
     };
 
     INotationProjectPtr project = currentNotationProject();
+
+    // StarScore Studio: a solo transcription is saved inside its .starscore
+    if (project && starScoreService()->isSoloProject(project.get())) {
+        if (saveMode == SaveMode::Save && saveLocationType != SaveLocationType::Cloud) {
+            Ret ret = starScoreService()->saveAll();
+            if (!ret) {
+                warnScoreCouldnotBeSaved(ret);
+                return false;
+            }
+            recentFilesController()->prependRecentFile(RecentFile(starScoreService()->mainProjectPath()));
+            return true;
+        }
+        if (saveMode != SaveMode::SaveSelection) {
+            starScoreService()->showMainScore();
+            project = currentNotationProject();
+        }
+    }
 
     const bool isExistingSave = saveMode == SaveMode::Save && !project->isNewlyCreated();
     const bool wantNewCloudSave = saveLocationType == SaveLocationType::Cloud && !project->isCloudProject();

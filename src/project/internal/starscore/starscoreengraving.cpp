@@ -15,6 +15,9 @@
 #include "engraving/dom/accidental.h"
 #include "engraving/dom/notedot.h"
 #include "engraving/dom/select.h"
+#include "engraving/dom/timesig.h"
+#include "engraving/dom/factory.h"
+#include "engraving/compat/dummyelement.h"
 #include "engraving/dom/systemlock.h"
 #include "engraving/editing/editsystemlocks.h"
 #include "engraving/style/style.h"
@@ -215,5 +218,98 @@ int colorNotes(Score* score, bool colorize)
     }
 
     return changed;
+}
+
+static const TimeSig* starscoreTimeSigAt(const Measure* m)
+{
+    const Segment* seg = m->findSegmentR(SegmentType::TimeSig, Fraction(0, 1));
+    if (!seg) {
+        return nullptr;
+    }
+    const EngravingItem* e = seg->element(0);
+    return (e && e->isTimeSig()) ? toTimeSig(e) : nullptr;
+}
+
+QString applyAdditiveTimeSig(MasterScore* score, Measure* start, Measure* last, const std::vector<int>& numerators, int denominator)
+{
+    if (!score || !start || numerators.empty() || denominator <= 0) {
+        return QString("Nothing to do");
+    }
+    for (int n : numerators) {
+        if (n <= 0 || n > 64) {
+            return QString("Each number must be between 1 and 64");
+        }
+    }
+    if (denominator & (denominator - 1)) {
+        return QString("The bottom number must be 1, 2, 4, 8, 16, 32 or 64");
+    }
+
+    if (start->isMMRest()) {
+        start = start->mmRestFirst();
+    }
+
+    // Where the pattern stops
+    const Fraction startTick = start->tick();
+    Fraction endTick;
+    Fraction resumeSig;   // time signature to restore after a selected range
+    if (last) {
+        endTick = last->endTick();
+        resumeSig = last->nextMeasure() ? last->nextMeasure()->timesig() : Fraction();
+        if (last->nextMeasure() && starscoreTimeSigAt(last->nextMeasure())) {
+            resumeSig = Fraction();   // a time signature already follows
+        }
+    } else {
+        endTick = score->lastMeasure()->endTick();
+        for (Measure* m = start->nextMeasure(); m; m = m->nextMeasure()) {
+            if (starscoreTimeSigAt(m)) {
+                endTick = m->tick();
+                break;
+            }
+        }
+    }
+
+    String numeratorText;
+    for (size_t i = 0; i < numerators.size(); ++i) {
+        if (i > 0) {
+            numeratorText += u"+";
+        }
+        numeratorText += String::number(numerators[i]);
+    }
+
+    Fraction tick = startTick;
+    size_t i = 0;
+    int guard = 0;
+    while (tick < endTick && guard++ < 10000) {
+        Measure* m = score->tick2measure(tick);
+        if (!m || m->tick() != tick) {
+            break;
+        }
+        const Fraction sig(numerators[i % numerators.size()], denominator);
+
+        TimeSig* ts = Factory::createTimeSig(score->dummy()->segment());
+        ts->setSig(sig);
+        if (i == 0) {
+            if (numerators.size() > 1) {
+                ts->setNumeratorString(numeratorText);
+            }
+        } else {
+            ts->setVisible(false);
+            ts->setShowCourtesySig(false);
+        }
+        score->cmdAddTimeSig(m, 0, ts, false);
+
+        tick += sig;
+        ++i;
+    }
+
+    if (resumeSig.isValid() && !resumeSig.isZero()) {
+        if (Measure* m = score->tick2measure(tick); m && m->tick() == tick) {
+            TimeSig* ts = Factory::createTimeSig(score->dummy()->segment());
+            ts->setSig(resumeSig);
+            score->cmdAddTimeSig(m, 0, ts, false);
+        }
+    }
+
+    return QString();
 }
 }

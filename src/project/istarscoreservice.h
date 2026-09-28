@@ -21,6 +21,8 @@
 #include "global/async/notification.h"
 
 namespace mu::project {
+class INotationProject;
+
 //! Status shown by the coloured dot on each section (and, derived, each arrangement).
 enum class StarScoreStatus {
     Empty = 0,
@@ -99,6 +101,31 @@ struct StarScoreStyleRule
     QString sectionKey;
     QString partName;
     QString stylePath;
+};
+
+//! A solo transcription stored inside the .starscore as its own score (entry "StarScoreSolos/<id>.mscz").
+//! It covers bars startBar..endBar of the main score, played `passes` times (1 = written out).
+struct StarScoreSolo
+{
+    QString id;
+    QString name;
+    QString file;
+    int startBar = 1;
+    int endBar = 1;
+    int passes = 1;
+    int soloBars = 0;
+};
+
+//! What adding a solo file would do, shown before the user confirms
+struct StarScoreSoloPlan
+{
+    int soloBars = 0;
+    int startBar = 1;
+    int endBar = 1;
+    int passes = 1;
+    bool repeated = false;
+    QString summary;
+    QString warning;
 };
 
 struct StarScorePartInfo
@@ -180,6 +207,25 @@ public:
     //! Apply the default style and matching rules. With partIds, only part books for those parts
     //! (and not the main score). Returns how many scores were restyled.
     virtual int applyStyles(const QStringList& partIds = {}) = 0;
+
+    // --- solo transcriptions ---
+    virtual std::vector<StarScoreSolo> solos() const = 0;
+    virtual QString currentSoloId() const = 0;          // empty when the main score is showing
+    virtual bool canAddSolos() const = 0;               // the main score is a saved .starscore
+    virtual bool isSoloProject(const INotationProject* project) const = 0;
+    virtual bool hasUnsavedSolos() const = 0;
+    virtual muse::io::path_t mainProjectPath() const = 0;
+    virtual muse::RetVal<StarScoreSoloPlan> planSolo(const muse::io::path_t& soloFile, int startBar, int endBar) const = 0;
+    virtual muse::RetVal<QString> addSolo(const muse::io::path_t& soloFile, const QString& name, int startBar, int endBar) = 0;
+    virtual muse::Ret showSolo(const QString& soloId) = 0;
+    virtual muse::Ret showMainScore() = 0;
+    //! Re-copy the band's music (repeats written out) into the solo view
+    virtual muse::Ret refreshSoloBand(const QString& soloId) = 0;
+    virtual void renameSolo(const QString& soloId, const QString& name) = 0;
+    virtual void removeSolo(const QString& soloId) = 0;
+    virtual muse::Ret exportSolo(const QString& soloId, const muse::io::path_t& msczPath) = 0;
+    //! Save changed solos and the main score (used when Save is pressed while a solo is showing)
+    virtual muse::Ret saveAll() = 0;
 
     //! Save a .mscz holding only the instruments and part books of this arrangement's sections.
     virtual muse::Ret exportArrangement(const QString& arrangementId, const muse::io::path_t& msczPath) = 0;

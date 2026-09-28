@@ -40,4 +40,11 @@ LayoutCopyResult copyLayout(const mu::engraving::Score* source, const std::vecto
 //! to the default colour. Works on the selected notes, or the whole score when nothing is selected.
 //! Must be called inside a command (startCmd/endCmd). Returns the number of notes changed.
 int colorNotes(mu::engraving::Score* score, bool colorize);
+
+//! Additive time signature, e.g. numerators {4,4,4,3} over 8: bars of 4/8, 4/8, 4/8, 3/8, repeating.
+//! The first bar shows "4+4+4+3 / 8"; the following changes are hidden. Runs from `start` to the end
+//! of `last` (or, when last is null, up to the next existing time signature or the end of the score).
+//! Must be called inside a command. Returns an error message, or an empty string.
+QString applyAdditiveTimeSig(mu::engraving::MasterScore* score, mu::engraving::Measure* start, mu::engraving::Measure* last,
+                             const std::vector<int>& numerators, int denominator);
 }

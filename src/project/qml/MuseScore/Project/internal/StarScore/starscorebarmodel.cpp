@@ -81,6 +81,57 @@ QVariantList StarScoreBarModel::sections() const
     return result;
 }
 
+QVariantList StarScoreBarModel::solos() const
+{
+    QVariantList result;
+    const QString current = starScore()->currentSoloId();
+    for (const StarScoreSolo& solo : starScore()->solos()) {
+        QString info = solo.passes > 1
+                       ? muse::qtrc("starscore", "%1 bars · over bars %2–%3 × %4").arg(solo.soloBars).arg(solo.startBar).arg(solo.endBar).arg(solo.passes)
+                       : muse::qtrc("starscore", "%1 bars · bars %2–%3").arg(solo.soloBars).arg(solo.startBar).arg(solo.endBar);
+        result << QVariantMap { { "id", solo.id }, { "name", solo.name }, { "info", info }, { "active", solo.id == current } };
+    }
+    return result;
+}
+
+bool StarScoreBarModel::isSoloView() const
+{
+    return !starScore()->currentSoloId().isEmpty();
+}
+
+bool StarScoreBarModel::canAddSolos() const
+{
+    return starScore()->canAddSolos();
+}
+
+void StarScoreBarModel::showSolo(const QString& id)
+{
+    muse::Ret ret = starScore()->showSolo(id);
+    if (!ret) {
+        interactive()->error(muse::trc("starscore", "Couldn't open the solo"), ret.toString());
+    }
+}
+
+void StarScoreBarModel::showMainScore()
+{
+    starScore()->showMainScore();
+}
+
+QVariantList StarScoreBarModel::soloMenu(const QString& id) const
+{
+    return {
+        QVariantMap { { "id", "solo-show:" + id }, { "title", muse::qtrc("starscore", "Show this solo") }, { "enabled", true } },
+        QVariantMap { { "id", "solo-refresh:" + id }, { "title", muse::qtrc("starscore", "Refresh band parts from the main score") },
+                      { "enabled", true } },
+        QVariantMap {},
+        QVariantMap { { "id", "solo-rename:" + id }, { "title", muse::qtrc("starscore", "Rename…") }, { "enabled", true } },
+        QVariantMap { { "id", "solo-export:" + id }, { "title", muse::qtrc("starscore", "Export as MuseScore file (.mscz)…") },
+                      { "enabled", true } },
+        QVariantMap {},
+        QVariantMap { { "id", "solo-remove:" + id }, { "title", muse::qtrc("starscore", "Remove solo from this file") }, { "enabled", true } },
+    };
+}
+
 void StarScoreBarModel::showArrangement(const QString& id)
 {
     starScore()->showArrangement(id);
@@ -405,6 +456,42 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
                             ? muse::qtrc("starscore", "Added %n section(s).", nullptr, added).toStdString()
                             : muse::trc("starscore", "No new sections found. Sections come from part books named like "
                                                      "“3-Horn Arrangement” or “Lead Sheet”, plus rhythm-section instruments."));
+    } else if (action == "solo-show") {
+        showSolo(arg);
+    } else if (action == "solo-refresh") {
+        muse::Ret ret = starScore()->refreshSoloBand(arg);
+        if (!ret) {
+            interactive()->error(muse::trc("starscore", "Couldn't refresh the band parts"), ret.toString());
+        }
+    } else if (action == "solo-rename") {
+        openEditDialog("rename-solo", arg);
+    } else if (action == "solo-export") {
+        QString name = arg;
+        for (const StarScoreSolo& solo : starScore()->solos()) {
+            if (solo.id == arg) {
+                name = solo.name;
+            }
+        }
+        const QFileInfo mainFile(starScore()->mainProjectPath().toQString());
+        const io::path_t defaultPath = io::path_t(mainFile.absolutePath()).appendingComponent(name).appendingSuffix("mscz");
+        const io::path_t path = interactive()->selectSavingFileSync(muse::trc("starscore", "Export solo"), defaultPath,
+                                                                    { muse::trc("project", "MuseScore file") + " (*.mscz)" });
+        if (!path.empty()) {
+            muse::Ret ret = starScore()->exportSolo(arg, path);
+            if (!ret) {
+                interactive()->error(muse::trc("starscore", "Couldn't export the solo"), ret.toString());
+            }
+        }
+    } else if (action == "solo-remove") {
+        IInteractive::Result res = interactive()->warningSync(
+            muse::trc("starscore", "Remove this solo from the .starscore?"),
+            muse::trc("starscore", "Its transcription is deleted from this file when you save. Export it first if you want a copy."),
+            { IInteractive::Button::Cancel, IInteractive::Button::Ok }, IInteractive::Button::Cancel);
+        if (res.standardButton() == IInteractive::Button::Ok) {
+            starScore()->removeSolo(arg);
+        }
+    } else if (action == "solo-add") {
+        interactive()->open(UriQuery("musescore://starscore/addsolo"));
     } else if (action == "part-styles") {
         dispatcher()->dispatch("starscore-part-styles");
     } else if (action == "apply-styles") {

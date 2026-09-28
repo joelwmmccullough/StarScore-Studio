@@ -70,6 +70,10 @@ qt_add_qml_module(project_qml
         internal/StarScore/newstarscoremodel.h
         internal/StarScore/starscorestylesmodel.cpp
         internal/StarScore/starscorestylesmodel.h
+        internal/StarScore/addsolomodel.cpp
+        internal/StarScore/addsolomodel.h
+        internal/StarScore/additivetimesigmodel.cpp
+        internal/StarScore/additivetimesigmodel.h
     QML_FILES
         AlsoShareAudioComDialog.qml
         AskSaveLocationTypeDialog.qml
@@ -147,6 +151,8 @@ qt_add_qml_module(project_qml
         CopyLayoutDialog.qml
         NewStarScoreDialog.qml
         StarScoreStylesDialog.qml
+        AddSoloDialog.qml
+        AdditiveTimeSigDialog.qml
     RESOURCES
         internal/Migration/migration.png
         internal/SaveToCloud/images/Cloud.png

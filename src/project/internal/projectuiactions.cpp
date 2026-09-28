@@ -63,6 +63,18 @@ const UiActionList ProjectUiActions::m_actions = {
              TranslatableString("action", "Part styles…"),
              TranslatableString("action", "Part styles")
              ),
+    UiAction("starscore-additive-timesig",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Additive time signature…"),
+             TranslatableString("action", "Additive time signature (e.g. 4+4+4+3/8)")
+             ),
+    UiAction("starscore-add-solo",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Add solo transcription…"),
+             TranslatableString("action", "Add solo transcription")
+             ),
     UiAction("starscore-color-notes",
              mu::context::UiCtxProjectOpened,
              mu::context::CTX_ANY,

@@ -360,6 +360,8 @@ MenuItem* AppMenuModel::makeFormatMenu()
         makeMenuItem("page-settings"),
         makeMenuItem("starscore-copy-layout"),
         makeMenuItem("starscore-part-styles"),
+        makeMenuItem("starscore-additive-timesig"),
+        makeMenuItem("starscore-add-solo"),
         makeMenuItem("starscore-color-notes"),
         makeMenuItem("starscore-uncolor-notes"),
         makeSeparator(),

@@ -53,6 +53,7 @@
 #include "iprojectconfiguration.h"
 #include "iprojectcreator.h"
 #include "irecentfilescontroller.h"
+#include "istarscoreservice.h"
 #include "iprojectautosaver.h"
 
 namespace mu::project {
@@ -68,6 +69,7 @@ class ProjectActionsController : public IProjectFilesController, public muse::mi
     muse::ContextInject<INotationReadersRegister> readers = { this };
     muse::ContextInject<IRecentFilesController> recentFilesController = { this };
     muse::ContextInject<IProjectAutoSaver> projectAutoSaver = { this };
+    muse::ContextInject<IStarScoreService> starScoreService = { this };
     muse::ContextInject<IOpenSaveProjectScenario> openSaveProjectScenario = { this };
     muse::ContextInject<IExportProjectScenario> exportProjectScenario = { this };
     muse::ContextInject<muse::actions::IActionsDispatcher> dispatcher = { this };

@@ -26,6 +26,8 @@ QString StarScoreEditModel::dialogTitle() const
         return muse::qtrc("starscore", "Rename section");
     } else if (m_mode == "rename-arrangement") {
         return muse::qtrc("starscore", "Rename arrangement");
+    } else if (m_mode == "rename-solo") {
+        return muse::qtrc("starscore", "Rename solo");
     }
     return QString();
 }
@@ -69,7 +71,13 @@ void StarScoreEditModel::load(const QString& mode, const QString& itemId)
     const std::vector<StarScoreSection> sections = starScore()->sections();
     const std::vector<StarScoreArrangement> arrangements = starScore()->arrangements();
 
-    if (mode == "section" || mode == "rename-section") {
+    if (mode == "rename-solo") {
+        for (const StarScoreSolo& solo : starScore()->solos()) {
+            if (solo.id == itemId) {
+                m_name = solo.name;
+            }
+        }
+    } else if (mode == "section" || mode == "rename-section") {
         QStringList selected;
         for (const StarScoreSection& s : sections) {
             if (s.id == itemId) {
@@ -152,7 +160,9 @@ bool StarScoreEditModel::apply()
         }
     }
 
-    if (m_mode == "rename-section") {
+    if (m_mode == "rename-solo") {
+        starScore()->renameSolo(m_itemId, name);
+    } else if (m_mode == "rename-section") {
         starScore()->renameSection(m_itemId, name);
     } else if (m_mode == "rename-arrangement") {
         starScore()->renameArrangement(m_itemId, name);
