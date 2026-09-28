@@ -12,6 +12,7 @@
 #include "context/iglobalcontext.h"
 #include "notation/iinstrumentsrepository.h"
 #include "iprojectcreator.h"
+#include "global/iglobalconfiguration.h"
 
 namespace mu::engraving {
 class MasterScore;
@@ -23,6 +24,7 @@ namespace mu::project {
 class StarScoreService : public IStarScoreService, public muse::Contextable, public muse::async::Asyncable
 {
     muse::GlobalInject<IProjectCreator> projectCreator;
+    muse::GlobalInject<muse::IGlobalConfiguration> globalConfiguration;
     muse::ContextInject<context::IGlobalContext> globalContext = { this };
     muse::ContextInject<notation::IInstrumentsRepository> instrumentsRepository = { this };
 
@@ -70,6 +72,12 @@ public:
 
     int detectSections() override;
 
+    QString defaultStylePath() const override;
+    void setDefaultStylePath(const QString& path) override;
+    std::vector<StarScoreStyleRule> styleRules() const override;
+    void setStyleRules(const std::vector<StarScoreStyleRule>& rules) override;
+    int applyStyles(const QStringList& partIds = {}) override;
+
     muse::Ret exportArrangement(const QString& arrangementId, const muse::io::path_t& msczPath) override;
 
     struct Data {
@@ -97,6 +105,13 @@ private:
                                     const std::vector<StarScoreInstrument>& instruments);
     const StarScoreSectionTemplate* sectionTemplate(const QString& key) const;
     void removePartsKeepingSystemObjects(const QStringList& partIdsToRemove);
+
+    struct StyleSettings {
+        QString defaultStyle;
+        std::vector<StarScoreStyleRule> rules;
+    };
+    StyleSettings loadStyleSettings() const;
+    void saveStyleSettings(const StyleSettings& settings);
 
     static QString uniqueId(const QStringList& taken, const QString& base);
     static QString idText(const mu::engraving::Part* part);

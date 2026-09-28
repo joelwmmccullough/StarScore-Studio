@@ -57,6 +57,24 @@ const UiActionList ProjectUiActions::m_actions = {
              TranslatableString("action", "Copy layout breaks to other parts…"),
              TranslatableString("action", "Copy layout breaks to other parts")
              ),
+    UiAction("starscore-part-styles",
+             mu::context::UiCtxAny,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Part styles…"),
+             TranslatableString("action", "Part styles")
+             ),
+    UiAction("starscore-color-notes",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Color notes by pitch"),
+             TranslatableString("action", "Color notes by pitch (selection, or whole score)")
+             ),
+    UiAction("starscore-uncolor-notes",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Remove note colors"),
+             TranslatableString("action", "Remove note colors (selection, or whole score)")
+             ),
     UiAction("file-close",
              mu::context::UiCtxAny,
              mu::context::CTX_ANY,

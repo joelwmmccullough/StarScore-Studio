@@ -127,6 +127,7 @@ void ProjectModule::resolveImports()
         ir->registerQmlUri(Uri("musescore://starscore/new"), "MuseScore.Project", "NewStarScoreDialog");
         ir->registerQmlUri(Uri("musescore://starscore/edit"), "MuseScore.Project", "StarScoreEditDialog");
         ir->registerQmlUri(Uri("musescore://starscore/copylayout"), "MuseScore.Project", "CopyLayoutDialog");
+        ir->registerQmlUri(Uri("musescore://starscore/styles"), "MuseScore.Project", "StarScoreStylesDialog");
     }
 
     auto er = ioc()->resolve<muse::extensions::IExtensionsExecPointsRegister>(moduleName());

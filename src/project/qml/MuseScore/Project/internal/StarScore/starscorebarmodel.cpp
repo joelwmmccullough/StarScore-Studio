@@ -245,6 +245,11 @@ QVariantList StarScoreBarModel::moreMenu() const
         QVariantMap {},
         QVariantMap { { "id", "copy-layout" }, { "title", muse::qtrc("starscore", "Copy layout breaks to other parts…") },
                       { "enabled", true } },
+        QVariantMap { { "id", "part-styles" }, { "title", muse::qtrc("starscore", "Part styles…") }, { "enabled", true } },
+        QVariantMap { { "id", "apply-styles" }, { "title", muse::qtrc("starscore", "Apply part styles now") }, { "enabled", true } },
+        QVariantMap {},
+        QVariantMap { { "id", "color-notes" }, { "title", muse::qtrc("starscore", "Color notes by pitch") }, { "enabled", true } },
+        QVariantMap { { "id", "uncolor-notes" }, { "title", muse::qtrc("starscore", "Remove note colors") }, { "enabled", true } },
     };
 }
 
@@ -400,6 +405,14 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
                             ? muse::qtrc("starscore", "Added %n section(s).", nullptr, added).toStdString()
                             : muse::trc("starscore", "No new sections found. Sections come from part books named like "
                                                      "“3-Horn Arrangement” or “Lead Sheet”, plus rhythm-section instruments."));
+    } else if (action == "part-styles") {
+        dispatcher()->dispatch("starscore-part-styles");
+    } else if (action == "apply-styles") {
+        starScore()->applyStyles();
+    } else if (action == "color-notes") {
+        dispatcher()->dispatch("starscore-color-notes");
+    } else if (action == "uncolor-notes") {
+        dispatcher()->dispatch("starscore-uncolor-notes");
     } else if (action == "copy-layout") {
         interactive()->open(UriQuery(STARSCORE_COPY_LAYOUT_URI.toStdString()));
     }

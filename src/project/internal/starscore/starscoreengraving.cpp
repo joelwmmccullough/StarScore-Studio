@@ -9,6 +9,12 @@
 
 #include "engraving/dom/masterscore.h"
 #include "engraving/dom/measure.h"
+#include "engraving/dom/segment.h"
+#include "engraving/dom/chord.h"
+#include "engraving/dom/note.h"
+#include "engraving/dom/accidental.h"
+#include "engraving/dom/notedot.h"
+#include "engraving/dom/select.h"
 #include "engraving/dom/systemlock.h"
 #include "engraving/editing/editsystemlocks.h"
 #include "engraving/style/style.h"
@@ -132,5 +138,82 @@ LayoutCopyResult copyLayout(const Score* source, const std::vector<Score*>& targ
     }
 
     return result;
+}
+
+// C, C#, D, D#, E, F, F#, G, G#, A, A#, B
+static const char* STARSCORE_PITCH_COLORS[12] = {
+    "#C7C102", "#FF5DA1", "#028800", "#2DD3C0", "#001CA4", "#CC75F8",
+    "#92D303", "#F47700", "#915700", "#AD000E", "#829EFF", "#770096"
+};
+
+static void starscoreCollectChordNotes(Chord* chord, std::vector<Note*>& notes)
+{
+    for (Note* n : chord->notes()) {
+        notes.push_back(n);
+    }
+    for (Chord* grace : chord->graceNotes()) {
+        for (Note* n : grace->notes()) {
+            notes.push_back(n);
+        }
+    }
+}
+
+int colorNotes(Score* score, bool colorize)
+{
+    if (!score) {
+        return 0;
+    }
+
+    std::vector<Note*> notes;
+    const Selection& sel = score->selection();
+
+    if (!sel.isNone()) {
+        for (EngravingItem* e : sel.elements()) {
+            if (e->isNote()) {
+                notes.push_back(toNote(e));
+            } else if (e->isChord()) {
+                starscoreCollectChordNotes(toChord(e), notes);
+            }
+        }
+    } else {
+        for (Segment* s = score->firstSegment(SegmentType::ChordRest); s; s = s->next1(SegmentType::ChordRest)) {
+            for (track_idx_t t = 0; t < score->ntracks(); ++t) {
+                EngravingItem* e = s->element(t);
+                if (e && e->isChord()) {
+                    starscoreCollectChordNotes(toChord(e), notes);
+                }
+            }
+        }
+    }
+
+    // remove duplicates (a chord and its notes can both be selected)
+    std::sort(notes.begin(), notes.end());
+    notes.erase(std::unique(notes.begin(), notes.end()), notes.end());
+
+    int changed = 0;
+    for (Note* note : notes) {
+        const Color color = colorize
+                            ? Color::fromString(STARSCORE_PITCH_COLORS[((note->pitch() % 12) + 12) % 12])
+                            : note->propertyDefault(Pid::COLOR).value<Color>();
+
+        auto apply = [&](EngravingItem* item) {
+            if (item && item->getProperty(Pid::COLOR).value<Color>() != color) {
+                item->undoChangeProperty(Pid::COLOR, color);
+                return true;
+            }
+            return false;
+        };
+
+        bool any = apply(note);
+        any |= apply(note->accidental());
+        for (NoteDot* dot : note->dots()) {
+            any |= apply(dot);
+        }
+        if (any) {
+            ++changed;
+        }
+    }
+
+    return changed;
 }
 }

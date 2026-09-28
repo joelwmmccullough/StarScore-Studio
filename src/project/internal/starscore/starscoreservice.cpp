@@ -9,6 +9,7 @@
 #include <set>
 
 #include <QDir>
+#include <QFileInfo>
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -24,6 +25,7 @@
 #include "notation/inotationparts.h"
 #include "notation/iexcerptnotation.h"
 #include "notation/inotationelements.h"
+#include "notation/inotationstyle.h"
 
 #include "inotationproject.h"
 
@@ -824,6 +826,8 @@ RetVal<QString> StarScoreService::createSection(const QString& templateKey, cons
     data.sections.push_back(section);
     store(data);
 
+    applyStyles(section.partIds);
+
     if (!missing.isEmpty()) {
         LOGW() << "[starscore] skipped unknown instruments: " << missing.join(", ");
     }
@@ -969,6 +973,7 @@ Ret StarScoreService::newStarScore(const StarScoreNewOptions& options)
     data.arrangements.push_back(a);
 
     store(data);
+    applyStyles();
     return make_ok();
 }
 
@@ -1496,4 +1501,143 @@ Ret StarScoreService::exportArrangement(const QString& arrangementId, const io::
     ret = copy->save(msczPath, SaveMode::SaveAs, false);
     QFile::remove(tmpPath);
     return ret;
+}
+
+// ---------------------------------------------------------------------------
+//  Part-book styles
+// ---------------------------------------------------------------------------
+
+StarScoreService::StyleSettings StarScoreService::loadStyleSettings() const
+{
+    StyleSettings settings;
+    QFile file(globalConfiguration()->userAppDataPath().appendingComponent("starscore_styles.json").toQString());
+    if (!file.open(QIODevice::ReadOnly)) {
+        return settings;
+    }
+    const QJsonObject root = QJsonDocument::fromJson(file.readAll()).object();
+    settings.defaultStyle = root.value("defaultStyle").toString();
+    for (const QJsonValue& v : root.value("rules").toArray()) {
+        const QJsonObject o = v.toObject();
+        settings.rules.push_back({ o.value("section").toString(), o.value("part").toString(), o.value("style").toString() });
+    }
+    return settings;
+}
+
+void StarScoreService::saveStyleSettings(const StyleSettings& settings)
+{
+    QJsonArray rules;
+    for (const StarScoreStyleRule& r : settings.rules) {
+        QJsonObject o;
+        o["section"] = r.sectionKey;
+        o["part"] = r.partName;
+        o["style"] = r.stylePath;
+        rules.append(o);
+    }
+    QJsonObject root;
+    root["defaultStyle"] = settings.defaultStyle;
+    root["rules"] = rules;
+
+    QFile file(globalConfiguration()->userAppDataPath().appendingComponent("starscore_styles.json").toQString());
+    if (file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        file.write(QJsonDocument(root).toJson());
+    }
+}
+
+QString StarScoreService::defaultStylePath() const
+{
+    return loadStyleSettings().defaultStyle;
+}
+
+void StarScoreService::setDefaultStylePath(const QString& path)
+{
+    StyleSettings settings = loadStyleSettings();
+    settings.defaultStyle = path;
+    saveStyleSettings(settings);
+}
+
+std::vector<StarScoreStyleRule> StarScoreService::styleRules() const
+{
+    return loadStyleSettings().rules;
+}
+
+void StarScoreService::setStyleRules(const std::vector<StarScoreStyleRule>& rules)
+{
+    StyleSettings settings = loadStyleSettings();
+    settings.rules = rules;
+    saveStyleSettings(settings);
+}
+
+int StarScoreService::applyStyles(const QStringList& partIds)
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    engraving::MasterScore* ms = masterScore();
+    if (!master || !ms) {
+        return 0;
+    }
+
+    const StyleSettings settings = loadStyleSettings();
+    const Data data = load();
+
+    auto usable = [](const QString& path) {
+        return !path.isEmpty() && QFileInfo::exists(path);
+    };
+
+    int restyled = 0;
+
+    if (partIds.isEmpty() && usable(settings.defaultStyle)) {
+        if (master->notation()->style()->loadStyle(settings.defaultStyle, true)) {
+            ++restyled;
+        }
+    }
+
+    for (const IExcerptNotationPtr& e : master->excerpts()) {
+        engraving::Excerpt* ex = starscoreExcerptOf(e);
+        if (!ex) {
+            continue;
+        }
+
+        // The part book's instrument (only single-instrument part books get specific rules)
+        const std::vector<engraving::Part*> parts = masterPartsOf(ex);
+        const engraving::Part* part = parts.size() == 1 ? parts.front() : nullptr;
+        const QString partId = part ? idText(part) : QString();
+
+        if (!partIds.isEmpty() && (partId.isEmpty() || !partIds.contains(partId))) {
+            continue;
+        }
+
+        QStringList sectionKeys;
+        for (const StarScoreSection& s : data.sections) {
+            if (!partId.isEmpty() && s.partIds.contains(partId)) {
+                sectionKeys << s.templateKey;
+            }
+        }
+
+        QString chosen;
+        if (part) {
+            const QString partName = part->partName().toQString().trimmed();
+            for (const StarScoreStyleRule& r : settings.rules) {
+                const bool sectionOk = r.sectionKey.isEmpty() || sectionKeys.contains(r.sectionKey);
+                const bool partOk = r.partName.trimmed().isEmpty()
+                                    || r.partName.trimmed().compare(partName, Qt::CaseInsensitive) == 0
+                                    || r.partName.trimmed().compare(e->name().trimmed(), Qt::CaseInsensitive) == 0;
+                if (sectionOk && partOk && usable(r.stylePath)) {
+                    chosen = r.stylePath;   // later rules win
+                }
+            }
+        }
+
+        INotationPtr n = e->notation();
+        bool changed = false;
+        if (usable(settings.defaultStyle)) {
+            changed |= n->style()->loadStyle(settings.defaultStyle, true);
+        }
+        if (!chosen.isEmpty()) {
+            changed |= n->style()->loadStyle(chosen, true);
+        }
+        if (changed) {
+            ++restyled;
+        }
+    }
+
+    return restyled;
 }

@@ -91,6 +91,16 @@ struct StarScoreNewOptions
     QString arrangementTemplateKey = "3-horn-standard";
 };
 
+//! "Always give this part book this style": a MuseScore style file (.mss) applied to part books
+//! whose instrument is in a section made from `sectionKey` (empty = any section) and whose
+//! part name is `partName` (empty = any part). Rules are app-wide, not per file.
+struct StarScoreStyleRule
+{
+    QString sectionKey;
+    QString partName;
+    QString stylePath;
+};
+
 struct StarScorePartInfo
 {
     QString partId;
@@ -160,6 +170,16 @@ public:
     //! and instrument types (rhythm section), plus a matching arrangement for each horn size.
     //! Returns how many sections were added.
     virtual int detectSections() = 0;
+
+    // --- styles ---
+    //! Style applied first to the main score and every part book (empty = none)
+    virtual QString defaultStylePath() const = 0;
+    virtual void setDefaultStylePath(const QString& path) = 0;
+    virtual std::vector<StarScoreStyleRule> styleRules() const = 0;
+    virtual void setStyleRules(const std::vector<StarScoreStyleRule>& rules) = 0;
+    //! Apply the default style and matching rules. With partIds, only part books for those parts
+    //! (and not the main score). Returns how many scores were restyled.
+    virtual int applyStyles(const QStringList& partIds = {}) = 0;
 
     //! Save a .mscz holding only the instruments and part books of this arrangement's sections.
     virtual muse::Ret exportArrangement(const QString& arrangementId, const muse::io::path_t& msczPath) = 0;

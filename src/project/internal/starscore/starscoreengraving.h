@@ -35,4 +35,9 @@ struct LayoutCopyResult {
 //! Must be called inside a command (startCmd/endCmd).
 LayoutCopyResult copyLayout(const mu::engraving::Score* source, const std::vector<mu::engraving::Score*>& targets,
                             const LayoutCopyOptions& options);
+
+//! Colour notes (noteheads, accidentals, dots) by pitch class using Joel's 12 colours, or reset them
+//! to the default colour. Works on the selected notes, or the whole score when nothing is selected.
+//! Must be called inside a command (startCmd/endCmd). Returns the number of notes changed.
+int colorNotes(mu::engraving::Score* score, bool colorize);
 }

@@ -21,6 +21,9 @@
  */
 #include "projectactionscontroller.h"
 
+#include "starscore/starscoreengraving.h"
+#include "notation/inotationelements.h"
+
 #include <QBuffer>
 #include <QEventLoop>
 #include <QFileInfo>
@@ -68,6 +71,11 @@ void ProjectActionsController::init()
     dispatcher()->reg(this, "starscore-copy-layout", [this]() {
         interactive()->open(Uri("musescore://starscore/copylayout"));
     });
+    dispatcher()->reg(this, "starscore-part-styles", [this]() {
+        interactive()->open(Uri("musescore://starscore/styles"));
+    });
+    dispatcher()->reg(this, "starscore-color-notes", [this]() { colorNotes(true); });
+    dispatcher()->reg(this, "starscore-uncolor-notes", [this]() { colorNotes(false); });
     dispatcher()->reg(this, "file-open", this, &ProjectActionsController::openProject);
 
     dispatcher()->reg(this, "file-close", [this]() {
@@ -136,6 +144,7 @@ bool ProjectActionsController::canReceiveAction(const ActionCode& code) const
         static const std::unordered_set<ActionCode> DONT_REQUIRE_OPEN_PROJECT {
             "file-new",
             "file-new-musescore",
+            "starscore-part-styles",
             "file-open",
             "file-import-pdf",
             "file-import-audio-to-score",
@@ -654,6 +663,20 @@ bool ProjectActionsController::isAnyProjectOpened() const
         return true;
     }
     return false;
+}
+
+void ProjectActionsController::colorNotes(bool colorize)
+{
+    INotationPtr notation = currentNotation();
+    if (!notation) {
+        return;
+    }
+
+    mu::engraving::Score* score = notation->elements()->msScore();
+    notation->undoStack()->prepareChanges(TranslatableString::untranslatable(colorize ? "Color notes by pitch" : "Remove note colors"));
+    starscore::colorNotes(score, colorize);
+    notation->undoStack()->commitChanges();
+    notation->notationChanged().notify();
 }
 
 void ProjectActionsController::newProject(bool museScoreWizard)

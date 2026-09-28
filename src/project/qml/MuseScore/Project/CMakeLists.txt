@@ -68,6 +68,8 @@ qt_add_qml_module(project_qml
         internal/StarScore/copylayoutmodel.h
         internal/StarScore/newstarscoremodel.cpp
         internal/StarScore/newstarscoremodel.h
+        internal/StarScore/starscorestylesmodel.cpp
+        internal/StarScore/starscorestylesmodel.h
     QML_FILES
         AlsoShareAudioComDialog.qml
         AskSaveLocationTypeDialog.qml
@@ -144,6 +146,7 @@ qt_add_qml_module(project_qml
         StarScoreEditDialog.qml
         CopyLayoutDialog.qml
         NewStarScoreDialog.qml
+        StarScoreStylesDialog.qml
     RESOURCES
         internal/Migration/migration.png
         internal/SaveToCloud/images/Cloud.png
