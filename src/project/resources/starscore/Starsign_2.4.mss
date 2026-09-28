@@ -435,7 +435,7 @@
     <concertPitch>0</concertPitch>
     <multiVoiceRestTwoSpaceOffset>0</multiVoiceRestTwoSpaceOffset>
     <mergeMatchingRests>0</mergeMatchingRests>
-    <createMultiMeasureRests>1</createMultiMeasureRests>
+    <createMultiMeasureRests>0</createMultiMeasureRests>
     <minEmptyMeasures>1</minEmptyMeasures>
     <singleMeasureMMRestUseNormalRest>1</singleMeasureMMRestUseNormalRest>
     <singleMeasureMMRestShowNumber>0</singleMeasureMMRestShowNumber>
@@ -994,7 +994,7 @@
     <dynamicsFrameBgColor r="255" g="255" b="255" a="0"/>
     <dynamicsPosition>center</dynamicsPosition>
     <expressionFontFace>Futura</expressionFontFace>
-    <expressionFontSize>9</expressionFontSize>
+    <expressionFontSize>8</expressionFontSize>
     <expressionLineSpacing>1</expressionLineSpacing>
     <expressionFontSpatiumDependent>1</expressionFontSpatiumDependent>
     <expressionFontStyle>2</expressionFontStyle>
