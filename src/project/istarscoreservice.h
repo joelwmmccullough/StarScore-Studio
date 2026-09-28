@@ -318,6 +318,11 @@ public:
     virtual std::vector<StarScoreComparison> compareParts(const std::map<QString, QString>& referenceByInstrument) const = 0;
     virtual void selectBar(const QString& partId, int bar) = 0;   // bar is 1-based
 
+    // --- Minor-major seventh symbol (triangle with a bar) per part: on by default for Starsign parts,
+    // off for big band, orchestra and marching band parts; can be switched for the part or score being viewed
+    virtual bool minMajSymbolInCurrentScore() const = 0;
+    virtual void setMinMajSymbolInCurrentScore(bool on) = 0;
+
     // --- Check the order of the voices within each horn / wind / string section
     virtual std::vector<StarScoreVoiceSection> checkVoiceOrder() const = 0;
 

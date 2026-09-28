@@ -926,18 +926,61 @@ void HarmonyLayout::renderActionSet(Harmony* item, Harmony::LayoutData* ldata, c
         font.setPointSizeF(font.pointSizeF() * nmag);
     }
 
-    // StarScore: the triangles drawn from StarScore Jost (major seventh U+E000, minor-major seventh U+E001)
-    // are sized to the capital height of whatever chord font the style uses, so they fit any font
+    // StarScore: the chord triangles live in StarScore Jost (U+E000 major seventh, U+E001 minor-major seventh),
+    // one pair per chord font family (Jost, Bravura, Petaluma, Leland, MuseJazz, Finale Maestro, Finale Broadway),
+    // each drawn from that font's own triangle and minus. The pair matching the style's chord font is used, and it
+    // is sized to that font's capital height. Unknown fonts get the Jost pair.
     if (text.size() == 1 && (text.at(0).unicode() == 0xE000 || text.at(0).unicode() == 0xE001)) {
+        const muse::draw::Font chordFont = ldata->fontList.value().front();
+        const String family = chordFont.family().id().toLower();
+        int variant = 0;
+        if (family.contains(u"bravura")) {
+            variant = 1;
+        } else if (family.contains(u"petaluma")) {
+            variant = 2;
+        } else if (family.contains(u"leland")) {
+            variant = 3;
+        } else if (family.contains(u"musejazz")) {
+            variant = 4;
+        } else if (family.contains(u"finale maestro")) {
+            variant = 5;
+        } else if (family.contains(u"finale broadway")) {
+            variant = 6;
+        }
+
         const double rootCap = FontMetrics::capHeight(item->font()) * harmonyCtx.scale;
         const double glyphCap = FontMetrics::capHeight(font);
         if (rootCap > 0.0 && glyphCap > 0.0) {
             font.setPointSizeF(font.pointSizeF() * rootCap / glyphCap);
         }
+
+        // The minor-major symbol can be switched off for a part (score meta tag "starscoreMinMaj"):
+        // then it is written "m" followed by the plain triangle
+        const String minmaj = item->score()->metaTag(u"starscoreMinMaj");
+        const bool minMajOff = minmaj == u"off" || minmaj == u"auto-off";
+        bool isMinMaj = text.at(0).unicode() == 0xE001;
+        if (isMinMaj && minMajOff) {
+            muse::draw::Font mFont = chordFont;
+            mFont.setPointSizeF(mFont.pointSizeF() * harmonyCtx.scale);
+            TextSegment* m = new TextSegment(u"m", mFont, harmonyCtx.x(), harmonyCtx.y(), harmonyCtx.hAlign);
+            harmonyCtx.movex(m->width());
+            if (a->renderText()) {
+                harmonyCtx.renderItemList.push_back(m);
+            } else {
+                delete m;
+            }
+            isMinMaj = false;
+        }
+        const String glyph = String(Char(char16_t(0xE000 + 2 * variant + (isMinMaj ? 1 : 0))));
+        TextSegment* tri = new TextSegment(glyph, font, harmonyCtx.x(), harmonyCtx.y(), harmonyCtx.hAlign);
+        harmonyCtx.movex(tri->width());
+        if (a->renderText()) {
+            harmonyCtx.renderItemList.push_back(tri);
+        } else {
+            delete tri;
+        }
+        return;
     }
-
-
-    kernCharacters(item, text, harmonyCtx, ctx);
 
     TextSegment* ts = new TextSegment(text, font, harmonyCtx.x(), harmonyCtx.y(), harmonyCtx.hAlign);
     harmonyCtx.movex(ts->width());

@@ -365,6 +365,7 @@ MenuItem* AppMenuModel::makeFormatMenu()
         makeMenuItem("starscore-add-solo"),
         makeMenuItem("starscore-compare-parts"),
         makeMenuItem("starscore-voice-order"),
+        makeMenuItem("starscore-toggle-minmaj"),
         makeMenuItem("starscore-check-ranges"),
         makeMenuItem("starscore-color-notes"),
         makeMenuItem("starscore-uncolor-notes"),

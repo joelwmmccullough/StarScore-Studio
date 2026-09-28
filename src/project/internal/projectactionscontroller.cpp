@@ -88,6 +88,9 @@ void ProjectActionsController::init()
     dispatcher()->reg(this, "starscore-compare-parts", [this]() {
         interactive()->open(Uri("musescore://starscore/compare"));
     });
+    dispatcher()->reg(this, "starscore-toggle-minmaj", [this]() {
+        starScoreService()->setMinMajSymbolInCurrentScore(!starScoreService()->minMajSymbolInCurrentScore());
+    });
     dispatcher()->reg(this, "starscore-voice-order", [this]() {
         interactive()->open(Uri("musescore://starscore/voiceorder"));
     });

@@ -118,6 +118,9 @@ public:
     std::vector<StarScoreComparison> compareParts(const std::map<QString, QString>& referenceByInstrument) const override;
     void selectBar(const QString& partId, int bar) override;
     std::vector<StarScoreVoiceSection> checkVoiceOrder() const override;
+    bool minMajSymbolInCurrentScore() const override;
+    void setMinMajSymbolInCurrentScore(bool on) override;
+    void syncMinMajDefaults();
 
     muse::Ret exportArrangement(const QString& arrangementId, const muse::io::path_t& msczPath) override;
 

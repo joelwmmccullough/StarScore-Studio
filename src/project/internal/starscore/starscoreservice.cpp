@@ -1747,6 +1747,8 @@ int StarScoreService::applyStyles(const QStringList& partIds)
         return 0;
     }
 
+    syncMinMajDefaults();
+
     const StyleSettings settings = loadStyleSettings();
     const Data data = load();
     const QString version = scoreVersion();
@@ -2601,6 +2603,7 @@ void StarScoreService::syncArrangementScores()
     if (dataChanged) {
         store(data);
     }
+    syncMinMajDefaults();
 
     if (!created.empty()) {
         const StyleSettings settings = loadStyleSettings();
@@ -2646,4 +2649,84 @@ void StarScoreService::openArrangementScore(const QString& arrangementId)
         master->setExcerptIsOpen(n, true);
         globalContext()->setCurrentNotation(n);
     }
+}
+
+// ---------------------------------------------------------------------------
+//  Minor-major seventh symbol, per score (meta tag "starscoreMinMaj": on / off set by the user,
+//  auto-on / auto-off set from the sections; the chord layout reads it)
+// ---------------------------------------------------------------------------
+
+static const muse::String STARSCORE_MINMAJ_TAG(u"starscoreMinMaj");
+
+void StarScoreService::syncMinMajDefaults()
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    engraving::MasterScore* ms = masterScore();
+    if (!master || !ms) {
+        return;
+    }
+    const Data data = load();
+
+    auto isOrchestralPart = [&](const engraving::Part* p) {
+        const QString pid = idText(p);
+        for (const StarScoreSection& s : data.sections) {
+            if (s.partIds.contains(pid) && (s.templateKey.startsWith("orch-") || s.templateKey.startsWith("marching-")
+                                                  || s.templateKey.startsWith("bigband-"))) {
+                return true;
+            }
+        }
+        return false;
+    };
+    auto setAuto = [](engraving::Score* score, bool on) {
+        const muse::String now = score->metaTag(STARSCORE_MINMAJ_TAG);
+        if (now == u"on" || now == u"off") {
+            return;   // chosen by hand
+        }
+        const muse::String want = on ? u"auto-on" : u"auto-off";
+        if (now != want) {
+            score->setMetaTag(STARSCORE_MINMAJ_TAG, want);
+        }
+    };
+
+    setAuto(ms, true);
+    for (const IExcerptNotationPtr& e : master->excerpts()) {
+        engraving::Excerpt* ex = starscoreExcerptOf(e);
+        if (!ex || !ex->excerptScore()) {
+            continue;
+        }
+        const std::vector<engraving::Part*> parts = masterPartsOf(ex);
+        bool allOrchestral = !parts.empty();
+        for (const engraving::Part* p : parts) {
+            allOrchestral &= isOrchestralPart(p);
+        }
+        setAuto(ex->excerptScore(), !allOrchestral);
+    }
+}
+
+bool StarScoreService::minMajSymbolInCurrentScore() const
+{
+    INotationPtr n = globalContext()->currentNotation();
+    engraving::Score* score = n ? n->elements()->msScore() : nullptr;
+    if (!score) {
+        return true;
+    }
+    const muse::String v = score->metaTag(STARSCORE_MINMAJ_TAG);
+    return !(v == u"off" || v == u"auto-off");
+}
+
+void StarScoreService::setMinMajSymbolInCurrentScore(bool on)
+{
+    INotationPtr n = globalContext()->currentNotation();
+    engraving::Score* score = n ? n->elements()->msScore() : nullptr;
+    if (!score) {
+        return;
+    }
+    score->setMetaTag(STARSCORE_MINMAJ_TAG, on ? u"on" : u"off");
+    score->setLayoutAll();
+    score->doLayout();
+    n->notationChanged().notify();
+    if (INotationProjectPtr project = globalContext()->currentProject()) {
+        project->markAsUnsaved();
+    }
+    m_changed.notify();
 }

@@ -304,6 +304,11 @@ QVariantList StarScoreBarModel::moreMenu() const
         QVariantMap { { "id", "uncolor-notes" }, { "title", muse::qtrc("starscore", "Remove note colors") }, { "enabled", true } },
         QVariantMap {},
         QVariantMap { { "id", "compare-parts" }, { "title", muse::qtrc("starscore", "Compare parts…") }, { "enabled", true } },
+        QVariantMap { { "id", "toggle-minmaj" },
+                      { "title", starScore()->minMajSymbolInCurrentScore()
+                        ? muse::qtrc("starscore", "Minor-major symbol in this part: on (switch off)")
+                        : muse::qtrc("starscore", "Minor-major symbol in this part: off (switch on)") },
+                      { "enabled", true } },
         QVariantMap { { "id", "voice-order" }, { "title", muse::qtrc("starscore", "Check voice order…") }, { "enabled", true } },
         QVariantMap { { "id", "sync-scores" }, { "title", muse::qtrc("starscore", "Make / update arrangement scores") }, { "enabled", true } },
         QVariantMap { { "id", "check-ranges" }, { "title", muse::qtrc("starscore", "Check instrument ranges") }, { "enabled", true } },
@@ -513,6 +518,8 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
         interactive()->open(UriQuery(STARSCORE_COPY_LAYOUT_URI.toStdString()));
     } else if (action == "compare-parts") {
         dispatcher()->dispatch("starscore-compare-parts");
+    } else if (action == "toggle-minmaj") {
+        starScore()->setMinMajSymbolInCurrentScore(!starScore()->minMajSymbolInCurrentScore());
     } else if (action == "voice-order") {
         dispatcher()->dispatch("starscore-voice-order");
     } else if (action == "sync-scores") {

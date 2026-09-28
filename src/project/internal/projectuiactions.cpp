@@ -87,6 +87,12 @@ const UiActionList ProjectUiActions::m_actions = {
              TranslatableString("action", "Compare parts…"),
              TranslatableString("action", "See which bars differ between parts on the same instrument")
              ),
+    UiAction("starscore-toggle-minmaj",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Minor-major symbol in this part on/off"),
+             TranslatableString("action", "Switch the minor-major seventh triangle for the part being viewed")
+             ),
     UiAction("starscore-voice-order",
              mu::context::UiCtxProjectOpened,
              mu::context::CTX_ANY,
