@@ -14,7 +14,7 @@
 				<string>starscore</string>
 			</array>
 			<key>CFBundleTypeIconFile</key>
-			<string>MsczIcon.icns</string>
+			<string>StarScoreIcon.icns</string>
 			<key>CFBundleTypeName</key>
 			<string>StarScore File</string>
 			<key>CFBundleTypeRole</key>
@@ -592,7 +592,7 @@
 			<key>UTTypeDescription</key>
 			<string>StarScore File</string>
 			<key>UTTypeIconFile</key>
-			<string>MsczIcon.icns</string>
+			<string>StarScoreIcon.icns</string>
 			<key>UTTypeIdentifier</key>
 			<string>com.starsign.starscore</string>
 			<key>UTTypeTagSpecification</key>

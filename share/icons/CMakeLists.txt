@@ -25,6 +25,7 @@ if (OS_IS_MAC)
 
     install(FILES MsczIcon/MS4_MsczIcon.icns RENAME MsczIcon.icns DESTINATION ${Mscore_SHARE_NAME}${Mscore_INSTALL_NAME})
     install(FILES MscxIcon/MS4_MscxIcon.icns RENAME MscxIcon.icns DESTINATION ${Mscore_SHARE_NAME}${Mscore_INSTALL_NAME})
+    install(FILES StarScoreIcon/StarScoreIcon.icns DESTINATION ${Mscore_SHARE_NAME}${Mscore_INSTALL_NAME})
 
 elseif(OS_IS_WIN)
     # See also windows_icons.rc
