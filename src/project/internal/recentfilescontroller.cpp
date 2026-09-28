@@ -25,6 +25,11 @@
 #include "global/defer.h"
 #include "global/serialization/json.h"
 
+#include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+
 #include "multiwindows/resourcelockguard.h"
 
 #include "app_config.h"
@@ -141,7 +146,15 @@ void RecentFilesController::loadRecentFilesList()
     }
 
     if (!data.ret || data.val.empty()) {
-        data.val = configuration()->compatRecentFilesData();
+        // StarScore Studio, first run with its own list: take back the .starscore files that
+        // earlier builds wrote into MuseScore Studio's shared list, and remove them from it.
+        newList = takeStarScoreFilesFromMuseScoreList();
+        if (!newList.empty()) {
+            async::Async::call(nullptr, [this]() {
+                saveRecentFilesList();
+            });
+        }
+        return;
     }
 
     if (data.val.empty()) {
@@ -175,6 +188,44 @@ void RecentFilesController::loadRecentFilesList()
             continue;
         }
     }
+}
+
+RecentFilesList RecentFilesController::takeStarScoreFilesFromMuseScoreList()
+{
+    RecentFilesList taken;
+
+    const QString sharedPath = (configuration()->recentFilesJsonPath().toQString().section('/', 0, -2)) + "/recent_files.json";
+    QFile file(sharedPath);
+    if (!file.open(QIODevice::ReadOnly)) {
+        return taken;
+    }
+    const QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+    file.close();
+    if (!doc.isArray()) {
+        return taken;
+    }
+
+    QJsonArray kept;
+    for (const QJsonValue& v : doc.array()) {
+        const QString path = v.isObject() ? v.toObject().value("path").toString() : v.toString();
+        if (path.endsWith(".starscore", Qt::CaseInsensitive)) {
+            RecentFile rf;
+            rf.path = muse::io::path_t(path);
+            if (v.isObject()) {
+                rf.displayNameOverride = v.toObject().value("displayName").toString();
+            }
+            taken.push_back(rf);
+        } else {
+            kept.append(v);
+        }
+    }
+
+    if (!taken.empty() && file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        file.write(QJsonDocument(kept).toJson());
+        file.close();
+    }
+
+    return taken;
 }
 
 void RecentFilesController::removeNonexistentFiles()

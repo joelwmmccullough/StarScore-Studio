@@ -61,6 +61,7 @@ protected:
 
 private:
     void loadRecentFilesList();
+    RecentFilesList takeStarScoreFilesFromMuseScoreList();
     void removeNonexistentFiles();
     void setRecentFilesList(const RecentFilesList& list, bool saveAndNotify);
     void saveRecentFilesList();

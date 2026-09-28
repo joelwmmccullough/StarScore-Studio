@@ -152,14 +152,14 @@ void ProjectConfiguration::init()
 
 muse::io::path_t ProjectConfiguration::recentFilesJsonPath() const
 {
-    return globalConfiguration()->userAppDataPath().appendingComponent("recent_files.json");
+    // StarScore Studio keeps its own list, separate from MuseScore Studio's recent_files.json
+    return globalConfiguration()->userAppDataPath().appendingComponent("starscore_recent_files.json");
 }
 
 ByteArray ProjectConfiguration::compatRecentFilesData() const
 {
-    std::string data = settings()->value(COMPAT_RECENT_FILES_DATA).toString();
-
-    return ByteArray(data.data(), data.size());
+    // StarScore Studio: never import MuseScore's old recent list
+    return ByteArray();
 }
 
 muse::io::path_t ProjectConfiguration::myFirstProjectPath() const
