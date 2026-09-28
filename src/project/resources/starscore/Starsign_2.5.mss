@@ -305,7 +305,7 @@
     <romanNumeralPosBelow x="0" y="3.5"/>
     <nashvilleNumberPosAbove x="0" y="-2.5"/>
     <nashvilleNumberPosBelow x="0" y="3.5"/>
-    <chordSymbolAFontFace>StarScore Jost</chordSymbolAFontFace>
+    <chordSymbolAFontFace>Finale Broadway</chordSymbolAFontFace>
     <chordSymbolAFontSize>15</chordSymbolAFontSize>
     <chordSymbolALineSpacing>1</chordSymbolALineSpacing>
     <chordSymbolAFontSpatiumDependent>1</chordSymbolAFontSpatiumDependent>
@@ -415,16 +415,16 @@
     <lowerCaseMinorChords>0</lowerCaseMinorChords>
     <lowerCaseBassNotes>0</lowerCaseBassNotes>
     <allCapsNoteNames>0</allCapsNoteNames>
-    <chordStyle>custom</chordStyle>
+    <chordStyle>jazz</chordStyle>
     <chordsXmlFile>0</chordsXmlFile>
-    <chordDescriptionFile>chords_starsign.xml</chordDescriptionFile>
-    <chordExtensionMag>0.71</chordExtensionMag>
-    <chordExtensionAdjust>-0.5</chordExtensionAdjust>
-    <chordModifierMag>0.71</chordModifierMag>
-    <chordModifierAdjust>-0.5</chordModifierAdjust>
+    <chordDescriptionFile>chords_jazz.xml</chordDescriptionFile>
+    <chordExtensionMag>1</chordExtensionMag>
+    <chordExtensionAdjust>0</chordExtensionAdjust>
+    <chordModifierMag>1</chordModifierMag>
+    <chordModifierAdjust>0</chordModifierAdjust>
     <verticallyStackModifiers>0</verticallyStackModifiers>
     <chordStackedModifierMag>0.75</chordStackedModifierMag>
-    <chordBassNoteStagger>0</chordBassNoteStagger>
+    <chordBassNoteStagger>1</chordBassNoteStagger>
     <chordBassNoteScale>1</chordBassNoteScale>
     <polychordDividerThickness>0.11</polychordDividerThickness>
     <polychordDividerSpacing>0.4</polychordDividerSpacing>
@@ -435,7 +435,7 @@
     <concertPitch>0</concertPitch>
     <multiVoiceRestTwoSpaceOffset>0</multiVoiceRestTwoSpaceOffset>
     <mergeMatchingRests>0</mergeMatchingRests>
-    <createMultiMeasureRests>0</createMultiMeasureRests>
+    <createMultiMeasureRests>1</createMultiMeasureRests>
     <minEmptyMeasures>1</minEmptyMeasures>
     <singleMeasureMMRestUseNormalRest>1</singleMeasureMMRestUseNormalRest>
     <singleMeasureMMRestShowNumber>0</singleMeasureMMRestShowNumber>
@@ -518,8 +518,9 @@
     <evenFooterC>$c</evenFooterC>
     <evenFooterR></evenFooterR>
     <oddFooterL></oddFooterL>
-    <oddFooterC>$C</oddFooterC>
-    <oddFooterR>Version 1.0.0</oddFooterR>
+    <oddFooterC>Version 1.0.0
+$C</oddFooterC>
+    <oddFooterR></oddFooterR>
     <voltaPosAbove x="0" y="-3"/>
     <voltaHook>2.2</voltaHook>
     <voltaLineWidth>0.16</voltaLineWidth>
@@ -1145,11 +1146,11 @@
     <translatorFrameFgColor r="0" g="0" b="0" a="255"/>
     <translatorFrameBgColor r="255" g="255" b="255" a="0"/>
     <translatorPosition>left</translatorPosition>
-    <systemTextFontFace>TT Modernoir VF Trial</systemTextFontFace>
-    <systemTextFontSize>13</systemTextFontSize>
+    <systemTextFontFace>Jost</systemTextFontFace>
+    <systemTextFontSize>10</systemTextFontSize>
     <systemTextLineSpacing>1</systemTextLineSpacing>
     <systemTextFontSpatiumDependent>1</systemTextFontSpatiumDependent>
-    <systemTextFontStyle>1</systemTextFontStyle>
+    <systemTextFontStyle>0</systemTextFontStyle>
     <systemTextColor r="0" g="0" b="0" a="255"/>
     <systemTextAlign>center,baseline</systemTextAlign>
     <systemTextOffsetType>1</systemTextOffsetType>
@@ -1401,7 +1402,7 @@
     <headerFrameBgColor r="255" g="255" b="255" a="0"/>
     <headerPosition>center</headerPosition>
     <footerFontFace>TT Modernoir VF Trial</footerFontFace>
-    <footerFontSize>11</footerFontSize>
+    <footerFontSize>10</footerFontSize>
     <footerLineSpacing>1</footerLineSpacing>
     <footerFontSpatiumDependent>0</footerFontSpatiumDependent>
     <footerFontStyle>0</footerFontStyle>
@@ -1416,7 +1417,7 @@
     <footerFrameBgColor r="255" g="255" b="255" a="0"/>
     <footerPosition>center</footerPosition>
     <copyrightFontFace>TT Modernoir Trial</copyrightFontFace>
-    <copyrightFontSize>9</copyrightFontSize>
+    <copyrightFontSize>11</copyrightFontSize>
     <copyrightLineSpacing>1</copyrightLineSpacing>
     <copyrightFontSpatiumDependent>0</copyrightFontSpatiumDependent>
     <copyrightFontStyle>0</copyrightFontStyle>
@@ -1972,6 +1973,6 @@
     <palmMuteBeginFilledArrowWidth>0.85</palmMuteBeginFilledArrowWidth>
     <palmMuteEndFilledArrowHeight>1</palmMuteEndFilledArrowHeight>
     <palmMuteEndFilledArrowWidth>0.85</palmMuteEndFilledArrowWidth>
-    <spatium>1.625</spatium>
+    <spatium>1.75</spatium>
     </Style>
   </museScore>

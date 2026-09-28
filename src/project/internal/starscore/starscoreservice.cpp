@@ -1687,10 +1687,10 @@ void StarScoreService::saveStyleSettings(const StyleSettings& settings)
 //! Done once per bundled version. A default the user chose themselves (not an older bundled one) is kept.
 void StarScoreService::installBuiltinDefaultStyle()
 {
-    static const int BUILTIN_STYLE_VERSION = 5;   // 1 = Starsign 2.0, 2 = 2.1, 3 = 2.2, 4 = 2.3, 5 = 2.4
+    static const int BUILTIN_STYLE_VERSION = 6;   // 1 = Starsign 2.0, 2 = 2.1, 3 = 2.2, 4 = 2.3, 5 = 2.4, 6 = 2.5
 
     const QString dir = globalConfiguration()->userAppDataPath().appendingComponent("StarScoreStyles").toQString();
-    const QString target = dir + "/Starsign 2.4.mss";
+    const QString target = dir + "/Starsign 2.5.mss";
 
     StyleSettings settings = loadStyleSettings();
     const bool newVersion = settings.builtinStyleVersion < BUILTIN_STYLE_VERSION;
@@ -1700,7 +1700,7 @@ void StarScoreService::installBuiltinDefaultStyle()
 
     QDir().mkpath(dir);
     QFile::remove(target);
-    if (!QFile::copy(":/resources/starscore/Starsign_2.4.mss", target)) {
+    if (!QFile::copy(":/resources/starscore/Starsign_2.5.mss", target)) {
         LOGE() << "Could not install the built-in StarScore style";
         return;
     }
