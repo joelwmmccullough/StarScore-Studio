@@ -8,6 +8,7 @@
 #include "starscorehouse.h"
 
 #include <algorithm>
+#include <map>
 #include <set>
 
 #include <QDir>
@@ -403,10 +404,23 @@ std::vector<StarScoreSection> StarScoreService::sections() const
         return {};
     }
 
-    // A section is "on" when any of its instruments is visible
+    // A section is "on" when any of its own instruments is visible. An instrument shared with another section
+    // (e.g. a soprano sax in both the 6- and 7-Horn sections) only counts when all of the section's instruments
+    // are shared; otherwise showing one section would make the other look "on" too, and turning it off would
+    // then remember just the shared instrument.
+    std::map<QString, int> useCount;
+    for (const StarScoreSection& s : data.sections) {
+        for (const QString& id : s.partIds) {
+            ++useCount[id];
+        }
+    }
     for (StarScoreSection& s : data.sections) {
+        const bool hasOwn = std::any_of(s.partIds.begin(), s.partIds.end(), [&](const QString& id) { return useCount[id] == 1; });
         bool anyVisible = false;
         for (const QString& id : s.partIds) {
+            if (hasOwn && useCount[id] > 1) {
+                continue;
+            }
             const engraving::Part* p = ms->partById(ID(id));
             if (p && p->show()) {
                 anyVisible = true;
@@ -542,7 +556,19 @@ void StarScoreService::applyOnSections(const QStringList& onIds, const QString& 
             }
         } else if (wantOn) {
             // turning on: bring back the instruments that were showing when it was turned off
-            const QStringList& restore = s.shownPartIds.isEmpty() ? s.partIds : s.shownPartIds;
+            // (a remembered list with none of the section's own instruments is from an old mix-up: show everything)
+            std::map<QString, int> uses;
+            for (const StarScoreSection& o : data.sections) {
+                for (const QString& id : o.partIds) {
+                    ++uses[id];
+                }
+            }
+            const bool rememberedOwn = std::any_of(s.shownPartIds.begin(), s.shownPartIds.end(),
+                                                   [&](const QString& id) { return uses[id] == 1; });
+            const bool sectionHasOwn = std::any_of(s.partIds.begin(), s.partIds.end(),
+                                                   [&](const QString& id) { return uses[id] == 1; });
+            const QStringList& restore = (s.shownPartIds.isEmpty() || (sectionHasOwn && !rememberedOwn))
+                                         ? s.partIds : s.shownPartIds;
             for (const QString& id : restore) {
                 shown.insert(id);
             }
