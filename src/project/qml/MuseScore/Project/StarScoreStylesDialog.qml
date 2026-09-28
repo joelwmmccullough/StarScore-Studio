@@ -141,7 +141,11 @@ StyledDialogView {
                 accentButton: true
                 buttonRole: ButtonBoxModel.ApplyRole
                 buttonId: ButtonBoxModel.CustomButton + 1
-                onClicked: resultLabel.text = stylesModel.applyNow()
+                onClicked: {
+                    stylesModel.save()
+                    stylesModel.applyNow()
+                    root.hide()
+                }
             }
 
             onStandardButtonClicked: function(buttonId) {

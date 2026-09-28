@@ -104,7 +104,7 @@ void applyHouseStyle(Score* score, bool partBook, const QString& version)
     // Chord symbols: the CourseCreator / Songbook design (see chords_starsign.xml)
     starscoreSet(score, Sid::chordSymbolAFontFace, String(u"StarScore Jost"));
     starscoreSet(score, Sid::chordSymbolAFontStyle, int(FontStyle::Normal));
-    starscoreSet(score, Sid::chordSymbolAFontSize, 12.0);
+    starscoreSet(score, Sid::chordSymbolAFontSize, 15.0);
     starscoreSet(score, Sid::chordStyle, ChordStylePreset::CUSTOM);
     starscoreSet(score, Sid::chordsXmlFile, false);
     starscoreSet(score, Sid::verticallyStackModifiers, false);
@@ -118,6 +118,11 @@ void applyHouseStyle(Score* score, bool partBook, const QString& version)
 
     // Version in the footer
     applyVersionFooter(score, version);
+
+    // Subtitle 16.5 mm below the top of the title frame
+    const PointF subtitle = score->style().styleV(Sid::subTitleOffset).value<PointF>();
+    starscoreSet(score, Sid::subTitleOffsetType, int(OffsetType::ABS));
+    starscoreSet(score, Sid::subTitleOffset, PointF(subtitle.x(), 16.5));
 
     // Title frame on page 1: 15 sp tall
     MeasureBase* first = score->first();
