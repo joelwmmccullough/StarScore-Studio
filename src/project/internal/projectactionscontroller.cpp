@@ -75,6 +75,12 @@ void ProjectActionsController::init()
     dispatcher()->reg(this, "starscore-copy-layout", [this]() {
         interactive()->open(Uri("musescore://starscore/copylayout"));
     });
+    dispatcher()->reg(this, "starscore-layout-from", [this]() {
+        interactive()->open(UriQuery("musescore://starscore/copylayout?mode=from"));
+    });
+    dispatcher()->reg(this, "starscore-layout-to", [this]() {
+        interactive()->open(UriQuery("musescore://starscore/copylayout?mode=to"));
+    });
     dispatcher()->reg(this, "starscore-part-styles", [this]() {
         interactive()->open(Uri("musescore://starscore/styles"));
     });

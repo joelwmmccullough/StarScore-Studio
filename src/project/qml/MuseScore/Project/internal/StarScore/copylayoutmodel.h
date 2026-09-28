@@ -42,7 +42,9 @@ public:
     void setSourceIndex(int index);
     QVariantList targets() const;
 
-    Q_INVOKABLE void load();
+    //! mode "to": the part being viewed is the source, the others are ticked;
+    //! mode "from": the part being viewed is the only target, another part is the source
+    Q_INVOKABLE void load(const QString& mode = QString());
     Q_INVOKABLE void setTargetChecked(int index, bool checked);
     Q_INVOKABLE void setAllTargets(bool checked);
     //! Returns a one-line summary of what changed
@@ -63,6 +65,7 @@ private:
 
     std::vector<Entry> m_entries;   // 0 = main score, then part books
     int m_sourceIndex = 0;
+    bool m_fromMode = false;
 
     bool m_lineBreaks = true;
     bool m_pageBreaks = true;

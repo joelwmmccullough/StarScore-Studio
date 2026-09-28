@@ -295,7 +295,9 @@ QVariantList StarScoreBarModel::moreMenu() const
         QVariantMap { { "id", "detect" }, { "title", muse::qtrc("starscore", "Make sections from existing part books") },
                       { "enabled", true } },
         QVariantMap {},
-        QVariantMap { { "id", "copy-layout" }, { "title", muse::qtrc("starscore", "Copy layout breaks to other parts…") },
+        QVariantMap { { "id", "layout-from" }, { "title", muse::qtrc("starscore", "Apply system formatting from another part…") },
+                      { "enabled", true } },
+        QVariantMap { { "id", "layout-to" }, { "title", muse::qtrc("starscore", "Apply this system formatting to other parts…") },
                       { "enabled", true } },
         QVariantMap { { "id", "part-styles" }, { "title", muse::qtrc("starscore", "Part styles…") }, { "enabled", true } },
         QVariantMap { { "id", "apply-styles" }, { "title", muse::qtrc("starscore", "Apply part styles now") }, { "enabled", true } },
@@ -514,8 +516,10 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
         dispatcher()->dispatch("starscore-color-notes");
     } else if (action == "uncolor-notes") {
         dispatcher()->dispatch("starscore-uncolor-notes");
-    } else if (action == "copy-layout") {
-        interactive()->open(UriQuery(STARSCORE_COPY_LAYOUT_URI.toStdString()));
+    } else if (action == "copy-layout" || action == "layout-to") {
+        interactive()->open(UriQuery(STARSCORE_COPY_LAYOUT_URI.toStdString() + "?mode=to"));
+    } else if (action == "layout-from") {
+        interactive()->open(UriQuery(STARSCORE_COPY_LAYOUT_URI.toStdString() + "?mode=from"));
     } else if (action == "compare-parts") {
         dispatcher()->dispatch("starscore-compare-parts");
     } else if (action == "toggle-minmaj") {

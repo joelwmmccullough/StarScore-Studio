@@ -360,7 +360,8 @@ MenuItem* AppMenuModel::makeFormatMenu()
     MenuItemList formatItems {
         makeMenuItem("edit-style"),
         makeMenuItem("page-settings"),
-        makeMenuItem("starscore-copy-layout"),
+        makeMenuItem("starscore-layout-from"),
+        makeMenuItem("starscore-layout-to"),
         makeMenuItem("starscore-part-styles"),
         makeMenuItem("starscore-additive-timesig"),
         makeMenuItem("starscore-add-solo"),

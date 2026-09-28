@@ -13,7 +13,11 @@ import MuseScore.Project
 StyledDialogView {
     id: root
 
-    title: qsTrc("starscore", "Copy layout breaks")
+    // "to": apply this part's system formatting to other parts; "from": take it from another part
+    property string mode: "to"
+
+    title: mode === "from" ? qsTrc("starscore", "Apply system formatting from another part")
+                           : qsTrc("starscore", "Apply this system formatting to other parts")
 
     contentWidth: 480
     contentHeight: 600
@@ -24,7 +28,7 @@ StyledDialogView {
     }
 
     Component.onCompleted: {
-        layoutModel.load()
+        layoutModel.load(root.mode)
     }
 
     ColumnLayout {
@@ -35,7 +39,7 @@ StyledDialogView {
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
             horizontalAlignment: Text.AlignLeft
-            text: qsTrc("starscore", "Copies where systems and pages break, matched bar by bar. Undo reverts all changes in one step.")
+            text: qsTrc("starscore", "Copies system breaks, page breaks, \u201ckeep measures on the same system\u201d and system locks, matched bar by bar. Undo reverts all changes in one step.")
         }
 
         StyledTextLabel {

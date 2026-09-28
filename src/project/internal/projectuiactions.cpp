@@ -57,6 +57,18 @@ const UiActionList ProjectUiActions::m_actions = {
              TranslatableString("action", "Copy layout breaks to other parts…"),
              TranslatableString("action", "Copy layout breaks to other parts")
              ),
+    UiAction("starscore-layout-from",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Apply system formatting from another part…"),
+             TranslatableString("action", "Copy system breaks, page breaks and system locks from another part into this one")
+             ),
+    UiAction("starscore-layout-to",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Apply this system formatting to other parts…"),
+             TranslatableString("action", "Copy this part's system breaks, page breaks and system locks to other parts")
+             ),
     UiAction("starscore-part-styles",
              mu::context::UiCtxAny,
              mu::context::CTX_ANY,

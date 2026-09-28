@@ -20,8 +20,9 @@ CopyLayoutModel::CopyLayoutModel(QObject* parent)
 {
 }
 
-void CopyLayoutModel::load()
+void CopyLayoutModel::load(const QString& mode)
 {
+    m_fromMode = mode == "from";
     m_entries.clear();
 
     IMasterNotationPtr master = globalContext()->currentMasterNotation();
@@ -38,15 +39,29 @@ void CopyLayoutModel::load()
         }
     }
 
-    // The part currently open is the source by default
-    m_sourceIndex = 0;
+    int currentIndex = 0;
     INotationPtr current = globalContext()->currentNotation();
     for (size_t i = 0; i < m_entries.size(); ++i) {
         if (m_entries[i].notation == current) {
-            m_sourceIndex = int(i);
+            currentIndex = int(i);
         }
     }
-    m_entries[m_sourceIndex].checked = false;
+
+    if (m_fromMode) {
+        // Copy into the part being viewed, from the first other part book (or the main score)
+        for (Entry& e : m_entries) {
+            e.checked = false;
+        }
+        m_entries[currentIndex].checked = true;
+        m_sourceIndex = currentIndex == 0 ? (m_entries.size() > 1 ? 1 : 0) : 1;
+        if (m_sourceIndex == currentIndex) {
+            m_sourceIndex = 0;
+        }
+    } else {
+        // The part being viewed is the source; every other part is ticked
+        m_sourceIndex = currentIndex;
+        m_entries[m_sourceIndex].checked = false;
+    }
 
     emit loaded();
     emit sourceIndexChanged();
@@ -73,7 +88,7 @@ void CopyLayoutModel::setSourceIndex(int index)
         return;
     }
     m_sourceIndex = index;
-    m_entries[index].checked = false;
+    m_entries[index].checked = false;   // a part can't be both the source and a target
     emit sourceIndexChanged();
     emit targetsChanged();
 }
