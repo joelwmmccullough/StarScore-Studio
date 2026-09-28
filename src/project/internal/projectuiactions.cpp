@@ -93,6 +93,13 @@ const UiActionList ProjectUiActions::m_actions = {
              TranslatableString("action", "Minor-major symbol in this part on/off"),
              TranslatableString("action", "Switch the minor-major seventh triangle for the part being viewed")
              ),
+    UiAction("starscore-toggle-panel",
+             mu::context::UiCtxAny,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "StarScore panel"),
+             TranslatableString("action", "Show/hide the StarScore panel above the score"),
+             Checkable::Yes
+             ),
     UiAction("starscore-voice-order",
              mu::context::UiCtxProjectOpened,
              mu::context::CTX_ANY,
@@ -214,6 +221,11 @@ const UiActionList ProjectUiActions::m_actions = {
 ProjectUiActions::ProjectUiActions(std::shared_ptr<ProjectActionsController> controller, const muse::modularity::ContextPtr& iocCtx)
     : muse::Contextable(iocCtx), m_controller(controller)
 {
+    if (starScoreService()) {
+        starScoreService()->panelVisibleChanged().onNotify(this, [this]() {
+            m_actionCheckedChanged.send({ "starscore-toggle-panel" });
+        });
+    }
 }
 
 const UiActionList& ProjectUiActions::actionsList() const
@@ -230,8 +242,11 @@ bool ProjectUiActions::actionEnabled(const UiAction& act) const
     return true;
 }
 
-bool ProjectUiActions::actionChecked(const UiAction&) const
+bool ProjectUiActions::actionChecked(const UiAction& act) const
 {
+    if (act.code == "starscore-toggle-panel") {
+        return starScoreService() ? starScoreService()->isPanelVisible() : true;
+    }
     return false;
 }
 

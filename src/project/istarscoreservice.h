@@ -330,6 +330,11 @@ public:
     virtual QStringList bandExportUnticked(const QString& code) const = 0;
     virtual void setBandExportUnticked(const QString& code, const QStringList& paths) = 0;
 
+    // --- The StarScore panel above the score can be hidden (View › StarScore panel); remembered app-wide
+    virtual bool isPanelVisible() const = 0;
+    virtual void setPanelVisible(bool visible) = 0;
+    virtual muse::async::Notification panelVisibleChanged() const = 0;
+
     //! Save a .mscz holding only the instruments and part books of this arrangement's sections.
     virtual muse::Ret exportArrangement(const QString& arrangementId, const muse::io::path_t& msczPath) = 0;
 };

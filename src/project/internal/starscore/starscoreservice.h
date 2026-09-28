@@ -117,6 +117,9 @@ public:
 
     std::vector<StarScoreComparison> compareParts(const std::map<QString, QString>& referenceByInstrument) const override;
     void selectBar(const QString& partId, int bar) override;
+    bool isPanelVisible() const override;
+    void setPanelVisible(bool visible) override;
+    muse::async::Notification panelVisibleChanged() const override;
     std::vector<StarScoreVoiceSection> checkVoiceOrder() const override;
     bool minMajSymbolInCurrentScore() const override;
     void setMinMajSymbolInCurrentScore(bool on) override;
@@ -182,6 +185,7 @@ private:
     static QString idText(const mu::engraving::Part* part);
 
     muse::async::Notification m_changed;
+    muse::async::Notification m_panelVisibleChanged;
 
     std::shared_ptr<INotationProject> m_mainProject;
     std::map<QString, std::shared_ptr<INotationProject> > m_soloProjects;

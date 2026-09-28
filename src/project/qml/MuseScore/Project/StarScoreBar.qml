@@ -18,7 +18,7 @@ Rectangle {
 
     property bool collapsed: false
 
-    visible: barModel.hasScore
+    visible: barModel.hasScore && barModel.panelVisible
     implicitHeight: visible ? content.implicitHeight + 12 : 0
     color: ui.theme.backgroundSecondaryColor
 
@@ -214,6 +214,18 @@ Rectangle {
 
                 onClicked: {
                     root.collapsed = !root.collapsed
+                }
+            }
+
+            FlatButton {
+                Layout.alignment: Qt.AlignTop
+                icon: IconCode.CLOSE_X_ROUNDED
+                transparent: true
+                toolTipTitle: qsTrc("starscore", "Hide the StarScore panel")
+                toolTipDescription: qsTrc("starscore", "Bring it back with View › StarScore panel")
+
+                onClicked: {
+                    barModel.hidePanel()
                 }
             }
         }

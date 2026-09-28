@@ -91,6 +91,9 @@ void ProjectActionsController::init()
     dispatcher()->reg(this, "starscore-toggle-minmaj", [this]() {
         starScoreService()->setMinMajSymbolInCurrentScore(!starScoreService()->minMajSymbolInCurrentScore());
     });
+    dispatcher()->reg(this, "starscore-toggle-panel", [this]() {
+        starScoreService()->setPanelVisible(!starScoreService()->isPanelVisible());
+    });
     dispatcher()->reg(this, "starscore-voice-order", [this]() {
         interactive()->open(Uri("musescore://starscore/voiceorder"));
     });
@@ -173,6 +176,7 @@ bool ProjectActionsController::canReceiveAction(const ActionCode& code) const
             "file-new",
             "file-new-musescore",
             "starscore-part-styles",
+            "starscore-toggle-panel",
             "file-open",
             "file-import-pdf",
             "file-import-audio-to-score",

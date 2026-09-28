@@ -300,6 +300,7 @@ MenuItem* AppMenuModel::makeViewMenu()
 #ifndef Q_OS_MAC
         makeMenuItem("fullscreen"),
 #endif
+        makeMenuItem("starscore-toggle-panel"),
         makeMenuItem("toggle-palettes"),
         makeMenuItem("masterpalette"),
         makeMenuItem("toggle-instruments"),

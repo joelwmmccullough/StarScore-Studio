@@ -3,6 +3,7 @@
  *
  * StarScore Studio — a MuseScore Studio fork
  */
+#include <QSettings>
 #include "starscoreservice.h"
 #include "starscorehouse.h"
 
@@ -2729,4 +2730,28 @@ void StarScoreService::setMinMajSymbolInCurrentScore(bool on)
         project->markAsUnsaved();
     }
     m_changed.notify();
+}
+
+// ---------------------------------------------------------------------------
+//  Showing / hiding the StarScore panel
+// ---------------------------------------------------------------------------
+
+bool StarScoreService::isPanelVisible() const
+{
+    return QSettings().value("StarScore/panelVisible", true).toBool();
+}
+
+void StarScoreService::setPanelVisible(bool visible)
+{
+    if (isPanelVisible() == visible) {
+        return;
+    }
+    QSettings().setValue("StarScore/panelVisible", visible);
+    m_panelVisibleChanged.notify();
+    m_changed.notify();
+}
+
+muse::async::Notification StarScoreService::panelVisibleChanged() const
+{
+    return m_panelVisibleChanged;
 }

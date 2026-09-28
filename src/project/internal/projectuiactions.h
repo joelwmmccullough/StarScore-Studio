@@ -24,13 +24,16 @@
 
 #include "ui/iuiactionsmodule.h"
 #include "projectactionscontroller.h"
+#include "project/istarscoreservice.h"
+#include "async/asyncable.h"
 #include "modularity/ioc.h"
 #include "context/iuicontextresolver.h"
 
 namespace mu::project {
-class ProjectUiActions : public muse::ui::IUiActionsModule, public muse::Contextable
+class ProjectUiActions : public muse::ui::IUiActionsModule, public muse::Contextable, public muse::async::Asyncable
 {
     muse::ContextInject<context::IUiContextResolver> uicontextResolver = { this };
+    muse::ContextInject<IStarScoreService> starScoreService = { this };
 public:
 
     ProjectUiActions(std::shared_ptr<ProjectActionsController> controller, const muse::modularity::ContextPtr& iocCtx);

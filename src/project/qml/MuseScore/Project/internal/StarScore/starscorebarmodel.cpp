@@ -530,3 +530,13 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
         dispatcher()->dispatch("starscore-export-band");
     }
 }
+
+bool StarScoreBarModel::panelVisible() const
+{
+    return starScore()->isPanelVisible();
+}
+
+void StarScoreBarModel::hidePanel()
+{
+    starScore()->setPanelVisible(false);
+}

@@ -25,6 +25,7 @@ class StarScoreBarModel : public QObject, public muse::Contextable, public muse:
     Q_OBJECT
 
     Q_PROPERTY(bool hasScore READ hasScore NOTIFY changed)
+    Q_PROPERTY(bool panelVisible READ panelVisible NOTIFY changed)
     Q_PROPERTY(bool isStarScoreFile READ isStarScoreFile NOTIFY changed)
     Q_PROPERTY(QVariantList arrangements READ arrangements NOTIFY changed)
     Q_PROPERTY(QVariantList sections READ sections NOTIFY changed)
@@ -56,6 +57,8 @@ public:
     Q_INVOKABLE QVariantList soloMenu(const QString& id) const;
 
     Q_INVOKABLE void load();
+    Q_INVOKABLE void hidePanel();
+    bool panelVisible() const;
 
     Q_INVOKABLE void showArrangement(const QString& id);
     Q_INVOKABLE void toggleSection(const QString& id);
