@@ -778,6 +778,7 @@ void HarmonyLayout::renderActionNote(Harmony* item, Harmony::LayoutData* ldata, 
     muse::draw::Font font = cs.isValid() ? ldata->fontList.value()[cs.fontIdx] : ldata->fontList.value().front();
     font.setPointSizeF(font.pointSizeF() * harmonyCtx.scale);
 
+
     TextSegment* ts = new TextSegment(text, font, harmonyCtx.x(), harmonyCtx.y(), harmonyCtx.hAlign);
     harmonyCtx.renderItemList.push_back(ts);
     harmonyCtx.movex(ts->width());
@@ -924,6 +925,17 @@ void HarmonyLayout::renderActionSet(Harmony* item, Harmony::LayoutData* ldata, c
         double nmag = chordList->nominalMag();
         font.setPointSizeF(font.pointSizeF() * nmag);
     }
+
+    // StarScore: the triangles drawn from StarScore Jost (major seventh U+E000, minor-major seventh U+E001)
+    // are sized to the capital height of whatever chord font the style uses, so they fit any font
+    if (text.size() == 1 && (text.at(0).unicode() == 0xE000 || text.at(0).unicode() == 0xE001)) {
+        const double rootCap = FontMetrics::capHeight(item->font()) * harmonyCtx.scale;
+        const double glyphCap = FontMetrics::capHeight(font);
+        if (rootCap > 0.0 && glyphCap > 0.0) {
+            font.setPointSizeF(font.pointSizeF() * rootCap / glyphCap);
+        }
+    }
+
 
     kernCharacters(item, text, harmonyCtx, ctx);
 
