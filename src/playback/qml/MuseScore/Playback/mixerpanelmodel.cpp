@@ -82,6 +82,34 @@ void MixerPanelModel::load()
     m_currentTrackSequenceId = sequenceId;
 
     loadItems();
+
+    // StarScore Studio: rebuild the list when instruments are shown or hidden in the main score
+    if (INotationProjectPtr project = currentProject()) {
+        project->masterNotation()->notation()->notationChanged().onNotify(this, [this]() {
+            reloadIfVisiblePartsChanged();
+        });
+    }
+}
+
+QString MixerPanelModel::visiblePartsSignature() const
+{
+    QString sig;
+    if (INotationPartsPtr parts = masterNotationParts()) {
+        for (const Part* part : parts->partList()) {
+            if (part->show()) {
+                sig += QString::fromStdString(part->id().toStdString()) + ",";
+            }
+        }
+    }
+    return sig;
+}
+
+void MixerPanelModel::reloadIfVisiblePartsChanged()
+{
+    if (m_currentTrackSequenceId == -1 || visiblePartsSignature() == m_visiblePartsSignature) {
+        return;
+    }
+    loadItems();
 }
 
 QVariantMap MixerPanelModel::get(int index)
@@ -140,6 +168,8 @@ void MixerPanelModel::loadItems()
         return;
     }
 
+    m_visiblePartsSignature = visiblePartsSignature();
+
     const auto& instrumentTrackIdMap = controller()->instrumentTrackIdMap();
 
     auto addInstrumentTrack = [this, &instrumentTrackIdMap](const InstrumentTrackId& instrumentTrackId, bool isPrimary = true) {
@@ -153,6 +183,9 @@ void MixerPanelModel::loadItems()
 
     async::NotifyList<const Part*> partList = masterNotationParts()->partList();
     for (const Part* part : partList) {
+        if (!part->show()) {
+            continue;   // StarScore Studio: hidden instruments are left out of the mixer
+        }
         std::string primaryInstrId = part->instrument()->id().toStdString();
 
         for (const InstrumentTrackId& instrumentTrackId : part->instrumentTrackIdList()) {
@@ -194,6 +227,9 @@ void MixerPanelModel::onTrackAdded(const TrackId& trackId)
     if (instrumentIt != instrumentTracks.end()) {
         const InstrumentTrackId& instrumentTrackId = instrumentIt->first;
         const Part* part = masterNotationParts()->part(instrumentTrackId.partId);
+        if (part && !part->show()) {
+            return;
+        }
         bool isPrimary = part ? part->instrument()->id() == instrumentTrackId.instrumentId : true;
         MixerChannelItem* item = buildInstrumentChannelItem(trackId, instrumentTrackId, isPrimary);
         int index = resolveInsertIndex(instrumentTrackId);
@@ -367,6 +403,9 @@ int MixerPanelModel::resolveInsertIndex(const engraving::InstrumentTrackId& newI
 
     async::NotifyList<const Part*> partList = masterNotationParts()->partList();
     for (const Part* part : partList) {
+        if (!part->show()) {
+            continue;
+        }
         for (const InstrumentTrackId& instrumentTrackId : part->instrumentTrackIdList()) {
             if (instrumentTrackId == newInstrumentTrackId) {
                 return mixerChannelListIdx;

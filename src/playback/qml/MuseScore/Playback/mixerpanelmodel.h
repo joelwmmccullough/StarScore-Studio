@@ -87,6 +87,9 @@ private:
 
     void load();
     void loadItems();
+    // StarScore Studio: the mixer lists only the instruments shown in the main score
+    QString visiblePartsSignature() const;
+    void reloadIfVisiblePartsChanged();
     void onTrackAdded(const muse::audio::TrackId& trackId);
     void addItem(MixerChannelItem* item, int index);
     void removeItem(const muse::audio::TrackId trackId);
@@ -117,6 +120,7 @@ private:
     QList<MixerChannelItem*> m_mixerChannelList;
     MixerChannelItem* m_masterChannelItem = nullptr;
     muse::audio::TrackSequenceId m_currentTrackSequenceId = -1;
+    QString m_visiblePartsSignature;
 
     muse::ui::NavigationSection* m_navigationSection = nullptr;
     int m_navigationOrderStart = 1;
