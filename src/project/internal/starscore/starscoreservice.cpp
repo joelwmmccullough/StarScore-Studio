@@ -1829,7 +1829,7 @@ io::path_t StarScoreService::mainProjectPath() const
     return m_mainProject ? m_mainProject->path() : io::path_t();
 }
 
-engraving::Measure* StarScoreService::mainMeasureByNumber(int barNumber) const
+mu::engraving::Measure* StarScoreService::mainMeasureByNumber(int barNumber) const
 {
     if (!m_mainProject) {
         return nullptr;
@@ -2325,7 +2325,7 @@ Ret StarScoreService::injectSolos(const io::path_t& starscorePath)
             return make_ret(Ret::Code::UnknownError);
         }
         QFile::remove(tmp);
-        ZipWriter writer(io::path_t(tmp));
+        ZipWriter writer { io::path_t(tmp) };
         for (const ZipReader::FileInfo& info : reader.fileInfoList()) {
             const std::string name = info.filePath.toStdString();
             if (!info.isFile || QString::fromStdString(name).startsWith(STARSCORE_SOLOS_DIR + "/")) {
