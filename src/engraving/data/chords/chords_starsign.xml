@@ -7,7 +7,7 @@
       everything after the root (quality, extensions, alterations) as one superscript
       at 0.71 of the root, raised half a cap height (quality set here; extensions and
       alterations through the style's extension/modifier size and offset);
-      minor as a larger hyphen, major seventh as a triangle, half-diminished as ø,
+      minor (typed "-", "m", "mi", "min" or "minor") as a larger hyphen, major seventh as a triangle, half-diminished as ø,
       diminished as a raised small circle; slash bass full size.
     Units: 1 = cap height of the root font; negative y is up.
 -->
@@ -125,19 +125,19 @@
     </token>
   <token class="quality">
     <name>m</name>
-    <render>m:0.05:0 sc:0.71 m:0:-0.5 m m:0:0.5 sc:1.408451</render>
+    <render>m:0.05:0 sc:1.05 m:0:-0.38 minus m:0:0.38 sc:0.952381 m:0.02:0</render>
     </token>
   <token class="quality">
     <name>mi</name>
-    <render>m:0.05:0 sc:0.71 m:0:-0.5 mi m:0:0.5 sc:1.408451</render>
+    <render>m:0.05:0 sc:1.05 m:0:-0.38 minus m:0:0.38 sc:0.952381 m:0.02:0</render>
     </token>
   <token class="quality">
     <name>min</name>
-    <render>m:0.05:0 sc:0.71 m:0:-0.5 min m:0:0.5 sc:1.408451</render>
+    <render>m:0.05:0 sc:1.05 m:0:-0.38 minus m:0:0.38 sc:0.952381 m:0.02:0</render>
     </token>
   <token class="quality">
     <name>minor</name>
-    <render>m:0.05:0 sc:0.71 m:0:-0.5 minor m:0:0.5 sc:1.408451</render>
+    <render>m:0.05:0 sc:1.05 m:0:-0.38 minus m:0:0.38 sc:0.952381 m:0.02:0</render>
     </token>
   <token class="quality">
     <name>M</name>
