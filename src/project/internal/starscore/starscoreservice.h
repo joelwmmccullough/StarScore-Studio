@@ -117,6 +117,12 @@ public:
 
     std::vector<StarScoreComparison> compareParts(const std::map<QString, QString>& referenceByInstrument) const override;
     void selectBar(const QString& partId, int bar) override;
+    bool needsImport() const override;
+    StarScoreImportPlan planImport() const override;
+    muse::Ret applyImport(const std::map<QString, QString>& sectionByPart, const QStringList& arrangementKeys,
+                          bool standardize) override;
+    void saveAsNewStarScore() override;
+
     bool isPanelVisible() const override;
     void setPanelVisible(bool visible) override;
     muse::async::Notification panelVisibleChanged() const override;
@@ -163,6 +169,7 @@ private:
     QStringList onSectionIds(const Data& data) const;
     std::vector<mu::engraving::Part*> masterPartsOf(const mu::engraving::Excerpt* excerpt) const;
     void addPartBooksFor(const QStringList& partIds);
+    void standardizeImported();
     //! Name the new parts, hide default-hidden parts/staves, make part books; returns the new section
     StarScoreSection finishNewParts(const std::vector<mu::engraving::Part*>& newParts,
                                     const std::vector<StarScoreInstrument>& instruments);

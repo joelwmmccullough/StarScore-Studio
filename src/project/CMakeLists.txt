@@ -105,6 +105,7 @@ target_sources(project PRIVATE
     internal/starscore/starscorehouse.cpp
     internal/starscore/starscorehouse.h
     internal/starscore/starscorecompare.cpp
+    internal/starscore/starscoreimport.cpp
     internal/starscore/starscoreengraving.h
 )
 

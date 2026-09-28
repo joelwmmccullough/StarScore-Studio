@@ -197,6 +197,22 @@ struct StarScoreBandExportPlan
     QStringList notes;           // things that were skipped, and why
 };
 
+//! Opening a .mscz (or any file that isn't a .starscore): the instruments, with StarScore's guess for each one's section
+struct StarScoreImportPart
+{
+    QString partId;
+    QString name;
+    QString instrumentId;
+    QString suggestedSection;    // section template key, empty = not in a section
+    int staves = 1;
+};
+struct StarScoreImportPlan
+{
+    std::vector<StarScoreImportPart> parts;
+    QStringList suggestedArrangements;   // arrangement template keys
+    QString summary;                     // e.g. "Looks like 3-Horn Standard: Lead Sheet, 3-Horn Section, Rhythm Section (no congas)"
+};
+
 struct StarScorePartInfo
 {
     QString partId;
@@ -329,6 +345,18 @@ public:
     //! Sheets the user un-ticked the last time this song was exported (remembered per song code)
     virtual QStringList bandExportUnticked(const QString& code) const = 0;
     virtual void setBandExportUnticked(const QString& code, const QStringList& paths) = 0;
+
+    // --- Importing a MuseScore file: pick its sections and arrangements, optionally standardize it
+    //! The current file isn't a .starscore and has no StarScore sections yet
+    virtual bool needsImport() const = 0;
+    virtual StarScoreImportPlan planImport() const = 0;
+    //! sectionByPart: part id -> section template key ("" = none). Standardize: rename the lead to "Lead", hide its
+    //! bass staff, name the other instruments as in the templates, add missing hidden instruments (e.g. Congas),
+    //! add part books for every instrument, then apply the default style.
+    virtual muse::Ret applyImport(const std::map<QString, QString>& sectionByPart, const QStringList& arrangementKeys,
+                                  bool standardize) = 0;
+    //! From now on "Save" asks for a new .starscore next to the imported file instead of overwriting it
+    virtual void saveAsNewStarScore() = 0;
 
     // --- The StarScore panel above the score can be hidden (View › StarScore panel); remembered app-wide
     virtual bool isPanelVisible() const = 0;

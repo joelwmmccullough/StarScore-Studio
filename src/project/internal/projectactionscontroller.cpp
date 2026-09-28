@@ -406,7 +406,21 @@ Ret ProjectActionsController::doOpenProject(const muse::io::path_t& filePath)
 
     globalContext()->setCurrentProject(project);
 
-    return doFinishOpenProject();
+    Ret ret = doFinishOpenProject();
+
+    // StarScore Studio: a MuseScore file is imported (sections and arrangements chosen) rather than opened as it is,
+    // and saving it makes a new .starscore
+    if (ret && !isNewlyCreated && io::suffix(filePath) != "starscore") {
+        if (starScoreService()->needsImport()) {
+            QTimer::singleShot(0, [this]() {
+                interactive()->open(Uri("musescore://starscore/import"));
+            });
+        } else {
+            starScoreService()->saveAsNewStarScore();
+        }
+    }
+
+    return ret;
 }
 
 Ret ProjectActionsController::doOpenCloudProject(const muse::io::path_t& filePath, const CloudProjectInfo& info, bool isOwner)

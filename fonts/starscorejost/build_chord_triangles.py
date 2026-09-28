@@ -8,7 +8,7 @@ two glyphs are made, both normalised to the capital height (700 units) and sitti
   triangle with a bar (minor-major 7th)   U+E001 + 2*i
 The triangle is the font's own chord-symbol triangle (SMuFL csymMajorSeventh) where it has one; the bar is
 the font's own chord minus (csymMinor), stretched across the triangle, so hand-drawn fonts keep their look.
-Jost (i = 0) uses the geometric triangle drawn below. All source fonts are SIL OFL.
+Jost (i = 0) uses the geometric triangle already in the font. All source fonts are SIL OFL.
 
 Run from the repository root:  python3 fonts/starscorejost/build_chord_triangles.py
 """
@@ -25,6 +25,7 @@ from fontTools.pens.transformPen import TransformPen
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 from fontTools.pens.cu2quPen import Cu2QuPen
 from fontTools.pens.boundsPen import BoundsPen
+from fontTools.pens.reverseContourPen import ReverseContourPen
 
 TARGET = "fonts/starscorejost/StarScoreJost.ttf"
 CAP = 700
@@ -32,6 +33,7 @@ SIDE = 40
 
 # index, name, source font, triangle code point, minus code point (None = draw a rectangle)
 SOURCES = [
+    (0, "Jost", TARGET, 0xE000, None),   # Jost's own geometric triangle (already in the font)
     (1, "Bravura", "fonts/bravura/BravuraText.otf", 0xE873, 0xE874),
     (2, "Petaluma", "fonts/petaluma/PetalumaText.otf", 0xE873, 0xE874),
     (3, "Leland", "fonts/leland/LelandText.otf", 0xE873, 0xE874),
@@ -39,6 +41,10 @@ SOURCES = [
     (5, "Finale Maestro", "fonts/finalemaestro/FinaleMaestroText-Regular.otf", 0xE873, 0xE874),
     (6, "Finale Broadway", "fonts/finalebroadway/FinaleBroadwayText.otf", 0xE873, None),
 ]
+
+
+# Fonts whose triangle strokes are heavy (Jost SemiBold, MuseJazz, Finale Broadway): the bar is drawn lighter
+BOLD = {0: 0.4, 4: 0.34, 6: 0.26}   # bar thickness as a share of the triangle's stroke
 
 
 def record(font, code):
@@ -114,7 +120,7 @@ def glyph_from(draw):
 
 
 def build_variant(target, index, src_path, tri_code, minus_code):
-    src = TTFont(src_path)
+    src = target if src_path == TARGET else TTFont(src_path)
     rec, (x0, y0, x1, y1) = record(src, tri_code)
     s = CAP / (y1 - y0)
     tx = SIDE - x0 * s
@@ -128,13 +134,20 @@ def build_variant(target, index, src_path, tri_code, minus_code):
         mrec, mb = record(src, minus_code)
         if mrec:
             minus = (mrec, mb)
-    thick = min(110, max(40, stroke * 0.85))
-    ext = min(110, max(70, stroke * 0.6))
+    if index in BOLD:
+        # Heavy triangles: a lighter bar that ends closer to the sides keeps the symbol open
+        thick = max(30, stroke * BOLD[index])
+        ext = max(40, stroke * 0.38)
+    else:
+        thick = min(110, max(40, stroke * 0.85))
+        ext = min(110, max(70, stroke * 0.6))
     bx0, bx1 = xl - ext, xr + ext
     shift = max(0, SIDE - bx0)
 
     def plain(pen):
-        rec.replay(TransformPen(pen, (s, 0, 0, s, tx + shift, ty)))
+        # A TrueType source (Jost's own triangle) already runs clockwise: undo the reversal applied when writing
+        target_pen = ReverseContourPen(pen) if src is target else pen
+        rec.replay(TransformPen(target_pen, (s, 0, 0, s, tx + shift, ty)))
 
     def barred(pen):
         plain(pen)
@@ -142,7 +155,7 @@ def build_variant(target, index, src_path, tri_code, minus_code):
 
     adv_plain = width
     adv_bar = int(max(width + shift, bx1 + shift + SIDE))
-    add_glyph(target, 0xE000 + 2 * index, plain if shift == 0 else lambda p: rec.replay(TransformPen(p, t)), adv_plain)
+    add_glyph(target, 0xE000 + 2 * index, plain if shift == 0 else lambda p: rec.replay(TransformPen(ReverseContourPen(p) if src is target else p, t)), adv_plain)
     add_glyph(target, 0xE001 + 2 * index, barred, adv_bar)
 
 

@@ -80,6 +80,8 @@ qt_add_qml_module(project_qml
         internal/StarScore/comparepartsmodel.h
         internal/StarScore/voiceordermodel.cpp
         internal/StarScore/voiceordermodel.h
+        internal/StarScore/importmodel.cpp
+        internal/StarScore/importmodel.h
     QML_FILES
         AlsoShareAudioComDialog.qml
         AskSaveLocationTypeDialog.qml
@@ -162,6 +164,7 @@ qt_add_qml_module(project_qml
         BandExportDialog.qml
         ComparePartsDialog.qml
         VoiceOrderDialog.qml
+        StarScoreImportDialog.qml
     RESOURCES
         internal/Migration/migration.png
         internal/SaveToCloud/images/Cloud.png
