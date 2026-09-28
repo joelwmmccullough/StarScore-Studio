@@ -90,8 +90,8 @@ const UiActionList ProjectUiActions::m_actions = {
     UiAction("starscore-toggle-minmaj",
              mu::context::UiCtxProjectOpened,
              mu::context::CTX_ANY,
-             TranslatableString("action", "Minor-major symbol in this part on/off"),
-             TranslatableString("action", "Switch the minor-major seventh triangle for the part being viewed")
+             TranslatableString("action", "Minor-major and diminished-major symbols in this part on/off"),
+             TranslatableString("action", "Switch the minor-major and diminished-major seventh diamonds for the part being viewed")
              ),
     UiAction("starscore-toggle-panel",
              mu::context::UiCtxAny,

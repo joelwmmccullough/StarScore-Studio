@@ -930,7 +930,9 @@ void HarmonyLayout::renderActionSet(Harmony* item, Harmony::LayoutData* ldata, c
     // one pair per chord font family (Jost, Bravura, Petaluma, Leland, MuseJazz, Finale Maestro, Finale Broadway),
     // each drawn from that font's own triangle and minus. The pair matching the style's chord font is used, and it
     // is sized to that font's capital height. Unknown fonts get the Jost pair.
-    if (text.size() == 1 && (text.at(0).unicode() == 0xE000 || text.at(0).unicode() == 0xE001)) {
+    // Diamonds follow the same scheme: U+E020 diminished-major seventh, U+E021 minor-major seventh (diamond with a bar).
+    const char16_t starscoreCode = text.size() == 1 ? text.at(0).unicode() : 0;
+    if (starscoreCode == 0xE000 || starscoreCode == 0xE001 || starscoreCode == 0xE020 || starscoreCode == 0xE021) {
         const muse::draw::Font chordFont = ldata->fontList.value().front();
         const String family = chordFont.family().id().toLower();
         int variant = 0;
@@ -954,24 +956,39 @@ void HarmonyLayout::renderActionSet(Harmony* item, Harmony::LayoutData* ldata, c
             font.setPointSizeF(font.pointSizeF() * rootCap / glyphCap);
         }
 
-        // The minor-major symbol can be switched off for a part (score meta tag "starscoreMinMaj"):
-        // then it is written "m" followed by the plain triangle
+        // The minor-major and diminished-major symbols can be switched off for a part (score meta tag
+        // "starscoreMinMaj"): then they are written "m" or a raised circle, followed by the plain triangle
         const String minmaj = item->score()->metaTag(u"starscoreMinMaj");
         const bool minMajOff = minmaj == u"off" || minmaj == u"auto-off";
-        bool isMinMaj = text.at(0).unicode() == 0xE001;
-        if (isMinMaj && minMajOff) {
-            muse::draw::Font mFont = chordFont;
-            mFont.setPointSizeF(mFont.pointSizeF() * harmonyCtx.scale);
-            TextSegment* m = new TextSegment(u"m", mFont, harmonyCtx.x(), harmonyCtx.y(), harmonyCtx.hAlign);
+        char16_t base = (starscoreCode == 0xE020 || starscoreCode == 0xE021) ? 0xE020 : 0xE000;
+        bool barred = starscoreCode == 0xE001 || starscoreCode == 0xE021;
+        const bool special = starscoreCode != 0xE000;
+        if (special && minMajOff) {
+            const bool isDim = starscoreCode == 0xE020;
+            muse::draw::Font pFont = chordFont;
+            String prefix = u"m";
+            if (isDim) {
+                // the diminished circle comes from Bravura Text, as in the chord file's "o" token
+                for (const muse::draw::Font& f : ldata->fontList.value()) {
+                    if (f.family().id().toLower().contains(u"bravura")) {
+                        pFont = f;
+                        break;
+                    }
+                }
+                prefix = String(Char(char16_t(0xE870)));
+            }
+            pFont.setPointSizeF(pFont.pointSizeF() * harmonyCtx.scale);
+            TextSegment* m = new TextSegment(prefix, pFont, harmonyCtx.x(), harmonyCtx.y(), harmonyCtx.hAlign);
             harmonyCtx.movex(m->width());
             if (a->renderText()) {
                 harmonyCtx.renderItemList.push_back(m);
             } else {
                 delete m;
             }
-            isMinMaj = false;
+            base = 0xE000;
+            barred = false;
         }
-        const String glyph = String(Char(char16_t(0xE000 + 2 * variant + (isMinMaj ? 1 : 0))));
+        const String glyph = String(Char(char16_t(base + 2 * variant + (barred ? 1 : 0))));
         TextSegment* tri = new TextSegment(glyph, font, harmonyCtx.x(), harmonyCtx.y(), harmonyCtx.hAlign);
         harmonyCtx.movex(tri->width());
         if (a->renderText()) {

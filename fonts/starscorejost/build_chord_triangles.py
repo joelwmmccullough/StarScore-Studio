@@ -8,7 +8,8 @@ two glyphs are made, both normalised to the capital height (700 units) and sitti
   triangle with a bar (minor-major 7th)   U+E001 + 2*i
 The triangle is the font's own chord-symbol triangle (SMuFL csymMajorSeventh) where it has one; the bar is
 the font's own chord minus (csymMinor), stretched across the triangle, so hand-drawn fonts keep their look.
-Jost (i = 0) uses the geometric triangle already in the font. All source fonts are SIL OFL.
+Jost (i = 0) uses the geometric triangle already in the font.
+Diamonds (U+E020 + 2*i diminished-major, U+E021 + 2*i minor-major) are geometric, in each font's line weight. All source fonts are SIL OFL.
 
 Run from the repository root:  python3 fonts/starscorejost/build_chord_triangles.py
 """
@@ -44,7 +45,7 @@ SOURCES = [
 
 
 # Fonts whose triangle strokes are heavy (Jost SemiBold, MuseJazz, Finale Broadway): the bar is drawn lighter
-BOLD = {0: 0.4, 4: 0.34, 6: 0.26}   # bar thickness as a share of the triangle's stroke
+BOLD = {0: 0.5, 4: 0.42, 6: 0.34}   # bar thickness as a share of the triangle's stroke
 
 
 def record(font, code):
@@ -157,6 +158,62 @@ def build_variant(target, index, src_path, tri_code, minus_code):
     adv_bar = int(max(width + shift, bx1 + shift + SIDE))
     add_glyph(target, 0xE000 + 2 * index, plain if shift == 0 else lambda p: rec.replay(TransformPen(ReverseContourPen(p) if src is target else p, t)), adv_plain)
     add_glyph(target, 0xE001 + 2 * index, barred, adv_bar)
+    build_diamonds(target, index, stroke)
+
+
+# Diamond line weight relative to the font's triangle stroke (Petaluma's hand-drawn stroke reads heavy on a diamond)
+DIAMOND_WEIGHT = {2: 0.66}
+# Fonts with heavy lines: the minor-major bar is drawn only outside the diamond (two short ticks), so the
+# small opening in the middle stays clear
+DIAMOND_TICKS = {0, 4, 6}
+
+
+def poly(pen, pts):
+    pen.moveTo(pts[0])
+    for p in pts[1:]:
+        pen.lineTo(p)
+    pen.closePath()
+
+
+def build_diamonds(target, index, stroke, ticks=None):
+    """U+E020 + 2*index: diamond (diminished-major seventh); U+E021 + 2*index: diamond with a bar (minor-major)."""
+    stroke = max(40, min(130, stroke)) * DIAMOND_WEIGHT.get(index, 1.0)
+    ticks = (index in DIAMOND_TICKS) if ticks is None else ticks
+    h = CAP
+    w = round(h * 0.78)
+    a, b = w / 2, h / 2
+    c = math.hypot(a, b)
+    ia, ib = a - stroke * c / b, b - stroke * c / a
+    if index in BOLD:
+        thick = max(30, stroke * BOLD[index])
+        ext = max(60, stroke * 0.55)
+    else:
+        thick = min(110, max(40, stroke * (0.7 if index in DIAMOND_WEIGHT else 0.85)))
+        ext = min(110, max(70, stroke * 0.6))
+
+    def shape(pen, dx):
+        cx, cy = SIDE + dx + a, b
+        # outer counter-clockwise and inner clockwise here; both are reversed when written as TrueType
+        poly(pen, [(round(cx - a), round(cy)), (round(cx), round(cy - b)), (round(cx + a), round(cy)), (round(cx), round(cy + b))])
+        poly(pen, [(round(cx - ia), round(cy)), (round(cx), round(cy + ib)), (round(cx + ia), round(cy)), (round(cx), round(cy - ib))])
+
+    def plain(pen):
+        shape(pen, 0)
+
+    def barred(pen):
+        shape(pen, ext)
+        x0, x1 = SIDE, SIDE + ext + w + ext
+        y0, y1 = b - thick / 2, b + thick / 2
+        if ticks:
+            # only the parts outside the diamond: from the ends to just inside the outer corners
+            overlap = min(stroke * 0.5, a * 0.3)
+            draw_bar(pen, None, x0, SIDE + ext + overlap, y0, y1)
+            draw_bar(pen, None, SIDE + ext + w - overlap, x1, y0, y1)
+        else:
+            draw_bar(pen, None, x0, x1, y0, y1)
+
+    add_glyph(target, 0xE020 + 2 * index, plain, w + 2 * SIDE)
+    add_glyph(target, 0xE021 + 2 * index, barred, w + 2 * SIDE + 2 * ext)
 
 
 def add_glyph(font, code, draw, advance):
