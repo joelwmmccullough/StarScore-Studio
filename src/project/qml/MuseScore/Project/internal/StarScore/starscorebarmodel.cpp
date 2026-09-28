@@ -302,6 +302,7 @@ QVariantList StarScoreBarModel::moreMenu() const
         QVariantMap { { "id", "color-notes" }, { "title", muse::qtrc("starscore", "Color notes by pitch") }, { "enabled", true } },
         QVariantMap { { "id", "uncolor-notes" }, { "title", muse::qtrc("starscore", "Remove note colors") }, { "enabled", true } },
         QVariantMap {},
+        QVariantMap { { "id", "check-ranges" }, { "title", muse::qtrc("starscore", "Check instrument ranges") }, { "enabled", true } },
         QVariantMap { { "id", "export-band" }, { "title", muse::qtrc("starscore", "Export to Sheets and Demos…") }, { "enabled", true } },
     };
 }
@@ -504,6 +505,8 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
         dispatcher()->dispatch("starscore-uncolor-notes");
     } else if (action == "copy-layout") {
         interactive()->open(UriQuery(STARSCORE_COPY_LAYOUT_URI.toStdString()));
+    } else if (action == "check-ranges") {
+        dispatcher()->dispatch("starscore-check-ranges");
     } else if (action == "export-band") {
         dispatcher()->dispatch("starscore-export-band");
     }

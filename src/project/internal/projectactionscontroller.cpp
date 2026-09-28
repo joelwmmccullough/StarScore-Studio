@@ -85,6 +85,14 @@ void ProjectActionsController::init()
         interactive()->open(Uri("musescore://starscore/addsolo"));
     });
     dispatcher()->reg(this, "starscore-export-band", [this]() { exportToBandFolder(); });
+    dispatcher()->reg(this, "starscore-check-ranges", [this]() {
+        INotationPtr notation = currentNotation();
+        if (!notation) {
+            return;
+        }
+        const QString report = starscore::checkRanges(notation->elements()->msScore());
+        interactive()->infoSync(muse::trc("starscore", "Instrument ranges"), report.toStdString());
+    });
     dispatcher()->reg(this, "starscore-color-notes", [this]() { colorNotes(true); });
     dispatcher()->reg(this, "starscore-uncolor-notes", [this]() { colorNotes(false); });
     dispatcher()->reg(this, "file-open", this, &ProjectActionsController::openProject);
@@ -692,40 +700,7 @@ void ProjectActionsController::exportToBandFolder()
         starScoreService()->setBandFolder(dir.toQString());
     }
 
-    RetVal<StarScoreBandExportPlan> plan = starScoreService()->planBandExport();
-    if (!plan.ret) {
-        interactive()->errorSync(muse::trc("starscore", "Can't export to Sheets and Demos"), plan.ret.text().empty()
-                                 ? plan.ret.toString() : plan.ret.text());
-        return;
-    }
-
-    std::map<QString, int> perFolder;
-    for (const StarScoreBandFile& f : plan.val.files) {
-        perFolder[f.relativePath.section('/', 0, -2)]++;
-    }
-    QStringList lines;
-    for (const auto& [folder, n] : perFolder) {
-        lines << QString("%1  (%2)").arg(folder).arg(n);
-    }
-
-    const std::string title = muse::qtrc("starscore", "Export %1 PDF(s) to Sheets and Demos / %2?")
-                              .arg(plan.val.files.size()).arg(plan.val.songFolder).toStdString();
-    const std::string body = (lines.join("\n") + "\n\n"
-                              + muse::qtrc("starscore", "Sheets that already exist are moved to Version History/Superseded <today> first."))
-                             .toStdString();
-
-    IInteractive::Result res = interactive()->questionSync(title, body, { IInteractive::Button::Cancel, IInteractive::Button::Ok },
-                                                           IInteractive::Button::Ok);
-    if (res.standardButton() != IInteractive::Button::Ok) {
-        return;
-    }
-
-    RetVal<QString> summary = starScoreService()->exportToBandFolder();
-    if (!summary.ret) {
-        interactive()->errorSync(muse::trc("starscore", "Export failed"), summary.ret.toString());
-        return;
-    }
-    interactive()->infoSync(muse::trc("starscore", "Exported to Sheets and Demos"), summary.val.toStdString());
+    interactive()->open(muse::UriQuery("musescore://starscore/exportband"));
 }
 
 void ProjectActionsController::colorNotes(bool colorize)

@@ -65,6 +65,12 @@ struct StarScoreInstrument
     QString partName;            // name for the part, e.g. "Trumpet" (empty = MuseScore default)
     bool hidden = false;         // hidden when the section is first created (e.g. Congas)
     std::vector<int> hiddenStaves;  // staves of the instrument hidden by default (e.g. 1 = bass staff of a grand staff)
+    // Playable ranges in concert pitch (MIDI numbers; -1 = keep the instrument's own). MuseScore colours notes
+    // outside the amateur range dark yellow and outside the pro range red.
+    int minPitchA = -1;
+    int maxPitchA = -1;
+    int minPitchP = -1;
+    int maxPitchP = -1;
 };
 
 struct StarScoreSectionTemplate
@@ -134,6 +140,13 @@ struct StarScoreBandFile
     QString relativePath;        // e.g. "3H Tpt Alt Ten/AMPL - Alto Sax.pdf"
     QStringList partIds;         // one part = its part book; several = a score of just those instruments
     bool isScore = false;
+
+    // "Any Horns" chair versions: the chair is re-written for a transposition and clef at export time
+    bool isVersion = false;
+    int transposeDiatonic = 0;   // sounding relative to written, as MuseScore stores it (Bb trumpet = -1/-2)
+    int transposeChromatic = 0;
+    int clef = 0;                // 0 = treble, 1 = bass, 2 = alto
+    QString header;              // part name printed on the sheet, e.g. "3-Horn Arr: Horn 2 in Bb"
 };
 
 struct StarScoreBandExportPlan
@@ -250,7 +263,12 @@ public:
     virtual muse::RetVal<StarScoreBandExportPlan> planBandExport() const = 0;
     //! Write every PDF in the plan, moving any file it replaces to "Version History/Superseded <date>/".
     //! Returns a summary.
-    virtual muse::RetVal<QString> exportToBandFolder() = 0;
+    //! Exports the planned sheets whose relative paths are in onlyPaths (all of them when onlyPaths is empty)
+    virtual muse::RetVal<QString> exportToBandFolder(const QStringList& onlyPaths) = 0;
+
+    //! Sheets the user un-ticked the last time this song was exported (remembered per song code)
+    virtual QStringList bandExportUnticked(const QString& code) const = 0;
+    virtual void setBandExportUnticked(const QString& code, const QStringList& paths) = 0;
 
     //! Save a .mscz holding only the instruments and part books of this arrangement's sections.
     virtual muse::Ret exportArrangement(const QString& arrangementId, const muse::io::path_t& msczPath) = 0;

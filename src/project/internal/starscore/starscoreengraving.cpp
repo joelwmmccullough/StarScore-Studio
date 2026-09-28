@@ -6,12 +6,18 @@
 #include "starscoreengraving.h"
 
 #include <map>
+#include <set>
+
+#include <QStringList>
 
 #include "engraving/dom/masterscore.h"
 #include "engraving/dom/measure.h"
 #include "engraving/dom/segment.h"
 #include "engraving/dom/chord.h"
 #include "engraving/dom/note.h"
+#include "engraving/dom/part.h"
+#include "engraving/dom/staff.h"
+#include "engraving/dom/instrument.h"
 #include "engraving/dom/accidental.h"
 #include "engraving/dom/notedot.h"
 #include "engraving/dom/select.h"
@@ -311,5 +317,92 @@ QString applyAdditiveTimeSig(MasterScore* score, Measure* start, Measure* last, 
     }
 
     return QString();
+}
+static QString starscoreBarList(const std::set<int>& bars)
+{
+    QStringList out;
+    auto it = bars.begin();
+    while (it != bars.end()) {
+        const int start = *it;
+        int end = start;
+        auto next = std::next(it);
+        while (next != bars.end() && *next == end + 1) {
+            end = *next;
+            ++next;
+        }
+        out << (end > start ? QString("%1–%2").arg(start).arg(end) : QString::number(start));
+        it = next;
+    }
+    return out.join(", ");
+}
+
+QString checkRanges(const Score* score)
+{
+    if (!score) {
+        return QString();
+    }
+
+    struct Found {
+        std::set<int> pro;
+        std::set<int> amateur;
+    };
+    std::map<const Part*, Found> found;
+
+    auto check = [&](const Chord* c, const Part* part, int bar) {
+        const Instrument* in = part->instrument(c->tick());
+        if (!in) {
+            return;
+        }
+        for (const Note* n : c->notes()) {
+            const int pitch = n->ppitch();
+            if (pitch < in->minPitchP() || pitch > in->maxPitchP()) {
+                found[part].pro.insert(bar);
+            } else if (pitch < in->minPitchA() || pitch > in->maxPitchA()) {
+                found[part].amateur.insert(bar);
+            }
+        }
+    };
+
+    for (const Measure* m = score->firstMeasure(); m; m = m->nextMeasure()) {
+        const int bar = m->no() + 1;
+        for (const Segment* s = m->first(SegmentType::ChordRest); s; s = s->next(SegmentType::ChordRest)) {
+            for (track_idx_t t = 0; t < score->ntracks(); ++t) {
+                const EngravingItem* e = s->element(t);
+                if (!e || !e->isChord()) {
+                    continue;
+                }
+                const Chord* c = toChord(e);
+                const Staff* staff = c->staff();
+                if (!staff || staff->isDrumStaff(c->tick()) || !staff->part() || !staff->part()->show()) {
+                    continue;
+                }
+                check(c, staff->part(), bar);
+                for (const Chord* g : c->graceNotes()) {
+                    check(g, staff->part(), bar);
+                }
+            }
+        }
+    }
+
+    QStringList lines;
+    for (const Part* part : score->parts()) {
+        auto it = found.find(part);
+        if (it == found.end()) {
+            continue;
+        }
+        QStringList bits;
+        if (!it->second.pro.empty()) {
+            bits << QString("outside the pro range in bars %1").arg(starscoreBarList(it->second.pro));
+        }
+        if (!it->second.amateur.empty()) {
+            bits << QString("outside the amateur range in bars %1").arg(starscoreBarList(it->second.amateur));
+        }
+        lines << QString("%1: %2.").arg(part->partName().toQString(), bits.join("; "));
+    }
+
+    if (lines.isEmpty()) {
+        return QString("Every note of the visible instruments is inside their amateur ranges.");
+    }
+    return lines.join("\n");
 }
 }

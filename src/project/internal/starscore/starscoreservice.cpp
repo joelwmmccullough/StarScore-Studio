@@ -22,6 +22,7 @@
 #include "engraving/dom/masterscore.h"
 #include "engraving/dom/excerpt.h"
 #include "engraving/dom/part.h"
+#include "engraving/dom/instrument.h"
 #include "engraving/dom/staff.h"
 #include "engraving/dom/measure.h"
 #include "engraving/dom/segment.h"
@@ -609,6 +610,17 @@ std::vector<StarScoreSectionTemplate> StarScoreService::sectionTemplates() const
         i.hiddenStaves = hiddenStaves;
         return i;
     };
+    auto chair = [](const char* id, const char* name, int minA, int maxA, int minP, int maxP, bool hidden = false) {
+        StarScoreInstrument i;
+        i.instrumentId = id;
+        i.partName = name;
+        i.hidden = hidden;
+        i.minPitchA = minA;
+        i.maxPitchA = maxA;
+        i.minPitchP = minP;
+        i.maxPitchP = maxP;
+        return i;
+    };
 
     return {
         { "lead-sheet", "Lead Sheet", { inst("piano", "Lead", false, { 1 }) } },
@@ -626,11 +638,13 @@ std::vector<StarScoreSectionTemplate> StarScoreService::sectionTemplates() const
               inst("soprano-saxophone", "Soprano Saxophone"), inst("alto-saxophone", "Alto Saxophone"),
               inst("tenor-saxophone", "Tenor Saxophone"), inst("trombone", "Trombone") } },
         { "7-horn", "7-Horn Section", { inst("bb-trumpet", "Trumpet 1"), inst("bb-trumpet", "Trumpet 2"),
-              inst("alto-saxophone", "Alto Saxophone"), inst("tenor-saxophone", "Tenor Saxophone 1"),
-              inst("tenor-saxophone", "Tenor Saxophone 2"), inst("trombone", "Trombone"), inst("bass-trombone", "Bass Trombone") } },
-        { "2-horn-any", "2-Horn Any", { inst("c-trumpet", "Horn 1 in C"), inst("tenor-saxophone", "Horn 2 in C") } },
-        { "3-horn-any", "3-Horn Any", { inst("c-trumpet", "Horn 1 in C"), inst("alto-saxophone", "Horn 2 in C"),
-              inst("tenor-saxophone", "Horn 3 in C") } },
+              inst("soprano-saxophone", "Soprano Saxophone"), inst("alto-saxophone", "Alto Saxophone"),
+              inst("tenor-saxophone", "Tenor Saxophone"), inst("trombone", "Trombone"), inst("bass-trombone", "Bass Trombone") } },
+        // "Any Horns": one concert-pitch staff per chair, with the chair's ranges from the Starsign Band Guide.
+        // Transposed versions for each instrument are made at export time.
+        { "2-horn-any", "2-Horn Any", { chair("c-trumpet", "Horn 1", 56, 80, 52, 85), chair("trombone", "Horn 2", 44, 71, 44, 74) } },
+        { "3-horn-any", "3-Horn Any", { chair("c-trumpet", "Horn 1", 56, 80, 52, 85), chair("flute", "Horn 1 (Flute)", -1, -1, -1, -1, true),
+              chair("c-trumpet", "Horn 2", 52, 75, 52, 85), chair("trombone", "Horn 3", 44, 71, 44, 74) } },
 
         // --- Big band ---
         { "bigband-saxes", "Big Band Saxophones", {
@@ -788,6 +802,21 @@ StarScoreSection StarScoreService::finishNewParts(const std::vector<engraving::P
         if (!inst.partName.isEmpty()) {
             master->parts()->setInstrumentName(InstrumentKey { p->instrumentId(), p->id(), engraving::Fraction(0, 1) }, inst.partName);
             p->setPartName(String::fromQString(inst.partName));
+        }
+
+        if (engraving::Instrument* ins = p->instrument()) {
+            if (inst.minPitchA >= 0) {
+                ins->setMinPitchA(inst.minPitchA);
+            }
+            if (inst.maxPitchA >= 0) {
+                ins->setMaxPitchA(inst.maxPitchA);
+            }
+            if (inst.minPitchP >= 0) {
+                ins->setMinPitchP(inst.minPitchP);
+            }
+            if (inst.maxPitchP >= 0) {
+                ins->setMaxPitchP(inst.maxPitchP);
+            }
         }
 
         for (int staffIdx : inst.hiddenStaves) {
@@ -1573,6 +1602,7 @@ StarScoreService::StyleSettings StarScoreService::loadStyleSettings() const
     settings.defaultStyle = root.value("defaultStyle").toString();
     settings.bandFolder = root.value("bandFolder").toString();
     settings.builtinStyleVersion = root.value("builtinStyleVersion").toInt();
+    settings.exportUnticked = root.value("exportUnticked").toObject();
     for (const QJsonValue& v : root.value("rules").toArray()) {
         const QJsonObject o = v.toObject();
         settings.rules.push_back({ o.value("section").toString(), o.value("part").toString(), o.value("style").toString() });
@@ -1594,6 +1624,7 @@ void StarScoreService::saveStyleSettings(const StyleSettings& settings)
     root["defaultStyle"] = settings.defaultStyle;
     root["bandFolder"] = settings.bandFolder;
     root["builtinStyleVersion"] = settings.builtinStyleVersion;
+    root["exportUnticked"] = settings.exportUnticked;
     root["rules"] = rules;
 
     QFile file(globalConfiguration()->userAppDataPath().appendingComponent("starscore_styles.json").toQString());

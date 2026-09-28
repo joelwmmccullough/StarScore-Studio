@@ -21,6 +21,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QRegularExpression>
@@ -30,11 +31,18 @@
 #include "engraving/dom/excerpt.h"
 #include "engraving/dom/part.h"
 #include "engraving/dom/staff.h"
+#include "engraving/dom/instrument.h"
+#include "engraving/dom/interval.h"
+#include "engraving/dom/clef.h"
 
 #include "notation/iexcerptnotation.h"
 #include "notation/inotationelements.h"
 #include "notation/inotationpainting.h"
 #include "notation/inotationparts.h"
+#include "notation/inotationstyle.h"
+#include "notation/inotation.h"
+
+#include "starscoreengraving.h"
 
 #include "io/filestream.h"
 #include "translation.h"
@@ -302,12 +310,75 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
         }
 
         static const QRegularExpression anyRe("^(\\d+)-horn-any$");
-        if (QRegularExpressionMatch m = anyRe.match(key); m.hasMatch()) {
-            const QString folder = QString("%1H Any Horns").arg(sec.partIds.size());
-            addFile(folder, "Score", sec.partIds, true);
+        if (anyRe.match(key).hasMatch()) {
+            // Chairs: "Horn N" staves (concert pitch); a staff with "Flute" in its name is Horn 1's flute variation
+            static const QRegularExpression chairRe("Horn\\s*(\\d+)", QRegularExpression::CaseInsensitiveOption);
+            std::vector<std::pair<QString, int> > chairs;   // (partId, chair number)
+            QString flutePid;
             for (const QString& pid : sec.partIds) {
-                if (engraving::Part* p = partById(pid)) {
-                    addFile(folder, p->partName().toQString(), { pid }, false);
+                engraving::Part* p = partById(pid);
+                if (!p) {
+                    continue;
+                }
+                const QString name = p->partName().toQString();
+                if (name.contains("flute", Qt::CaseInsensitive)) {
+                    flutePid = pid;
+                    continue;
+                }
+                const QRegularExpressionMatch cm = chairRe.match(name);
+                chairs.emplace_back(pid, cm.hasMatch() ? cm.captured(1).toInt() : int(chairs.size()) + 1);
+            }
+            if (chairs.empty()) {
+                continue;
+            }
+            const int horns = int(chairs.size());
+            const QString folder = QString("%1H Any Horns").arg(horns);
+            const QString arr = QString("%1-Horn Arr: ").arg(horns);
+
+            QStringList scoreParts;
+            for (const auto& c : chairs) {
+                scoreParts << c.first;
+            }
+            addFile(folder, "Score", scoreParts, true);
+
+            struct Version {
+                const char* suffix;
+                int dia;
+                int chrom;
+                int clef;
+            };
+            static const std::vector<Version> HIGH = {
+                { " in Bb", -1, -2, 0 }, { " in Eb", -5, -9, 0 }, { " in C", 0, 0, 0 },
+            };
+            static const std::vector<Version> MIDDLE = {
+                { " in Bb", -1, -2, 0 }, { " in Bb (Tenor Sax)", -8, -14, 0 }, { " in Eb", -5, -9, 0 }, { " in C", 0, 0, 0 },
+                { " (Alto Clef)", 0, 0, 2 },
+            };
+            static const std::vector<Version> LOW = {
+                { " in Bb", -8, -14, 0 }, { " in Eb", -12, -21, 0 }, { " in C", -7, -12, 0 }, { " (Bass Clef)", 0, 0, 1 },
+            };
+
+            auto addVersion = [&](const QString& pid, const QString& name, const Version& v) {
+                StarScoreBandFile f;
+                f.relativePath = folder + "/" + code + " - " + starscoreSafeFileName(name) + ".pdf";
+                f.partIds = { pid };
+                f.isVersion = true;
+                f.transposeDiatonic = v.dia;
+                f.transposeChromatic = v.chrom;
+                f.clef = v.clef;
+                f.header = arr + name;
+                plan.files.push_back(f);
+            };
+
+            for (const auto& [pid, number] : chairs) {
+                const std::vector<Version>& versions = (number == 1 && horns > 1) ? HIGH
+                                                       : (number >= horns && horns > 1) ? LOW : MIDDLE;
+                const QString chairName = QString("Horn %1").arg(number);
+                for (const Version& v : versions) {
+                    addVersion(pid, chairName + v.suffix, v);
+                }
+                if (number == 1 && !flutePid.isEmpty()) {
+                    addVersion(flutePid, "Horn 1 for C Flute", Version { "", 0, 0, 0 });
                 }
             }
             continue;
@@ -409,11 +480,39 @@ Ret StarScoreService::writePdf(const INotationPtr& notation, const QString& path
     return ret;
 }
 
-RetVal<QString> StarScoreService::exportToBandFolder()
+QStringList StarScoreService::bandExportUnticked(const QString& code) const
+{
+    QStringList paths;
+    for (const QJsonValue& v : loadStyleSettings().exportUnticked.value(code).toArray()) {
+        paths << v.toString();
+    }
+    return paths;
+}
+
+void StarScoreService::setBandExportUnticked(const QString& code, const QStringList& paths)
+{
+    if (code.isEmpty()) {
+        return;
+    }
+    StyleSettings settings = loadStyleSettings();
+    settings.exportUnticked[code] = QJsonArray::fromStringList(paths);
+    saveStyleSettings(settings);
+}
+
+RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPaths)
 {
     RetVal<StarScoreBandExportPlan> plan = planBandExport();
     if (!plan.ret) {
         return RetVal<QString>::make_ret(plan.ret);
+    }
+    if (!onlyPaths.isEmpty()) {
+        std::vector<StarScoreBandFile> chosen;
+        for (const StarScoreBandFile& f : plan.val.files) {
+            if (onlyPaths.contains(f.relativePath)) {
+                chosen.push_back(f);
+            }
+        }
+        plan.val.files = chosen;
     }
 
     INotationProjectPtr project = exportSourceProject();
@@ -448,20 +547,99 @@ RetVal<QString> StarScoreService::exportToBandFolder()
 
     // Scores of a few instruments come from a scratch copy with only those instruments showing
     INotationProjectPtr scratch;
-    auto scratchProject = [&]() -> INotationProjectPtr {
-        if (scratch) {
-            return scratch;
-        }
-        const QString copyPath = tmpDir + "/copy.mscz";
-        if (!project->save(io::path_t(copyPath), SaveMode::SaveCopy, false)) {
-            return nullptr;
+    const QString copyPath = tmpDir + "/copy.mscz";
+    bool copySaved = false;
+    auto loadCopy = [&]() -> INotationProjectPtr {
+        if (!copySaved) {
+            if (!project->save(io::path_t(copyPath), SaveMode::SaveCopy, false)) {
+                return nullptr;
+            }
+            copySaved = true;
         }
         INotationProjectPtr p = projectCreator()->newProject(iocContext());
         if (!p->load(io::path_t(copyPath))) {
             return nullptr;
         }
-        scratch = p;
+        return p;
+    };
+    auto scratchProject = [&]() -> INotationProjectPtr {
+        if (!scratch) {
+            scratch = loadCopy();
+        }
         return scratch;
+    };
+
+    // An "Any Horns" chair re-written for one transposition and clef, as a part book of its own
+    auto writeVersion = [&](const StarScoreBandFile& file, const QString& pdfPath) -> Ret {
+        INotationProjectPtr p = loadCopy();
+        if (!p) {
+            return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "couldn't make a copy of the score"));
+        }
+        IMasterNotationPtr vm = p->masterNotation();
+        engraving::MasterScore* vs = vm->masterScore();
+        engraving::Part* part = vs->partById(ID(file.partIds.value(0)));
+        if (!part || !part->instrument()) {
+            return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "instrument not found"));
+        }
+
+        vm->setExcerpts({});
+        if (!part->show()) {
+            vm->parts()->setPartsVisible({ { part->id(), true } }, TranslatableString::untranslatable("Show"));
+        }
+
+        engraving::Instrument instrument = *part->instrument();
+        instrument.setTranspose(engraving::Interval(file.transposeDiatonic, file.transposeChromatic));
+        const engraving::ClefType clef = file.clef == 1 ? engraving::ClefType::F
+                                         : file.clef == 2 ? engraving::ClefType::C3 : engraving::ClefType::G;
+        instrument.setClefType(0, engraving::ClefTypeList(clef, clef));
+        const InstrumentKey key { part->instrumentId(), part->id(), engraving::Fraction(0, 1) };
+        vm->parts()->replaceInstrument(key, instrument);
+        vm->parts()->setInstrumentName(InstrumentKey { part->instrumentId(), part->id(), engraving::Fraction(0, 1) }, file.header);
+        part->setPartName(String::fromQString(file.header));
+
+        IExcerptNotationPtr book;
+        for (const IExcerptNotationPtr& e : vm->potentialExcerpts()) {
+            if (e->name() == file.header) {
+                book = e;
+                break;
+            }
+        }
+        if (!book) {
+            return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "couldn't make the part"));
+        }
+        vm->initExcerpts({ book });
+        INotationPtr n = book->notation();
+        if (!n) {
+            return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "couldn't make the part"));
+        }
+
+        // Same look and line breaks as the chair's own part book
+        auto src = bookForPart.find(file.partIds.value(0));
+        if (src != bookForPart.end() && src->second->notation()) {
+            const QString mss = tmpDir + "/chair.mss";
+            if (src->second->notation()->style()->saveStyle(io::path_t(mss))) {
+                n->style()->loadStyle(io::path_t(mss), true);
+            }
+            engraving::Score* es = n->elements()->msScore();
+            const engraving::Score* srcScore = src->second->notation()->elements()->msScore();
+            if (es && srcScore) {
+                n->undoStack()->prepareChanges(TranslatableString::untranslatable("Copy layout"));
+                starscore::copyLayout(srcScore, { es }, starscore::LayoutCopyOptions());
+                n->undoStack()->commitChanges();
+            }
+        } else {
+            const QString def = defaultStylePath();
+            if (!def.isEmpty() && QFileInfo::exists(def)) {
+                n->style()->loadStyle(io::path_t(def), true);
+            }
+        }
+
+        // Written pitch, not concert pitch
+        n->undoStack()->prepareChanges(TranslatableString::untranslatable("Concert pitch"));
+        n->style()->setStyleValue(StyleId::concertPitch, false);
+        n->undoStack()->commitChanges();
+
+        return writePdf(n, pdfPath);
     };
 
     auto supersede = [&](const QString& rel) {
@@ -485,7 +663,9 @@ RetVal<QString> StarScoreService::exportToBandFolder()
         const QString tmpPdf = tmpDir + "/" + QString::number(written.size() + problems.size()) + ".pdf";
         Ret ret;
 
-        if (!file.isScore) {
+        if (file.isVersion) {
+            ret = writeVersion(file, tmpPdf);
+        } else if (!file.isScore) {
             auto it = bookForPart.find(file.partIds.value(0));
             if (it == bookForPart.end()) {
                 // no part book yet: use the potential one MuseScore would make

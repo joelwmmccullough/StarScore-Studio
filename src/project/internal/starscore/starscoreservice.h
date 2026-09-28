@@ -5,6 +5,8 @@
  */
 #pragma once
 
+#include <QJsonObject>
+
 #include "../../istarscoreservice.h"
 
 #include "modularity/ioc.h"
@@ -103,7 +105,9 @@ public:
     QString bandFolder() const override;
     void setBandFolder(const QString& path) override;
     muse::RetVal<StarScoreBandExportPlan> planBandExport() const override;
-    muse::RetVal<QString> exportToBandFolder() override;
+    muse::RetVal<QString> exportToBandFolder(const QStringList& onlyPaths) override;
+    QStringList bandExportUnticked(const QString& code) const override;
+    void setBandExportUnticked(const QString& code, const QStringList& paths) override;
 
     muse::Ret exportArrangement(const QString& arrangementId, const muse::io::path_t& msczPath) override;
 
@@ -153,6 +157,7 @@ private:
         QString bandFolder;
         QString defaultStyle;
         int builtinStyleVersion = 0;
+        QJsonObject exportUnticked;   // song code -> [relative paths]
         std::vector<StarScoreStyleRule> rules;
     };
     void installBuiltinDefaultStyle();

@@ -130,6 +130,7 @@ void ProjectModule::resolveImports()
         ir->registerQmlUri(Uri("musescore://starscore/styles"), "MuseScore.Project", "StarScoreStylesDialog");
         ir->registerQmlUri(Uri("musescore://starscore/addsolo"), "MuseScore.Project", "AddSoloDialog");
         ir->registerQmlUri(Uri("musescore://starscore/additivetimesig"), "MuseScore.Project", "AdditiveTimeSigDialog");
+        ir->registerQmlUri(Uri("musescore://starscore/exportband"), "MuseScore.Project", "BandExportDialog");
     }
 
     auto er = ioc()->resolve<muse::extensions::IExtensionsExecPointsRegister>(moduleName());

@@ -45,6 +45,10 @@ int colorNotes(mu::engraving::Score* score, bool colorize);
 //! The first bar shows "4+4+4+3 / 8"; the following changes are hidden. Runs from `start` to the end
 //! of `last` (or, when last is null, up to the next existing time signature or the end of the score).
 //! Must be called inside a command. Returns an error message, or an empty string.
+//! Lists, for every visible instrument, the bars with notes outside its pro range and outside its
+//! amateur range (concert pitch, as MuseScore's own range colouring). Returns a readable report.
+QString checkRanges(const mu::engraving::Score* score);
+
 QString applyAdditiveTimeSig(mu::engraving::MasterScore* score, mu::engraving::Measure* start, mu::engraving::Measure* last,
                              const std::vector<int>& numerators, int denominator);
 }
