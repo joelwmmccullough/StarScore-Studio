@@ -578,6 +578,53 @@ std::vector<StarScoreSectionTemplate> StarScoreService::sectionTemplates() const
         { "2-horn-any", "2-Horn Any", { inst("c-trumpet", "Horn 1 in C"), inst("tenor-saxophone", "Horn 2 in C") } },
         { "3-horn-any", "3-Horn Any", { inst("c-trumpet", "Horn 1 in C"), inst("alto-saxophone", "Horn 2 in C"),
               inst("tenor-saxophone", "Horn 3 in C") } },
+
+        // --- Big band ---
+        { "bigband-saxes", "Big Band Saxophones", {
+              inst("alto-saxophone", "Alto Saxophone 1"), inst("alto-saxophone", "Alto Saxophone 2"),
+              inst("tenor-saxophone", "Tenor Saxophone 1"), inst("tenor-saxophone", "Tenor Saxophone 2"),
+              inst("baritone-saxophone", "Baritone Saxophone") } },
+        { "bigband-trumpets", "Big Band Trumpets", {
+              inst("bb-trumpet", "Trumpet 1"), inst("bb-trumpet", "Trumpet 2"),
+              inst("bb-trumpet", "Trumpet 3"), inst("bb-trumpet", "Trumpet 4") } },
+        { "bigband-trombones", "Big Band Trombones", {
+              inst("trombone", "Trombone 1"), inst("trombone", "Trombone 2"),
+              inst("trombone", "Trombone 3"), inst("bass-trombone", "Bass Trombone") } },
+        { "bigband-rhythm", "Big Band Rhythm", {
+              inst("piano", "Piano"), inst("electric-guitar", "Guitar"), inst("contrabass", "Bass"), inst("drumset", "Drums") } },
+
+        // --- Marching band ---
+        { "marching-woodwinds", "Marching Woodwinds", {
+              inst("piccolo", "Piccolo"), inst("flute", "Flute"), inst("bb-clarinet", "Clarinet 1"), inst("bb-clarinet", "Clarinet 2"),
+              inst("alto-saxophone", "Alto Saxophone"), inst("tenor-saxophone", "Tenor Saxophone"),
+              inst("baritone-saxophone", "Baritone Saxophone") } },
+        { "marching-brass", "Marching Brass", {
+              inst("bb-trumpet", "Trumpet 1"), inst("bb-trumpet", "Trumpet 2"), inst("bb-trumpet", "Trumpet 3"),
+              inst("mellophone", "Mellophone"), inst("trombone", "Trombone 1"), inst("trombone", "Trombone 2"),
+              inst("baritone-horn", "Baritone"), inst("sousaphone", "Sousaphone") } },
+        { "marching-battery", "Marching Battery", {
+              inst("marching-snare", "Snare Drum"), inst("marching-tenor-drums", "Tenor Drums"),
+              inst("marching-bass-drums", "Bass Drums"), inst("marching-cymbals", "Cymbals") } },
+        { "marching-front", "Front Ensemble", {
+              inst("marimba", "Marimba"), inst("vibraphone", "Vibraphone"), inst("glockenspiel", "Glockenspiel"),
+              inst("timpani", "Timpani") } },
+
+        // --- Orchestra ---
+        { "orch-woodwinds", "Orchestra Woodwinds", {
+              inst("flute", "Flute 1"), inst("flute", "Flute 2"), inst("oboe", "Oboe 1"), inst("oboe", "Oboe 2"),
+              inst("bb-clarinet", "Clarinet 1"), inst("bb-clarinet", "Clarinet 2"),
+              inst("bassoon", "Bassoon 1"), inst("bassoon", "Bassoon 2") } },
+        { "orch-brass", "Orchestra Brass", {
+              inst("horn", "Horn 1"), inst("horn", "Horn 2"), inst("horn", "Horn 3"), inst("horn", "Horn 4"),
+              inst("bb-trumpet", "Trumpet 1"), inst("bb-trumpet", "Trumpet 2"),
+              inst("trombone", "Trombone 1"), inst("trombone", "Trombone 2"), inst("bass-trombone", "Bass Trombone"),
+              inst("tuba", "Tuba") } },
+        { "orch-percussion", "Orchestra Percussion", {
+              inst("timpani", "Timpani"), inst("snare-drum", "Snare Drum"), inst("bass-drum", "Bass Drum"),
+              inst("crash-cymbal", "Cymbals"), inst("glockenspiel", "Glockenspiel") } },
+        { "orch-strings", "Orchestra Strings", {
+              inst("violin", "Violin I"), inst("violin", "Violin II"), inst("viola", "Viola"),
+              inst("violoncello", "Cello"), inst("contrabass", "Contrabass") } },
     };
 }
 
@@ -592,6 +639,9 @@ std::vector<StarScoreArrangementTemplate> StarScoreService::arrangementTemplates
         { "7-horn-standard", "7-Horn Standard", { "lead-sheet", "7-horn", "rhythm" } },
         { "2-horn-any", "2-Horn Any", { "lead-sheet", "2-horn-any", "rhythm" } },
         { "3-horn-any", "3-Horn Any", { "lead-sheet", "3-horn-any", "rhythm" } },
+        { "big-band", "Big Band", { "bigband-saxes", "bigband-trumpets", "bigband-trombones", "bigband-rhythm" } },
+        { "marching-band", "Marching Band", { "marching-woodwinds", "marching-brass", "marching-battery", "marching-front" } },
+        { "orchestra", "Orchestra", { "orch-woodwinds", "orch-brass", "orch-percussion", "orch-strings" } },
     };
 }
 

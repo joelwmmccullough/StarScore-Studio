@@ -1,7 +1,7 @@
 name: 'StarScore Studio: macOS build'
 
-# Builds an Apple Silicon (arm64) StarScore Studio .dmg on every push to the
-# starscore branch, or on demand from the Actions tab.
+# Every push to the starscore branch compiles StarScore Studio (Apple Silicon) to catch errors.
+# A .dmg is packaged and published only when the workflow is run by hand (workflow_dispatch).
 
 on:
   push:
@@ -86,10 +86,12 @@ jobs:
       run: ccache -sv
 
     - name: Package
+      if: github.event_name == 'workflow_dispatch'
       run: |
         bash ./buildscripts/ci/macos/package.sh --signpass "''" --signsecret "''" --user "" --password "" --team-id ""
 
     - name: Publish a downloadable release
+      if: github.event_name == 'workflow_dispatch'
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
@@ -100,6 +102,7 @@ jobs:
           --title "StarScore Studio build ${{ github.run_number }}" --notes "Built from ${{ github.sha }}" --prerelease
 
     - name: Upload artifacts on GitHub
+      if: github.event_name == 'workflow_dispatch'
       uses: actions/upload-artifact@v6
       with:
         name: StarScore-Studio-mac-arm64-${{ github.run_number }}
