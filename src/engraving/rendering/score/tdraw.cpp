@@ -1738,8 +1738,60 @@ void TDraw::draw(const TextBlock& textBlock, const TextBase* item, Painter* pain
     painter->translate(0.0, -textBlock.y());
 }
 
+//! StarScore Studio: in "Mc" names followed by a capital (McCullough, McCULLOUGH) the lowercase c is
+//! drawn full size and raised so that its top meets the top of the capitals. The raise is measured from
+//! the fragment's own font (top of "C" minus top of "c", both including overshoot), so it fits any font.
+//! Only drawing changes; the text itself is untouched.
+static bool starscoreDrawRaisedMc(const TextFragment& f, const TextBase* item, muse::draw::Painter* painter)
+{
+    const String& text = f.text;
+    const size_t n = text.size();
+    if (n < 3 || text.indexOf(u"Mc") == muse::nidx) {
+        return false;
+    }
+
+    std::vector<size_t> raised;   // indexes of the c's to raise
+    for (size_t i = 0; i + 2 < n; ++i) {
+        const bool wordStart = i == 0 || !text.at(i - 1).isLetter();
+        if (wordStart && text.at(i) == u'M' && text.at(i + 1) == u'c' && text.at(i + 2).isLetter() && text.at(i + 2).isUpper()) {
+            raised.push_back(i + 1);
+        }
+    }
+    if (raised.empty()) {
+        return false;
+    }
+
+    const Font font = f.font(item);
+    const FontMetrics fm(font);
+    double raise = fm.tightBoundingRect(u"c").top() - fm.tightBoundingRect(u"C").top();
+    if (raise <= 0.0) {
+        raise = fm.capHeight() - fm.xHeight();
+    }
+
+    painter->setFont(font);
+    double x = f.pos.x();
+    size_t from = 0;
+    for (size_t c : raised) {
+        if (c > from) {
+            const String before = text.mid(from, c - from);
+            painter->drawText(PointF(x, f.pos.y()), before);
+            x += fm.width(before);
+        }
+        painter->drawText(PointF(x, f.pos.y() - raise), String(u"c"));
+        x += fm.width(String(u"c"));
+        from = c + 1;
+    }
+    if (from < n) {
+        painter->drawText(PointF(x, f.pos.y()), text.mid(from));
+    }
+    return true;
+}
+
 void TDraw::draw(const TextFragment& textFragment, const TextBase* item, muse::draw::Painter* painter)
 {
+    if (starscoreDrawRaisedMc(textFragment, item, painter)) {
+        return;
+    }
 #ifndef Q_OS_MACOS
     drawTextWorkaround(textFragment, item, painter);
     return;

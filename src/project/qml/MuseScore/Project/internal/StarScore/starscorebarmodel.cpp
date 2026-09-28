@@ -192,6 +192,7 @@ QVariantList StarScoreBarModel::arrangementMenu(const QString& id) const
 {
     return {
         QVariantMap { { "id", "arr-show:" + id }, { "title", muse::qtrc("starscore", "Show this arrangement") }, { "enabled", true } },
+        QVariantMap { { "id", "arr-score:" + id }, { "title", muse::qtrc("starscore", "Open this arrangement's score") }, { "enabled", true } },
         QVariantMap {},
         QVariantMap { { "id", "arr-edit:" + id }, { "title", muse::qtrc("starscore", "Choose sections…") }, { "enabled", true } },
         QVariantMap { { "id", "arr-rename:" + id }, { "title", muse::qtrc("starscore", "Rename…") }, { "enabled", true } },
@@ -302,6 +303,8 @@ QVariantList StarScoreBarModel::moreMenu() const
         QVariantMap { { "id", "color-notes" }, { "title", muse::qtrc("starscore", "Color notes by pitch") }, { "enabled", true } },
         QVariantMap { { "id", "uncolor-notes" }, { "title", muse::qtrc("starscore", "Remove note colors") }, { "enabled", true } },
         QVariantMap {},
+        QVariantMap { { "id", "compare-parts" }, { "title", muse::qtrc("starscore", "Compare parts…") }, { "enabled", true } },
+        QVariantMap { { "id", "sync-scores" }, { "title", muse::qtrc("starscore", "Make / update arrangement scores") }, { "enabled", true } },
         QVariantMap { { "id", "check-ranges" }, { "title", muse::qtrc("starscore", "Check instrument ranges") }, { "enabled", true } },
         QVariantMap { { "id", "export-band" }, { "title", muse::qtrc("starscore", "Export to Sheets and Demos…") }, { "enabled", true } },
     };
@@ -397,6 +400,8 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
 
     if (action == "arr-show") {
         starScore()->showArrangement(arg);
+    } else if (action == "arr-score") {
+        starScore()->openArrangementScore(arg);
     } else if (action == "arr-edit") {
         openEditDialog("arrangement", arg);
     } else if (action == "arr-rename") {
@@ -505,6 +510,10 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
         dispatcher()->dispatch("starscore-uncolor-notes");
     } else if (action == "copy-layout") {
         interactive()->open(UriQuery(STARSCORE_COPY_LAYOUT_URI.toStdString()));
+    } else if (action == "compare-parts") {
+        dispatcher()->dispatch("starscore-compare-parts");
+    } else if (action == "sync-scores") {
+        starScore()->syncArrangementScores();
     } else if (action == "check-ranges") {
         dispatcher()->dispatch("starscore-check-ranges");
     } else if (action == "export-band") {

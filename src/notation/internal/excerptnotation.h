@@ -52,6 +52,7 @@ public:
 
     INotationPtr notation() override;
     bool hasVisibleParts() const override;
+    void setMasterParts(const std::vector<engraving::Part*>& parts) override;
     IExcerptNotationPtr clone() const override;
 
 private:

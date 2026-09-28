@@ -76,6 +76,8 @@ qt_add_qml_module(project_qml
         internal/StarScore/additivetimesigmodel.h
         internal/StarScore/bandexportmodel.cpp
         internal/StarScore/bandexportmodel.h
+        internal/StarScore/comparepartsmodel.cpp
+        internal/StarScore/comparepartsmodel.h
     QML_FILES
         AlsoShareAudioComDialog.qml
         AskSaveLocationTypeDialog.qml
@@ -156,6 +158,7 @@ qt_add_qml_module(project_qml
         AddSoloDialog.qml
         AdditiveTimeSigDialog.qml
         BandExportDialog.qml
+        ComparePartsDialog.qml
     RESOURCES
         internal/Migration/migration.png
         internal/SaveToCloud/images/Cloud.png

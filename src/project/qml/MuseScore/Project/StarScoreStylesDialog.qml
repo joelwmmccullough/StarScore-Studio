@@ -38,7 +38,7 @@ StyledDialogView {
             horizontalAlignment: Text.AlignLeft
             text: qsTrc("starscore", "Styles are MuseScore style files (.mss, made with Format → Style → Save style). "
                         + "They cover page size, margins, staff size and spacing, fonts and text styles. "
-                        + "The default style is applied to every part score (the main score is left alone); then the matching rule below is applied on top. "
+                        + "The default style is applied to the main score, each arrangement score and every part book; then the matching rule below is applied on top, and then the built-in house settings (staff size, chord symbols, title frame, version footer). "
                         + "Starsign 2.1 is the built-in default. "
                         + "Styles are applied when a section is created, when a new StarScore is made, and when you click Apply.")
         }

@@ -85,6 +85,9 @@ void ProjectActionsController::init()
         interactive()->open(Uri("musescore://starscore/addsolo"));
     });
     dispatcher()->reg(this, "starscore-export-band", [this]() { exportToBandFolder(); });
+    dispatcher()->reg(this, "starscore-compare-parts", [this]() {
+        interactive()->open(Uri("musescore://starscore/compare"));
+    });
     dispatcher()->reg(this, "starscore-check-ranges", [this]() {
         INotationPtr notation = currentNotation();
         if (!notation) {

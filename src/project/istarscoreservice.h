@@ -9,6 +9,9 @@
  */
 #pragma once
 
+#include <map>
+#include <vector>
+
 #include <vector>
 
 #include <QString>
@@ -57,6 +60,7 @@ struct StarScoreArrangement
     QString name;
     QString templateKey;     // template it was made from, or empty
     QStringList sectionIds;
+    QString scoreName;       // name of the arrangement's own score (a part book of all its instruments)
 };
 
 struct StarScoreInstrument
@@ -135,6 +139,22 @@ struct StarScoreSoloPlan
 };
 
 //! One PDF the band export will write, relative to the song's folder in "Sheets and Demos"
+//! One instrument's part in "Compare parts": per bar, 0 = same as the reference part, 1 = different, 2 = both rest
+struct StarScoreComparedPart
+{
+    QString partId;
+    QString label;               // e.g. "Trumpet — 3-Horn Section"
+    QString summary;             // e.g. "Differs from 3-Horn Section in bars 17–24, 41"
+    bool isReference = false;
+    std::vector<int> bars;
+};
+struct StarScoreComparison
+{
+    QString instrument;          // e.g. "Trumpet"
+    int barCount = 0;
+    std::vector<StarScoreComparedPart> parts;
+};
+
 struct StarScoreBandFile
 {
     QString relativePath;        // e.g. "3H Tpt Alt Ten/AMPL - Alto Sax.pdf"
@@ -265,6 +285,19 @@ public:
     //! Returns a summary.
     //! Exports the planned sheets whose relative paths are in onlyPaths (all of them when onlyPaths is empty)
     virtual muse::RetVal<QString> exportToBandFolder(const QStringList& onlyPaths) = 0;
+
+    // --- Version number ("Version 4.0.1" in the copyright text, printed at the bottom of every page)
+    virtual QString scoreVersion() const = 0;                 // from the score, or the starting version for this song
+    virtual void setScoreVersion(const QString& version) = 0; // main score and every part book
+
+    // --- Each arrangement's own score
+    virtual void syncArrangementScores() = 0;                 // create / update / rename them to match the arrangements
+    virtual void openArrangementScore(const QString& arrangementId) = 0;
+
+    // --- Compare parts on the same instrument across sections
+    //! referenceByInstrument: instrument name (StarScoreComparison::instrument) -> part id to compare the others with (first part when missing)
+    virtual std::vector<StarScoreComparison> compareParts(const std::map<QString, QString>& referenceByInstrument) const = 0;
+    virtual void selectBar(const QString& partId, int bar) = 0;   // bar is 1-based
 
     //! Sheets the user un-ticked the last time this song was exported (remembered per song code)
     virtual QStringList bandExportUnticked(const QString& code) const = 0;

@@ -43,6 +43,7 @@
 #include "notation/inotation.h"
 
 #include "starscoreengraving.h"
+#include "starscorehouse.h"
 
 #include "io/filestream.h"
 #include "translation.h"
@@ -720,4 +721,83 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         summary += "\n\n" + muse::qtrc("starscore", "Skipped:") + "\n• " + problems.join("\n• ");
     }
     return RetVal<QString>::make_ok(summary);
+}
+
+// ---------------------------------------------------------------------------
+//  Version number: "Version x.y.z" in the copyright text
+// ---------------------------------------------------------------------------
+
+//! Songs in "1 Starsign Originals" and "2 Starsign Covers" on 27 Sep 2026: they start at 4.0.0.
+//! Any other song (new ones) starts at 1.0.0.
+static const std::set<QString> STARSCORE_V4_CODES {
+    "AMPL", "BRAN", "CIAO", "CUMU", "DEEP", "DEIM", "DBLE", "MUSH", "EVPR", "FEBR", "FYKB", "FISH", "GIJO", "HTLS",
+    "IPDW", "INTN", "PINT", "MXTR", "OKAN", "PORC", "ROYL", "SEAG", "SHTR", "TYFT", "COUR", "UPDG",
+    "ALWT", "ANRC", "BALK", "BRKO", "CHAM", "ISPY", "LOUI", "LVST", "PEAS", "PUTP", "SHOF", "SNTY", "CHKN", "TWOO", "UFTS",
+};
+static const std::set<QString> STARSCORE_V4_TITLES {
+    "amplitudes", "branston pickle", "ciao ferrari", "cumulonimbus", "deep speech", "deimos", "double entendre",
+    "dream of mushroom", "everpresent", "february", "feed your kid bugs", "feed your kids bugs", "fish oil", "g.i. jorge",
+    "hit list", "industrial park driveway", "intern", "last pint", "mxter shirts", "okane", "porcupine", "royal", "seagrass",
+    "shatter", "thank you for your time", "the courier", "updog",
+    "always there", "anarchy rainbow", "another star", "balkan wedding", "bet", "break out", "chameleon", "i'm a spy",
+    "little louie", "live strong + strasbourg", "move on up", "peasant funk", "pick up the pieces", "playground", "semente",
+    "shofukan", "standing next to you", "the chicken", "the essential", "two", "up from the south", "watermelon man",
+};
+
+QString StarScoreService::scoreVersion() const
+{
+    INotationProjectPtr project = exportSourceProject();
+    if (!project) {
+        return QString("1.0.0");
+    }
+    engraving::MasterScore* ms = project->masterNotation()->masterScore();
+    const QString fromScore = starscore::versionFromCopyright(ms->metaTag(u"copyright").toQString());
+    if (!fromScore.isEmpty()) {
+        return fromScore;
+    }
+
+    const QString fileBase = QFileInfo(project->path().toQString()).completeBaseName();
+    const QRegularExpressionMatch m = QRegularExpression("^([A-Z]{3,4})\\s*-\\s*(.*)$").match(fileBase);
+    const QString code = m.hasMatch() ? m.captured(1) : QString();
+    QString title = project->metaInfo().title.trimmed();
+    if (title.isEmpty()) {
+        title = m.hasMatch() ? m.captured(2).trimmed() : fileBase;
+    }
+    const bool existingSong = STARSCORE_V4_CODES.count(code) || STARSCORE_V4_TITLES.count(title.toLower());
+    return existingSong ? QString("4.0.0") : QString("1.0.0");
+}
+
+void StarScoreService::setScoreVersion(const QString& version)
+{
+    INotationProjectPtr project = exportSourceProject();
+    if (!project || version.isEmpty()) {
+        return;
+    }
+    IMasterNotationPtr master = project->masterNotation();
+    engraving::MasterScore* ms = master->masterScore();
+
+    const String text = String::fromQString(starscore::copyrightWithVersion(ms->metaTag(u"copyright").toQString(), version));
+
+    auto update = [&](INotationPtr n, engraving::Score* score) {
+        if (!score) {
+            return;
+        }
+        score->setMetaTag(u"copyright", text);
+        if (n) {
+            n->undoStack()->prepareChanges(TranslatableString::untranslatable("Version footer"));
+            starscore::applyVersionFooter(score);
+            n->undoStack()->commitChanges();
+            n->notationChanged().notify();
+        } else {
+            score->update();
+        }
+    };
+
+    update(master->notation(), ms);
+    for (const IExcerptNotationPtr& e : master->excerpts()) {
+        if (e->isInited() && e->notation()) {
+            update(e->notation(), e->notation()->elements()->msScore());
+        }
+    }
+    project->markAsUnsaved();
 }

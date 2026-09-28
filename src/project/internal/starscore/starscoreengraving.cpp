@@ -296,7 +296,10 @@ QString applyAdditiveTimeSig(MasterScore* score, Measure* start, Measure* last, 
         ts->setSig(sig);
         if (i == 0) {
             if (numerators.size() > 1) {
+                // One time signature: "4+4+4+3" over a single visible denominator. When only the
+                // numerator string is set, MuseScore draws no denominator, so both are set.
                 ts->setNumeratorString(numeratorText);
+                ts->setDenominatorString(String::number(denominator));
             }
         } else {
             ts->setVisible(false);

@@ -182,3 +182,12 @@ bool ExcerptNotation::hasVisibleParts() const
     }
     return false;
 }
+
+void ExcerptNotation::setMasterParts(const std::vector<mu::engraving::Part*>& parts)
+{
+    if (!m_excerpt || m_excerpt->inited()) {
+        return;
+    }
+    m_excerpt->setParts(parts);
+    m_excerpt->markAsCustom();
+}

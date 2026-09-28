@@ -16,7 +16,7 @@ StyledDialogView {
 
     title: qsTrc("starscore", "Export to Sheets and Demos")
 
-    contentWidth: 620
+    contentWidth: 700
     contentHeight: 620
     margins: 16
 
@@ -48,6 +48,36 @@ StyledDialogView {
             visible: exportModel.errorText === "" && !root.done
             text: qsTrc("starscore", "Sheets that already exist are moved to Version History/Superseded <today> first. "
                         + "Your ticks are remembered for this song.")
+        }
+
+        // Version: keep it, or raise one of the three numbers for this export
+        RowLayout {
+            visible: exportModel.errorText === "" && !root.done
+            spacing: 12
+
+            StyledTextLabel {
+                text: qsTrc("starscore", "Version %1  →").arg(exportModel.currentVersion)
+                font: ui.theme.bodyBoldFont
+            }
+            CheckBox {
+                text: qsTrc("starscore", "+ first number")
+                checked: exportModel.bump === 1
+                onClicked: exportModel.bump = checked ? 0 : 1
+            }
+            CheckBox {
+                text: qsTrc("starscore", "+ second")
+                checked: exportModel.bump === 2
+                onClicked: exportModel.bump = checked ? 0 : 2
+            }
+            CheckBox {
+                text: qsTrc("starscore", "+ third")
+                checked: exportModel.bump === 3
+                onClicked: exportModel.bump = checked ? 0 : 3
+            }
+            StyledTextLabel {
+                text: qsTrc("starscore", "Exports as Version %1").arg(exportModel.exportVersion)
+                color: ui.theme.fontSecondaryColor
+            }
         }
 
         RowLayout {

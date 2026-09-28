@@ -102,6 +102,9 @@ target_sources(project PRIVATE
     internal/starscore/starscorebandexport.cpp
     internal/starscore/starscoreservice.h
     internal/starscore/starscoreengraving.cpp
+    internal/starscore/starscorehouse.cpp
+    internal/starscore/starscorehouse.h
+    internal/starscore/starscorecompare.cpp
     internal/starscore/starscoreengraving.h
 )
 

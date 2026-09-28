@@ -378,6 +378,7 @@ elseif(OS_IS_FBSD)
 ###########################################
 elseif(OS_IS_MAC)
     install(FILES
+            ${PROJECT_SOURCE_DIR}/fonts/starscorejost/StarScoreJost.ttf
             ${PROJECT_SOURCE_DIR}/fonts/bravura/BravuraText.otf
             ${PROJECT_SOURCE_DIR}/fonts/campania/Campania.otf
             ${PROJECT_SOURCE_DIR}/fonts/edwin/Edwin-BdIta.otf

@@ -24,6 +24,9 @@ class BandExportModel : public QObject, public muse::Contextable
     Q_PROPERTY(QString notes READ notes NOTIFY loaded)
     Q_PROPERTY(QVariantList items READ items NOTIFY itemsChanged)
     Q_PROPERTY(int checkedCount READ checkedCount NOTIFY itemsChanged)
+    Q_PROPERTY(QString currentVersion READ currentVersion NOTIFY loaded)
+    Q_PROPERTY(int bump READ bump WRITE setBump NOTIFY bumpChanged)   // 0 none, 1 first number, 2 second, 3 third
+    Q_PROPERTY(QString exportVersion READ exportVersion NOTIFY bumpChanged)
 
     QML_ELEMENT
 
@@ -37,6 +40,10 @@ public:
     QString notes() const;
     QVariantList items() const;
     int checkedCount() const;
+    QString currentVersion() const;
+    int bump() const;
+    void setBump(int bump);
+    QString exportVersion() const;
 
     Q_INVOKABLE void load();
     Q_INVOKABLE void setChecked(int index, bool checked);
@@ -50,6 +57,7 @@ public:
 signals:
     void loaded();
     void itemsChanged();
+    void bumpChanged();
 
 private:
     void saveTicks();
@@ -60,5 +68,7 @@ private:
     QString m_notes;
     QString m_code;
     QVariantList m_items;
+    QString m_version;
+    int m_bump = 0;
 };
 }

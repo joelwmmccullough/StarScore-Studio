@@ -25,6 +25,10 @@
 
 #include "inotation.h"
 
+namespace mu::engraving {
+class Part;
+}
+
 namespace mu::notation {
 class IExcerptNotation;
 using IExcerptNotationPtr = std::shared_ptr<IExcerptNotation>;
@@ -51,6 +55,10 @@ public:
     //! StarScore Studio: false when every instrument in this part book is hidden in the main score
     //! (its section is switched off), so it is left out of the parts list and the tabs
     virtual bool hasVisibleParts() const { return true; }
+
+    //! StarScore Studio: before the part book is initialised, set which main-score instruments it holds
+    //! (used for each arrangement's own score)
+    virtual void setMasterParts(const std::vector<engraving::Part*>& parts) { (void)parts; }
     virtual IExcerptNotationPtr clone() const = 0;
 };
 }

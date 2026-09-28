@@ -109,6 +109,15 @@ public:
     QStringList bandExportUnticked(const QString& code) const override;
     void setBandExportUnticked(const QString& code, const QStringList& paths) override;
 
+    QString scoreVersion() const override;
+    void setScoreVersion(const QString& version) override;
+
+    void syncArrangementScores() override;
+    void openArrangementScore(const QString& arrangementId) override;
+
+    std::vector<StarScoreComparison> compareParts(const std::map<QString, QString>& referenceByInstrument) const override;
+    void selectBar(const QString& partId, int bar) override;
+
     muse::Ret exportArrangement(const QString& arrangementId, const muse::io::path_t& msczPath) override;
 
     struct Data {

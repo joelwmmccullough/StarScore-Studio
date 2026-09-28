@@ -547,7 +547,7 @@ void ParsedChord::configure(const ChordList* cl)
     m_lower << u"b" << u"-" << u"dim";
     m_raise << u"#" << u"+" << u"aug";
     m_mod << u"sus" << u"add" << u"no" << u"omit" << u"^" << u"type";
-    m_symbols << u"t" << u"^" << u"-" << u"+" << u"o" << u"0";
+    m_symbols << u"t" << u"^" << u"-" << u"+" << u"o" << u"0" << u"\u00f8" << u"h";
 }
 
 //---------------------------------------------------------
@@ -661,7 +661,8 @@ bool ParsedChord::parse(const String& s, const ChordList* cl, bool syntaxOnly, b
         if (!syntaxOnly) {
             m_chord = HChord(u"C E G#");
         }
-    } else if (tok1L == "0") {
+    } else if (tok1L == "0" || tok1L == u"\u00f8" || tok1L == u"h") {
+        // StarScore: "ø" and "h" are also half-diminished (Joel's library stores "h7")
         m_quality = u"half-diminished";
         if (!syntaxOnly) {
             m_chord = HChord(u"C Eb Gb Bb");

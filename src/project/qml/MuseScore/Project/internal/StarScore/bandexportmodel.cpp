@@ -44,8 +44,52 @@ int BandExportModel::checkedCount() const
     return n;
 }
 
+QString BandExportModel::currentVersion() const
+{
+    return m_version;
+}
+
+int BandExportModel::bump() const
+{
+    return m_bump;
+}
+
+void BandExportModel::setBump(int bump)
+{
+    if (m_bump != bump) {
+        m_bump = bump;
+        emit bumpChanged();
+    }
+}
+
+QString BandExportModel::exportVersion() const
+{
+    QStringList bits = m_version.split('.');
+    while (bits.size() < 3) {
+        bits << "0";
+    }
+    int major = bits[0].toInt();
+    int minor = bits[1].toInt();
+    int patch = bits[2].toInt();
+    if (m_bump == 1) {
+        ++major;
+        minor = 0;
+        patch = 0;
+    } else if (m_bump == 2) {
+        ++minor;
+        patch = 0;
+    } else if (m_bump == 3) {
+        ++patch;
+    }
+    return QString("%1.%2.%3").arg(major).arg(minor).arg(patch);
+}
+
 void BandExportModel::load()
 {
+    m_version = starScore()->scoreVersion();
+    m_bump = 0;
+    emit bumpChanged();
+
     m_items.clear();
     m_error.clear();
     m_notes.clear();
@@ -178,9 +222,17 @@ QString BandExportModel::exportNow()
         return muse::qtrc("starscore", "Nothing is ticked.");
     }
 
+    // The version printed on these sheets (and kept in the score for next time)
+    const QString version = exportVersion();
+    starScore()->setScoreVersion(version);
+    m_version = version;
+    m_bump = 0;
+    emit loaded();
+    emit bumpChanged();
+
     muse::RetVal<QString> summary = starScore()->exportToBandFolder(paths);
     if (!summary.ret) {
         return muse::qtrc("starscore", "Export failed: %1").arg(QString::fromStdString(summary.ret.toString()));
     }
-    return summary.val;
+    return summary.val + "\n\n" + muse::qtrc("starscore", "Sheets are marked Version %1. Save the .starscore to keep this version number.").arg(version);
 }

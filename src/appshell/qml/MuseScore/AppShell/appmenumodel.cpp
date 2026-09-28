@@ -363,6 +363,7 @@ MenuItem* AppMenuModel::makeFormatMenu()
         makeMenuItem("starscore-part-styles"),
         makeMenuItem("starscore-additive-timesig"),
         makeMenuItem("starscore-add-solo"),
+        makeMenuItem("starscore-compare-parts"),
         makeMenuItem("starscore-check-ranges"),
         makeMenuItem("starscore-color-notes"),
         makeMenuItem("starscore-uncolor-notes"),

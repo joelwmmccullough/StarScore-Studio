@@ -81,6 +81,12 @@ const UiActionList ProjectUiActions::m_actions = {
              TranslatableString("action", "Export to Sheets and Demos…"),
              TranslatableString("action", "Export every sheet to the band's Sheets and Demos folder")
              ),
+    UiAction("starscore-compare-parts",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Compare parts…"),
+             TranslatableString("action", "See which bars differ between parts on the same instrument")
+             ),
     UiAction("starscore-check-ranges",
              mu::context::UiCtxProjectOpened,
              mu::context::CTX_ANY,

@@ -4,6 +4,7 @@
  * StarScore Studio — a MuseScore Studio fork
  */
 #include "starscoreservice.h"
+#include "starscorehouse.h"
 
 #include <algorithm>
 #include <set>
@@ -89,6 +90,24 @@ void StarScoreService::listenCurrentProject()
 }
 
 //! The engraving Excerpt behind an (initialised) part book, or nullptr
+static QString starscoreArrangementScoreName(const QString& arrangementName)
+{
+    return arrangementName + " Score";
+}
+
+static int starscoreFindExcerpt(const ExcerptNotationList& excerpts, const QString& name)
+{
+    if (name.isEmpty()) {
+        return -1;
+    }
+    for (size_t i = 0; i < excerpts.size(); ++i) {
+        if (excerpts[i]->name() == name) {
+            return int(i);
+        }
+    }
+    return -1;
+}
+
 static mu::engraving::Excerpt* starscoreExcerptOf(const IExcerptNotationPtr& excerptNotation)
 {
     if (!excerptNotation || !excerptNotation->isInited()) {
@@ -187,6 +206,7 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
         a.id = o.value("id").toString();
         a.name = o.value("name").toString();
         a.templateKey = o.value("template").toString();
+        a.scoreName = o.value("score").toString();
         for (const QJsonValue& s : o.value("sections").toArray()) {
             a.sectionIds << s.toString();
         }
@@ -219,6 +239,9 @@ QString StarScoreService::toJson(const Data& data)
         o["name"] = a.name;
         o["template"] = a.templateKey;
         o["sections"] = QJsonArray::fromStringList(a.sectionIds);
+        if (!a.scoreName.isEmpty()) {
+            o["score"] = a.scoreName;
+        }
         arrangements.append(o);
     }
 
@@ -1053,6 +1076,7 @@ Ret StarScoreService::newStarScore(const StarScoreNewOptions& options)
     data.arrangements.push_back(a);
 
     store(data);
+    syncArrangementScores();
     applyStyles();
     return make_ok();
 }
@@ -1088,6 +1112,7 @@ void StarScoreService::setSectionParts(const QString& sectionId, const QStringLi
         }
     }
     store(data);
+    syncArrangementScores();
 }
 
 void StarScoreService::moveSection(const QString& sectionId, int newIndex)
@@ -1174,6 +1199,7 @@ void StarScoreService::removeSection(const QString& sectionId, bool deleteInstru
     store(data);
 
     removePartsKeepingSystemObjects(toDelete);
+    syncArrangementScores();
 }
 
 // ---------------------------------------------------------------------------
@@ -1263,6 +1289,7 @@ RetVal<QString> StarScoreService::createArrangement(const QString& name, const Q
     a.sectionIds = sectionIds;
     data.arrangements.push_back(a);
     store(data);
+    syncArrangementScores();
 
     return RetVal<QString>::make_ok(a.id);
 }
@@ -1276,6 +1303,7 @@ void StarScoreService::renameArrangement(const QString& arrangementId, const QSt
         }
     }
     store(data);
+    syncArrangementScores();
 }
 
 void StarScoreService::setArrangementSections(const QString& arrangementId, const QStringList& sectionIds)
@@ -1287,6 +1315,7 @@ void StarScoreService::setArrangementSections(const QString& arrangementId, cons
         }
     }
     store(data);
+    syncArrangementScores();
 }
 
 void StarScoreService::moveArrangement(const QString& arrangementId, int newIndex)
@@ -1307,6 +1336,20 @@ void StarScoreService::moveArrangement(const QString& arrangementId, int newInde
 void StarScoreService::removeArrangement(const QString& arrangementId)
 {
     Data data = load();
+    // Its own score goes too
+    if (IMasterNotationPtr master = globalContext()->currentMasterNotation()) {
+        for (const StarScoreArrangement& a : data.arrangements) {
+            if (a.id != arrangementId) {
+                continue;
+            }
+            ExcerptNotationList excerpts = master->excerpts();
+            const int idx = starscoreFindExcerpt(excerpts, a.scoreName);
+            if (idx >= 0) {
+                excerpts.erase(excerpts.begin() + idx);
+                master->setExcerpts(excerpts);
+            }
+        }
+    }
     data.arrangements.erase(std::remove_if(data.arrangements.begin(), data.arrangements.end(),
                                            [&](const StarScoreArrangement& a) { return a.id == arrangementId; }),
                             data.arrangements.end());
@@ -1476,6 +1519,7 @@ int StarScoreService::detectSections()
     }
 
     store(data);
+    syncArrangementScores();
     return added;
 }
 
@@ -1705,7 +1749,32 @@ int StarScoreService::applyStyles(const QStringList& partIds)
         return !path.isEmpty() && QFileInfo::exists(path);
     };
 
+    // Style file(s), then the house settings a style file can't hold, in one undo step per score
+    auto restyle = [&](INotationPtr n, const QString& ruleStyle, bool partBook) {
+        if (!n) {
+            return false;
+        }
+        bool changed = false;
+        if (usable(settings.defaultStyle)) {
+            changed |= n->style()->loadStyle(settings.defaultStyle, true);
+        }
+        if (!ruleStyle.isEmpty()) {
+            changed |= n->style()->loadStyle(ruleStyle, true);
+        }
+        engraving::Score* score = n->elements()->msScore();
+        n->undoStack()->prepareChanges(TranslatableString::untranslatable("StarScore house style"));
+        starscore::applyHouseStyle(score, partBook);
+        n->undoStack()->commitChanges();
+        n->notationChanged().notify();
+        return true;
+    };
+
     int restyled = 0;
+
+    // The main score (a workspace of every arrangement) when restyling everything
+    if (partIds.isEmpty() && restyle(master->notation(), QString(), false)) {
+        ++restyled;
+    }
 
     for (const IExcerptNotationPtr& e : master->excerpts()) {
         engraving::Excerpt* ex = starscoreExcerptOf(e);
@@ -1713,13 +1782,19 @@ int StarScoreService::applyStyles(const QStringList& partIds)
             continue;
         }
 
-        // The part book's instrument (only single-instrument part books get specific rules)
         const std::vector<engraving::Part*> parts = masterPartsOf(ex);
-        const engraving::Part* part = parts.size() == 1 ? parts.front() : nullptr;
+        const bool partBook = parts.size() == 1;
+        const engraving::Part* part = partBook ? parts.front() : nullptr;
         const QString partId = part ? idText(part) : QString();
 
-        if (!partIds.isEmpty() && (partId.isEmpty() || !partIds.contains(partId))) {
-            continue;
+        if (!partIds.isEmpty()) {
+            bool touches = false;
+            for (const engraving::Part* p : parts) {
+                touches |= partIds.contains(idText(p));
+            }
+            if (!touches) {
+                continue;
+            }
         }
 
         QStringList sectionKeys;
@@ -1743,15 +1818,7 @@ int StarScoreService::applyStyles(const QStringList& partIds)
             }
         }
 
-        INotationPtr n = e->notation();
-        bool changed = false;
-        if (usable(settings.defaultStyle)) {
-            changed |= n->style()->loadStyle(settings.defaultStyle, true);
-        }
-        if (!chosen.isEmpty()) {
-            changed |= n->style()->loadStyle(chosen, true);
-        }
-        if (changed) {
+        if (restyle(e->notation(), chosen, partBook)) {
             ++restyled;
         }
     }
@@ -2433,4 +2500,144 @@ Ret StarScoreService::saveAll()
     Ret ret = injectSolos(m_mainProject->path());
     m_changed.notify();
     return ret;
+}
+
+// ---------------------------------------------------------------------------
+//  Each arrangement's own score: a part book holding all of the arrangement's
+//  instruments, since the main score is a workspace of every arrangement at once
+// ---------------------------------------------------------------------------
+
+void StarScoreService::syncArrangementScores()
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    engraving::MasterScore* ms = masterScore();
+    if (!master || !ms || isSoloProject(globalContext()->currentProject().get())) {
+        return;
+    }
+
+    Data data = load();
+    ExcerptNotationList excerpts = master->excerpts();
+    bool listChanged = false;
+    bool dataChanged = false;
+    std::vector<std::pair<IExcerptNotationPtr, QStringList> > created;   // new score, parts to hide in it
+
+    for (StarScoreArrangement& a : data.arrangements) {
+        std::set<QString> wanted;
+        QStringList hidden;
+        for (const StarScoreSection& s : data.sections) {
+            if (!a.sectionIds.contains(s.id)) {
+                continue;
+            }
+            for (const QString& pid : s.partIds) {
+                wanted.insert(pid);
+                // instruments the section keeps hidden (e.g. Congas) start hidden in the score too
+                if (!s.shownPartIds.isEmpty() && !s.shownPartIds.contains(pid)) {
+                    hidden << pid;
+                }
+            }
+        }
+        std::vector<engraving::Part*> parts;
+        for (engraving::Part* p : ms->parts()) {
+            if (wanted.count(idText(p))) {
+                parts.push_back(p);
+            }
+        }
+
+        const QString name = starscoreArrangementScoreName(a.name);
+        const int idx = starscoreFindExcerpt(excerpts, a.scoreName);
+
+        if (parts.empty()) {
+            if (idx >= 0) {
+                excerpts.erase(excerpts.begin() + idx);
+                listChanged = true;
+            }
+            if (!a.scoreName.isEmpty()) {
+                a.scoreName.clear();
+                dataChanged = true;
+            }
+            continue;
+        }
+
+        if (idx >= 0) {
+            const IExcerptNotationPtr& existing = excerpts[idx];
+            std::vector<engraving::Part*> have = masterPartsOf(starscoreExcerptOf(existing));
+            std::set<const engraving::Part*> haveSet(have.begin(), have.end());
+            std::set<const engraving::Part*> wantSet(parts.begin(), parts.end());
+            if (haveSet == wantSet) {
+                if (existing->name() != name && starscoreFindExcerpt(excerpts, name) < 0) {
+                    existing->setName(name);
+                    a.scoreName = name;
+                    dataChanged = true;
+                }
+                continue;
+            }
+            // The instruments changed: rebuild the score (its own layout breaks are lost)
+            excerpts.erase(excerpts.begin() + idx);
+            listChanged = true;
+        }
+
+        QString unique = name;
+        for (int i = 2; starscoreFindExcerpt(excerpts, unique) >= 0; ++i) {
+            unique = QString("%1 (%2)").arg(name).arg(i);
+        }
+        IExcerptNotationPtr score = master->createEmptyExcerpt(unique);
+        score->setMasterParts(parts);
+        excerpts.push_back(score);
+        created.emplace_back(score, hidden);
+        a.scoreName = unique;
+        listChanged = true;
+        dataChanged = true;
+    }
+
+    if (listChanged) {
+        master->setExcerpts(excerpts);
+    }
+    if (dataChanged) {
+        store(data);
+    }
+
+    if (!created.empty()) {
+        const StyleSettings settings = loadStyleSettings();
+        for (auto& [score, hidden] : created) {
+            INotationPtr n = score->notation();
+            if (!n) {
+                continue;
+            }
+            if (!hidden.isEmpty()) {
+                std::vector<std::pair<muse::ID, bool> > vis;
+                for (const QString& pid : hidden) {
+                    vis.emplace_back(muse::ID(pid), false);
+                }
+                n->parts()->setPartsVisible(vis, TranslatableString::untranslatable("Hide instruments"));
+            }
+            if (!settings.defaultStyle.isEmpty() && QFileInfo::exists(settings.defaultStyle)) {
+                n->style()->loadStyle(settings.defaultStyle, true);
+            }
+            n->undoStack()->prepareChanges(TranslatableString::untranslatable("StarScore house style"));
+            starscore::applyHouseStyle(n->elements()->msScore(), false);
+            n->undoStack()->commitChanges();
+        }
+    }
+}
+
+void StarScoreService::openArrangementScore(const QString& arrangementId)
+{
+    syncArrangementScores();
+
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    if (!master) {
+        return;
+    }
+    for (const StarScoreArrangement& a : load().arrangements) {
+        if (a.id != arrangementId) {
+            continue;
+        }
+        const int idx = starscoreFindExcerpt(master->excerpts(), a.scoreName);
+        if (idx < 0) {
+            return;
+        }
+        INotationPtr n = master->excerpts().at(idx)->notation();
+        master->setExcerptIsOpen(n, true);
+        globalContext()->setCurrentNotation(n);
+    }
 }
