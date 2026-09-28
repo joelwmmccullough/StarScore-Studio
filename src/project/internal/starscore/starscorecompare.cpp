@@ -39,7 +39,7 @@ using namespace muse;
 
 //! What a part plays in one bar, as text: rhythm, pitches (concert), ties, articulations and dynamics.
 //! Empty when the bar is only rests.
-static std::string starscoreBarSignature(const Part* part, const Measure* m)
+static std::string starscoreBarSignature(const Part* part, const Measure* m, bool ignoreOctave = false)
 {
     std::string sig;
     bool hasNotes = false;
@@ -59,7 +59,8 @@ static std::string starscoreBarSignature(const Part* part, const Measure* m)
                     const Chord* c = toChord(e);
                     std::vector<int> pitches;
                     for (const Note* n : c->notes()) {
-                        pitches.push_back(n->pitch() * 2 + (n->tieFor() ? 1 : 0));
+                        const int pitch = ignoreOctave ? n->pitch() % 12 : n->pitch();
+                        pitches.push_back(pitch * 2 + (n->tieFor() ? 1 : 0));
                     }
                     std::sort(pitches.begin(), pitches.end());
                     for (int p : pitches) {
@@ -154,13 +155,17 @@ std::vector<StarScoreComparison> StarScoreService::compareParts(const std::map<Q
         }
 
         std::vector<std::vector<std::string> > sigs;
+        std::vector<std::vector<std::string> > classSigs;   // pitch classes only, to spot octave-only differences
         for (const Part* p : parts) {
             std::vector<std::string> row;
+            std::vector<std::string> classRow;
             row.reserve(measures.size());
             for (const Measure* m : measures) {
                 row.push_back(starscoreBarSignature(p, m));
+                classRow.push_back(starscoreBarSignature(p, m, true));
             }
             sigs.push_back(std::move(row));
+            classSigs.push_back(std::move(classRow));
         }
 
         const QString instrumentName = parts.front()->instrument()->trackName().toQString();
@@ -190,18 +195,27 @@ std::vector<StarScoreComparison> StarScoreService::compareParts(const std::map<Q
             row.isReference = i == ref;
 
             std::vector<int> differing;
+            std::vector<int> octaveOnly;
             for (size_t b = 0; b < measures.size(); ++b) {
                 const bool same = sigs[i][b] == sigs[ref][b];
-                if (!same) {
+                if (same) {
+                    row.bars.push_back(sigs[i][b].empty() ? 2 : 0);
+                } else if (!sigs[i][b].empty() && classSigs[i][b] == classSigs[ref][b]) {
+                    row.bars.push_back(3);   // same notes and rhythm, different octave
+                    octaveOnly.push_back(int(b) + 1);
+                } else {
+                    row.bars.push_back(1);
                     differing.push_back(int(b) + 1);
                 }
-                row.bars.push_back(same ? (sigs[i][b].empty() ? 2 : 0) : 1);
             }
 
             if (i == ref) {
                 row.summary = muse::qtrc("starscore", "Reference");
-            } else if (differing.empty()) {
+            } else if (differing.empty() && octaveOnly.empty()) {
                 row.summary = muse::qtrc("starscore", "Same as %1").arg(shortOf(ref));
+            } else if (differing.empty()) {
+                row.summary = muse::qtrc("starscore", "Same as %1 apart from the octave in bars %2")
+                              .arg(shortOf(ref), starscoreBarRanges(octaveOnly));
             } else {
                 // Identical to another non-reference part?
                 QString twin;
@@ -212,6 +226,9 @@ std::vector<StarScoreComparison> StarScoreService::compareParts(const std::map<Q
                 }
                 row.summary = muse::qtrc("starscore", "%n bar(s) differ from %1: %2", nullptr, int(differing.size()))
                               .arg(shortOf(ref), starscoreBarRanges(differing));
+                if (!octaveOnly.empty()) {
+                    row.summary += "; " + muse::qtrc("starscore", "octave only: %1").arg(starscoreBarRanges(octaveOnly));
+                }
                 if (!twin.isEmpty()) {
                     row.summary += "  " + muse::qtrc("starscore", "(identical to %1)").arg(twin);
                 }

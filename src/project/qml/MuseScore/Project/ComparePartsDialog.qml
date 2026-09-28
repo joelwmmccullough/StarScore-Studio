@@ -24,6 +24,7 @@ StyledDialogView {
 
     readonly property color sameColor: ui.theme.buttonColor
     readonly property color diffColor: "#E8892B"
+    readonly property color octaveColor: "#4A8FE0"
     readonly property color emptyColor: Qt.rgba(ui.theme.fontPrimaryColor.r, ui.theme.fontPrimaryColor.g, ui.theme.fontPrimaryColor.b, 0.06)
 
     ComparePartsModel {
@@ -42,7 +43,7 @@ StyledDialogView {
             wrapMode: Text.WordWrap
             text: compareModel.groups.length === 0
                   ? qsTrc("starscore", "No instrument is used in more than one section.")
-                  : qsTrc("starscore", "Orange bars differ from the reference part (★). Grey bars are the same; pale bars are rests in both. "
+                  : qsTrc("starscore", "Orange bars differ from the reference part (★). Blue bars are the same apart from the octave. Grey bars are the same; pale bars are rests in both. "
                           + "Click a part's name to compare the others with it. Click a bar to select it in the main score.")
         }
 
@@ -116,7 +117,7 @@ StyledDialogView {
                                                 required property int index
                                                 width: strip.cell
                                                 height: strip.height
-                                                color: modelData === 1 ? root.diffColor : (modelData === 2 ? root.emptyColor : root.sameColor)
+                                                color: modelData === 1 ? root.diffColor : (modelData === 3 ? root.octaveColor : (modelData === 2 ? root.emptyColor : root.sameColor))
                                                 border.width: strip.cell > 6 ? 1 : 0
                                                 border.color: ui.theme.backgroundPrimaryColor
 

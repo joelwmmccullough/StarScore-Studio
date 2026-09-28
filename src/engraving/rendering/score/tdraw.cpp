@@ -1768,21 +1768,25 @@ static bool starscoreDrawRaisedMc(const TextFragment& f, const TextBase* item, m
         raise = fm.capHeight() - fm.xHeight();
     }
 
-    painter->setFont(font);
+    // Painter::drawText scales the current font for the device, so the font is set again before every call
+    auto drawPiece = [&](const PointF& p, const String& piece) {
+        painter->setFont(font);
+        painter->drawText(p, piece);
+    };
     double x = f.pos.x();
     size_t from = 0;
     for (size_t c : raised) {
         if (c > from) {
             const String before = text.mid(from, c - from);
-            painter->drawText(PointF(x, f.pos.y()), before);
+            drawPiece(PointF(x, f.pos.y()), before);
             x += fm.width(before);
         }
-        painter->drawText(PointF(x, f.pos.y() - raise), String(u"c"));
+        drawPiece(PointF(x, f.pos.y() - raise), String(u"c"));
         x += fm.width(String(u"c"));
         from = c + 1;
     }
     if (from < n) {
-        painter->drawText(PointF(x, f.pos.y()), text.mid(from));
+        drawPiece(PointF(x, f.pos.y()), text.mid(from));
     }
     return true;
 }

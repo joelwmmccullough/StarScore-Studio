@@ -139,7 +139,7 @@ struct StarScoreSoloPlan
 };
 
 //! One PDF the band export will write, relative to the song's folder in "Sheets and Demos"
-//! One instrument's part in "Compare parts": per bar, 0 = same as the reference part, 1 = different, 2 = both rest
+//! One instrument's part in "Compare parts": per bar, 0 = same as the reference part, 1 = different, 2 = both rest, 3 = same apart from the octave
 struct StarScoreComparedPart
 {
     QString partId;
