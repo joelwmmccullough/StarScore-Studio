@@ -165,7 +165,7 @@ def build_variant(target, index, src_path, tri_code, minus_code):
 DIAMOND_WEIGHT = {2: 0.66}
 # Fonts with heavy lines: the minor-major bar is drawn only outside the diamond (two short ticks), so the
 # small opening in the middle stays clear
-DIAMOND_TICKS = {0, 4, 6}
+DIAMOND_TICKS = set()   # fonts drawn with ticks outside the diamond instead of a full bar (none: Joel chose the full bar)
 
 
 def poly(pen, pts):
