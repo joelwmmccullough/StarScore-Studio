@@ -79,7 +79,7 @@ signals:
     void changed();
 
 private:
-    QVariantList statusSubmenu(const QString& prefix, int current) const;
+    QVariantList statusSubmenu(const QString& prefix, int current, bool rhythm = false) const;
     void openEditDialog(const QString& mode, const QString& id, const QString& slot = QString());
     void createCustomSection();
     void askRename(bool isSection, const QString& id);

@@ -290,11 +290,17 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
                 if (!p) {
                     continue;
                 }
-                QString name = starscoreRhythmName(p->instrumentId().toQString(), p->partName().toQString());
+                const QString role = starscoreRhythmName(p->instrumentId().toQString(), p->partName().toQString());
+                QString name = role;
                 if (counts[name] > 1) {
                     name += " (" + p->partName().toQString() + ")";
                 }
                 addFile("1 Rhythm", name, { pid }, false);
+                // "Finished, drums/percussion/keys use the lead sheet": only guitar and bass sheets ticked by default
+                if (sec.status == StarScoreStatus::FinishedLeadSheetParts && role != "Guitar" && role != "Bass"
+                    && role != "Bass Synth") {
+                    plan.files.back().defaultUnchecked = true;
+                }
             }
             continue;
         }

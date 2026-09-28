@@ -32,7 +32,10 @@ enum class StarScoreStatus {
     Sketch,
     InProgress,
     NeedsReview,
-    Finished
+    Finished,
+    //! Rhythm sections only: lead sheet, guitar and bass are finished; drums, percussion and keys play from the
+    //! lead sheet, so their own sheets are left out of the band export by default. Counts as finished.
+    FinishedLeadSheetParts
 };
 
 //! A section is a named group of instruments inside the one score: "Lead Sheet", "3-Horn Section",
@@ -179,6 +182,7 @@ struct StarScoreBandFile
     QString relativePath;        // e.g. "3H Tpt Alt Ten/AMPL - Alto Sax.pdf"
     QStringList partIds;         // one part = its part book; several = a score of just those instruments
     bool isScore = false;
+    bool defaultUnchecked = false;   // left unticked in the export dialog unless the user ticks it
 
     // "Any Horns" chair versions: the chair is re-written for a transposition and clef at export time
     bool isVersion = false;

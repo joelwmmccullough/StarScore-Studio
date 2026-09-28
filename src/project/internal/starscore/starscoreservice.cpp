@@ -135,6 +135,7 @@ QString StarScoreService::statusKey(StarScoreStatus status)
     case StarScoreStatus::InProgress: return "in-progress";
     case StarScoreStatus::NeedsReview: return "needs-review";
     case StarScoreStatus::Finished: return "finished";
+    case StarScoreStatus::FinishedLeadSheetParts: return "finished-lead-sheet-parts";
     }
     return "in-progress";
 }
@@ -149,6 +150,8 @@ StarScoreStatus StarScoreService::statusFromKey(const QString& key)
         return StarScoreStatus::NeedsReview;
     } else if (key == "finished") {
         return StarScoreStatus::Finished;
+    } else if (key == "finished-lead-sheet-parts") {
+        return StarScoreStatus::FinishedLeadSheetParts;
     }
     return StarScoreStatus::InProgress;
 }
@@ -478,7 +481,8 @@ StarScoreStatus StarScoreService::arrangementStatus(const QString& arrangementId
         for (const StarScoreSection& s : data.sections) {
             if (a.sectionIds.contains(s.id)) {
                 any = true;
-                result = std::min(result, s.status);
+                // "finished, drums/percussion/keys use the lead sheet" counts as finished
+                result = std::min(result, std::min(s.status, StarScoreStatus::Finished));
             }
         }
     }

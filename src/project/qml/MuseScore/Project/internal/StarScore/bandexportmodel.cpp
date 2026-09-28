@@ -123,7 +123,7 @@ void BandExportModel::load()
                     { "path", f.relativePath },
                     { "folder", folder },
                     { "name", f.relativePath.section('/', -1) },
-                    { "checked", !unticked.contains(f.relativePath) },
+                    { "checked", !unticked.contains(f.relativePath) && !f.defaultUnchecked },
                 };
             }
         }

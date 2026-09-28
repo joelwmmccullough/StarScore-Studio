@@ -160,6 +160,7 @@ QString StarScoreBarModel::statusColor(int status) const
     case StarScoreStatus::InProgress: return "#F29B30";
     case StarScoreStatus::NeedsReview: return "#3C8CE7";
     case StarScoreStatus::Finished: return "#3FB05A";
+    case StarScoreStatus::FinishedLeadSheetParts: return "#2FA58F";
     }
     return "#8A8A8A";
 }
@@ -172,14 +173,17 @@ QString StarScoreBarModel::statusName(int status) const
     case StarScoreStatus::InProgress: return muse::qtrc("starscore", "In progress");
     case StarScoreStatus::NeedsReview: return muse::qtrc("starscore", "Needs review");
     case StarScoreStatus::Finished: return muse::qtrc("starscore", "Finished");
+    case StarScoreStatus::FinishedLeadSheetParts:
+        return muse::qtrc("starscore", "Finished \u2014 drums, percussion and keys use the lead sheet");
     }
     return QString();
 }
 
-QVariantList StarScoreBarModel::statusSubmenu(const QString& prefix, int current) const
+QVariantList StarScoreBarModel::statusSubmenu(const QString& prefix, int current, bool rhythm) const
 {
     QVariantList items;
-    for (int i = 0; i <= int(StarScoreStatus::Finished); ++i) {
+    const int last = rhythm ? int(StarScoreStatus::FinishedLeadSheetParts) : int(StarScoreStatus::Finished);
+    for (int i = 0; i <= last; ++i) {
         items << QVariantMap {
             { "id", prefix + QString::number(i) }, { "title", statusName(i) },
             { "checkable", true }, { "checked", i == current }, { "enabled", true }
@@ -208,15 +212,17 @@ QVariantList StarScoreBarModel::arrangementMenu(const QString& id) const
 QVariantList StarScoreBarModel::sectionMenu(const QString& id) const
 {
     int status = 0;
+    bool rhythm = false;
     for (const StarScoreSection& s : starScore()->sections()) {
         if (s.id == id) {
             status = int(s.status);
+            rhythm = s.templateKey == "rhythm" || s.templateKey == "bigband-rhythm";
         }
     }
 
     return {
         QVariantMap { { "id", "sec-solo:" + id }, { "title", muse::qtrc("starscore", "Show only this section") }, { "enabled", true } },
-        QVariantMap { { "title", muse::qtrc("starscore", "Status") }, { "subitems", statusSubmenu("sec-status:" + id + ":", status) },
+        QVariantMap { { "title", muse::qtrc("starscore", "Status") }, { "subitems", statusSubmenu("sec-status:" + id + ":", status, rhythm) },
                       { "enabled", true } },
         QVariantMap {},
         QVariantMap { { "id", "sec-edit:" + id }, { "title", muse::qtrc("starscore", "Choose instruments…") }, { "enabled", true } },
