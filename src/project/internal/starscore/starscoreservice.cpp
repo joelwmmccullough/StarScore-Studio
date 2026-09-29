@@ -1878,7 +1878,7 @@ void StarScoreService::saveStyleSettings(const StyleSettings& settings)
 //! Done once per bundled version. A default the user chose themselves (not an older bundled one) is kept.
 void StarScoreService::installBuiltinDefaultStyle()
 {
-    static const int BUILTIN_STYLE_VERSION = 7;   // 1 = Starsign 2.0, 2 = 2.1, 3 = 2.2, 4 = 2.3, 5 = 2.4, 6 = 2.5, 7 = 2.6
+    static const int BUILTIN_STYLE_VERSION = 8;   // 1 = Starsign 2.0, 2 = 2.1, 3 = 2.2, 4 = 2.3, 5 = 2.4, 6 = 2.5, 7 = 2.6, 8 = 2.6 with H-bar 0.7sp
 
     const QString dir = globalConfiguration()->userAppDataPath().appendingComponent("StarScoreStyles").toQString();
     const QString target = dir + "/Starsign 2.6.mss";

@@ -447,7 +447,7 @@
     <mmRestBetweenStaves>1</mmRestBetweenStaves>
     <mmRestNumberMaskHBar>1</mmRestNumberMaskHBar>
     <multiMeasureRestMargin>1.25</multiMeasureRestMargin>
-    <mmRestHBarThickness>1</mmRestHBarThickness>
+    <mmRestHBarThickness>0.7</mmRestHBarThickness>
     <mmRestHBarVStrokeThickness>0.2</mmRestHBarVStrokeThickness>
     <mmRestHBarVStrokeHeight>2</mmRestHBarVStrokeHeight>
     <oldStyleMultiMeasureRests>0</oldStyleMultiMeasureRests>

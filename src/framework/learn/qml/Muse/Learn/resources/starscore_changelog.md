@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.2.2
+
+- Multimeasure rests: the H-bar's horizontal stroke is 0.70sp thick (was 1.00sp), in the Starsign style and on every sheet when part styles are applied.
+
 ## 1.2.1
 
 - Audit library: clicking a song no longer crashes the app. The song opens with the Audit panel.

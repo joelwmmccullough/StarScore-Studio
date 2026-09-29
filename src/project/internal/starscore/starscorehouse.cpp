@@ -104,6 +104,8 @@ void applyHouseStyle(Score* score, bool partBook, const QString& version)
 
     // Multimeasure rests are always on in Starsign scores and parts
     starscoreSet(score, Sid::createMultiMeasureRests, true);
+    // H-bar multimeasure rests: horizontal stroke 0.7sp
+    starscoreSet(score, Sid::mmRestHBarThickness, Spatium(0.7));
 
     // Chord symbols (font, size, chords_starsign.xml, superscript sizes) come from the style file (Starsign 2.3+)
 
