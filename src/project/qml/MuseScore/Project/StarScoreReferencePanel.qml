@@ -5,6 +5,7 @@
  * Scroll through the pages; zoom with the buttons (or fit the panel width).
  */
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Window
 
