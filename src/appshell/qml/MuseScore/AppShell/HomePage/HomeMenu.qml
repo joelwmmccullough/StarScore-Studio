@@ -88,6 +88,7 @@ Item {
             spacing: 0
 
             model: [
+                { "name": "dashboard", "title": qsTrc("starscore", "Dashboard"), "iconCode": IconCode.STAR },
                 { "name": "scores", "title": qsTrc("appshell", "Scores"), "iconCode": IconCode.MUSIC_NOTES },
                 { "name": "extensions", "title": qsTrc("appshell", "Plugins"), "iconCode":  IconCode.PLUGIN },
                 { "name": "musesounds", "title": qsTrc("appshell", "MuseSounds"), "iconCode": IconCode.PLAY },

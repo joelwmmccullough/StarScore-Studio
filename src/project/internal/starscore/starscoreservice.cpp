@@ -15,6 +15,7 @@
 #include <QCryptographicHash>
 #include <QDir>
 #include <QTimer>
+#include <QDateTime>
 #include <QImage>
 #include <QFileInfo>
 #include <QFile>
@@ -84,8 +85,11 @@ void StarScoreService::init()
     });
     globalContext()->currentProjectChanged().onNotify(this, [this]() {
         // the notation page and its panels may still be loading: restore once they are there
+        m_projectOpenedMs = QDateTime::currentMSecsSinceEpoch();
         QTimer::singleShot(0, [this]() { pickReferenceForCurrentScore(); });
         QTimer::singleShot(1000, [this]() { pickReferenceForCurrentScore(); });
+        QTimer::singleShot(2500, [this]() { pickReferenceForCurrentScore(); });
+        QTimer::singleShot(5000, [this]() { pickReferenceForCurrentScore(); });
     });
     dockWindowProvider()->windowChanged().onNotify(this, [this]() {
         listenReferencePanel();
@@ -219,6 +223,9 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
         for (auto it = alts.begin(); it != alts.end(); ++it) {
             s.alternates[it.key()] = it.value().toString();
         }
+        // "N-Horn Any" is now called "N-Horn Flexible" (1.8.0)
+        static const QRegularExpression anyRe("\\b(\\d+)-Horn Any\\b");
+        s.name.replace(anyRe, "\\1-Horn Flexible");
         if (!s.id.isEmpty()) {
             data.sections.push_back(s);
         }
@@ -283,6 +290,10 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
         StarScoreArrangement a;
         a.id = o.value("id").toString();
         a.name = o.value("name").toString();
+        {
+            static const QRegularExpression anyRe("\\b(\\d+)-Horn Any\\b");
+            a.name.replace(anyRe, "\\1-Horn Flexible");
+        }
         a.templateKey = o.value("template").toString();
         a.scoreName = o.value("score").toString();
         for (const QJsonValue& s : o.value("sections").toArray()) {
@@ -937,8 +948,8 @@ std::vector<StarScoreSectionTemplate> StarScoreService::sectionTemplates() const
               inst("tenor-saxophone", "Tenor Saxophone"), inst("trombone", "Trombone"), inst("bass-trombone", "Bass Trombone") } },
         // "Any Horns": one concert-pitch staff per chair, with the chair's ranges from the Starsign Band Guide.
         // Transposed versions for each instrument are made at export time.
-        { "2-horn-any", "2-Horn Any", { chair("c-trumpet", "Horn 1", 56, 80, 52, 85), chair("trombone", "Horn 2", 44, 71, 44, 74) } },
-        { "3-horn-any", "3-Horn Any", { chair("c-trumpet", "Horn 1", 56, 80, 52, 85), chair("flute", "Horn 1 (Flute)", -1, -1, -1, -1, true),
+        { "2-horn-any", "2-Horn Flexible", { chair("c-trumpet", "Horn 1", 56, 80, 52, 85), chair("trombone", "Horn 2", 44, 71, 44, 74) } },
+        { "3-horn-any", "3-Horn Flexible", { chair("c-trumpet", "Horn 1", 56, 80, 52, 85), chair("flute", "Horn 1 (Flute)", -1, -1, -1, -1, true),
               chair("c-trumpet", "Horn 2", 52, 75, 52, 85), chair("trombone", "Horn 3", 44, 71, 44, 74) } },
 
         // --- Big band ---
@@ -999,8 +1010,8 @@ std::vector<StarScoreArrangementTemplate> StarScoreService::arrangementTemplates
         { "5-horn-standard", "5-Horn Standard", { "lead-sheet", "5-horn", "rhythm" } },
         { "6-horn-standard", "6-Horn Standard", { "lead-sheet", "6-horn", "rhythm" } },
         { "7-horn-standard", "7-Horn Standard", { "lead-sheet", "7-horn", "rhythm" } },
-        { "2-horn-any", "2-Horn Any", { "lead-sheet", "2-horn-any", "rhythm" } },
-        { "3-horn-any", "3-Horn Any", { "lead-sheet", "3-horn-any", "rhythm" } },
+        { "2-horn-any", "2-Horn Flexible", { "lead-sheet", "2-horn-any", "rhythm" } },
+        { "3-horn-any", "3-Horn Flexible", { "lead-sheet", "3-horn-any", "rhythm" } },
         { "big-band", "Big Band", { "bigband-saxes", "bigband-trumpets", "bigband-trombones", "bigband-rhythm" } },
         { "marching-band", "Marching Band", { "marching-woodwinds", "marching-brass", "marching-battery", "marching-front" } },
         { "orchestra", "Orchestra", { "orch-woodwinds", "orch-brass", "orch-percussion", "orch-strings" } },
@@ -1227,6 +1238,10 @@ RetVal<QString> StarScoreService::createSection(const QString& templateKey, cons
     store(data);
 
     applyStyles(section.partIds);
+    // The mixer's tracks for new instruments appear a moment after they're added: apply the defaults again then
+    const QStringList newIds = section.partIds;
+    QTimer::singleShot(1500, [this, newIds]() { applyMixerDefaults(newIds); });
+    QTimer::singleShot(4000, [this, newIds]() { applyMixerDefaults(newIds); });
 
     if (section.templateKey.endsWith("-horn-any")) {
         fillAnyHornsFromStandard(section);
@@ -1875,7 +1890,7 @@ int StarScoreService::detectSections()
             const bool inC = rest.contains(QRegularExpression("in\\s*C\\b", QRegularExpression::CaseInsensitiveOption))
                              || rest.contains("any", Qt::CaseInsensitive);
             addSection(inC ? QString("%1-horn-any").arg(n) : QString("%1-horn").arg(n),
-                       inC ? QString("%1-Horn Any").arg(n) : QString("%1-Horn Section").arg(n), parts);
+                       inC ? QString("%1-Horn Flexible").arg(n) : QString("%1-Horn Section").arg(n), parts);
         }
     }
 
@@ -2448,9 +2463,17 @@ void StarScoreService::listenReferencePanel()
         return;
     }
     window->docksOpenStatusChanged().onReceive(this, [this](const QStringList& names) {
-        if (names.contains(STARSCORE_REFERENCE_PANEL)) {
-            recordReferenceView();
+        if (!names.contains(STARSCORE_REFERENCE_PANEL)) {
+            return;
         }
+        // Opened by the notation page restoring its panels just after a file opened (not by you): put it back
+        // the way this score had it
+        if (!m_restoringReferenceView && m_projectOpenedMs > 0
+            && QDateTime::currentMSecsSinceEpoch() - m_projectOpenedMs < 6000) {
+            QTimer::singleShot(0, [this]() { pickReferenceForCurrentScore(); });
+            return;
+        }
+        recordReferenceView();
     });
 }
 

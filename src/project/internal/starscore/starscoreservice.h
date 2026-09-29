@@ -215,6 +215,7 @@ private:
     Data load() const;
     void store(const Data& data);
     Data loadFrom(const mu::engraving::MasterScore* score) const;
+    std::vector<StarScoreFileArrangement> summarizeArrangements(const Data& data, const StarScoreAuditReport& report) const;
     void storeTo(mu::engraving::MasterScore* score, const Data& data, const std::shared_ptr<INotationProject>& project);
 
     // solos
@@ -288,6 +289,8 @@ private:
     int m_listenStartTick = -1;
     int m_listenEndTick = -1;
     bool m_restoringReferenceView = false;
+    qint64 m_projectOpenedMs = 0;   // when the current project was opened (ms since epoch): the notation page
+                                    // restores its panels a moment later, which can reopen the reference panel
     bool m_switching = false;
 };
 }

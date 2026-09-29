@@ -274,6 +274,28 @@ void MeasureLayout::createMMRest(LayoutContext& ctx, Measure* firstMeasure, Meas
         cloneAnnotationsToMMRest(lastMeasureEndBarlineSeg, mmrEndBarlineSeg, ctx);
     }
 
+    // StarScore: a multimeasure rest that is reused after its bars changed can keep the end barline of the bars it
+    // used to end on (often a double barline). Its end barline is its last bar's: where that bar has no barline of
+    // its own, the multimeasure rest gets an ordinary one (the barline layout then picks normal or final).
+    if (Segment* mmrBls = mmrMeasure->findSegmentR(SegmentType::EndBarLine, mmrMeasure->ticks())) {
+        for (size_t staffIdx = 0; staffIdx < ctx.dom().nstaves(); ++staffIdx) {
+            EngravingItem* e = mmrBls->element(staffIdx * VOICES);
+            if (!e || !e->isBarLine()) {
+                continue;
+            }
+            const EngravingItem* src = lastMeasureEndBarlineSeg ? lastMeasureEndBarlineSeg->element(staffIdx * VOICES) : nullptr;
+            if (src) {
+                continue;   // matched to the last bar's barline above
+            }
+            BarLine* bl = toBarLine(e);
+            if (bl->barLineType() != BarLineType::NORMAL || !bl->generated()) {
+                ctx.mutDom().undo(new ChangeProperty(bl, Pid::BARLINE_TYPE, PropertyValue::fromValue(BarLineType::NORMAL),
+                                                     PropertyFlags::NOSTYLE));
+                ctx.mutDom().undo(new ChangeProperty(bl, Pid::GENERATED, true, PropertyFlags::NOSTYLE));
+            }
+        }
+    }
+
     //
     // if last underlying measure ends with clef change, show same at end of mmrest
     //

@@ -306,6 +306,19 @@ struct StarScoreAuditReport
 };
 
 //! One file's line in the library audit
+//! One arrangement of a song, as the dashboard sees it
+struct StarScoreFileArrangement
+{
+    QString column;              // "3H", "2H", "2F" (2-Horn Flexible), "3F", "4H" … "7H"; empty = not a Starsign horn arrangement
+    QString name;
+    int status = 0;              // StarScoreStatus: the least-finished of its sections
+    QStringList unfinished;      // "Rhythm Section: In progress", … (sections not finished)
+    bool audited = false;        // audited and unchanged since
+    bool changedSinceAudit = false;
+    QString auditedDate;
+    int openIssues = 0;
+};
+
 struct StarScoreAuditFileSummary
 {
     QString path;
@@ -318,6 +331,7 @@ struct StarScoreAuditFileSummary
     int listenSteps = 0;
     int listenApproved = 0;
     QString error;                   // couldn't be read
+    std::vector<StarScoreFileArrangement> arrangementList;
 };
 
 struct StarScorePartInfo

@@ -36,7 +36,7 @@ import MuseScore.MuseSounds
 DockPage {
     id: root
 
-    property string section: "scores"
+    property string section: "dashboard"
     property string subSection: ""
 
     property var window: null
@@ -66,6 +66,7 @@ DockPage {
         section = name
 
         switch (name) {
+        case "dashboard": root.central = dashboardComp; break
         case "scores": root.central = scoresComp; break
         case "plugins": root.central = extensionsComp; break // backward compatibility
         case "extensions": root.central = extensionsComp; break
@@ -106,12 +107,18 @@ DockPage {
         }
     ]
 
-    central: scoresComp
+    central: dashboardComp
 
     Component {
         id: accountComp
 
         AccountPage {}
+    }
+
+    Component {
+        id: dashboardComp
+
+        StarScoreDashboard {}
     }
 
     Component {

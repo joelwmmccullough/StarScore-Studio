@@ -328,7 +328,7 @@ Item {
                 visible: !auditModel.hasListenSteps
                 wrapMode: Text.WordWrap
                 horizontalAlignment: Text.AlignLeft
-                text: qsTrc("starscore", "No horn sections to listen to. Horn sections are sections named like “3-Horn Section” or “3-Horn Any”.")
+                text: qsTrc("starscore", "No horn sections to listen to. Horn sections are sections named like “3-Horn Section” or “3-Horn Flexible”.")
             }
 
             StyledTextLabel {

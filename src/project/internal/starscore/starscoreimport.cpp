@@ -13,6 +13,9 @@
 
 #include <QRegularExpression>
 #include <QTimer>
+#include <QUuid>
+#include <QFile>
+#include <QDir>
 
 #include "engraving/dom/masterscore.h"
 #include "engraving/dom/excerpt.h"
@@ -30,6 +33,8 @@
 #include "notation/inotationparts.h"
 #include "notation/iexcerptnotation.h"
 #include "notation/inotationelements.h"
+#include "notation/inotationstyle.h"
+#include "notation/inotation.h"
 #include "inotationproject.h"
 #include "translation.h"
 
@@ -671,6 +676,47 @@ void StarScoreService::fillAnyHornsFromStandard(const StarScoreSection& anySecti
     }
     master->notation()->undoStack()->commitChanges();
     master->notation()->notationChanged().notify();
+
+    // Each chair's part score takes the formatting of the part it came from (Horn 1 = Trumpet, Horn 2 = Alto
+    // Sax, …): its style and its system and page breaks
+    auto bookOf = [&](const engraving::Part* part) -> INotationPtr {
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            INotationPtr n = e ? e->notation() : nullptr;
+            engraving::Score* es = n && n->elements() ? n->elements()->msScore() : nullptr;
+            if (!es || es->parts().size() != 1) {
+                continue;
+            }
+            for (engraving::Staff* staff : es->parts().front()->staves()) {
+                if (engraving::Staff* linked = staff->findLinkedInScore(ms)) {
+                    if (linked->part() == part) {
+                        return n;
+                    }
+                    break;
+                }
+            }
+        }
+        return nullptr;
+    };
+    const QString mss = QDir::tempPath() + "/starscore-chair-" + QUuid::createUuid().toString(QUuid::Id128) + ".mss";
+    for (const auto& [from, to] : copies) {
+        INotationPtr src = bookOf(from);
+        INotationPtr dst = bookOf(to);
+        if (!src || !dst) {
+            continue;
+        }
+        if (src->style()->saveStyle(io::path_t(mss))) {
+            dst->style()->loadStyle(io::path_t(mss), true);
+        }
+        engraving::Score* srcScore = src->elements()->msScore();
+        engraving::Score* dstScore = dst->elements()->msScore();
+        if (srcScore && dstScore) {
+            dst->undoStack()->prepareChanges(TranslatableString::untranslatable("Copy layout from the standard part"));
+            starscore::copyLayout(srcScore, { dstScore }, starscore::LayoutCopyOptions());
+            dst->undoStack()->commitChanges();
+            dst->notationChanged().notify();
+        }
+    }
+    QFile::remove(mss);
 }
 
 // ---------------------------------------------------------------------------
@@ -843,6 +889,9 @@ RetVal<QStringList> StarScoreService::createLowAlternates(const QString& section
     }
     store(d);
     applyStyles(made.partIds);
+    const QStringList newIds = made.partIds;
+    QTimer::singleShot(1500, [this, newIds]() { applyMixerDefaults(newIds); });
+    QTimer::singleShot(4000, [this, newIds]() { applyMixerDefaults(newIds); });
 
     master->notation()->notationChanged().notify();
     m_changed.notify();

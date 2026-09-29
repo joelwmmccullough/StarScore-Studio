@@ -4,6 +4,22 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.8.0
+
+- **Dashboard** (Home › Dashboard, now the first page of Home): every song in 1 Starsign Originals and 2 Starsign Covers, with a square for each arrangement (3-Horn, 2-Horn, 2- and 3-Horn Flexible, 4- to 7-Horn) colored by how far along it is.
+  - **Next up**: the list of what to do next, in priority order: originals' 3-Horn, 2-Horn, 2-Horn Flexible and 3-Horn Flexible arrangements, then the same for covers, then originals' 4- to 7-Horn, then covers' 4- to 7-Horn. Within each, the songs played most in 2026 (setlist.fm) come first, and the one closest to done breaks a tie. Click a task to open the song (with the Audit panel when it needs auditing).
+  - **Done** means Finished for Top Hat, Bet, Another One and any new song, and audited for the songs converted from older files.
+  - **By priority**: a progress bar for each of the 16 groups, with the next song in each.
+  - **Audit preview** for each song: things to look at, likely errors and listen-throughs approved.
+  - “Audit these in order” goes through the songs that need auditing one at a time, in priority order, with the Audit panel.
+  - Songs are read in the background and remembered; only songs that changed are read again (Refresh).
+- “N-Horn Any” is now called **N-Horn Flexible** everywhere in StarScore. Existing sections and arrangements are renamed when a file is opened. (The Sheets and Demos folders are still called “NH Any Horns”.)
+- A new 2- or 3-Horn Flexible section filled from the Standard section also takes each part's formatting: Horn 1's part score gets the Trumpet part's style and system and page breaks, Horn 2 the Alto Sax's (Tenor Sax's in 2-Horn), and so on.
+- New sections get the default mixer settings once their instruments' sounds are loaded. Before, they were applied too early and didn't take.
+- The Reference PDF panel no longer opens with songs that don't use it (it could be reopened by the page restoring its panels after the song opened).
+- Chord symbols: C♭, F♭, E♯, B♯ and double sharps or flats in a chord's root or bass are written as the easier note (B, E, F, C, …), including in transposed parts.
+- A multimeasure rest no longer shows a double barline that belonged to bars it used to end on. A double barline written at the end of its last bar still shows.
+
 ## 1.7.0
 
 - Exported horn sheets (Export to Sheets and Demos) have the horn's name at the top left (“Trumpet in B♭”) and the arrangement at the top right (“2-Horn Arrangement”). This is done only while printing; the part scores themselves don't change.

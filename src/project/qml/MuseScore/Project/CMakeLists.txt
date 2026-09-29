@@ -88,6 +88,8 @@ qt_add_qml_module(project_qml
         internal/StarScore/auditpanelmodel.h
         internal/StarScore/auditlibrarymodel.cpp
         internal/StarScore/auditlibrarymodel.h
+        internal/StarScore/dashboardmodel.cpp
+        internal/StarScore/dashboardmodel.h
     QML_FILES
         AlsoShareAudioComDialog.qml
         AskSaveLocationTypeDialog.qml
@@ -164,6 +166,7 @@ qt_add_qml_module(project_qml
         StarScoreReferencePanel.qml
         StarScoreAuditPanel.qml
         AuditLibraryDialog.qml
+        StarScoreDashboard.qml
         StarScoreEditDialog.qml
         CopyLayoutDialog.qml
         NewStarScoreDialog.qml

@@ -588,8 +588,22 @@ void HarmonyLayout::renderSingleHarmony(Harmony* item, Harmony::LayoutData* ldat
     const MStyle& style = ctx.conf().style();
     HarmonyInfo* info = harmonyCtx.info;
 
-    int rootTpc = info->rootTpc();
-    int bassTpc = info->bassTpc();
+    // StarScore: chord roots and bass notes are written with their easier name (Cb as B, Fb as E, E# as F, B# as C,
+    // any double sharp or double flat as its plain note), in the score and in transposed parts alike
+    auto starscoreSimplerTpc = [](int tpc) {
+        if (!tpcIsValid(tpc)) {
+            return tpc;
+        }
+        while (tpc < int(Tpc::TPC_G_B)) {
+            tpc += TPC_DELTA_ENHARMONIC;
+        }
+        while (tpc > int(Tpc::TPC_A_S)) {
+            tpc -= TPC_DELTA_ENHARMONIC;
+        }
+        return tpc;
+    };
+    int rootTpc = starscoreSimplerTpc(info->rootTpc());
+    int bassTpc = starscoreSimplerTpc(info->bassTpc());
 
     DisplayCapoChordType displayCapo = style.styleV(Sid::displayCapoChords).value<DisplayCapoChordType>();
 
