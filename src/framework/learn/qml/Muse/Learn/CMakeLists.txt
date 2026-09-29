@@ -28,6 +28,7 @@ qt_add_qml_module(muse_learn_qml
         learnpagemodel.h
     QML_FILES
         LearnPage.qml
+        StarScoreChangelogPage.qml
         internal/ClassesPage.qml
         internal/Playlist.qml
         internal/PlaylistItem.qml

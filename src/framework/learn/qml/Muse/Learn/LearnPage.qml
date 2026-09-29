@@ -114,7 +114,7 @@ FocusScope {
             navigation.panel: navSearchPanel
             navigation.order: 1
 
-            visible: tabBar.currentIndex === 0 // Not visible for Classes or the StarScore changelog
+            visible: tabBar.currentIndex === 0 // Not visible for Classes
 
             onSearchTextChanged: {
                 pageModel.setSearchText(searchText)
@@ -138,7 +138,6 @@ FocusScope {
             //! NOTE: see https://github.com/musescore/MuseScore/issues/14886
             //case "advanced": return 1
             case "classes": return 1
-            case "starscore-changelog": return 2
             }
 
             return 0
@@ -191,14 +190,6 @@ FocusScope {
             navigation.name: "Classes"
             navigation.panel: navTabPanel
             navigation.column: 3
-        }
-
-        StyledTabButton {
-            text: qsTrc("learn", "StarScore changelog")
-
-            navigation.name: "StarScoreChangelog"
-            navigation.panel: navTabPanel
-            navigation.column: 4
         }
     }
 
@@ -266,30 +257,6 @@ FocusScope {
             navigation.accessible.name: qsTrc("learn", "Classes") + navigation.directionInfo
 
             sideMargin: prv.sideMargin
-        }
-
-        // StarScore: what's new in each version
-        StyledFlickable {
-            id: changelogComp
-
-            contentWidth: width
-            contentHeight: changelogText.implicitHeight + 40
-            clip: true
-
-            StyledTextLabel {
-                id: changelogText
-
-                anchors.left: parent.left
-                anchors.leftMargin: prv.sideMargin
-                width: Math.min(changelogComp.width - 2 * prv.sideMargin, 900)
-
-                textFormat: Text.MarkdownText
-                wrapMode: Text.WordWrap
-                horizontalAlignment: Text.AlignLeft
-                verticalAlignment: Text.AlignTop
-                elide: Text.ElideNone
-                text: pageModel.starscoreChangelog()
-            }
         }
     }
 }

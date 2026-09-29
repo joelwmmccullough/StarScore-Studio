@@ -198,8 +198,25 @@ Rectangle {
                                 required property var modelData
                                 required property int index
 
+                                readonly property bool showHeading: modelData.firstOfGroup && modelData.group === "write"
+
                                 Layout.fillWidth: true
-                                implicitHeight: taskLayout.implicitHeight + 12
+                                implicitHeight: taskLayout.implicitHeight + 12 + (showHeading ? groupHeading.implicitHeight + 14 : 0)
+
+                                StyledTextLabel {
+                                    id: groupHeading
+                                    visible: taskRow.showHeading
+                                    x: 8
+                                    y: 6
+                                    width: parent.width - 16
+                                    horizontalAlignment: Text.AlignLeft
+                                    wrapMode: Text.WordWrap
+                                    text: taskRow.index === 0
+                                          ? qsTrc("starscore", "Every existing arrangement is done. Arrangements to write next:")
+                                          : qsTrc("starscore", "Then, arrangements to write:")
+                                    font: ui.theme.bodyBoldFont
+                                    opacity: 0.8
+                                }
                                 radius: 4
                                 color: taskMouse.containsMouse ? ui.theme.buttonColor : (index === 0 ? Qt.rgba(0.56, 0.49, 0.94, 0.12) : "transparent")
 
@@ -213,7 +230,7 @@ Rectangle {
                                 RowLayout {
                                     id: taskLayout
                                     x: 8
-                                    y: 6
+                                    y: 6 + (taskRow.showHeading ? groupHeading.implicitHeight + 14 : 0)
                                     width: parent.width - 16
                                     spacing: 10
 

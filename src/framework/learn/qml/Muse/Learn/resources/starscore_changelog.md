@@ -4,6 +4,11 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.10.0
+
+- **Changelog** has its own page on Home, below Learn, instead of a tab inside Learn.
+- **Dashboard**: Next up lists the existing arrangements to audit or finish first. After those, it goes on to recommend which missing arrangements to write next, in the same priority order as the audit list.
+
 ## 1.9.0
 
 - **Songbooks** (Home › Songbooks): builds printable books and charts from the parts that are done.

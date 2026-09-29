@@ -73,6 +73,7 @@ DockPage {
         case "extensions": root.central = extensionsComp; break
         case "musesounds": root.central = museSoundsComp; break
         case "learn": root.central = learnComp; break
+        case "changelog": root.central = changelogComp; break
         case "account": root.central = accountComp; break
         }
     }
@@ -144,6 +145,12 @@ DockPage {
         id: museSoundsComp
 
         MuseSoundsPage {}
+    }
+
+    Component {
+        id: changelogComp
+
+        StarScoreChangelogPage {}
     }
 
     Component {

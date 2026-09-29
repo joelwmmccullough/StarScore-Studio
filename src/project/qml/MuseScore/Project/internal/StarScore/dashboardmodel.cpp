@@ -356,8 +356,16 @@ void DashboardModel::rebuild()
         };
     }
 
-    // Tiers in priority order; within one, the most-played songs first, then the ones closest to done
-    int rank = 0;
+    // Tiers in priority order; within one, the most-played songs first, then the ones closest to done.
+    // Arrangements that exist but aren't done (to audit or finish) come first; once those run out, the list goes
+    // on to the arrangements still to write, in the same priority order.
+    struct Task {
+        QString path;
+        bool audit = false;
+        QVariantMap row;
+    };
+    std::vector<Task> work;
+    std::vector<Task> write;
     for (const Tier& t : TIERS) {
         const QString column = QString::fromUtf8(t.column);
         struct Item {
@@ -393,16 +401,17 @@ void DashboardModel::rebuild()
             if (next.isEmpty()) {
                 next = it.song->title;
             }
-            ++rank;
-            m_taskPaths.push_back(it.song->path);
-            m_taskAudit.push_back(it.cell.audit);
-            m_tasks << QVariantMap {
-                { "rank", rank }, { "song", it.song->title }, { "action", it.cell.action }, { "detail", it.cell.detail },
+            Task task;
+            task.path = it.song->path;
+            task.audit = it.cell.audit;
+            task.row = QVariantMap {
+                { "song", it.song->title }, { "action", it.cell.action }, { "detail", it.cell.detail },
                 { "tier", QString("%1 · %2").arg(t.cover ? muse::qtrc("starscore", "Covers") : muse::qtrc("starscore", "Originals"),
                                                   columnTitle(column)) },
                 { "state", it.cell.state }, { "status", it.cell.status }, { "audit", it.cell.audit },
                 { "plays", it.song->plays },
             };
+            (it.cell.state == "missing" ? write : work).push_back(task);
         }
         m_done += done;
         m_cells += int(items.size());
@@ -411,6 +420,21 @@ void DashboardModel::rebuild()
                                               columnTitle(column)) },
             { "done", done }, { "total", int(items.size()) }, { "next", next },
         };
+    }
+
+    int rank = 0;
+    for (const std::vector<Task>* group : { &work, &write }) {
+        bool first = true;
+        for (const Task& task : *group) {
+            QVariantMap row = task.row;
+            row["rank"] = ++rank;
+            row["group"] = group == &work ? QString("work") : QString("write");
+            row["firstOfGroup"] = first;
+            first = false;
+            m_taskPaths.push_back(task.path);
+            m_taskAudit.push_back(task.audit);
+            m_tasks << row;
+        }
     }
     emit changed();
 }
