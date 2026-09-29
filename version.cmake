@@ -34,6 +34,10 @@ set(MUSE_APP_VERSION "${MUSE_APP_VERSION_MAJ_MIN}.${MUSE_APP_VERSION_PATCH}")
 
 set(MUSE_APP_VERSION_LABEL "")
 
+# StarScore Studio's own version (shown on the splash screen under the MuseScore version it is based on).
+# 1.0.0 = first numbered release (29 Sep 2026); earlier builds count as 0.x.
+set(STARSCORE_VERSION "1.0.0")
+
 if (NOT CMAKE_BUILD_NUMBER)
     set(CMAKE_BUILD_NUMBER "1")
 endif()

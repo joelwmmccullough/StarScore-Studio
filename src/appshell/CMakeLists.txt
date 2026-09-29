@@ -20,6 +20,9 @@
 
 muse_create_module(appshell)
 
+# StarScore: its own version number for the splash screen
+target_compile_definitions(appshell PRIVATE STARSCORE_VERSION_STR="${STARSCORE_VERSION}")
+
 target_sources(appshell PRIVATE
     appshellmodule.cpp
     appshellmodule.h

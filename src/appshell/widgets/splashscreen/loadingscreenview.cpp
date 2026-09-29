@@ -84,11 +84,19 @@ void LoadingScreenView::draw(QPainter* painter)
     QRectF websiteBoundingRect;
     painter->drawText(websiteRect, Qt::AlignBottom | alignment | Qt::TextDontClip, website, &websiteBoundingRect);
 
-    // Draw version number
+    // Draw version numbers: StarScore's own just above the website, the MuseScore version it's based on above that
     pen.setColor(versionNumberColor);
     painter->setPen(pen);
 
+#ifndef STARSCORE_VERSION_STR
+#define STARSCORE_VERSION_STR "1.0.0"
+#endif
+    QRectF starscoreBoundingRect;
     painter->drawText(websiteRect.translated(0.0, -websiteBoundingRect.height() - versionNumberSpacing),
                       Qt::AlignBottom | alignment | Qt::TextDontClip,
-                      muse::qtrc("appshell", "Version %1").arg(application()->fullVersion().toString()));
+                      muse::qtrc("appshell", "StarScore Version %1").arg(QString(STARSCORE_VERSION_STR)), &starscoreBoundingRect);
+
+    painter->drawText(websiteRect.translated(0.0, -websiteBoundingRect.height() - starscoreBoundingRect.height() - 2 * versionNumberSpacing),
+                      Qt::AlignBottom | alignment | Qt::TextDontClip,
+                      muse::qtrc("appshell", "MuseScore Version %1").arg(application()->fullVersion().toString()));
 }
