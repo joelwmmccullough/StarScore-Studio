@@ -310,6 +310,8 @@ struct StarScoreAuditReport
 struct StarScoreFileArrangement
 {
     QString column;              // "3H", "2H", "2F" (2-Horn Flexible), "3F", "4H" … "7H"; empty = not a Starsign horn arrangement
+    QString templateKey;         // "3-horn-standard", "big-band", … (empty for custom arrangements)
+    QStringList sectionKeys;     // the template keys of its sections ("lead-sheet", "3-horn", "rhythm", …)
     QString name;
     int status = 0;              // StarScoreStatus: the least-finished of its sections
     QStringList unfinished;      // "Rhythm Section: In progress", … (sections not finished)
@@ -332,6 +334,27 @@ struct StarScoreAuditFileSummary
     int listenApproved = 0;
     QString error;                   // couldn't be read
     std::vector<StarScoreFileArrangement> arrangementList;
+    std::map<QString, int> sectionStatus;   // section template key -> status (the least finished, if several)
+};
+
+//! One sheet of a songbook or chart: which part of a song, how it's written, and what its title frame says
+struct StarScoreSongbookSheet
+{
+    QString kind;                // "lead" (the lead sheet), "chair" (a Flexible chair), "rhythm" (a rhythm-section player),
+                                 // "part" (partId), "score" (the arrangement's score)
+    QString sectionKey;          // chair: "2-horn-any" / "3-horn-any"; score: the arrangement's template key
+    int chair = 0;               // chair: 1 = top line …
+    QString role;                // rhythm: "keys", "guitar", "bass"
+    QString partId;              // part
+    bool transpose = false;      // rewrite for another instrument's key and clef
+    int transposeDiatonic = 0;   // sounding relative to written (B♭ = -1/-2)
+    int transposeChromatic = 0;
+    int clef = 0;                // 0 treble, 1 bass, 2 alto
+    QString left;                // title frame, top left (the instrument)
+    QString right;               // top right (e.g. "Trio · Middle line")
+    QString pdfPath;             // where to write it
+    QString error;               // after rendering: why it failed
+    int pages = 0;               // after rendering
 };
 
 struct StarScorePartInfo
@@ -550,6 +573,14 @@ public:
     virtual std::vector<StarScoreAuditFileSummary> cachedLibraryAudit(const QString& folder) const = 0;
 
     // --- Audit all songs: go through the songs one by one, each opened with the Audit panel (remembered across restarts)
+    // Songbooks: render sheets of one song (each gets its error / page count filled in)
+    virtual void songbookRenderSheets(const QString& songPath, std::vector<StarScoreSongbookSheet>& sheets) = 0;
+    //! The sheets of an arrangement's chart (score + every part), written into outDir
+    virtual muse::RetVal<std::vector<StarScoreSongbookSheet> > songbookChartSheets(const QString& songPath,
+                                                                                 const QString& arrangementTemplateKey,
+                                                                                 const QString& chartTitle,
+                                                                                 const QString& outDir) = 0;
+
     virtual void startAuditWalk(const QStringList& paths) = 0;
     virtual bool auditWalkActive() const = 0;
     virtual int auditWalkIndex() const = 0;          // 0-based

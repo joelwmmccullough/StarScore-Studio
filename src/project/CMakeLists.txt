@@ -122,7 +122,7 @@ if (OS_IS_MAC)
         internal/platform/macos/macosrecentfilescontroller.h
     )
     # StarScore: reference PDFs are drawn with CoreGraphics
-    target_link_libraries(project PRIVATE "-framework CoreGraphics" "-framework CoreFoundation")
+    target_link_libraries(project PRIVATE "-framework CoreGraphics" "-framework CoreFoundation" "-framework CoreText")
     # Don't mix C++ and Objective-C++ in Unity Build
     set_source_files_properties(
         internal/platform/macos/macosrecentfilescontroller.mm

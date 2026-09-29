@@ -12,6 +12,7 @@
 #ifdef Q_OS_MACOS
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreGraphics/CoreGraphics.h>
+#include <CoreText/CoreText.h>
 #endif
 
 namespace mu::project::starscore {
@@ -92,7 +93,103 @@ bool renderPdfPage(const QString& pdfPath, int page, int widthPx, const QString&
 
     return image.save(pngPath, "PNG");
 }
+
+static CFStringRef toCF(const QString& s)
+{
+    const QByteArray utf8 = s.toUtf8();
+    return CFStringCreateWithBytes(kCFAllocatorDefault, reinterpret_cast<const UInt8*>(utf8.constData()), utf8.size(),
+                                   kCFStringEncodingUTF8, false);
+}
+
+static void drawPageNumber(CGContextRef ctx, const CGRect& page, int number)
+{
+    CFStringRef text = toCF(QString::number(number));
+    CTFontRef font = CTFontCreateWithName(CFSTR("Helvetica"), 9.0, nullptr);
+    CGColorSpaceRef space = CGColorSpaceCreateDeviceGray();
+    const CGFloat grey[] = { 0.4, 1.0 };
+    CGColorRef color = CGColorCreate(space, grey);
+    const void* keys[] = { kCTFontAttributeName, kCTForegroundColorAttributeName };
+    const void* values[] = { font, color };
+    CFDictionaryRef attrs = CFDictionaryCreate(kCFAllocatorDefault, keys, values, 2, &kCFTypeDictionaryKeyCallBacks,
+                                               &kCFTypeDictionaryValueCallBacks);
+    CFAttributedStringRef str = CFAttributedStringCreate(kCFAllocatorDefault, text, attrs);
+    CTLineRef line = CTLineCreateWithAttributedString(str);
+    const double width = CTLineGetTypographicBounds(line, nullptr, nullptr, nullptr);
+    CGContextSetTextMatrix(ctx, CGAffineTransformIdentity);
+    CGContextSetTextPosition(ctx, page.origin.x + page.size.width - 0.6 * 72 - width, page.origin.y + 0.45 * 72);
+    CTLineDraw(line, ctx);
+    CFRelease(line);
+    CFRelease(str);
+    CFRelease(attrs);
+    CGColorRelease(color);
+    CGColorSpaceRelease(space);
+    CFRelease(font);
+    CFRelease(text);
+}
+
+bool mergePdfs(const std::vector<QString>& inputs, const std::vector<bool>& numberPages, const QString& outPath,
+               const QString& title)
+{
+    const QByteArray utf8 = outPath.toUtf8();
+    CFURLRef url = CFURLCreateFromFileSystemRepresentation(kCFAllocatorDefault, reinterpret_cast<const UInt8*>(utf8.constData()),
+                                                           utf8.size(), false);
+    if (!url) {
+        return false;
+    }
+    CFStringRef cfTitle = toCF(title);
+    const void* infoKeys[] = { kCGPDFContextTitle };
+    const void* infoValues[] = { cfTitle };
+    CFDictionaryRef info = CFDictionaryCreate(kCFAllocatorDefault, infoKeys, infoValues, 1, &kCFTypeDictionaryKeyCallBacks,
+                                              &kCFTypeDictionaryValueCallBacks);
+    CGRect letter = CGRectMake(0, 0, 612, 792);
+    CGContextRef ctx = CGPDFContextCreateWithURL(url, &letter, info);
+    CFRelease(info);
+    CFRelease(cfTitle);
+    CFRelease(url);
+    if (!ctx) {
+        return false;
+    }
+
+    int number = 0;
+    for (size_t i = 0; i < inputs.size(); ++i) {
+        CGPDFDocumentRef doc = openPdf(inputs[i]);
+        if (!doc) {
+            continue;
+        }
+        const size_t n = CGPDFDocumentGetNumberOfPages(doc);
+        for (size_t k = 1; k <= n; ++k) {
+            CGPDFPageRef page = CGPDFDocumentGetPage(doc, k);
+            if (!page) {
+                continue;
+            }
+            ++number;
+            CGRect box = CGPDFPageGetBoxRect(page, kCGPDFMediaBox);
+            CFDataRef boxData = CFDataCreate(kCFAllocatorDefault, reinterpret_cast<const UInt8*>(&box), sizeof(box));
+            const void* pageKeys[] = { kCGPDFContextMediaBox };
+            const void* pageValues[] = { boxData };
+            CFDictionaryRef pageInfo = CFDictionaryCreate(kCFAllocatorDefault, pageKeys, pageValues, 1,
+                                                          &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+            CGPDFContextBeginPage(ctx, pageInfo);
+            CGContextDrawPDFPage(ctx, page);
+            if (i < numberPages.size() && numberPages[i]) {
+                drawPageNumber(ctx, box, number);
+            }
+            CGPDFContextEndPage(ctx);
+            CFRelease(pageInfo);
+            CFRelease(boxData);
+        }
+        CGPDFDocumentRelease(doc);
+    }
+    CGPDFContextClose(ctx);
+    CGContextRelease(ctx);
+    return number > 0;
+}
 #else
+bool mergePdfs(const std::vector<QString>&, const std::vector<bool>&, const QString&, const QString&)
+{
+    return false;
+}
+
 int pdfPageCount(const QString&)
 {
     return 0;

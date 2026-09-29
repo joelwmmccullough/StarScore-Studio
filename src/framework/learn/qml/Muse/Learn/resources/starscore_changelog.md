@@ -4,6 +4,18 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.9.0
+
+- **Songbooks** (Home › Songbooks): builds printable books and charts from the parts that are done.
+  - **Album songbooks** for Tenor Sax, Alto Sax, B♭ Trumpet, Trombone, Piano, Guitar and Bass. Each song gets an opening page (with your notes, if you've written them) and then:
+    - horn books: Solo (the lead sheet in the instrument's key), and the instrument's Duo and Trio lines from the 2- and 3-Horn Flexible arrangements, transposed and in its clef, titled “Duo · Bottom line” and so on;
+    - rhythm books: the lead sheet and the instrument's part from the rhythm section.
+    The book starts with a cover, “How to use this book” and contents, with headings in TT Modernoir and page numbers throughout.
+  - **Song charts**: 4-, 5-, 6- and 7-Horn, Big Band, Marching Band and Orchestra. A folder with the arrangement's score and every part, each titled with the instrument and the arrangement.
+  - Only finished parts go in: Finished for Top Hat, Bet, Another One and new songs; audited for songs converted from older files. The page shows, song by song, which sheets are ready and why the others aren't. Songs that aren't ready are left out of a book and listed in it as not in this edition yet.
+  - Album tracklists can be edited (Edit tracklist); Ichiban is filled in, and Feed Your Kid Bugs has the five songs confirmed so far.
+  - Songbooks are saved in “Songbooks” next to your songs (Projects and Sheets) unless you pick another folder. A book or chart written again moves the old one to Songbooks/Deprecated/<date>.
+
 ## 1.8.0
 
 - **Dashboard** (Home › Dashboard, now the first page of Home): every song in 1 Starsign Originals and 2 Starsign Covers, with a square for each arrangement (3-Horn, 2-Horn, 2- and 3-Horn Flexible, 4- to 7-Horn) colored by how far along it is.

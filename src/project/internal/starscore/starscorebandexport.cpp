@@ -47,6 +47,7 @@
 
 #include "starscoreengraving.h"
 #include "starscorehouse.h"
+#include "starscorepdf.h"
 
 #include "io/filestream.h"
 #include "translation.h"
@@ -1254,4 +1255,347 @@ RetVal<QString> StarScoreService::exportArrangementsAsMscz(const QString& folder
         summary += "\n\n" + muse::qtrc("starscore", "Couldn't export:") + "\n  • " + failed.join("\n  • ");
     }
     return RetVal<QString>::make_ok(summary);
+}
+
+// ---------------------------------------------------------------------------
+//  Songbooks: sheets of one song, rendered from a copy of its file
+// ---------------------------------------------------------------------------
+
+//! The rhythm-section role of an instrument: "keys", "guitar", "bass", "drums", "percussion"
+static QString songbookRhythmRole(const QString& id)
+{
+    if (id == "drumset" || id == "drum-kit" || id.startsWith("drum")) {
+        return "drums";
+    }
+    if (id == "congas" || id == "bongos" || id == "percussion" || id == "timbales" || id == "cajon" || id.contains("shaker")
+        || id.contains("tambourine") || id.contains("cowbell")) {
+        return "percussion";
+    }
+    if (id.contains("bass") || id == "contrabass") {
+        return "bass";
+    }
+    if (id.contains("guitar")) {
+        return "guitar";
+    }
+    return "keys";
+}
+
+void StarScoreService::songbookRenderSheets(const QString& songPath, std::vector<StarScoreSongbookSheet>& sheets)
+{
+    const QString tmpDir = QDir::tempPath() + "/StarScoreSongbook-" + QUuid::createUuid().toString(QUuid::Id128);
+    QDir().mkpath(tmpDir);
+    const QString copyPath = tmpDir + "/song.mscz";
+    auto failAll = [&](const QString& why) {
+        for (StarScoreSongbookSheet& s : sheets) {
+            s.error = why;
+        }
+        QDir(tmpDir).removeRecursively();
+    };
+    if (!QFile::copy(songPath, copyPath)) {
+        failAll(muse::qtrc("starscore", "couldn't read the file"));
+        return;
+    }
+    auto load = [&]() -> INotationProjectPtr {
+        INotationProjectPtr p = projectCreator()->newProject(iocContext());
+        if (!p->load(io::path_t(copyPath))) {
+            return nullptr;
+        }
+        return p;
+    };
+
+    // One copy stays as it is: part books to take style and layout from, the song's sections, and plain parts
+    INotationProjectPtr base = load();
+    if (!base || !base->masterNotation() || !base->masterNotation()->masterScore()) {
+        failAll(muse::qtrc("starscore", "couldn't open the file"));
+        return;
+    }
+    IMasterNotationPtr baseMaster = base->masterNotation();
+    engraving::MasterScore* bms = baseMaster->masterScore();
+    const Data data = loadFrom(bms);
+
+    auto bookFor = [](IMasterNotationPtr master, const engraving::Part* part) -> INotationPtr {
+        engraving::MasterScore* ms = master->masterScore();
+        INotationPtr best;
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            INotationPtr n = e ? e->notation() : nullptr;
+            engraving::Score* es = n && n->elements() ? n->elements()->msScore() : nullptr;
+            if (!es || es->parts().size() != 1) {
+                continue;
+            }
+            for (engraving::Staff* staff : es->parts().front()->staves()) {
+                if (engraving::Staff* linked = staff->findLinkedInScore(ms)) {
+                    if (linked->part() == part && (!best || e->name() == part->partName().toQString())) {
+                        best = n;
+                    }
+                    break;
+                }
+            }
+        }
+        return best;
+    };
+
+    // Which part a sheet is
+    auto resolvePart = [&](const StarScoreSongbookSheet& sheet) -> QString {
+        if (sheet.kind == "part") {
+            return sheet.partId;
+        }
+        for (const StarScoreSection& sec : data.sections) {
+            if (sheet.kind == "lead" && sec.templateKey == "lead-sheet" && !sec.partIds.isEmpty()) {
+                return sec.partIds.first();
+            }
+            if (sheet.kind == "rhythm" && (sec.templateKey == "rhythm" || sec.templateKey.endsWith("-rhythm"))) {
+                for (const QString& pid : sec.partIds) {
+                    const engraving::Part* p = bms->partById(ID(pid));
+                    if (p && songbookRhythmRole(p->instrumentId().toQString()) == sheet.role
+                        && (sec.shownPartIds.isEmpty() || sec.shownPartIds.contains(pid))) {
+                        return pid;
+                    }
+                }
+            }
+            if (sheet.kind == "chair" && sec.templateKey == sheet.sectionKey) {
+                static const QRegularExpression chairRe("Horn\\s*(\\d+)", QRegularExpression::CaseInsensitiveOption);
+                int order = 0;
+                for (const engraving::Part* p : bms->parts()) {
+                    const QString pid = idText(p);
+                    if (!sec.partIds.contains(pid)) {
+                        continue;
+                    }
+                    const QString name = p->partName().toQString();
+                    if (name.contains("flute", Qt::CaseInsensitive)) {
+                        continue;
+                    }
+                    ++order;
+                    const QRegularExpressionMatch m = chairRe.match(name);
+                    if ((m.hasMatch() ? m.captured(1).toInt() : order) == sheet.chair) {
+                        return pid;
+                    }
+                }
+            }
+        }
+        return QString();
+    };
+
+    auto finish = [&](INotationPtr n, StarScoreSongbookSheet& sheet) {
+        engraving::Score* score = n->elements()->msScore();
+        n->undoStack()->prepareChanges(TranslatableString::untranslatable("Songbook sheet"));
+        n->style()->setStyleValue(StyleId::showPageNumber, false);   // the book numbers its pages
+        starscoreRetitleSheet(score, sheet.left, sheet.right);
+        n->undoStack()->commitChanges();
+        QDir().mkpath(QFileInfo(sheet.pdfPath).absolutePath());
+        QFile::remove(sheet.pdfPath);
+        const Ret ret = writePdf(n, sheet.pdfPath);
+        if (!ret) {
+            sheet.error = QString::fromStdString(ret.toString());
+        } else {
+            sheet.pages = starscore::pdfPageCount(sheet.pdfPath);
+        }
+    };
+
+    for (StarScoreSongbookSheet& sheet : sheets) {
+        sheet.error.clear();
+        sheet.pages = 0;
+
+        if (sheet.kind == "score") {
+            INotationProjectPtr p = load();
+            const StarScoreArrangement* arr = nullptr;
+            for (const StarScoreArrangement& a : data.arrangements) {
+                if (a.templateKey == sheet.sectionKey) {
+                    arr = &a;
+                }
+            }
+            INotationPtr n;
+            if (p && arr) {
+                for (const IExcerptNotationPtr& e : p->masterNotation()->excerpts()) {
+                    if (e && e->name() == arr->scoreName) {
+                        n = e->notation();
+                    }
+                }
+            }
+            if (!n) {
+                sheet.error = muse::qtrc("starscore", "the arrangement has no score (use “Make / update arrangement scores”)");
+                continue;
+            }
+            finish(n, sheet);
+            continue;
+        }
+
+        const QString pid = resolvePart(sheet);
+        const engraving::Part* basePart = pid.isEmpty() ? nullptr : bms->partById(ID(pid));
+        if (!basePart) {
+            sheet.error = sheet.kind == "chair" ? muse::qtrc("starscore", "no Horn %1 in the Flexible section").arg(sheet.chair)
+                          : sheet.kind == "rhythm" ? muse::qtrc("starscore", "no %1 part in the rhythm section").arg(sheet.role)
+                          : muse::qtrc("starscore", "part not found");
+            continue;
+        }
+        INotationPtr srcBook = bookFor(baseMaster, basePart);
+
+        if (!sheet.transpose) {
+            // The part score as it is (in a fresh copy, so retitling can't touch anything else)
+            INotationProjectPtr p = load();
+            engraving::Part* part = p ? p->masterNotation()->masterScore()->partById(ID(pid)) : nullptr;
+            INotationPtr n = part ? bookFor(p->masterNotation(), part) : nullptr;
+            if (!n && part) {
+                for (const IExcerptNotationPtr& e : p->masterNotation()->potentialExcerpts()) {
+                    if (e->name() == part->partName().toQString()) {
+                        p->masterNotation()->initExcerpts({ e });
+                        n = e->notation();
+                        break;
+                    }
+                }
+            }
+            if (!n) {
+                sheet.error = muse::qtrc("starscore", "no part score for this instrument");
+                continue;
+            }
+            finish(n, sheet);
+            continue;
+        }
+
+        // Rewritten for another instrument: as the Any-horn export does
+        INotationProjectPtr p = load();
+        if (!p) {
+            sheet.error = muse::qtrc("starscore", "couldn't open the file");
+            continue;
+        }
+        IMasterNotationPtr vm = p->masterNotation();
+        engraving::Part* part = vm->masterScore()->partById(ID(pid));
+        if (!part || !part->instrument()) {
+            sheet.error = muse::qtrc("starscore", "part not found");
+            continue;
+        }
+        vm->setExcerpts({});
+        if (!part->show()) {
+            vm->parts()->setPartsVisible({ { part->id(), true } }, TranslatableString::untranslatable("Show"));
+        }
+        engraving::Instrument instrument = *part->instrument();
+        instrument.setTranspose(engraving::Interval(sheet.transposeDiatonic, sheet.transposeChromatic));
+        const engraving::ClefType clef = sheet.clef == 1 ? engraving::ClefType::F
+                                         : sheet.clef == 2 ? engraving::ClefType::C3 : engraving::ClefType::G;
+        instrument.setClefType(0, engraving::ClefTypeList(clef, clef));
+        const InstrumentKey key { part->instrumentId(), part->id(), engraving::Fraction(0, 1) };
+        vm->parts()->replaceInstrument(key, instrument);
+        const QString bookName = "StarScore songbook " + QUuid::createUuid().toString(QUuid::Id128);
+        vm->parts()->setInstrumentName(InstrumentKey { part->instrumentId(), part->id(), engraving::Fraction(0, 1) }, bookName);
+        part->setPartName(String::fromQString(bookName));
+        IExcerptNotationPtr book;
+        for (const IExcerptNotationPtr& e : vm->potentialExcerpts()) {
+            if (e->name() == bookName) {
+                book = e;
+                break;
+            }
+        }
+        if (!book) {
+            sheet.error = muse::qtrc("starscore", "couldn't make the part");
+            continue;
+        }
+        vm->initExcerpts({ book });
+        INotationPtr n = book->notation();
+        if (!n) {
+            sheet.error = muse::qtrc("starscore", "couldn't make the part");
+            continue;
+        }
+        if (srcBook) {
+            const QString mss = tmpDir + "/part.mss";
+            if (srcBook->style()->saveStyle(io::path_t(mss))) {
+                n->style()->loadStyle(io::path_t(mss), true);
+            }
+            engraving::Score* es = n->elements()->msScore();
+            const engraving::Score* srcScore = srcBook->elements()->msScore();
+            if (es && srcScore) {
+                n->undoStack()->prepareChanges(TranslatableString::untranslatable("Copy layout"));
+                starscore::copyLayout(srcScore, { es }, starscore::LayoutCopyOptions());
+                n->undoStack()->commitChanges();
+            }
+        } else {
+            const QString def = defaultStylePath();
+            if (!def.isEmpty() && QFileInfo::exists(def)) {
+                n->style()->loadStyle(io::path_t(def), true);
+            }
+        }
+        n->undoStack()->prepareChanges(TranslatableString::untranslatable("Concert pitch"));
+        n->style()->setStyleValue(StyleId::concertPitch, false);
+        n->undoStack()->commitChanges();
+        finish(n, sheet);
+    }
+
+    QDir(tmpDir).removeRecursively();
+}
+
+RetVal<std::vector<StarScoreSongbookSheet> > StarScoreService::songbookChartSheets(const QString& songPath,
+                                                                                const QString& arrangementTemplateKey,
+                                                                                const QString& chartTitle,
+                                                                                const QString& outDir)
+{
+    using Out = RetVal<std::vector<StarScoreSongbookSheet> >;
+    const QString tmpDir = QDir::tempPath() + "/StarScoreChart-" + QUuid::createUuid().toString(QUuid::Id128);
+    QDir().mkpath(tmpDir);
+    const QString copyPath = tmpDir + "/song.mscz";
+    if (!QFile::copy(songPath, copyPath)) {
+        QDir(tmpDir).removeRecursively();
+        return Out::make_ret(Ret::Code::UnknownError, muse::trc("starscore", "couldn't read the file"));
+    }
+    INotationProjectPtr p = projectCreator()->newProject(iocContext());
+    if (!p->load(io::path_t(copyPath)) || !p->masterNotation()) {
+        QDir(tmpDir).removeRecursively();
+        return Out::make_ret(Ret::Code::UnknownError, muse::trc("starscore", "couldn't open the file"));
+    }
+    engraving::MasterScore* ms = p->masterNotation()->masterScore();
+    const Data data = loadFrom(ms);
+    QDir(tmpDir).removeRecursively();
+
+    const StarScoreArrangement* arr = nullptr;
+    for (const StarScoreArrangement& a : data.arrangements) {
+        if (a.templateKey == arrangementTemplateKey) {
+            arr = &a;
+        }
+    }
+    if (!arr) {
+        return Out::make_ret(Ret::Code::UnknownError, muse::trc("starscore", "the song has no such arrangement"));
+    }
+
+    const QString code = QFileInfo(songPath).completeBaseName().section(" - ", 0, 0);
+    const QString prefix = code.size() >= 3 && code.size() <= 4 && code == code.toUpper() ? code + " - " : QString();
+    std::vector<StarScoreSongbookSheet> sheets;
+
+    StarScoreSongbookSheet score;
+    score.kind = "score";
+    score.sectionKey = arrangementTemplateKey;
+    score.left = muse::qtrc("starscore", "Score");
+    score.right = chartTitle;
+    score.pdfPath = outDir + "/" + prefix + "Score.pdf";
+    sheets.push_back(score);
+
+    std::map<QString, int> used;
+    for (const QString& sid : arr->sectionIds) {
+        for (const StarScoreSection& sec : data.sections) {
+            if (sec.id != sid) {
+                continue;
+            }
+            for (const engraving::Part* part : ms->parts()) {
+                const QString pid = idText(part);
+                if (!sec.partIds.contains(pid) || sec.alternates.count(pid)
+                    || (!sec.shownPartIds.isEmpty() && !sec.shownPartIds.contains(pid) && sec.templateKey != "lead-sheet")) {
+                    continue;
+                }
+                const QString iid = part->instrumentId().toQString();
+                QString name = sec.templateKey == "lead-sheet" ? QString("Lead Sheet")
+                               : !starscoreHornName(iid).isEmpty() ? starscoreSheetHornName(part->partName().toQString().isEmpty()
+                                                                                             ? starscoreHornName(iid)
+                                                                                             : part->partName().toQString())
+                               : part->partName().toQString();
+                QString file = starscoreSafeFileName(QString(name).replace(QString::fromUtf8("♭"), "b"));
+                if (used[file]++ > 0) {
+                    file += QString(" (%1)").arg(used[file]);
+                }
+                StarScoreSongbookSheet s;
+                s.kind = "part";
+                s.partId = pid;
+                s.left = name;
+                s.right = chartTitle;
+                s.pdfPath = outDir + "/" + prefix + file + ".pdf";
+                sheets.push_back(s);
+            }
+        }
+    }
+    return Out::make_ok(sheets);
 }

@@ -1792,19 +1792,25 @@ static void auditWriteCache(const QJsonObject& cache)
 }
 
 // Cache entries from before the dashboard (no arrangement list) are read again
-static const int AUDIT_CACHE_VERSION = 2;
+static const int AUDIT_CACHE_VERSION = 3;
 
 static QJsonObject auditSummaryToJson(const StarScoreAuditFileSummary& s)
 {
     QJsonArray arrs;
     for (const StarScoreFileArrangement& a : s.arrangementList) {
         arrs.append(QJsonObject {
-            { "col", a.column }, { "name", a.name }, { "status", a.status },
+            { "col", a.column }, { "tpl", a.templateKey }, { "secs", QJsonArray::fromStringList(a.sectionKeys) },
+            { "name", a.name }, { "status", a.status },
             { "unfinished", QJsonArray::fromStringList(a.unfinished) }, { "audited", a.audited },
             { "changed", a.changedSinceAudit }, { "date", a.auditedDate }, { "open", a.openIssues }
         });
     }
+    QJsonObject secStatus;
+    for (const auto& [key, st] : s.sectionStatus) {
+        secStatus[key] = st;
+    }
     return QJsonObject {
+        { "secStatus", secStatus },
         { "title", s.title }, { "open", s.openIssues }, { "likely", s.likelyErrors }, { "arr", s.arrangements },
         { "audited", s.arrangementsAudited }, { "changed", s.arrangementsChanged }, { "steps", s.listenSteps },
         { "approved", s.listenApproved }, { "error", s.error }, { "arrs", arrs }, { "v", AUDIT_CACHE_VERSION }
@@ -1828,6 +1834,10 @@ static StarScoreAuditFileSummary auditSummaryFromJson(const QString& path, const
         const QJsonObject a = v.toObject();
         StarScoreFileArrangement fa;
         fa.column = a.value("col").toString();
+        fa.templateKey = a.value("tpl").toString();
+        for (const QJsonValue& k : a.value("secs").toArray()) {
+            fa.sectionKeys << k.toString();
+        }
         fa.name = a.value("name").toString();
         fa.status = a.value("status").toInt();
         for (const QJsonValue& u : a.value("unfinished").toArray()) {
@@ -1838,6 +1848,10 @@ static StarScoreAuditFileSummary auditSummaryFromJson(const QString& path, const
         fa.auditedDate = a.value("date").toString();
         fa.openIssues = a.value("open").toInt();
         s.arrangementList.push_back(fa);
+    }
+    const QJsonObject secStatus = o.value("secStatus").toObject();
+    for (auto it = secStatus.begin(); it != secStatus.end(); ++it) {
+        s.sectionStatus[it.key()] = it.value().toInt();
     }
     return s;
 }
@@ -1883,6 +1897,7 @@ std::vector<StarScoreFileArrangement> StarScoreService::summarizeArrangements(co
     for (const StarScoreArrangement& a : data.arrangements) {
         StarScoreFileArrangement fa;
         fa.column = auditArrangementColumn(a);
+        fa.templateKey = a.templateKey;
         fa.name = a.name;
         int least = int(StarScoreStatus::Finished);
         for (const QString& sid : a.sectionIds) {
@@ -1890,8 +1905,11 @@ std::vector<StarScoreFileArrangement> StarScoreService::summarizeArrangements(co
                 if (sec.id != sid) {
                     continue;
                 }
-                const int st = int(sec.status);
+                const int st = (sec.leadSheetFinish ? int(StarScoreStatus::Finished) : int(sec.status));
                 least = std::min(least, st);
+                if (!fa.sectionKeys.contains(sec.templateKey)) {
+                    fa.sectionKeys << sec.templateKey;
+                }
                 if (st < int(StarScoreStatus::Finished)) {
                     fa.unfinished << QString("%1: %2").arg(sec.name, auditStatusName(st));
                 }
@@ -2006,7 +2024,13 @@ StarScoreAuditFileSummary StarScoreService::auditFile(const QString& path, bool 
     if (m_mainProject && QFileInfo(m_mainProject->path().toQString()).absoluteFilePath() == fi.absoluteFilePath()) {
         const StarScoreAuditReport report = audit();
         StarScoreAuditFileSummary live = auditSummarize(path, report);
-        live.arrangementList = summarizeArrangements(loadFrom(m_mainProject->masterNotation()->masterScore()), report);
+        const Data liveData = loadFrom(m_mainProject->masterNotation()->masterScore());
+        live.arrangementList = summarizeArrangements(liveData, report);
+        for (const StarScoreSection& sec : liveData.sections) {
+            const int st = sec.leadSheetFinish ? int(StarScoreStatus::Finished) : int(sec.status);
+            auto it = live.sectionStatus.find(sec.templateKey);
+            live.sectionStatus[sec.templateKey] = it == live.sectionStatus.end() ? st : std::min(it->second, st);
+        }
         return live;
     }
 
@@ -2038,6 +2062,11 @@ StarScoreAuditFileSummary StarScoreService::auditFile(const QString& path, bool 
             const StarScoreAuditReport report = auditScore(ms, fileData);
             summary = auditSummarize(path, report);
             summary.arrangementList = summarizeArrangements(fileData, report);
+            for (const StarScoreSection& sec : fileData.sections) {
+                const int st = sec.leadSheetFinish ? int(StarScoreStatus::Finished) : int(sec.status);
+                auto it = summary.sectionStatus.find(sec.templateKey);
+                summary.sectionStatus[sec.templateKey] = it == summary.sectionStatus.end() ? st : std::min(it->second, st);
+            }
         }
         QFile::remove(tmp);
     }
