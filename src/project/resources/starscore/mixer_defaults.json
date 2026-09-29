@@ -91,19 +91,7 @@
     0.3,
     0.3
    ],
-   "in": {
-    "attributes": {
-     "playbackSetupData": "last.last.last",
-     "presetBank": "0",
-     "presetName": "Trumpet",
-     "presetProgram": "56",
-     "soundFontName": "MS Basic"
-    },
-    "hasNativeEditorSupport": false,
-    "id": "MS Basic\\0\\56",
-    "type": "fluid_soundfont",
-    "vendor": "Fluid"
-   }
+   "in": {"attributes": {"playbackSetupData": "last.last.last", "soundFontName": "MS Basic"}, "hasNativeEditorSupport": false, "id": "MS Basic", "type": "fluid_soundfont", "vendor": "Fluid"}
   },
   "2-horn|bb-trumpet|1|chords": {
    "volumeDb": 0,
@@ -180,19 +168,7 @@
     0.3,
     0.3
    ],
-   "in": {
-    "attributes": {
-     "playbackSetupData": "last.last.last",
-     "presetBank": "0",
-     "presetName": "Trumpet",
-     "presetProgram": "56",
-     "soundFontName": "MS Basic"
-    },
-    "hasNativeEditorSupport": false,
-    "id": "MS Basic\\0\\56",
-    "type": "fluid_soundfont",
-    "vendor": "Fluid"
-   }
+   "in": {"attributes": {"playbackSetupData": "last.last.last", "soundFontName": "MS Basic"}, "hasNativeEditorSupport": false, "id": "MS Basic", "type": "fluid_soundfont", "vendor": "Fluid"}
   },
   "3-horn|bb-trumpet|1|chords": {
    "volumeDb": 0,
@@ -359,19 +335,7 @@
     0.3,
     0.3
    ],
-   "in": {
-    "attributes": {
-     "playbackSetupData": "last.last.last",
-     "presetBank": "0",
-     "presetName": "Trumpet",
-     "presetProgram": "56",
-     "soundFontName": "MS Basic"
-    },
-    "hasNativeEditorSupport": false,
-    "id": "MS Basic\\0\\56",
-    "type": "fluid_soundfont",
-    "vendor": "Fluid"
-   }
+   "in": {"attributes": {"playbackSetupData": "last.last.last", "soundFontName": "MS Basic"}, "hasNativeEditorSupport": false, "id": "MS Basic", "type": "fluid_soundfont", "vendor": "Fluid"}
   },
   "4-horn|bb-trumpet|1|chords": {
    "volumeDb": 0,
@@ -583,19 +547,7 @@
     0.3,
     0.3
    ],
-   "in": {
-    "attributes": {
-     "playbackSetupData": "last.last.last",
-     "presetBank": "0",
-     "presetName": "Trumpet",
-     "presetProgram": "56",
-     "soundFontName": "MS Basic"
-    },
-    "hasNativeEditorSupport": false,
-    "id": "MS Basic\\0\\56",
-    "type": "fluid_soundfont",
-    "vendor": "Fluid"
-   }
+   "in": {"attributes": {"playbackSetupData": "last.last.last", "soundFontName": "MS Basic"}, "hasNativeEditorSupport": false, "id": "MS Basic", "type": "fluid_soundfont", "vendor": "Fluid"}
   },
   "5-horn|bb-trumpet|1|chords": {
    "volumeDb": 0,
@@ -627,19 +579,7 @@
     0.3,
     0.3
    ],
-   "in": {
-    "attributes": {
-     "playbackSetupData": "last.last.last",
-     "presetBank": "0",
-     "presetName": "Trumpet",
-     "presetProgram": "56",
-     "soundFontName": "MS Basic"
-    },
-    "hasNativeEditorSupport": false,
-    "id": "MS Basic\\0\\56",
-    "type": "fluid_soundfont",
-    "vendor": "Fluid"
-   }
+   "in": {"attributes": {"playbackSetupData": "last.last.last", "soundFontName": "MS Basic"}, "hasNativeEditorSupport": false, "id": "MS Basic", "type": "fluid_soundfont", "vendor": "Fluid"}
   },
   "5-horn|bb-trumpet|2|chords": {
    "volumeDb": 0,
@@ -851,19 +791,7 @@
     0.3,
     0.3
    ],
-   "in": {
-    "attributes": {
-     "playbackSetupData": "last.last.last",
-     "presetBank": "0",
-     "presetName": "Trumpet",
-     "presetProgram": "56",
-     "soundFontName": "MS Basic"
-    },
-    "hasNativeEditorSupport": false,
-    "id": "MS Basic\\0\\56",
-    "type": "fluid_soundfont",
-    "vendor": "Fluid"
-   }
+   "in": {"attributes": {"playbackSetupData": "last.last.last", "soundFontName": "MS Basic"}, "hasNativeEditorSupport": false, "id": "MS Basic", "type": "fluid_soundfont", "vendor": "Fluid"}
   },
   "6-horn|bb-trumpet|1|chords": {
    "volumeDb": 0,
@@ -895,19 +823,7 @@
     0.3,
     0.3
    ],
-   "in": {
-    "attributes": {
-     "playbackSetupData": "last.last.last",
-     "presetBank": "0",
-     "presetName": "Trumpet",
-     "presetProgram": "56",
-     "soundFontName": "MS Basic"
-    },
-    "hasNativeEditorSupport": false,
-    "id": "MS Basic\\0\\56",
-    "type": "fluid_soundfont",
-    "vendor": "Fluid"
-   }
+   "in": {"attributes": {"playbackSetupData": "last.last.last", "soundFontName": "MS Basic"}, "hasNativeEditorSupport": false, "id": "MS Basic", "type": "fluid_soundfont", "vendor": "Fluid"}
   },
   "6-horn|bb-trumpet|2|chords": {
    "volumeDb": 0,
@@ -1263,19 +1179,7 @@
     0.3,
     0.3
    ],
-   "in": {
-    "attributes": {
-     "playbackSetupData": "last.last.last",
-     "presetBank": "0",
-     "presetName": "Trumpet",
-     "presetProgram": "56",
-     "soundFontName": "MS Basic"
-    },
-    "hasNativeEditorSupport": false,
-    "id": "MS Basic\\0\\56",
-    "type": "fluid_soundfont",
-    "vendor": "Fluid"
-   }
+   "in": {"attributes": {"playbackSetupData": "last.last.last", "soundFontName": "MS Basic"}, "hasNativeEditorSupport": false, "id": "MS Basic", "type": "fluid_soundfont", "vendor": "Fluid"}
   },
   "7-horn|bb-trumpet|1|chords": {
    "volumeDb": 0,
@@ -1307,19 +1211,7 @@
     0.3,
     0.3
    ],
-   "in": {
-    "attributes": {
-     "playbackSetupData": "last.last.last",
-     "presetBank": "0",
-     "presetName": "Trumpet",
-     "presetProgram": "56",
-     "soundFontName": "MS Basic"
-    },
-    "hasNativeEditorSupport": false,
-    "id": "MS Basic\\0\\56",
-    "type": "fluid_soundfont",
-    "vendor": "Fluid"
-   }
+   "in": {"attributes": {"playbackSetupData": "last.last.last", "soundFontName": "MS Basic"}, "hasNativeEditorSupport": false, "id": "MS Basic", "type": "fluid_soundfont", "vendor": "Fluid"}
   },
   "7-horn|bb-trumpet|2|chords": {
    "volumeDb": 0,
@@ -1707,19 +1599,7 @@
     0.29,
     0.3
    ],
-   "in": {
-    "attributes": {
-     "playbackSetupData": "last.last.last",
-     "presetBank": "0",
-     "presetName": "Trumpet",
-     "presetProgram": "56",
-     "soundFontName": "MS Basic"
-    },
-    "hasNativeEditorSupport": false,
-    "id": "MS Basic\\0\\56",
-    "type": "fluid_soundfont",
-    "vendor": "Fluid"
-   }
+   "in": {"attributes": {"playbackSetupData": "last.last.last", "soundFontName": "MS Basic"}, "hasNativeEditorSupport": false, "id": "MS Basic", "type": "fluid_soundfont", "vendor": "Fluid"}
   },
   "2-horn-any|c-trumpet|1|chords": {
    "volumeDb": 0,
@@ -1796,19 +1676,7 @@
     0.3,
     0.3
    ],
-   "in": {
-    "attributes": {
-     "playbackSetupData": "last.last.last",
-     "presetBank": "0",
-     "presetName": "Trumpet",
-     "presetProgram": "56",
-     "soundFontName": "MS Basic"
-    },
-    "hasNativeEditorSupport": false,
-    "id": "MS Basic\\0\\56",
-    "type": "fluid_soundfont",
-    "vendor": "Fluid"
-   }
+   "in": {"attributes": {"playbackSetupData": "last.last.last", "soundFontName": "MS Basic"}, "hasNativeEditorSupport": false, "id": "MS Basic", "type": "fluid_soundfont", "vendor": "Fluid"}
   },
   "3-horn-any|c-trumpet|1|chords": {
    "volumeDb": 0,
