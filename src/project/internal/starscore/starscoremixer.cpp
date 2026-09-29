@@ -154,7 +154,9 @@ void StarScoreService::applyMixerDefaults(const QStringList& partIds)
                 continue;
             }
 
-            const QString key = QString("%1|%2|%3").arg(section.templateKey, iid).arg(n);
+            // 1-Horn melody sheets take the 4-Horn Section's levels (same four instruments)
+            const QString mixTemplate = section.templateKey == "1-horn" ? QString("4-horn") : section.templateKey;
+            const QString key = QString("%1|%2|%3").arg(mixTemplate, iid).arg(n);
             QString found;
             if (oneTenor6or7 && (iid == "alto-saxophone" || iid == "tenor-saxophone") && defaults.contains(key + "|1ten")) {
                 found = key + "|1ten";

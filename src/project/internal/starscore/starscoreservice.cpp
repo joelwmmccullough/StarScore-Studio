@@ -285,6 +285,11 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
         const QJsonObject o = it.value().toObject();
         data.auditAudited[it.key()] = { o.value("date").toString(), o.value("fp").toString() };
     }
+    const QJsonObject partsAudited = audit.value("parts").toObject();
+    for (auto it = partsAudited.begin(); it != partsAudited.end(); ++it) {
+        const QJsonObject o = it.value().toObject();
+        data.auditPartAudited[it.key()] = { o.value("date").toString(), o.value("fp").toString() };
+    }
 
     for (const QJsonValue& v : root.value("arrangements").toArray()) {
         const QJsonObject o = v.toObject();
@@ -416,6 +421,13 @@ QString StarScoreService::toJson(const Data& data)
     }
     if (!audited.isEmpty()) {
         audit["audited"] = audited;
+    }
+    QJsonObject partsAudited;
+    for (const auto& [pid, entry] : data.auditPartAudited) {
+        partsAudited[pid] = QJsonObject { { "date", entry.first }, { "fp", entry.second } };
+    }
+    if (!partsAudited.isEmpty()) {
+        audit["parts"] = partsAudited;
     }
     if (!audit.isEmpty()) {
         root["audit"] = audit;
@@ -936,6 +948,9 @@ std::vector<StarScoreSectionTemplate> StarScoreService::sectionTemplates() const
         { "rhythm", "Rhythm Section", {
               inst("piano", "Piano"), inst("electric-guitar", "Electric Guitar"), inst("electric-bass", "Electric Bass"),
               inst("drumset", "Drum Kit"), inst("congas", "Congas", true) } },
+        // 1-Horn: the melody written out for each horn we make songbooks for, one sheet per instrument
+        { "1-horn", "1-Horn Section", { inst("bb-trumpet", "Trumpet"), inst("alto-saxophone", "Alto Saxophone"),
+              inst("tenor-saxophone", "Tenor Saxophone"), inst("trombone", "Trombone") } },
         { "2-horn", "2-Horn Section", { inst("bb-trumpet", "Trumpet"), inst("tenor-saxophone", "Tenor Saxophone") } },
         { "3-horn", "3-Horn Section", { inst("bb-trumpet", "Trumpet"), inst("alto-saxophone", "Alto Saxophone"),
               inst("tenor-saxophone", "Tenor Saxophone") } },
@@ -1007,6 +1022,7 @@ std::vector<StarScoreSectionTemplate> StarScoreService::sectionTemplates() const
 std::vector<StarScoreArrangementTemplate> StarScoreService::arrangementTemplates() const
 {
     return {
+        { "1-horn-standard", "1-Horn Standard", { "lead-sheet", "1-horn", "rhythm" } },
         { "2-horn-standard", "2-Horn Standard", { "lead-sheet", "2-horn", "rhythm" } },
         { "3-horn-standard", "3-Horn Standard", { "lead-sheet", "3-horn", "rhythm" } },
         { "4-horn-standard", "4-Horn Standard", { "lead-sheet", "4-horn", "rhythm" } },
@@ -1404,11 +1420,17 @@ Ret StarScoreService::newStarScore(const StarScoreNewOptions& options)
 void StarScoreService::setSectionStatus(const QString& sectionId, StarScoreStatus status)
 {
     Data data = load();
+    QStringList partIds;
     for (StarScoreSection& s : data.sections) {
         if (s.id == sectionId) {
             s.status = status;
             s.autoStatus = false;
+            partIds = s.partIds;
         }
+    }
+    // a section marked Finished: its sheets no longer need auditing
+    if (status == StarScoreStatus::Finished) {
+        markPartsAudited(data, masterScore(), partIds, true);
     }
     store(data);
 }
@@ -1491,6 +1513,7 @@ void StarScoreService::setPartScoreStatus(const engraving::Score* score, int sta
             data.partStatus[id] = statusKey(static_cast<StarScoreStatus>(status));
         }
     }
+    markPartsAudited(data, ms, ids, status == int(StarScoreStatus::Finished));
     storeTo(ms, data, m_mainProject ? m_mainProject : globalContext()->currentProject());
     if (status == int(StarScoreStatus::Finished)) {
         offerLowAlternates(ids);
@@ -1505,6 +1528,7 @@ void StarScoreService::setPartStatus(const QString& partId, int status)
     } else {
         data.partStatus[partId] = statusKey(static_cast<StarScoreStatus>(status));
     }
+    markPartsAudited(data, masterScore(), { partId }, status == int(StarScoreStatus::Finished));
     store(data);
     if (status == int(StarScoreStatus::Finished)) {
         offerLowAlternates({ partId });

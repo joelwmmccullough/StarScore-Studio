@@ -340,7 +340,8 @@ struct StarScoreAuditFileSummary
 //! One sheet of a songbook or chart: which part of a song, how it's written, and what its title frame says
 struct StarScoreSongbookSheet
 {
-    QString kind;                // "lead" (the lead sheet), "chair" (a Flexible chair), "rhythm" (a rhythm-section player),
+    QString kind;                // "lead" (the lead sheet), "solo" (an instrument's 1-Horn sheet; role = instrument id),
+                                 // "chair" (a Flexible chair), "rhythm" (a rhythm-section player),
                                  // "part" (partId), "score" (the arrangement's score)
     QString sectionKey;          // chair: "2-horn-any" / "3-horn-any"; score: the arrangement's template key
     int chair = 0;               // chair: 1 = top line …

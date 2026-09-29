@@ -54,6 +54,7 @@ struct BookDef {
     int leadDia = 0, leadChrom = 0, leadClef = 0;
     bool leadTranspose = false;
     std::vector<Seat> seats;
+    QString soloInstrument;  // horn books: the instrument id of its sheet in the 1-Horn section
     QString rhythmRole;      // rhythm books: the part
     QString rhythmTitle;
     QString linesSummary;
@@ -70,6 +71,8 @@ const std::vector<BookDef>& bookDefs()
                        int lclef, std::vector<Seat> seats, const QString& summary) {
             BookDef b;
             b.id = id;
+            b.soloInstrument = id == "tenor" ? "tenor-saxophone" : id == "alto" ? "alto-saxophone"
+                               : id == "trumpet" ? "bb-trumpet" : "trombone";
             b.title = title;
             b.instrument = instrument;
             b.keyLabel = key;
@@ -453,8 +456,26 @@ std::vector<SongbookModel::SheetPlan> SongbookModel::sheetsFor(const Song& song)
         return true;
     };
 
-    // Solo: the lead sheet
-    {
+    // Horn books, Solo: the instrument's sheet in the 1-Horn arrangement (written by hand, not the lead sheet)
+    if (b.horn) {
+        SheetPlan sp;
+        sp.sheet.kind = "solo";
+        sp.sheet.role = b.soloInstrument;
+        sp.sheet.left = b.instrument;
+        sp.sheet.right = QString("Solo · Melody and changes");
+        sp.label = QString("Solo");
+        sp.chapterKind = QString("SOLO");
+        sp.chapterTitle = "Melody and changes";
+        if (sum.sectionStatus.find("1-horn") == sum.sectionStatus.end()) {
+            sp.why = muse::qtrc("starscore", "no 1-Horn arrangement");
+        } else if (!sectionDone(song.legacy, sum, "1-horn")) {
+            sp.why = muse::qtrc("starscore", "1-Horn section not marked Finished");
+        } else {
+            sp.ready = true;
+        }
+        out.push_back(sp);
+    } else {
+        // Rhythm books: the lead sheet
         SheetPlan sp;
         sp.sheet.kind = "lead";
         sp.sheet.transpose = b.leadTranspose;
@@ -462,9 +483,9 @@ std::vector<SongbookModel::SheetPlan> SongbookModel::sheetsFor(const Song& song)
         sp.sheet.transposeChromatic = b.leadChrom;
         sp.sheet.clef = b.leadClef;
         sp.sheet.left = b.instrument;
-        sp.sheet.right = b.horn ? QString("Solo · Melody and changes") : QString("Lead Sheet");
-        sp.label = b.horn ? QString("Solo") : QString("Lead sheet");
-        sp.chapterKind = b.horn ? QString("SOLO") : QString("LEAD SHEET");
+        sp.sheet.right = QString("Lead Sheet");
+        sp.label = QString("Lead sheet");
+        sp.chapterKind = QString("LEAD SHEET");
         sp.chapterTitle = "Melody and changes";
         if (sum.sectionStatus.find("lead-sheet") == sum.sectionStatus.end()) {
             sp.why = muse::qtrc("starscore", "no lead sheet");

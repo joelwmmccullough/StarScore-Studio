@@ -385,8 +385,9 @@ std::vector<StarScoreVoiceSection> StarScoreService::checkVoiceOrderIn(const Mas
     static const QRegularExpression chairRe("^\\s*Horn\\s*(\\d+)\\s*$", QRegularExpression::CaseInsensitiveOption);
 
     for (const StarScoreSection& sec : data.sections) {
+        // (1-Horn: one melody sheet per instrument, not voices of one chord)
         if (sec.templateKey == "lead-sheet" || sec.templateKey == "rhythm" || sec.templateKey.endsWith("-rhythm")
-            || sec.partIds.size() < 2) {
+            || sec.templateKey == "1-horn" || sec.partIds.size() < 2) {
             continue;
         }
 

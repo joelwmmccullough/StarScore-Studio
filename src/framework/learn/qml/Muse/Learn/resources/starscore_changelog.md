@@ -6,6 +6,11 @@ Version numbers: the first number changes when files stop being compatible, the 
 
 ## 1.10.0
 
+- **1-Horn arrangement** (new template): a 1-Horn Section with a melody sheet for each songbook horn (Trumpet, Alto Sax, Tenor Sax, Trombone), with the lead sheet and rhythm section. You write these sheets by hand; the lead sheet stays the full overview of the song.
+  - Songbooks: a horn book's Solo sheet is now that instrument's 1-Horn sheet, as written, instead of the lead sheet transposed. It's ready when the 1-Horn Section is Finished. Piano, guitar and bass books still use the lead sheet.
+  - Dashboard: a 1-Horn column. In the priority order, originals' 1-Horn comes after covers' 3-Horn Flexible and before originals' 4-Horn; covers' 1-Horn comes after covers' 4-Horn.
+  - Export to Sheets and Demos puts the 1-Horn sheets in a “1H” folder, one sheet per horn, titled “1-Horn Arrangement”. The mixer gives them the 4-Horn Section's levels.
+- **Older songs**: marking a sheet Finished marks it as no longer needing an audit, and marking a section Finished does the same for all its sheets. An arrangement whose sheets are all marked that way counts as audited. If the music of such a sheet changes afterwards, the arrangement shows as changed since the audit. Sheets already marked Finished before this version count too. Setting a sheet back to something other than Finished takes the mark off.
 - **Changelog** has its own page on Home, below Learn, instead of a tab inside Learn.
 - **Dashboard**: Next up lists the existing arrangements to audit or finish first. After those, it goes on to recommend which missing arrangements to write next, in the same priority order as the audit list.
 - **Audit**: the “Differs from the reference section” check is gone, and so is the “Compare with” choice. The library audit reads every song again once to update the counts.

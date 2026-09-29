@@ -78,14 +78,14 @@ inline bool arrangementDone(bool legacy, const StarScoreFileArrangement& a)
     return legacy ? a.audited : a.status == int(StarScoreStatus::Finished);
 }
 
-//! Is this section ready to print? New songs: the section is Finished. Older songs: an audited arrangement has it.
+//! Is this section ready to print? It's Finished, or (older songs) an audited arrangement has it.
 inline bool sectionDone(bool legacy, const StarScoreAuditFileSummary& s, const QString& sectionKey)
 {
     auto it = s.sectionStatus.find(sectionKey);
     if (it == s.sectionStatus.end()) {
         return false;
     }
-    if (!legacy) {
+    if (!legacy || it->second == int(StarScoreStatus::Finished)) {
         return it->second == int(StarScoreStatus::Finished);
     }
     for (const StarScoreFileArrangement& a : s.arrangementList) {

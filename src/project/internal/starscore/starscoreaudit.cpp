@@ -1285,13 +1285,51 @@ StarScoreAuditReport StarScoreService::auditScore(const MasterScore* ms, const D
                 st.likelyErrors += issue.severity == 2 ? 1 : 0;
             }
         }
-        const QString fingerprint = auditFingerprint(auditArrangementParts(arr, data.sections), ctx.lines);
+        const std::set<QString> arrParts = auditArrangementParts(arr, data.sections);
+        const QString fingerprint = auditFingerprint(arrParts, ctx.lines);
+        bool arrOk = false;
         auto ait = data.auditAudited.find(arr.id);
         if (ait != data.auditAudited.end()) {
             st.audited = true;
             st.auditedDate = ait->second.first;
-            st.changedSinceAudit = ait->second.second != fingerprint;
+            arrOk = ait->second.second == fingerprint;
         }
+
+        // Or every sheet in it was marked Finished (itself, or with its section). A sheet marked Finished before
+        // this was kept counts too, without change tracking.
+        std::set<QString> finishedBySection;
+        for (const StarScoreSection& sec : data.sections) {
+            if (!sec.autoStatus && sec.status == StarScoreStatus::Finished) {
+                finishedBySection.insert(sec.partIds.begin(), sec.partIds.end());
+            }
+        }
+        bool allSheets = !arrParts.empty();
+        bool sheetsOk = !arrParts.empty();
+        QString latest;
+        for (const QString& pid : arrParts) {
+            auto pit = data.auditPartAudited.find(pid);
+            if (pit != data.auditPartAudited.end()) {
+                latest = std::max(latest, pit->second.first);
+                if (pit->second.second != auditFingerprint({ pid }, ctx.lines)) {
+                    sheetsOk = false;
+                }
+                continue;
+            }
+            auto sit = data.partStatus.find(pid);
+            const bool finished = (sit != data.partStatus.end() && statusFromKey(sit->second) == StarScoreStatus::Finished)
+                                  || finishedBySection.count(pid);
+            if (!finished) {
+                allSheets = false;
+                sheetsOk = false;
+            }
+        }
+        if (allSheets) {
+            st.audited = true;
+            if (!arrOk && (st.auditedDate.isEmpty() || sheetsOk)) {
+                st.auditedDate = latest;
+            }
+        }
+        st.changedSinceAudit = st.audited && !arrOk && !(allSheets && sheetsOk);
         report.arrangements.push_back(st);
     }
 
@@ -1392,6 +1430,32 @@ void StarScoreService::setAuditIntentional(const QString& issueKey, bool intenti
         data.auditIntentional << issueKey;
     }
     storeTo(ms, data, m_mainProject ? m_mainProject : globalContext()->currentProject());
+}
+
+void StarScoreService::markPartsAudited(Data& data, const MasterScore* ms, const QStringList& partIds, bool audited) const
+{
+    if (!audited) {
+        for (const QString& pid : partIds) {
+            data.auditPartAudited.erase(pid);
+        }
+        return;
+    }
+    if (!ms) {
+        return;
+    }
+    std::vector<const Measure*> measures;
+    for (const Measure* m = ms->firstMeasure(); m; m = m->nextMeasure()) {
+        measures.push_back(m);
+    }
+    const QString today = QDate::currentDate().toString(Qt::ISODate);
+    for (const QString& pid : partIds) {
+        std::map<QString, AuditLine> lines;
+        const Part* p = ms->partById(ID(pid));
+        if (p && !auditIsDrums(p)) {
+            lines[pid] = auditLineOf(p, measures, auditSlurTicks(ms, p), false);
+        }
+        data.auditPartAudited[pid] = { today, auditFingerprint({ pid }, lines) };
+    }
 }
 
 void StarScoreService::setArrangementAudited(const QString& arrangementId, bool audited)

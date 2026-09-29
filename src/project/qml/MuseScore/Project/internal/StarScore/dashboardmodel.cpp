@@ -32,10 +32,10 @@ struct Column {
 //! Dashboard columns, in the order they're shown
 const std::vector<Column> COLUMNS {
     { "3H", "3-Horn", "3H" }, { "2H", "2-Horn", "2H" }, { "2F", "2-Horn Flexible", "2F" }, { "3F", "3-Horn Flexible", "3F" },
-    { "4H", "4-Horn", "4H" }, { "5H", "5-Horn", "5H" }, { "6H", "6-Horn", "6H" }, { "7H", "7-Horn", "7H" },
+    { "1H", "1-Horn", "1H" }, { "4H", "4-Horn", "4H" }, { "5H", "5-Horn", "5H" }, { "6H", "6-Horn", "6H" }, { "7H", "7-Horn", "7H" },
 };
 
-//! Joel's priority order (29 Sep 2026): which arrangements of which songs come first
+//! Joel's priority order (29 Sep 2026, 1-Horn added the same day): which arrangements of which songs come first
 struct Tier {
     bool cover;
     const char* column;
@@ -43,8 +43,8 @@ struct Tier {
 const std::vector<Tier> TIERS {
     { false, "3H" }, { false, "2H" }, { false, "2F" }, { false, "3F" },
     { true, "3H" }, { true, "2H" }, { true, "2F" }, { true, "3F" },
-    { false, "4H" }, { false, "5H" }, { false, "6H" }, { false, "7H" },
-    { true, "4H" }, { true, "5H" }, { true, "6H" }, { true, "7H" },
+    { false, "1H" }, { false, "4H" }, { false, "5H" }, { false, "6H" }, { false, "7H" },
+    { true, "4H" }, { true, "1H" }, { true, "5H" }, { true, "6H" }, { true, "7H" },
 };
 
 QString columnTitle(const QString& key)

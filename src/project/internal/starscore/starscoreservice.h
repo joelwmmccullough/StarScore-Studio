@@ -204,6 +204,9 @@ public:
         QString auditReferenceSectionId;          // section the others are compared with (empty = automatic)
         QStringList auditIntentional;             // issue keys marked "intentional"
         std::map<QString, std::pair<QString, QString> > auditAudited;   // arrangement id -> (date, fingerprint)
+        // part id -> (date, fingerprint): a sheet marked Finished (or in a section marked Finished) no longer needs
+        // auditing; an arrangement whose sheets are all like that counts as audited
+        std::map<QString, std::pair<QString, QString> > auditPartAudited;
         QStringList auditListened;                // approved listen steps
     };
 
@@ -246,6 +249,8 @@ private:
     void fillAnyHornsFromStandard(const StarScoreSection& anySection);
     //! A 7-Horn Bass Trombone part marked Finished: offer Baritone and Bass Saxophone versions of it
     void offerLowAlternates(const QStringList& partIds);
+    //! Legacy audit: marks (or unmarks) these sheets as no longer needing auditing, with a fingerprint of their music
+    void markPartsAudited(Data& data, const mu::engraving::MasterScore* ms, const QStringList& partIds, bool audited) const;
     muse::RetVal<QStringList> createLowAlternates(const QString& sectionId, const QString& mainPartId);
     //! Name the new parts, hide default-hidden parts/staves, make part books; returns the new section
     StarScoreSection finishNewParts(const std::vector<mu::engraving::Part*>& newParts,

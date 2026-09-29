@@ -564,6 +564,22 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
             continue;
         }
 
+        // 1-Horn: one melody sheet per horn, each played alone with the rhythm section (no score)
+        if (sec.templateKey == "1-horn") {
+            for (const QString& pid : sec.partIds) {
+                engraving::Part* p = partById(pid);
+                const QString horn = p ? starscoreHornName(p->instrumentId().toQString()) : QString();
+                const QString name = horn.isEmpty() && p ? p->partName().toQString() : horn;
+                if (name.isEmpty()) {
+                    continue;
+                }
+                addFile("1H", name, { pid }, false);
+                plan.files.back().sheetLeft = starscoreSheetHornName(name);
+                plan.files.back().sheetRight = QString("1-Horn Arrangement");
+            }
+            continue;
+        }
+
         // Horn sections (template or custom): named from their instruments
         bool allHorns = true;
         std::vector<std::pair<QString, QString> > horns;   // (partId, horn name)
@@ -1344,6 +1360,14 @@ void StarScoreService::songbookRenderSheets(const QString& songPath, std::vector
             return sheet.partId;
         }
         for (const StarScoreSection& sec : data.sections) {
+            if (sheet.kind == "solo" && sec.templateKey == "1-horn") {
+                for (const QString& pid : sec.partIds) {
+                    const engraving::Part* p = bms->partById(ID(pid));
+                    if (p && p->instrumentId().toQString() == sheet.role) {
+                        return pid;
+                    }
+                }
+            }
             if (sheet.kind == "lead" && sec.templateKey == "lead-sheet" && !sec.partIds.isEmpty()) {
                 return sec.partIds.first();
             }
@@ -1428,6 +1452,7 @@ void StarScoreService::songbookRenderSheets(const QString& songPath, std::vector
         if (!basePart) {
             sheet.error = sheet.kind == "chair" ? muse::qtrc("starscore", "no Horn %1 in the Flexible section").arg(sheet.chair)
                           : sheet.kind == "rhythm" ? muse::qtrc("starscore", "no %1 part in the rhythm section").arg(sheet.role)
+                          : sheet.kind == "solo" ? muse::qtrc("starscore", "no sheet for this instrument in the 1-Horn section")
                           : muse::qtrc("starscore", "part not found");
             continue;
         }
