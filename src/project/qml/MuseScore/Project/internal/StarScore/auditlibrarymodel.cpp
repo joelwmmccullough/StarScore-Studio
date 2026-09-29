@@ -10,6 +10,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QTimer>
+#include <QCoreApplication>
 #include <QUrl>
 
 #include "translation.h"
@@ -168,13 +169,21 @@ void AuditLibraryModel::openSong(int index)
         return;
     }
     const QString path = m_results[index].path;
-    cancel();
-    emit closeRequested();
-    dispatcher()->dispatch("file-open", muse::actions::ActionData::make_arg1<QUrl>(QUrl::fromLocalFile(path)));
-    // then show the Audit panel once the score is open
-    QTimer::singleShot(1500, [d = dispatcher(), docks = dockWindowProvider()]() {
+    // Stop scanning without touching the list: this runs inside a click on one of the list's rows
+    m_scanning = false;
+    m_queue.clear();
+
+    // Everything else happens after the click has finished. Closing the dialog deletes this model, so the
+    // file is opened (and the Audit panel shown) by timers that don't use it.
+    auto d = dispatcher();
+    auto docks = dockWindowProvider();
+    QTimer::singleShot(0, qApp, [d, path]() {
+        d->dispatch("file-open", muse::actions::ActionData::make_arg1<QUrl>(QUrl::fromLocalFile(path)));
+    });
+    QTimer::singleShot(2000, qApp, [d, docks]() {
         if (docks && docks->window() && !docks->window()->isDockOpen("starscoreAuditPanel")) {
             d->dispatch("toggle-starscore-audit");
         }
     });
+    QTimer::singleShot(0, this, [this]() { emit closeRequested(); });
 }

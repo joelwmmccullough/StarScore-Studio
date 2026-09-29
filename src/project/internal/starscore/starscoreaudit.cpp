@@ -1847,7 +1847,18 @@ QStringList StarScoreService::auditLibraryFiles(const QString& folder) const
     if (folder.isEmpty()) {
         return files;
     }
-    QDirIterator it(folder, { "*.starscore" }, QDir::Files, QDirIterator::Subdirectories);
+    // The band's songs: only "1 Starsign Originals" and "2 Starsign Covers" when the folder has them
+    QStringList roots;
+    for (const QString& sub : { QString("1 Starsign Originals"), QString("2 Starsign Covers") }) {
+        if (QDir(folder + "/" + sub).exists()) {
+            roots << folder + "/" + sub;
+        }
+    }
+    if (roots.isEmpty()) {
+        roots << folder;
+    }
+    for (const QString& root : roots) {
+    QDirIterator it(root, { "*.starscore" }, QDir::Files, QDirIterator::Subdirectories);
     while (it.hasNext()) {
         const QString path = it.next();
         const QString rel = QDir(folder).relativeFilePath(path);
@@ -1856,6 +1867,7 @@ QStringList StarScoreService::auditLibraryFiles(const QString& folder) const
             continue;
         }
         files << path;
+    }
     }
     std::sort(files.begin(), files.end(), [](const QString& a, const QString& b) {
         return QString::localeAwareCompare(a, b) < 0;

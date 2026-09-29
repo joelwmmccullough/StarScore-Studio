@@ -4,6 +4,11 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.2.1
+
+- Audit library: clicking a song no longer crashes the app. The song opens with the Audit panel.
+- Audit library checks only the songs in “1 Starsign Originals” and “2 Starsign Covers”.
+
 ## 1.2.0
 
 Based on MuseScore Studio 4.7.5.
