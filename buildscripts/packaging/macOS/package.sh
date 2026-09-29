@@ -14,6 +14,7 @@ while [[ "$#" -gt 0 ]]; do
     case $1 in
         --app-name) APP_NAME="$2"; shift ;;
         --vol-name) VOL_NAME="$2"; shift ;;
+        --vol-title) VOL_TITLE="$2"; shift ;;   # StarScore: the disk's name when mounted (may contain spaces)
         --sign) DO_SIGN=true ;;
         --team-id) APPLE_TEAM_ID="$2"; shift ;;
         --user) APPLE_USERNAME="$2"; shift ;;
@@ -106,13 +107,14 @@ fi
 # Create DMG
 ################################################################
 
+VOL_TITLE="${VOL_TITLE:-$VOL_NAME}"
 DMG_NAME="${VOL_NAME}-uncompressed.dmg"
 COMPRESSED_DMG_NAME="${VOL_NAME}.dmg"
 
 rm -f "applebuild/${COMPRESSED_DMG_NAME}"
 
 # Tip: increase the size if error on copy
-hdiutil create -size 650m -fs HFS+ -volname "${VOL_NAME}" "applebuild/${DMG_NAME}"
+hdiutil create -size 650m -fs HFS+ -volname "${VOL_TITLE}" "applebuild/${DMG_NAME}"
 
 # Mount the disk image
 hdiutil attach "applebuild/${DMG_NAME}"
@@ -120,7 +122,8 @@ hdiutil attach "applebuild/${DMG_NAME}"
 # Obtain device information
 DEVS=$(hdiutil attach "applebuild/${DMG_NAME}" | cut -f 1)
 DEV=$(echo $DEVS | cut -f 1 -d ' ')
-VOLUME=$(mount | grep ${DEV} | cut -f 3 -d ' ')
+# (the mount point may contain spaces: take everything between " on " and " (")
+VOLUME=$(mount | grep "^${DEV} " | sed -E 's|^[^ ]+ on (.*) \(.*$|\1|')
 
 # copy in the application bundle
 cp -Rp ${APP_PATH} "${VOLUME}/${APP_NAME}.app"

@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.4.3
+
+- The installer disk is named “StarScore Studio 1.4.3” (the StarScore version) instead of “StarScore-Studio-4.7.5”.
+
 ## 1.4.2
 
 - Mixer defaults: trumpets use MS Basic › Choose automatically instead of MS Basic › Trumpet, so “mute” text switches them to the muted sound. Songs set up earlier get this when you use “Apply part styles now”.

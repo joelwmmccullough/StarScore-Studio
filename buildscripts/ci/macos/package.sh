@@ -96,7 +96,11 @@ if [ "$BUILD_MODE" == "stable" ]; then
     VOL_NAME="StarScore-Studio-${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}"
 fi
 
-buildscripts/packaging/macOS/package.sh --app-name "$APP_NAME" --vol-name "$VOL_NAME" --user "$APPLE_USERNAME" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" $SIGN_ARGS
+# StarScore: the mounted disk is called "StarScore Studio X.Y.Z" (StarScore's own version)
+STARSCORE_VERSION=$(grep -o 'STARSCORE_VERSION "[0-9.]*"' version.cmake | cut -d'"' -f2)
+VOL_TITLE="StarScore Studio ${STARSCORE_VERSION}"
+
+buildscripts/packaging/macOS/package.sh --app-name "$APP_NAME" --vol-name "$VOL_NAME" --vol-title "$VOL_TITLE" --user "$APPLE_USERNAME" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" $SIGN_ARGS
 
 DMGFILE="$(ls applebuild/*.dmg)"
 echo "DMGFILE: $DMGFILE"
