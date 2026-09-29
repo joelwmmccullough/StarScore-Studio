@@ -6,6 +6,7 @@ Version numbers: the first number changes when files stop being compatible, the 
 
 ## 1.4.3
 
+- Slash chords: after an extension (G♭△7/B♭) the slash sits closer, so the chord and its bass read as one unit. Chords without an extension (C/E) are unchanged.
 - The installer disk is named “StarScore Studio 1.4.3” (the StarScore version) instead of “StarScore-Studio-4.7.5”.
 
 ## 1.4.2

@@ -570,6 +570,12 @@ void HarmonyLayout::doRenderSingleHarmony(Harmony* item, Harmony::LayoutData* ld
         if (hasModifierStack || is69) {
             render(item, ldata, { std::make_shared<RenderActionMove>(0.05, 0.0) }, harmonyCtx, ctx,
                    bassTpc, spelling, bassCase, item->bassScale());
+        } else if (item->harmonyType() == HarmonyType::STANDARD && cd && !cd->renderList.empty()
+                   && !style.styleB(Sid::chordBassNoteStagger)) {
+            // StarScore: after a raised extension (G♭△7/B♭) the slash tucks under the extension's empty lower half,
+            // so the chord and its bass read as one unit. A bare root (C/E) keeps the normal spacing.
+            render(item, ldata, { std::make_shared<RenderActionMove>(-0.2, 0.0) }, harmonyCtx, ctx,
+                   bassTpc, spelling, bassCase, item->bassScale());
         }
         render(item, ldata, bassNoteChordList, harmonyCtx, ctx, bassTpc, spelling, bassCase, item->bassScale());
     }
