@@ -1768,6 +1768,16 @@ void TextBase::createBlocks(LayoutData* ldata) const
             } else {
                 if (symState) {
                     sym += c;
+                } else if (!isHarmony() && hasSymbolSize() && cursor.format()->fontFamily() != u"ScoreText"
+                           && c.unicode() >= 0x266D && c.unicode() <= 0x266F) {
+                    // StarScore: a typed ♭ ♮ ♯ ("Trumpet in B♭") is drawn as the music font's accidental, like an
+                    // inserted symbol, so it gets the same size and position (text fonts often have no such glyph)
+                    static const SymId ACCS[] = { SymId::accidentalFlat, SymId::accidentalNatural, SymId::accidentalSharp };
+                    const SymId id = ACCS[c.unicode() - 0x266D];
+                    CharFormat fmt = *cursor.format();
+                    cursor.format()->setFontFamily(u"ScoreText");
+                    insert(&cursor, score()->engravingFonts()->fallbackFont()->symCode(id), ldata);
+                    cursor.setFormat(fmt);
                 } else {
                     if (c.isHighSurrogate()) {
                         i++;

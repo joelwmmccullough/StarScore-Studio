@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.4.5
+
+- A ♭, ♮ or ♯ typed as a plain character in text (for example the part name “Trumpet in B♭”) is drawn with the music font's accidental, at the same size and position as an inserted accidental symbol. Before, text fonts without that character fell back to a thin, oversized flat with a gap in front of it.
+
 ## 1.4.4
 
 - A rehearsal mark that would touch a chord symbol right after it slides a little to the left (up to 4 spaces) instead of jumping up above the chord, so it stays at its usual height.
