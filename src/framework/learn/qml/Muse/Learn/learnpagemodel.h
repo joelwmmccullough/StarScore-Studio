@@ -55,6 +55,8 @@ public:
     Q_INVOKABLE void setSearchText(const QString& text);
     Q_INVOKABLE QVariantMap classesAuthor() const;
     Q_INVOKABLE bool classesEnabled();
+    //! StarScore: the changelog (Markdown), bundled with the app
+    Q_INVOKABLE QString starscoreChangelog() const;
 
 private slots:
     void setStartedPlaylist(Playlist startedPlaylist);

@@ -236,7 +236,7 @@ static QString auditPitchName(int tpc)
     const int t = tpc + 1;
     const int step = ((t % 7) + 7) % 7;
     const int acc = (t - step) / 7;
-    QString name(QChar(STEPS[step]));
+    QString name = QString(QChar(STEPS[step]));
     switch (acc) {
     case 0: name += QString::fromUtf8("𝄫");
         break;

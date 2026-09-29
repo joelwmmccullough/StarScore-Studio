@@ -21,6 +21,8 @@
  */
 #include "learnpagemodel.h"
 
+#include <QFile>
+
 #include <QVariant>
 #include <QDateTime>
 
@@ -172,4 +174,13 @@ Playlist LearnPageModel::filterPlaylistBySearch(const Playlist& playlist) const
     }
 
     return result;
+}
+
+QString LearnPageModel::starscoreChangelog() const
+{
+    QFile file(":/qt/qml/Muse/Learn/resources/starscore_changelog.md");
+    if (!file.open(QIODevice::ReadOnly)) {
+        return QString();
+    }
+    return QString::fromUtf8(file.readAll());
 }
