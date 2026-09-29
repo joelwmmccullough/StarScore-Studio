@@ -302,6 +302,7 @@ MenuItem* AppMenuModel::makeViewMenu()
         makeMenuItem("fullscreen"),
 #endif
         makeMenuItem("starscore-toggle-panel"),
+        makeMenuItem("toggle-starscore-reference"),
         makeMenuItem("toggle-palettes"),
         makeMenuItem("masterpalette"),
         makeMenuItem("toggle-instruments"),

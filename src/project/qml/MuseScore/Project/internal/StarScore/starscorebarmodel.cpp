@@ -337,7 +337,10 @@ QVariantList StarScoreBarModel::moreMenu() const
         refItems << QVariantMap {
             { "title", r.name }, { "enabled", true },
             { "subitems", QVariantList {
-                  QVariantMap { { "id", "ref-open:" + r.id }, { "title", muse::qtrc("starscore", "Open") }, { "enabled", true } },
+                  QVariantMap { { "id", "ref-open:" + r.id }, { "title", muse::qtrc("starscore", "Show beside the score") },
+                                { "enabled", true } },
+                  QVariantMap { { "id", "ref-external:" + r.id }, { "title", muse::qtrc("starscore", "Open in another app") },
+                                { "enabled", true } },
                   QVariantMap { { "id", "ref-remove:" + r.id }, { "title", muse::qtrc("starscore", "Remove from this score") },
                                 { "enabled", true } },
               } }
@@ -565,6 +568,12 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
             }
         }
     } else if (action == "ref-open") {
+        // shown in the Reference PDF panel beside the score
+        starScore()->setCurrentReferenceId(arg);
+        if (dockWindowProvider()->window() && !dockWindowProvider()->window()->isDockOpen("starscoreReferencePanel")) {
+            dispatcher()->dispatch("toggle-starscore-reference");
+        }
+    } else if (action == "ref-external") {
         const muse::io::path_t p = starScore()->referencePath(arg);
         if (QFileInfo::exists(p.toQString())) {
             interactive()->openUrl(QUrl::fromLocalFile(p.toQString()));

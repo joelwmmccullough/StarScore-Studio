@@ -151,6 +151,13 @@ const UiActionList ApplicationUiActions::m_actions = {
              TranslatableString("action", "Show/hide selection filter"),
              Checkable::Yes
              ),
+    UiAction("toggle-starscore-reference",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_NOTATION_OPENED,
+             TranslatableString("action", "&Reference PDF"),
+             TranslatableString("action", "Show/hide the song's reference PDFs beside the score"),
+             Checkable::Yes
+             ),
     UiAction("toggle-undo-history-panel",
              mu::context::UiCtxProjectOpened,
              mu::context::CTX_NOTATION_OPENED,
@@ -396,6 +403,7 @@ const QMap<ActionCode, DockName>& ApplicationUiActions::toggleDockActions()
         { "inspector", INSPECTOR_PANEL_NAME },
         { "toggle-selection-filter", SELECTION_FILTERS_PANEL_NAME },
         { "toggle-undo-history-panel", UNDO_HISTORY_PANEL_NAME },
+        { "toggle-starscore-reference", STARSCORE_REFERENCE_PANEL_NAME },
 
         { TOGGLE_NAVIGATOR_ACTION_CODE, NOTATION_NAVIGATOR_PANEL_NAME },
         { TOGGLE_BRAILLE_ACTION_CODE, NOTATION_BRAILLE_PANEL_NAME },

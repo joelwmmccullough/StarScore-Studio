@@ -15,6 +15,7 @@
 #include "actions/iactionsdispatcher.h"
 #include "context/iglobalcontext.h"
 #include "notationscene/iselectinstrumentscenario.h"
+#include "dockwindow/idockwindowprovider.h"
 
 #include "project/istarscoreservice.h"
 
@@ -40,6 +41,7 @@ class StarScoreBarModel : public QObject, public muse::Contextable, public muse:
     muse::ContextInject<muse::actions::IActionsDispatcher> dispatcher = { this };
     muse::ContextInject<context::IGlobalContext> globalContext = { this };
     muse::ContextInject<notation::ISelectInstrumentsScenario> selectInstrumentsScenario = { this };
+    muse::ContextInject<muse::dock::IDockWindowProvider> dockWindowProvider = { this };
 
 public:
     explicit StarScoreBarModel(QObject* parent = nullptr);

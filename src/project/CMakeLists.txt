@@ -107,6 +107,8 @@ target_sources(project PRIVATE
     internal/starscore/starscorecompare.cpp
     internal/starscore/starscoreimport.cpp
     internal/starscore/starscoremixer.cpp
+    internal/starscore/starscorepdf.cpp
+    internal/starscore/starscorepdf.h
     internal/starscore/starscoreengraving.h
 )
 
@@ -115,9 +117,12 @@ if (OS_IS_MAC)
         internal/platform/macos/macosrecentfilescontroller.mm
         internal/platform/macos/macosrecentfilescontroller.h
     )
+    # StarScore: reference PDFs are drawn with CoreGraphics
+    target_link_libraries(project PRIVATE "-framework CoreGraphics" "-framework CoreFoundation")
     # Don't mix C++ and Objective-C++ in Unity Build
     set_source_files_properties(
         internal/platform/macos/macosrecentfilescontroller.mm
+        internal/starscore/starscorepdf.cpp
         PROPERTIES
         SKIP_UNITY_BUILD_INCLUSION ON
         SKIP_PRECOMPILE_HEADERS ON

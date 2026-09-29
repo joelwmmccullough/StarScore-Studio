@@ -82,6 +82,8 @@ qt_add_qml_module(project_qml
         internal/StarScore/voiceordermodel.h
         internal/StarScore/importmodel.cpp
         internal/StarScore/importmodel.h
+        internal/StarScore/referencepanelmodel.cpp
+        internal/StarScore/referencepanelmodel.h
     QML_FILES
         AlsoShareAudioComDialog.qml
         AskSaveLocationTypeDialog.qml
@@ -155,6 +157,7 @@ qt_add_qml_module(project_qml
         ScoresView.qml
         UploadProgressDialog.qml
         StarScoreBar.qml
+        StarScoreReferencePanel.qml
         StarScoreEditDialog.qml
         CopyLayoutDialog.qml
         NewStarScoreDialog.qml

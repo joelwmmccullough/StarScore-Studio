@@ -336,6 +336,12 @@ public:
     virtual muse::RetVal<QString> addReference(const muse::io::path_t& pdfFile) = 0;
     virtual void removeReference(const QString& referenceId) = 0;
     virtual muse::io::path_t referencePath(const QString& referenceId) const = 0;   // working copy on disk
+    //! The reference shown in the Reference PDF panel beside the score
+    virtual QString currentReferenceId() const = 0;
+    virtual void setCurrentReferenceId(const QString& referenceId) = 0;
+    virtual int referencePageCount(const QString& referenceId) const = 0;          // 0 when it can't be read
+    //! One page (0-based) drawn at widthPx wide; the PNG's path, or empty on failure
+    virtual QString referencePageImage(const QString& referenceId, int page, int widthPx) const = 0;
     //! Save changed solos and the main score (used when Save is pressed while a solo is showing)
     virtual muse::Ret saveAll() = 0;
 

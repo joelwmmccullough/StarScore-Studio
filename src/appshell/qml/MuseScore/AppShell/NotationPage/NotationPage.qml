@@ -388,6 +388,36 @@ DockPage {
                 navigationOrderStart: undoHistoryPanel.contentNavigationPanelOrderStart
             }
         },
+
+        // StarScore: the song's reference PDFs beside the working score
+        DockPanel {
+            id: starscoreReferencePanel
+
+            objectName: root.pageModel.starscoreReferencePanelName()
+            title: qsTrc("starscore", "Reference PDF")
+
+            navigationSection: root.navigationPanelSec(starscoreReferencePanel.location)
+
+            width: 520
+            minimumWidth: 220
+            maximumWidth: root.panelMaxDimension
+
+            minimumHeight: root.panelMinDimension
+            maximumHeight: root.panelMaxDimension
+
+            groupName: root.verticalPanelsGroup
+            location: Location.Right
+
+            //! NOTE: hidden by default
+            visible: false
+
+            dropDestinations: root.verticalPanelDropDestinations
+
+            StarScoreReferencePanel {
+                navigationSection: starscoreReferencePanel.navigationSection
+                navigationOrderStart: starscoreReferencePanel.contentNavigationPanelOrderStart
+            }
+        },
         
         // =============================================
         // Horizontal Panels
