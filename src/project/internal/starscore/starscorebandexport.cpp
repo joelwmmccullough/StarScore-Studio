@@ -652,15 +652,15 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
 }
 
 //! The sheet's title frame: the horn's name top left (the part name text), the arrangement top right
-static void starscoreRetitleSheet(engraving::Score* score, const QString& left, const QString& right)
+static void starscoreRetitleSheet(mu::engraving::Score* score, const QString& left, const QString& right)
 {
     if (!score) {
         return;
     }
-    engraving::Box* box = nullptr;
-    for (engraving::MeasureBase* mb = score->first(); mb; mb = mb->next()) {
+    mu::engraving::Box* box = nullptr;
+    for (mu::engraving::MeasureBase* mb = score->first(); mb; mb = mb->next()) {
         if (mb->isVBox()) {
-            box = engraving::toBox(mb);
+            box = mu::engraving::toBox(mb);
             break;
         }
         if (mb->isMeasure()) {
@@ -671,21 +671,21 @@ static void starscoreRetitleSheet(engraving::Score* score, const QString& left, 
         return;
     }
     auto escape = [](const QString& t) {
-        return engraving::String::fromQString(t.toHtmlEscaped());
+        return muse::String::fromQString(t.toHtmlEscaped());
     };
 
-    engraving::Text* partText = nullptr;
-    for (engraving::EngravingItem* e : box->el()) {
-        if (e && e->isText() && engraving::toText(e)->textStyleType() == engraving::TextStyleType::INSTRUMENT_EXCERPT) {
-            partText = engraving::toText(e);
+    mu::engraving::Text* partText = nullptr;
+    for (mu::engraving::EngravingItem* e : box->el()) {
+        if (e && e->isText() && mu::engraving::toText(e)->textStyleType() == mu::engraving::TextStyleType::INSTRUMENT_EXCERPT) {
+            partText = mu::engraving::toText(e);
             break;
         }
     }
     if (!left.isEmpty()) {
         if (partText) {
-            partText->undoChangeProperty(engraving::Pid::TEXT, escape(left));
+            partText->undoChangeProperty(mu::engraving::Pid::TEXT, escape(left));
         } else {
-            engraving::Text* t = engraving::Factory::createText(box, engraving::TextStyleType::INSTRUMENT_EXCERPT);
+            mu::engraving::Text* t = mu::engraving::Factory::createText(box, mu::engraving::TextStyleType::INSTRUMENT_EXCERPT);
             t->setParent(box);
             t->setTrack(0);
             t->setXmlText(escape(left));
@@ -694,12 +694,12 @@ static void starscoreRetitleSheet(engraving::Score* score, const QString& left, 
         }
     }
     if (!right.isEmpty()) {
-        engraving::Text* t = engraving::Factory::createText(box, engraving::TextStyleType::INSTRUMENT_EXCERPT);
+        mu::engraving::Text* t = mu::engraving::Factory::createText(box, mu::engraving::TextStyleType::INSTRUMENT_EXCERPT);
         t->setParent(box);
         t->setTrack(0);
         t->setXmlText(escape(right));
-        t->setAlign(engraving::Align(engraving::AlignH::RIGHT, engraving::AlignV::TOP));
-        t->setPropertyFlags(engraving::Pid::ALIGN, engraving::PropertyFlags::UNSTYLED);
+        t->setAlign(mu::engraving::Align(mu::engraving::AlignH::RIGHT, mu::engraving::AlignV::TOP));
+        t->setPropertyFlags(mu::engraving::Pid::ALIGN, mu::engraving::PropertyFlags::UNSTYLED);
         score->undoAddElement(t);
     }
     score->setLayoutAll();
