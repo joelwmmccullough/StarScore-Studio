@@ -202,6 +202,7 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
         s.name = o.value("name").toString();
         s.templateKey = o.value("template").toString("custom");
         s.status = statusFromKey(o.value("status").toString());
+        s.autoStatus = o.value("status").toString() == "auto";
         for (const QJsonValue& v : o.value("skipSheets").toArray()) {
             s.skipSheets << v.toString();
         }
@@ -254,6 +255,10 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
 
     data.version = root.value("scoreVersion").toString();
     data.fileId = root.value("fileId").toString();
+    const QJsonObject partStatus = root.value("partStatus").toObject();
+    for (auto it = partStatus.begin(); it != partStatus.end(); ++it) {
+        data.partStatus[it.key()] = it.value().toString();
+    }
 
     const QJsonObject audit = root.value("audit").toObject();
     data.auditReferenceSectionId = audit.value("reference").toString();
@@ -295,7 +300,7 @@ QString StarScoreService::toJson(const Data& data)
         o["id"] = s.id;
         o["name"] = s.name;
         o["template"] = s.templateKey;
-        o["status"] = statusKey(s.status);
+        o["status"] = s.autoStatus ? QString("auto") : statusKey(s.status);
         o["parts"] = QJsonArray::fromStringList(s.partIds);
         o["shown"] = QJsonArray::fromStringList(s.shownPartIds);
         if (!s.skipSheets.isEmpty()) {
@@ -364,6 +369,13 @@ QString StarScoreService::toJson(const Data& data)
     }
     if (!data.fileId.isEmpty()) {
         root["fileId"] = data.fileId;
+    }
+    QJsonObject partStatus;
+    for (const auto& [pid, key] : data.partStatus) {
+        partStatus[pid] = key;
+    }
+    if (!partStatus.isEmpty()) {
+        root["partStatus"] = partStatus;
     }
     QJsonObject audit;
     if (!data.auditReferenceSectionId.isEmpty()) {
@@ -443,6 +455,20 @@ StarScoreService::Data StarScoreService::loadFrom(const engraving::MasterScore* 
             }
         }
         a.sectionIds = kept;
+    }
+
+    // "Auto" sections: the least-finished of the parts the section shows (a part with no tag counts as Empty)
+    for (StarScoreSection& s : data.sections) {
+        if (!s.autoStatus) {
+            continue;
+        }
+        const QStringList& counted = s.shownPartIds.isEmpty() ? s.partIds : s.shownPartIds;
+        StarScoreStatus result = StarScoreStatus::Finished;
+        for (const QString& pid : counted) {
+            auto it = data.partStatus.find(pid);
+            result = std::min(result, it == data.partStatus.end() ? StarScoreStatus::Empty : statusFromKey(it->second));
+        }
+        s.status = counted.isEmpty() ? StarScoreStatus::Empty : result;
     }
 
     return data;
@@ -1267,7 +1293,39 @@ void StarScoreService::setSectionStatus(const QString& sectionId, StarScoreStatu
     for (StarScoreSection& s : data.sections) {
         if (s.id == sectionId) {
             s.status = status;
+            s.autoStatus = false;
         }
+    }
+    store(data);
+}
+
+void StarScoreService::setSectionAutoStatus(const QString& sectionId)
+{
+    Data data = load();
+    for (StarScoreSection& s : data.sections) {
+        if (s.id == sectionId) {
+            s.autoStatus = true;
+        }
+    }
+    store(data);
+}
+
+std::map<QString, StarScoreStatus> StarScoreService::partStatuses() const
+{
+    std::map<QString, StarScoreStatus> result;
+    for (const auto& [pid, key] : load().partStatus) {
+        result[pid] = statusFromKey(key);
+    }
+    return result;
+}
+
+void StarScoreService::setPartStatus(const QString& partId, int status)
+{
+    Data data = load();
+    if (status < 0) {
+        data.partStatus.erase(partId);
+    } else {
+        data.partStatus[partId] = statusKey(static_cast<StarScoreStatus>(status));
     }
     store(data);
 }

@@ -71,6 +71,9 @@ public:
                                         const std::vector<StarScoreInstrument>& instruments) override;
     muse::RetVal<QString> createSectionFromParts(const QString& name, const QStringList& partIds) override;
     void setSectionStatus(const QString& sectionId, StarScoreStatus status) override;
+    void setSectionAutoStatus(const QString& sectionId) override;
+    std::map<QString, StarScoreStatus> partStatuses() const override;
+    void setPartStatus(const QString& partId, int status) override;
     void setSectionSkipSheet(const QString& sectionId, const QString& which, bool skip) override;
     void renameSection(const QString& sectionId, const QString& name) override;
     void setSectionParts(const QString& sectionId, const QStringList& partIds) override;
@@ -178,6 +181,7 @@ public:
         std::vector<StarScoreReference> references;
         std::map<QString, QString> referenceForScore;   // part score name ("" = main score) -> reference shown with it
         QString version;   // "4.0.1"; printed in the footer
+        std::map<QString, QString> partStatus;   // part id -> status key
         QString fileId;    // permanent id of this .starscore (kept when the file is moved or renamed)
 
         // Audit mode

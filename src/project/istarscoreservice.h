@@ -46,7 +46,8 @@ struct StarScoreSection
     QString id;
     QString name;
     QString templateKey;     // "lead-sheet", "3-horn", "rhythm", … or "custom"
-    StarScoreStatus status = StarScoreStatus::InProgress;
+    StarScoreStatus status = StarScoreStatus::InProgress;   // when autoStatus: worked out from its parts
+    bool autoStatus = false; // "Auto": the least-finished status of the section's parts (a part with no tag counts as Empty)
     bool on = true;          // derived, not stored
     QStringList partIds;     // muse::ID of each part, as text
     QStringList shownPartIds;  // parts to show when the section is turned on
@@ -349,6 +350,10 @@ public:
                                                 const std::vector<StarScoreInstrument>& instruments) = 0;
     virtual muse::RetVal<QString> createSectionFromParts(const QString& name, const QStringList& partIds) = 0;
     virtual void setSectionStatus(const QString& sectionId, StarScoreStatus status) = 0;
+    virtual void setSectionAutoStatus(const QString& sectionId) = 0;
+    //! Completion tag of each part (instrument); parts without a tag are missing from the map
+    virtual std::map<QString, StarScoreStatus> partStatuses() const = 0;
+    virtual void setPartStatus(const QString& partId, int status) = 0;   // -1 = no tag
     //! which: "drums", "percussion" or "keys"
     virtual void setSectionSkipSheet(const QString& sectionId, const QString& which, bool skip) = 0;
     virtual void renameSection(const QString& sectionId, const QString& name) = 0;

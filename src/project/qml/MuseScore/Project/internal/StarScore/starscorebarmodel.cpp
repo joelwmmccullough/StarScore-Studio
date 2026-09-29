@@ -224,16 +224,60 @@ QVariantList StarScoreBarModel::sectionMenu(const QString& id) const
 {
     int status = 0;
     bool rhythm = false;
+    bool autoStatus = false;
     QStringList skip;
+    QStringList partIds;
     for (const StarScoreSection& s : starScore()->sections()) {
         if (s.id == id) {
             status = int(s.status);
             rhythm = s.templateKey == "rhythm" || s.templateKey == "bigband-rhythm";
             skip = s.skipSheets;
+            autoStatus = s.autoStatus;
+            partIds = s.partIds;
         }
     }
 
-    QVariantList statusItems = statusSubmenu("sec-status:" + id + ":", status, rhythm);
+    // "Auto" first: the section's status follows its parts' tags
+    QVariantList statusItems;
+    statusItems << QVariantMap {
+        { "id", "sec-auto:" + id },
+        { "title", autoStatus ? muse::qtrc("starscore", "Auto (from its parts: %1)").arg(statusName(status))
+          : muse::qtrc("starscore", "Auto (from its parts)") },
+        { "checkable", true }, { "checked", autoStatus }, { "enabled", true }, { "keepOpen", true }
+    };
+    statusItems << QVariantMap {};
+    for (QVariant& v : statusSubmenu("sec-status:" + id + ":", autoStatus ? -1 : status, rhythm)) {
+        statusItems << v;
+    }
+
+    // Each part's own tag
+    const std::map<QString, StarScoreStatus> tags = starScore()->partStatuses();
+    std::map<QString, QString> names;
+    for (const StarScorePartInfo& p : starScore()->parts()) {
+        names[p.partId] = p.name;
+    }
+    QVariantList partItems;
+    QStringList usedTitles;
+    for (const QString& pid : partIds) {
+        QString title = names.count(pid) ? names[pid] : pid;
+        const QString base = title;
+        for (int n = 2; usedTitles.contains(title); ++n) {
+            title = QString("%1 (%2)").arg(base).arg(n);   // two parts with the same name
+        }
+        usedTitles << title;
+        auto it = tags.find(pid);
+        const int current = it == tags.end() ? -1 : int(it->second);
+        QVariantList tagItems;
+        tagItems << QVariantMap {
+            { "id", "part-status:" + pid + ":-1" }, { "title", muse::qtrc("starscore", "No tag") },
+            { "checkable", true }, { "checked", current < 0 }, { "enabled", true }, { "keepOpen", true }
+        };
+        tagItems << QVariantMap {};
+        for (QVariant& v : statusSubmenu("part-status:" + pid + ":", current, false)) {
+            tagItems << v;
+        }
+        partItems << QVariantMap { { "title", title }, { "subitems", tagItems }, { "enabled", true } };
+    }
     if (rhythm) {
         // Finished rhythm section: players who read from the lead sheet get no sheet of their own by default
         const bool finished = status == int(StarScoreStatus::Finished);
@@ -256,6 +300,8 @@ QVariantList StarScoreBarModel::sectionMenu(const QString& id) const
         QVariantMap { { "id", "sec-solo:" + id }, { "title", muse::qtrc("starscore", "Show only this section") }, { "enabled", true } },
         QVariantMap { { "title", muse::qtrc("starscore", "Status") }, { "subitems", statusItems },
                       { "enabled", true } },
+        QVariantMap { { "title", muse::qtrc("starscore", "Part status") }, { "subitems", partItems },
+                      { "enabled", !partItems.isEmpty() } },
         QVariantMap {},
         QVariantMap { { "id", "sec-edit:" + id }, { "title", muse::qtrc("starscore", "Choose instruments…") }, { "enabled", true } },
         QVariantMap { { "id", "sec-rename:" + id }, { "title", muse::qtrc("starscore", "Rename…") }, { "enabled", true } },
@@ -503,6 +549,11 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
     } else if (action == "sec-status") {
         const int c = arg.lastIndexOf(':');
         starScore()->setSectionStatus(arg.left(c), static_cast<StarScoreStatus>(arg.mid(c + 1).toInt()));
+    } else if (action == "sec-auto") {
+        starScore()->setSectionAutoStatus(arg);
+    } else if (action == "part-status") {
+        const int c = arg.lastIndexOf(':');
+        starScore()->setPartStatus(arg.left(c), arg.mid(c + 1).toInt());
     } else if (action == "sec-skip") {
         const int c = arg.lastIndexOf(':');
         const QString sectionId = arg.left(c);
