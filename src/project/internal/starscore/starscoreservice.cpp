@@ -86,6 +86,7 @@ void StarScoreService::init()
     globalContext()->currentProjectChanged().onNotify(this, [this]() {
         // the notation page and its panels may still be loading: restore once they are there
         m_projectOpenedMs = QDateTime::currentMSecsSinceEpoch();
+        m_auditRevealed.clear();
         QTimer::singleShot(0, [this]() { pickReferenceForCurrentScore(); });
         QTimer::singleShot(1000, [this]() { pickReferenceForCurrentScore(); });
         QTimer::singleShot(2500, [this]() { pickReferenceForCurrentScore(); });
@@ -647,7 +648,7 @@ std::vector<StarScoreSection> StarScoreService::sections() const
                 continue;
             }
             const engraving::Part* p = ms->partById(ID(id));
-            if (p && p->show()) {
+            if (p && p->show() && !m_auditRevealed.count(id)) {
                 anyVisible = true;
                 break;
             }
@@ -753,9 +754,10 @@ void StarScoreService::applyOnSections(const QStringList& onIds, const QString& 
     Data data = load();
     const std::vector<StarScoreSection> current = sections();   // with the derived "on" flag
 
-    auto isVisible = [ms](const QString& partId) {
+    // an instrument shown only for an audit issue counts as hidden here
+    auto isVisible = [this, ms](const QString& partId) {
         const engraving::Part* p = ms->partById(ID(partId));
-        return p && p->show();
+        return p && p->show() && !m_auditRevealed.count(partId);
     };
 
     std::set<QString> managed;
@@ -815,6 +817,7 @@ void StarScoreService::applyOnSections(const QStringList& onIds, const QString& 
     if (rememberedChanged) {
         store(data);
     }
+    m_auditRevealed.clear();
 
     std::vector<std::pair<muse::ID, bool> > changes;
     for (const engraving::Part* p : ms->parts()) {

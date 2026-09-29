@@ -805,82 +805,6 @@ static bool auditIsIsland(const AuditLine& a, const AuditLine& b, const std::vec
     return before >= 0 && after < int(measures.size()) && matchesAt(before) && matchesAt(after);
 }
 
-//! Check 2: each horn line against its closest line in the reference section
-static void auditReference(AuditContext& ctx, AuditIssueBuilder& add, const StarScoreSection& refSection,
-                           const std::vector<std::pair<const StarScoreSection*, std::vector<const Part*> > >& linesBySection)
-{
-    std::vector<QString> refParts;
-    for (const QString& pid : refSection.partIds) {
-        const Part* p = ctx.ms->partById(ID(pid));
-        if (p && !auditIsDrums(p) && ctx.lines.count(pid)) {
-            refParts.push_back(pid);
-        }
-    }
-    if (refParts.empty()) {
-        return;
-    }
-
-    for (const auto& [section, parts] : linesBySection) {
-        if (section->id == refSection.id) {
-            continue;
-        }
-        for (const Part* part : parts) {
-            const QString pid = StarScoreService::idTextOf(part);
-            if (std::find(refParts.begin(), refParts.end(), pid) != refParts.end()) {
-                continue;   // the same instrument is in the reference section
-            }
-            const AuditLine& line = ctx.lines.at(pid);
-            int plays = 0;
-            for (const AuditBar& bar : line) {
-                plays += bar.empty() ? 0 : 1;
-            }
-            if (plays == 0) {
-                continue;
-            }
-
-            QString bestId;
-            int bestSame = 0;
-            int bestEither = 1;
-            for (const QString& rid : refParts) {
-                const auto [same, either] = auditAgreement(line, ctx.lines.at(rid), ctx.measures);
-                if (same > bestSame) {
-                    bestSame = same;
-                    bestEither = either;
-                    bestId = rid;
-                }
-            }
-            if (bestId.isEmpty() || bestSame < 2 || bestSame < plays / 4) {
-                continue;   // an independent line: nothing to compare it with
-            }
-            const double similarity = double(bestSame) / std::max(1, bestEither);
-            const AuditLine& ref = ctx.lines.at(bestId);
-            const QString other = add.shortLabel(bestId);
-
-            std::vector<std::pair<AuditDiff, QString> > perBar(ctx.measures.size());
-            std::vector<bool> island(ctx.measures.size(), false);
-            for (size_t b = 0; b < ctx.measures.size(); ++b) {
-                QString msg;
-                const AuditDiff d = auditCompareBars(line[b], ref[b], true, true, ctx.measures[b], other, &msg);
-                if (d == AuditDiff::None) {
-                    continue;
-                }
-                island[b] = auditIsIsland(line, ref, ctx.measures, int(b));
-                if (similarity >= 0.6 || island[b]) {
-                    perBar[b] = { d, msg };
-                }
-            }
-            for (const AuditRun& run : auditRuns(perBar)) {
-                int severity = run.worst == AuditDiff::Notes ? 1 : 0;
-                if (run.worst == AuditDiff::Notes && run.to - run.from <= 1 && island[run.from]) {
-                    severity = 2;   // a bar or two that break from an otherwise identical line
-                }
-                add.add("reference", severity, pid, bestId, run.from, run.to,
-                        muse::qtrc("starscore", "Differs from the reference section"), auditWithMore(run));
-            }
-        }
-    }
-}
-
 //! Horn lines that follow the lead sheet melody and break from it for a bar
 static void auditMelody(AuditContext& ctx, AuditIssueBuilder& add, const Part* lead,
                         const std::vector<std::pair<const StarScoreSection*, std::vector<const Part*> > >& linesBySection)
@@ -1268,29 +1192,8 @@ StarScoreAuditReport StarScoreService::auditScore(const MasterScore* ms, const D
         }
     }
 
-    // 2: against the reference section, and against the lead sheet melody
+    // 2: against the lead sheet melody (the reference-section comparison was removed in 1.10.0)
     const std::vector<const StarScoreSection*> hornSections = auditHornSections(data.sections);
-    const StarScoreSection* refSection = nullptr;
-    for (const StarScoreSection* s : hornSections) {
-        report.referenceChoiceIds << s->id;
-        report.referenceChoiceNames << s->name;
-        if (s->id == data.auditReferenceSectionId) {
-            refSection = s;
-        }
-    }
-    if (!refSection) {
-        for (const StarScoreSection* s : hornSections) {
-            if (!auditIsAny(*s)) {
-                refSection = s;   // the biggest standard horn section
-                break;
-            }
-        }
-    }
-    if (refSection) {
-        report.referenceSectionId = refSection->id;
-        auditReference(ctx, add, *refSection, linesBySection);
-    }
-
     const Part* lead = nullptr;
     for (const StarScoreSection& s : data.sections) {
         if (s.templateKey == "lead-sheet" && !s.partIds.isEmpty()) {
@@ -1532,9 +1435,9 @@ void StarScoreService::setListenApproved(const QString& stepKey, bool approved)
     storeTo(ms, data, m_mainProject ? m_mainProject : globalContext()->currentProject());
 }
 
-//! Main score: select bars from..to (1-based) on the staves of the given parts, showing them if hidden
+//! Main score: select bars from..to (1-based) on the staves of the given parts
 static void auditSelectBars(const IMasterNotationPtr& master, MasterScore* ms, const std::vector<const Part*>& parts, int fromBar,
-                            int toBar, bool showHidden)
+                            int toBar)
 {
     Measure* first = nullptr;
     Measure* last = nullptr;
@@ -1552,18 +1455,6 @@ static void auditSelectBars(const IMasterNotationPtr& master, MasterScore* ms, c
     }
     if (!last) {
         last = first;
-    }
-
-    if (showHidden) {
-        std::vector<std::pair<ID, bool> > show;
-        for (const Part* p : parts) {
-            if (!p->show()) {
-                show.push_back({ p->id(), true });
-            }
-        }
-        if (!show.empty()) {
-            master->parts()->setPartsVisible(show, TranslatableString::untranslatable("Show instrument"));
-        }
     }
 
     staff_idx_t top = muse::nidx;
@@ -1598,7 +1489,40 @@ void StarScoreService::showAuditIssue(const StarScoreAuditIssue& issue)
         }
     }
     globalContext()->setCurrentNotation(master->notation());
-    auditSelectBars(master, ms, parts, issue.bar, issue.endBar, !m_listening);
+
+    // Show the issue's instruments if hidden; the ones shown for the previous issue are hidden again. They don't
+    // turn their section on (see sections()), so the section switches keep working as before.
+    if (!m_listening) {
+        std::set<QString> wanted;
+        for (const Part* p : parts) {
+            wanted.insert(idText(p));
+        }
+        std::vector<std::pair<ID, bool> > changes;
+        std::set<QString> stillRevealed;
+        for (const QString& pid : m_auditRevealed) {
+            const Part* p = ms->partById(ID(pid));
+            if (!p || !p->show()) {
+                continue;   // hidden since, some other way
+            }
+            if (wanted.count(pid)) {
+                stillRevealed.insert(pid);
+            } else {
+                changes.push_back({ p->id(), false });
+            }
+        }
+        for (const Part* p : parts) {
+            if (!p->show()) {
+                changes.push_back({ p->id(), true });
+                stillRevealed.insert(idText(p));
+            }
+        }
+        m_auditRevealed = stillRevealed;
+        if (!changes.empty()) {
+            master->parts()->setPartsVisible(changes, TranslatableString::untranslatable("Show instrument"));
+            m_changed.notify();
+        }
+    }
+    auditSelectBars(master, ms, parts, issue.bar, issue.endBar);
 }
 
 // ---------------------------------------------------------------------------
@@ -1692,7 +1616,7 @@ void StarScoreService::playListenStep(const StarScoreListenStep& step, bool with
     }
 
     // Select the section's bars across the playing instruments (range playback plays just those) and play
-    auditSelectBars(master, ms, playParts, step.startBar, step.endBar, false);
+    auditSelectBars(master, ms, playParts, step.startBar, step.endBar);
     int bar = 1;
     m_listenStartTick = -1;
     m_listenEndTick = -1;
@@ -1792,7 +1716,7 @@ static void auditWriteCache(const QJsonObject& cache)
 }
 
 // Cache entries from before the dashboard (no arrangement list) are read again
-static const int AUDIT_CACHE_VERSION = 3;
+static const int AUDIT_CACHE_VERSION = 4;
 
 static QJsonObject auditSummaryToJson(const StarScoreAuditFileSummary& s)
 {

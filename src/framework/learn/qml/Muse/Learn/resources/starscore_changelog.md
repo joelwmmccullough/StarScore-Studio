@@ -8,6 +8,9 @@ Version numbers: the first number changes when files stop being compatible, the 
 
 - **Changelog** has its own page on Home, below Learn, instead of a tab inside Learn.
 - **Dashboard**: Next up lists the existing arrangements to audit or finish first. After those, it goes on to recommend which missing arrangements to write next, in the same priority order as the audit list.
+- **Audit**: the “Differs from the reference section” check is gone, and so is the “Compare with” choice. The library audit reads every song again once to update the counts.
+- **Audit and section switches**: an instrument shown because you clicked an audit item is now temporary. It's hidden again when you click another item, it doesn't make its section look switched on, and it isn't remembered as one of the section's shown instruments. Switching a section on or off after using the audit now shows or hides the whole section as expected.
+- **Mixer**: StarScore now remembers, in the file, which tracks it muted because their instrument was hidden. Showing an instrument again unmutes it after reopening the file or coming back from a part book. Tracks muted on purpose (the lead sheet piano, chord-symbol tracks, congas) stay muted.
 
 ## 1.9.0
 

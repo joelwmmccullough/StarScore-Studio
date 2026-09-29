@@ -220,6 +220,9 @@ private:
     // "mute hidden instruments" setting is on; unmute the ones this muted once they are shown again
     void applyHiddenInstrumentMutes();
     void releaseHiddenInstrumentMutes();
+    bool hiddenMutesInMainScore() const;
+    void loadHiddenAutoMuted();
+    void saveHiddenAutoMuted();
     void updateAuxMuteStates();
 
     using TrackAddFinished = std::function<void ()>;

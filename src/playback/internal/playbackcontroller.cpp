@@ -1723,6 +1723,7 @@ void PlaybackController::setNotation(notation::INotationPtr notation)
     }
 
     updateSoloMuteStates();
+    loadHiddenAutoMuted();
     applyHiddenInstrumentMutes();
 
     // StarScore Studio: sections are shown and hidden through the master score's parts, which doesn't always
@@ -1845,12 +1846,90 @@ muse::audio::secs_t PlaybackController::playedTickToSecs(int tick) const
     return secs_t(notationPlayback()->playedTickToSec(tick));
 }
 
+// StarScore Studio: which tracks were muted because their instrument was hidden is kept in the main score
+// (meta tag), so a file reopened, or the main score shown again after a part book, still knows which mutes to
+// lift when an instrument is shown again
+static const muse::String HIDDEN_MUTED_TAG = u"starscoreHiddenMuted";
+
+bool PlaybackController::hiddenMutesInMainScore() const
+{
+    return m_notation && m_masterNotation && m_notation == m_masterNotation->notation() && m_masterNotation->masterScore();
+}
+
+void PlaybackController::loadHiddenAutoMuted()
+{
+    m_hiddenAutoMuted.clear();
+    if (!hiddenMutesInMainScore()) {
+        return;
+    }
+    const engraving::MasterScore* ms = m_masterNotation->masterScore();
+    const auto& tags = ms->metaTags();
+    auto it = tags.find(HIDDEN_MUTED_TAG);
+    if (it == tags.end()) {
+        // A file saved before this was kept: an instrument that is hidden and muted is taken as muted because it's
+        // hidden, except chord-symbol tracks, congas and the lead sheet piano (the first part), muted on purpose
+        const auto parts = m_notation->parts()->partList();
+        bool first = true;
+        for (const Part* part : parts) {
+            const bool firstPart = first;
+            first = false;
+            if (part->show()) {
+                continue;
+            }
+            for (const InstrumentTrackId& id : part->instrumentTrackIdList()) {
+                const String iid = id.instrumentId;
+                if (iid == u"congas" || (firstPart && iid == u"piano")) {
+                    continue;
+                }
+                if (trackSoloMuteState(id).mute) {
+                    m_hiddenAutoMuted.insert(id);
+                }
+            }
+        }
+        return;
+    }
+    for (const String& entry : it->second.split(u'\n')) {
+        const muse::StringList bits = entry.split(u'|');
+        if (bits.size() != 2) {
+            continue;
+        }
+        uint64_t pid = 0;
+        try {
+            pid = std::stoull(bits.at(0).toStdString());
+        } catch (...) {
+            continue;
+        }
+        if (pid != 0) {
+            m_hiddenAutoMuted.insert(InstrumentTrackId { muse::ID(pid), bits.at(1) });
+        }
+    }
+}
+
+void PlaybackController::saveHiddenAutoMuted()
+{
+    if (!hiddenMutesInMainScore()) {
+        return;
+    }
+    muse::StringList entries;
+    for (const InstrumentTrackId& id : m_hiddenAutoMuted) {
+        entries << String::fromStdString(std::to_string(id.partId.toUint64())) + u"|" + id.instrumentId;
+    }
+    const String value = entries.join(u"\n");
+    engraving::MasterScore* ms = m_masterNotation->masterScore();
+    const auto& tags = ms->metaTags();
+    auto it = tags.find(HIDDEN_MUTED_TAG);
+    if (it == tags.end() || it->second != value) {
+        ms->setMetaTag(HIDDEN_MUTED_TAG, value);
+    }
+}
+
 void PlaybackController::applyHiddenInstrumentMutes()
 {
     if (!m_notation || !notationPlayback() || !configuration()->muteHiddenInstruments()) {
         return;
     }
 
+    const std::set<InstrumentTrackId> before = m_hiddenAutoMuted;
     for (const Part* part : m_notation->parts()->partList()) {
         std::vector<InstrumentTrackId> ids;
         for (const InstrumentTrackId& id : part->instrumentTrackIdList()) {
@@ -1876,6 +1955,9 @@ void PlaybackController::applyHiddenInstrumentMutes()
             }
         }
     }
+    if (m_hiddenAutoMuted != before) {
+        saveHiddenAutoMuted();
+    }
 }
 
 void PlaybackController::releaseHiddenInstrumentMutes()
@@ -1888,6 +1970,7 @@ void PlaybackController::releaseHiddenInstrumentMutes()
         }
     }
     m_hiddenAutoMuted.clear();
+    saveHiddenAutoMuted();
 }
 
 void PlaybackController::applyTrackMixSettings(const std::map<InstrumentTrackId, TrackMixSetting>& settings)
@@ -1941,6 +2024,11 @@ void PlaybackController::applyTrackMixSettings(const std::map<InstrumentTrackId,
             auto state = trackSoloMuteState(instrumentTrackId);
             state.mute = s.mute;
             setTrackSoloMuteState(instrumentTrackId, state);
+            // a mute set on purpose stays when the instrument is shown; an unmute on a hidden instrument is
+            // turned back into a hidden-instrument mute below
+            m_hiddenAutoMuted.erase(instrumentTrackId);
         }
     }
+    saveHiddenAutoMuted();
+    applyHiddenInstrumentMutes();
 }

@@ -5,6 +5,8 @@
  */
 #pragma once
 
+#include <set>
+
 #include <QJsonObject>
 
 #include "../../istarscoreservice.h"
@@ -288,6 +290,9 @@ private:
     void onPlaybackPosition(int tick);
     muse::async::Notification m_listeningChanged;
     std::map<QString, bool> m_listenVisibility;   // every part's visibility before listening
+    // instruments shown only to show an audit issue: they don't count toward a section being on, aren't
+    // remembered as part of a section, and are hidden again when another issue is shown
+    std::set<QString> m_auditRevealed;
     bool m_listening = false;
     int m_listenStartTick = -1;
     int m_listenEndTick = -1;
