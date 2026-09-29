@@ -36,6 +36,7 @@
 #include "engraving/dom/clef.h"
 #include "engraving/dom/box.h"
 #include "engraving/dom/text.h"
+#include "engraving/dom/factory.h"
 
 #include "notation/iexcerptnotation.h"
 #include "notation/inotationelements.h"
@@ -102,6 +103,27 @@ static QString starscoreHornName(const QString& id)
         return "Bass Sax";
     }
     return QString();
+}
+
+//! The horn's name printed on its sheet ("Trumpet 1" -> "Trumpet 1 in B♭", "Alto Sax" -> "Alto Saxophone")
+static QString starscoreSheetHornName(const QString& bandName)
+{
+    static const std::vector<std::pair<QString, QString> > FULL {
+        { "Soprano Sax", "Soprano Saxophone" }, { "Alto Sax", "Alto Saxophone" }, { "Tenor Sax", "Tenor Saxophone" },
+        { "Bari Sax", "Baritone Saxophone" }, { "Bass Sax", "Bass Saxophone" },
+    };
+    QString name = bandName;
+    for (const auto& [shortName, full] : FULL) {
+        if (name.startsWith(shortName)) {
+            name = full + name.mid(shortName.size());
+            break;
+        }
+    }
+    if (name.startsWith("Trumpet") || name.startsWith("Flugelhorn") || name.startsWith("Clarinet")
+        || name.startsWith("Bass Clarinet")) {
+        name += QString::fromUtf8(" in B\u266D");
+    }
+    return name;
 }
 
 //! The band's name for a rhythm-section instrument
@@ -379,6 +401,7 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
     };
 
     std::map<QString, QStringList> familyParts;   // "Big Band" etc: all instruments, for one score
+    QStringList anyFolders;                        // "NH Any Horns" folders: older sheet names there get archived
 
     for (const StarScoreSection& sec : data.sections) {
         if (sec.partIds.isEmpty()) {
@@ -482,46 +505,57 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
             }
             addFile(folder, "Score", scoreParts, true);
 
-            struct Version {
-                const char* suffix;
+            // Each chair as a sheet for every instrument that can sit in it (Starsign Band Guide, page 3)
+            struct Seat {
+                const char* file;    // file name part, e.g. "Trumpet in Bb"
+                const char* sheet;   // printed name
                 int dia;
                 int chrom;
-                int clef;
+                int clef;            // 0 treble, 1 bass, 2 alto
             };
-            static const std::vector<Version> HIGH = {
-                { " in Bb", -1, -2, 0 }, { " in Eb", -5, -9, 0 }, { " in C", 0, 0, 0 },
-            };
-            static const std::vector<Version> MIDDLE = {
-                { " in Bb", -1, -2, 0 }, { " in Bb (Tenor Sax)", -8, -14, 0 }, { " in Eb", -5, -9, 0 }, { " in C", 0, 0, 0 },
-                { " (Alto Clef)", 0, 0, 2 },
-            };
-            static const std::vector<Version> LOW = {
-                { " in Bb", -8, -14, 0 }, { " in Eb", -12, -21, 0 }, { " in C", -7, -12, 0 }, { " (Bass Clef)", 0, 0, 1 },
-            };
+            static const Seat SOP { "Soprano Sax", "Soprano Saxophone", -1, -2, 0 };
+            static const Seat CLA { "Clarinet in Bb", "Clarinet in B\u266D", -1, -2, 0 };
+            static const Seat TPT { "Trumpet in Bb", "Trumpet in B\u266D", -1, -2, 0 };
+            static const Seat ALT { "Alto Sax", "Alto Saxophone", -5, -9, 0 };
+            static const Seat VLN { "Violin", "Violin", 0, 0, 0 };
+            static const Seat TEN { "Tenor Sax", "Tenor Saxophone", -8, -14, 0 };
+            static const Seat VLA { "Viola", "Viola", 0, 0, 2 };
+            static const Seat BAR { "Bari Sax", "Baritone Saxophone", -12, -21, 0 };
+            static const Seat TBN { "Trombone", "Trombone", 0, 0, 1 };
+            static const Seat BCL { "Bass Clarinet in Bb", "Bass Clarinet in B\u266D", -8, -14, 0 };
+            static const Seat VC { "Cello", "Cello", 0, 0, 1 };
+            const std::vector<Seat> HIGH2 { SOP, CLA, TPT, ALT, VLN };
+            const std::vector<Seat> HIGH3 { CLA, SOP, TPT, ALT, VLN };
+            const std::vector<Seat> MIDDLE { TPT, CLA, ALT, TEN, VLA };
+            const std::vector<Seat> LOW { TEN, BAR, TBN, BCL, VC };
+            const QString right = QString("Flexible %1-Horn Arrangement").arg(horns);
 
-            auto addVersion = [&](const QString& pid, const QString& name, const Version& v) {
+            auto addSeat = [&](const QString& pid, int number, const Seat& seat) {
                 StarScoreBandFile f;
+                const QString name = QString("Horn %1 - %2").arg(number).arg(QString::fromUtf8(seat.file));
                 f.relativePath = folder + "/" + code + " - " + starscoreSafeFileName(name) + ".pdf";
                 f.partIds = { pid };
                 f.isVersion = true;
-                f.transposeDiatonic = v.dia;
-                f.transposeChromatic = v.chrom;
-                f.clef = v.clef;
+                f.transposeDiatonic = seat.dia;
+                f.transposeChromatic = seat.chrom;
+                f.clef = seat.clef;
                 f.header = arr + name;
+                f.sheetLeft = QString::fromUtf8(seat.sheet);
+                f.sheetRight = right;
                 plan.files.push_back(f);
             };
 
             for (const auto& [pid, number] : chairs) {
-                const std::vector<Version>& versions = (number == 1 && horns > 1) ? HIGH
-                                                       : (number >= horns && horns > 1) ? LOW : MIDDLE;
-                const QString chairName = QString("Horn %1").arg(number);
-                for (const Version& v : versions) {
-                    addVersion(pid, chairName + v.suffix, v);
+                const std::vector<Seat>& seats = (number == 1 && horns > 1) ? (horns >= 3 ? HIGH3 : HIGH2)
+                                                 : (number >= horns && horns > 1) ? LOW : MIDDLE;
+                for (const Seat& seat : seats) {
+                    addSeat(pid, number, seat);
                 }
                 if (number == 1 && !flutePid.isEmpty()) {
-                    addVersion(flutePid, "Horn 1 for C Flute", Version { "", 0, 0, 0 });
+                    addSeat(flutePid, 1, Seat { "Flute", "Flute", 0, 0, 0 });
                 }
             }
+            anyFolders << folder;
             continue;
         }
 
@@ -540,17 +574,29 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
 
         if (allHorns && !horns.empty()) {
             std::map<QString, int> counts;
+            int players = 0;   // stand-in versions (7-Horn Baritone / Bass Saxophone) aren't extra players
+            std::map<QString, int> playerCounts;
             for (const auto& h : horns) {
                 counts[h.second]++;
+                if (!sec.alternates.count(h.first)) {
+                    ++players;
+                    playerCounts[h.second]++;
+                }
             }
             QStringList codes;
             for (const auto& [name, abbr] : STARSCORE_HORN_ORDER) {
-                if (counts.count(name)) {
-                    codes << (counts[name] > 1 ? QString::number(counts[name]) : QString()) + abbr;
+                if (playerCounts.count(name)) {
+                    codes << (playerCounts[name] > 1 ? QString::number(playerCounts[name]) : QString()) + abbr;
                 }
             }
-            const QString folder = QString("%1H %2").arg(horns.size()).arg(codes.join(' '));
-            addFile(folder, "Score", sec.partIds, true);
+            const QString folder = QString("%1H %2").arg(players).arg(codes.join(' '));
+            QStringList scoreParts;
+            for (const QString& pid : sec.partIds) {
+                if (!sec.alternates.count(pid)) {
+                    scoreParts << pid;
+                }
+            }
+            addFile(folder, "Score", scoreParts, true);
 
             std::map<QString, int> seen;
             for (const auto& [pid, horn] : horns) {
@@ -559,6 +605,8 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
                     name += QString(" %1").arg(++seen[horn]);
                 }
                 addFile(folder, name, { pid }, false);
+                plan.files.back().sheetLeft = starscoreSheetHornName(name);
+                plan.files.back().sheetRight = QString("%1-Horn Arrangement").arg(players);
             }
             continue;
         }
@@ -598,8 +646,64 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
         }
     }
     plan.files = unique;
+    plan.anyHornFolders = anyFolders;
 
     return RetVal<StarScoreBandExportPlan>::make_ok(plan);
+}
+
+//! The sheet's title frame: the horn's name top left (the part name text), the arrangement top right
+static void starscoreRetitleSheet(engraving::Score* score, const QString& left, const QString& right)
+{
+    if (!score) {
+        return;
+    }
+    engraving::Box* box = nullptr;
+    for (engraving::MeasureBase* mb = score->first(); mb; mb = mb->next()) {
+        if (mb->isVBox()) {
+            box = engraving::toBox(mb);
+            break;
+        }
+        if (mb->isMeasure()) {
+            break;
+        }
+    }
+    if (!box) {
+        return;
+    }
+    auto escape = [](const QString& t) {
+        return engraving::String::fromQString(t.toHtmlEscaped());
+    };
+
+    engraving::Text* partText = nullptr;
+    for (engraving::EngravingItem* e : box->el()) {
+        if (e && e->isText() && engraving::toText(e)->textStyleType() == engraving::TextStyleType::INSTRUMENT_EXCERPT) {
+            partText = engraving::toText(e);
+            break;
+        }
+    }
+    if (!left.isEmpty()) {
+        if (partText) {
+            partText->undoChangeProperty(engraving::Pid::TEXT, escape(left));
+        } else {
+            engraving::Text* t = engraving::Factory::createText(box, engraving::TextStyleType::INSTRUMENT_EXCERPT);
+            t->setParent(box);
+            t->setTrack(0);
+            t->setXmlText(escape(left));
+            score->undoAddElement(t);
+            partText = t;
+        }
+    }
+    if (!right.isEmpty()) {
+        engraving::Text* t = engraving::Factory::createText(box, engraving::TextStyleType::INSTRUMENT_EXCERPT);
+        t->setParent(box);
+        t->setTrack(0);
+        t->setXmlText(escape(right));
+        t->setAlign(engraving::Align(engraving::AlignH::RIGHT, engraving::AlignV::TOP));
+        t->setPropertyFlags(engraving::Pid::ALIGN, engraving::PropertyFlags::UNSTYLED);
+        score->undoAddElement(t);
+    }
+    score->setLayoutAll();
+    score->doLayout();
 }
 
 Ret StarScoreService::writePdf(const INotationPtr& notation, const QString& path) const
@@ -787,6 +891,11 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         n->undoStack()->prepareChanges(TranslatableString::untranslatable("Concert pitch"));
         n->style()->setStyleValue(StyleId::concertPitch, false);
         n->undoStack()->commitChanges();
+        if (!file.sheetLeft.isEmpty() || !file.sheetRight.isEmpty()) {
+            n->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
+            starscoreRetitleSheet(n->elements()->msScore(), file.sheetLeft, file.sheetRight);
+            n->undoStack()->commitChanges();
+        }
 
         return writePdf(n, pdfPath);
     };
@@ -833,7 +942,22 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                 problems << muse::qtrc("starscore", "%1: no part book for this instrument.").arg(file.relativePath);
                 continue;
             }
-            ret = writePdf(it->second->notation(), tmpPdf);
+            INotationPtr bookNotation = it->second->notation();
+            const bool retitle = bookNotation && (!file.sheetLeft.isEmpty() || !file.sheetRight.isEmpty());
+            if (retitle) {
+                // Only for printing: undone right after, so the part score itself doesn't change
+                bookNotation->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
+                starscoreRetitleSheet(bookNotation->elements()->msScore(), file.sheetLeft, file.sheetRight);
+            }
+            ret = writePdf(bookNotation, tmpPdf);
+            if (retitle) {
+                bookNotation->undoStack()->rollbackChanges();
+                if (engraving::Score* bs = bookNotation->elements()->msScore()) {
+                    bs->setLayoutAll();
+                    bs->doLayout();
+                }
+                bookNotation->notationChanged().notify();
+            }
         } else {
             INotationProjectPtr p = scratchProject();
             if (!p) {
@@ -863,6 +987,25 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
             continue;
         }
         written << file.relativePath;
+    }
+
+    // "NH Any Horns": sheets under older names (e.g. "Horn 1 in Bb" before each instrument got its own sheet)
+    // are archived, as replaced sheets are
+    {
+        QStringList current;
+        const RetVal<StarScoreBandExportPlan> full = planBandExport();
+        for (const StarScoreBandFile& f : (full.ret ? full.val.files : plan.val.files)) {
+            current << f.relativePath;
+        }
+        for (const QString& folder : plan.val.anyHornFolders) {
+            const QDir dir(songDir + "/" + folder);
+            for (const QString& fileName : dir.entryList({ plan.val.code + " - Horn *.pdf" }, QDir::Files)) {
+                const QString rel = folder + "/" + fileName;
+                if (!current.contains(rel)) {
+                    supersede(rel);
+                }
+            }
+        }
     }
 
     QDir(tmpDir).removeRecursively();

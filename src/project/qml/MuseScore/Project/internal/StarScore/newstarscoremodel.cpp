@@ -44,6 +44,7 @@ bool NewStarScoreModel::create(const QVariantMap& o)
 {
     StarScoreNewOptions options;
     options.title = o.value("title").toString();
+    options.subtitle = o.value("subtitle").toString();
     options.composer = o.value("composer").toString();
     options.keyFifths = o.value("keyFifths", 0).toInt();
     options.timeSigNumerator = o.value("timeSigNumerator", 4).toInt();

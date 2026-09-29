@@ -4,6 +4,13 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.7.0
+
+- Exported horn sheets (Export to Sheets and Demos) have the horn's name at the top left (“Trumpet in B♭”) and the arrangement at the top right (“2-Horn Arrangement”). This is done only while printing; the part scores themselves don't change.
+- “Any Horns” sections export one sheet for every instrument that can play each chair (Starsign Band Guide, page 3), each with its own name at the top left and “Flexible N-Horn Arrangement” at the top right. For example Horn 1 of a 2-horn arrangement becomes Soprano Saxophone, Clarinet in B♭, Trumpet in B♭, Alto Saxophone and Violin sheets, each transposed and in its clef. Files are named “CODE - Horn 1 - Trumpet in Bb.pdf”. Sheets with the older names (“Horn 1 in Bb”) are moved to Version History when you export.
+- The 7-Horn section's Baritone and Bass Saxophone versions of the Bass Trombone don't count as extra players in the folder name (still “7H …”), and aren't in the section's score.
+- New StarScore: a Subtitle field.
+
 ## 1.6.1
 
 - Chord symbols: the diminished circle (C♯°7) is a smaller ring in the chord font's line weight, with its top level with the extension, instead of Bravura's large thin circle.

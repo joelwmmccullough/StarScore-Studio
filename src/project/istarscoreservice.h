@@ -112,6 +112,7 @@ struct StarScoreArrangementTemplate
 struct StarScoreNewOptions
 {
     QString title;
+    QString subtitle;
     QString composer;
     int keyFifths = 0;          // -7 … 7
     int timeSigNumerator = 4;
@@ -217,6 +218,10 @@ struct StarScoreBandFile
     int transposeChromatic = 0;
     int clef = 0;                // 0 = treble, 1 = bass, 2 = alto
     QString header;              // part name printed on the sheet, e.g. "3-Horn Arr: Horn 2 in Bb"
+    // Title frame on the printed sheet (horn sheets): the horn's name top left, the arrangement top right,
+    // e.g. "Trumpet in B♭" / "2-Horn Arrangement". Applied only while printing; the score isn't changed.
+    QString sheetLeft;
+    QString sheetRight;
 };
 
 struct StarScoreBandExportPlan
@@ -226,6 +231,7 @@ struct StarScoreBandExportPlan
     QString code;                // e.g. "AMPL"
     std::vector<StarScoreBandFile> files;
     QStringList notes;           // things that were skipped, and why
+    QStringList anyHornFolders;  // "NH Any Horns" folders: sheets there with older names are archived after exporting
 
     // The song isn't in Sheets and Demos yet: the dialog asks for its folder and code first (registerBandSong)
     bool newSong = false;

@@ -1294,6 +1294,7 @@ Ret StarScoreService::newStarScore(const StarScoreNewOptions& options)
 
     ProjectCreateOptions projectOptions;
     projectOptions.title = options.title;
+    projectOptions.subtitle = options.subtitle;
     projectOptions.composer = options.composer;
 
     ScoreCreateOptions& score = projectOptions.scoreOptions;

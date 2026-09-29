@@ -24,6 +24,7 @@ StyledDialogView {
     }
 
     property string scoreTitle: ""
+    property string subtitle: ""
     property string composer: ""
     property int keyFifths: 0
     property int timeNum: 4
@@ -39,6 +40,7 @@ StyledDialogView {
     function create() {
         if (newModel.create({
             "title": root.scoreTitle,
+            "subtitle": root.subtitle,
             "composer": root.composer,
             "keyFifths": root.keyFifths,
             "timeSigNumerator": root.timeNum,
@@ -62,6 +64,14 @@ StyledDialogView {
             Layout.fillWidth: true
             hint: qsTrc("starscore", "Song title")
             onTextEdited: function(t) { root.scoreTitle = t }
+            onAccepted: root.create()
+        }
+
+        StyledTextLabel { text: qsTrc("starscore", "Subtitle"); font: ui.theme.bodyBoldFont }
+        TextInputField {
+            Layout.fillWidth: true
+            hint: qsTrc("starscore", "Subtitle (optional)")
+            onTextEdited: function(t) { root.subtitle = t }
             onAccepted: root.create()
         }
 
