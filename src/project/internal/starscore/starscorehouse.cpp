@@ -19,7 +19,7 @@
 using namespace mu::engraving;
 
 namespace mu::project::starscore {
-static int starscoreVisibleStaves(const Score* score)
+static int starscoreVisibleStaves(const Score* score, bool skipHideWhenEmpty = false)
 {
     int n = 0;
     for (const Part* part : score->parts()) {
@@ -27,6 +27,11 @@ static int starscoreVisibleStaves(const Score* score)
             continue;
         }
         for (const Staff* staff : part->staves()) {
+            // The lead sheet's bass staff ("Hide when empty: Always") only shows where it has music, so it
+            // doesn't make the lead sheet a keys-sized sheet
+            if (skipHideWhenEmpty && staff->hideWhenEmpty() == AutoOnOff::ON) {
+                continue;
+            }
             if (staff->visible()) {
                 ++n;
             }
@@ -37,10 +42,10 @@ static int starscoreVisibleStaves(const Score* score)
 
 double houseStaffHeightMm(const Score* score, bool partBook)
 {
-    const int staves = std::max(1, starscoreVisibleStaves(score));
     if (partBook) {
-        return staves >= 2 ? 6.5 : 7.5;
+        return std::max(1, starscoreVisibleStaves(score, true)) >= 2 ? 6.5 : 7.5;
     }
+    const int staves = std::max(1, starscoreVisibleStaves(score));
     if (staves <= 4) {
         return 6.5;
     } else if (staves <= 6) {
