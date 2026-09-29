@@ -377,6 +377,8 @@ QVariantList StarScoreBarModel::moreMenu() const
         QVariantMap { { "id", "voice-order" }, { "title", muse::qtrc("starscore", "Check voice order…") }, { "enabled", true } },
         QVariantMap { { "id", "sync-scores" }, { "title", muse::qtrc("starscore", "Make / update arrangement scores") }, { "enabled", true } },
         QVariantMap { { "id", "check-ranges" }, { "title", muse::qtrc("starscore", "Check instrument ranges") }, { "enabled", true } },
+        QVariantMap { { "id", "set-version" }, { "title", muse::qtrc("starscore", "Version number (%1)…").arg(starScore()->scoreVersion()) },
+                      { "enabled", true } },
         QVariantMap { { "id", "export-band" }, { "title", muse::qtrc("starscore", "Export to Sheets and Demos…") }, { "enabled", true } },
         QVariantMap { { "id", "export-arrangements" }, { "title", muse::qtrc("starscore", "Export arrangements as MuseScore files…") },
                       { "enabled", !starScore()->arrangements().empty() } },
@@ -649,6 +651,8 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
         dispatcher()->dispatch("starscore-check-ranges");
     } else if (action == "export-band") {
         dispatcher()->dispatch("starscore-export-band");
+    } else if (action == "set-version") {
+        openEditDialog("version", QString());
     } else if (action == "export-arrangements") {
         dispatcher()->dispatch("starscore-export-arrangements");
     }

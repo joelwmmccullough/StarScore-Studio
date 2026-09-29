@@ -5,6 +5,8 @@
  */
 #include "starscoreeditmodel.h"
 
+#include <QRegularExpression>
+
 #include "translation.h"
 
 using namespace mu::project;
@@ -28,6 +30,8 @@ QString StarScoreEditModel::dialogTitle() const
         return muse::qtrc("starscore", "Rename arrangement");
     } else if (m_mode == "rename-solo") {
         return muse::qtrc("starscore", "Rename solo");
+    } else if (m_mode == "version") {
+        return muse::qtrc("starscore", "Score version number (e.g. 4.0.1)");
     }
     return QString();
 }
@@ -71,7 +75,9 @@ void StarScoreEditModel::load(const QString& mode, const QString& itemId)
     const std::vector<StarScoreSection> sections = starScore()->sections();
     const std::vector<StarScoreArrangement> arrangements = starScore()->arrangements();
 
-    if (mode == "rename-solo") {
+    if (mode == "version") {
+        m_name = starScore()->scoreVersion();
+    } else if (mode == "rename-solo") {
         for (const StarScoreSolo& solo : starScore()->solos()) {
             if (solo.id == itemId) {
                 m_name = solo.name;
@@ -160,7 +166,13 @@ bool StarScoreEditModel::apply()
         }
     }
 
-    if (m_mode == "rename-solo") {
+    if (m_mode == "version") {
+        // three numbers, like 4.0.1; printed in the footer of the score and every part
+        if (!QRegularExpression("^\\d+\\.\\d+\\.\\d+$").match(name).hasMatch()) {
+            return false;
+        }
+        starScore()->setScoreVersion(name);
+    } else if (m_mode == "rename-solo") {
         starScore()->renameSolo(m_itemId, name);
     } else if (m_mode == "rename-section") {
         starScore()->renameSection(m_itemId, name);
