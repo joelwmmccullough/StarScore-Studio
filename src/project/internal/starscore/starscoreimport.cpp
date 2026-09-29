@@ -12,6 +12,7 @@
 #include <set>
 
 #include <QRegularExpression>
+#include <QTimer>
 
 #include "engraving/dom/masterscore.h"
 #include "engraving/dom/excerpt.h"
@@ -670,4 +671,180 @@ void StarScoreService::fillAnyHornsFromStandard(const StarScoreSection& anySecti
     }
     master->notation()->undoStack()->commitChanges();
     master->notation()->notationChanged().notify();
+}
+
+// ---------------------------------------------------------------------------
+//  7-Horn: Baritone and Bass Saxophone versions of the Bass Trombone line
+// ---------------------------------------------------------------------------
+
+void StarScoreService::offerLowAlternates(const QStringList& partIds)
+{
+    engraving::MasterScore* ms = masterScore();
+    if (!ms) {
+        return;
+    }
+    const Data data = load();
+    QString sectionId;
+    QString mainId;
+    for (const StarScoreSection& s : data.sections) {
+        if (s.templateKey != "7-horn") {
+            continue;
+        }
+        for (const QString& pid : partIds) {
+            const engraving::Part* p = ms->partById(ID(pid));
+            if (!p || !s.partIds.contains(pid) || !p->instrumentId().toQString().contains("bass-trombone")) {
+                continue;
+            }
+            const bool hasVersions = std::any_of(s.alternates.begin(), s.alternates.end(),
+                                                 [&](const auto& kv) { return kv.second == pid; });
+            if (!hasVersions) {
+                sectionId = s.id;
+                mainId = pid;
+            }
+        }
+    }
+    if (mainId.isEmpty()) {
+        return;
+    }
+
+    // After the menu that set the status has closed
+    QTimer::singleShot(0, [this, sectionId, mainId]() {
+        constexpr int Create = static_cast<int>(IInteractive::Button::CustomButton) + 1;
+        constexpr int NotNow = static_cast<int>(IInteractive::Button::CustomButton) + 2;
+        const IInteractive::Result answer = interactive()->questionSync(
+            muse::trc("starscore", "Bass Trombone part finished"),
+            muse::trc("starscore", "Create Baritone Saxophone and Bass Saxophone parts with the same music? "
+                                   "They're transposed for each saxophone. Check them afterwards: notes below a "
+                                   "saxophone's range need moving up."), {
+            IInteractive::ButtonData(NotNow, muse::trc("starscore", "Not now")),
+            IInteractive::ButtonData(Create, muse::trc("starscore", "Create parts"), true),
+        }, Create);
+        if (answer.button() != Create) {
+            return;
+        }
+        const RetVal<QStringList> made = createLowAlternates(sectionId, mainId);
+        if (!made.ret) {
+            interactive()->error(muse::trc("starscore", "Couldn't create the saxophone parts"), made.ret.toString());
+            return;
+        }
+        interactive()->info(muse::trc("starscore", "Saxophone parts created"),
+                            muse::trc("starscore", "Baritone Saxophone and Bass Saxophone now have the Bass Trombone's "
+                                                   "music, and their status is Needs review. They're hidden in the "
+                                                   "score: open their part scores (Parts) to check them. Notes too low "
+                                                   "for a saxophone are colored as out of range."));
+    });
+}
+
+RetVal<QStringList> StarScoreService::createLowAlternates(const QString& sectionId, const QString& mainPartId)
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    engraving::MasterScore* ms = masterScore();
+    if (!master || !ms || !ms->firstMeasure()) {
+        return RetVal<QStringList>::make_ret(Ret::Code::InternalError);
+    }
+    engraving::Part* mainPart = ms->partById(ID(mainPartId));
+    if (!mainPart || mainPart->staves().empty()) {
+        return RetVal<QStringList>::make_ret(Ret::Code::UnknownError);
+    }
+
+    std::vector<StarScoreInstrument> wanted(2);
+    wanted[0].instrumentId = "baritone-saxophone";
+    wanted[0].partName = "Baritone Saxophone";
+    wanted[0].hidden = true;
+    wanted[1].instrumentId = "bass-saxophone";
+    wanted[1].partName = "Bass Saxophone";
+    wanted[1].hidden = true;
+
+    // Right after the Bass Trombone
+    std::set<QString> before;
+    PartInstrumentList list;
+    int insertAt = -1;
+    for (const engraving::Part* p : ms->parts()) {
+        before.insert(idText(p));
+        PartInstrument pi;
+        pi.isExistingPart = true;
+        pi.partId = p->id();
+        list << pi;
+        if (p == mainPart) {
+            insertAt = int(list.size());
+        }
+    }
+    std::vector<StarScoreInstrument> added;
+    for (const StarScoreInstrument& inst : wanted) {
+        const InstrumentTemplate& tpl = instrumentsRepository()->instrumentTemplate(String::fromQString(inst.instrumentId));
+        if (tpl.id.isEmpty()) {
+            LOGW() << "[starscore] unknown instrument " << inst.instrumentId;
+            continue;
+        }
+        PartInstrument pi;
+        pi.isExistingPart = false;
+        pi.instrumentTemplate = tpl;
+        if (insertAt < 0 || insertAt > int(list.size())) {
+            list << pi;
+        } else {
+            list.insert(insertAt++, pi);
+        }
+        added.push_back(inst);
+    }
+    if (added.empty()) {
+        return RetVal<QStringList>::make_ret(Ret::Code::UnknownError);
+    }
+
+    engraving::ScoreOrder order = master->parts()->scoreOrder();
+    order.customized = true;
+    master->parts()->setParts(list, order);
+
+    std::vector<engraving::Part*> newParts;
+    for (engraving::Part* p : ms->parts()) {
+        if (!before.count(idText(p))) {
+            newParts.push_back(p);
+        }
+    }
+    if (newParts.empty()) {
+        return RetVal<QStringList>::make_ret(Ret::Code::UnknownError);
+    }
+
+    // Same music as the Bass Trombone (pasting keeps the sounding pitch, so each saxophone's part is transposed)
+    mainPart = ms->partById(ID(mainPartId));
+    if (mainPart && !mainPart->staves().empty()) {
+        engraving::Segment* start = ms->firstMeasure()->first(engraving::SegmentType::ChordRest);
+        const engraving::staff_idx_t src = mainPart->staves().front()->idx();
+        master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Saxophone versions of the Bass Trombone"));
+        for (engraving::Part* to : newParts) {
+            if (to->staves().empty()) {
+                continue;
+            }
+            engraving::Selection sel(ms);
+            sel.setRange(start, nullptr, src, src + 1);
+            const ByteArray mime = sel.mimeData();
+            if (mime.empty()) {
+                continue;
+            }
+            engraving::XmlReader reader(mime);
+            ms->pasteStaff(reader, start, to->staves().front()->idx());
+        }
+        master->notation()->undoStack()->commitChanges();
+    }
+
+    const StarScoreSection made = finishNewParts(newParts, added);
+
+    Data d = load();
+    for (StarScoreSection& s : d.sections) {
+        if (s.id != sectionId) {
+            continue;
+        }
+        for (const QString& pid : made.partIds) {
+            if (!s.partIds.contains(pid)) {
+                s.partIds << pid;
+            }
+            s.alternates[pid] = mainPartId;
+            d.partStatus[pid] = statusKey(StarScoreStatus::NeedsReview);
+        }
+    }
+    store(d);
+    applyStyles(made.partIds);
+
+    master->notation()->notationChanged().notify();
+    m_changed.notify();
+    return RetVal<QStringList>::make_ok(made.partIds);
 }

@@ -215,6 +215,10 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
         for (const QJsonValue& p : o.value("shown").toArray()) {
             s.shownPartIds << p.toString();
         }
+        const QJsonObject alts = o.value("alternates").toObject();
+        for (auto it = alts.begin(); it != alts.end(); ++it) {
+            s.alternates[it.key()] = it.value().toString();
+        }
         if (!s.id.isEmpty()) {
             data.sections.push_back(s);
         }
@@ -305,6 +309,13 @@ QString StarScoreService::toJson(const Data& data)
         o["shown"] = QJsonArray::fromStringList(s.shownPartIds);
         if (!s.skipSheets.isEmpty()) {
             o["skipSheets"] = QJsonArray::fromStringList(s.skipSheets);
+        }
+        if (!s.alternates.empty()) {
+            QJsonObject alts;
+            for (const auto& [alt, main] : s.alternates) {
+                alts[alt] = main;
+            }
+            o["alternates"] = alts;
         }
         sections.append(o);
     }
@@ -457,6 +468,13 @@ StarScoreService::Data StarScoreService::loadFrom(const engraving::MasterScore* 
             }
         }
         s.shownPartIds = shown;
+        for (auto it = s.alternates.begin(); it != s.alternates.end();) {
+            if (existing.count(it->first) && existing.count(it->second)) {
+                ++it;
+            } else {
+                it = s.alternates.erase(it);
+            }
+        }
     }
 
     // Drop references to sections that no longer exist
@@ -481,7 +499,12 @@ StarScoreService::Data StarScoreService::loadFrom(const engraving::MasterScore* 
             continue;
         }
         const bool rhythm = s.templateKey == "rhythm" || s.templateKey == "bigband-rhythm";
-        const QStringList& counted = s.shownPartIds.isEmpty() ? s.partIds : s.shownPartIds;
+        QStringList counted = s.shownPartIds.isEmpty() ? s.partIds : s.shownPartIds;
+        for (const auto& [alt, main] : s.alternates) {   // stand-in versions are hidden but still need finishing
+            if (!counted.contains(alt)) {
+                counted << alt;
+            }
+        }
         StarScoreStatus result = StarScoreStatus::Finished;
         int countedParts = 0;
         for (const QString& pid : counted) {
@@ -1430,6 +1453,9 @@ void StarScoreService::setPartScoreStatus(const engraving::Score* score, int sta
         }
     }
     storeTo(ms, data, m_mainProject ? m_mainProject : globalContext()->currentProject());
+    if (status == int(StarScoreStatus::Finished)) {
+        offerLowAlternates(ids);
+    }
 }
 
 void StarScoreService::setPartStatus(const QString& partId, int status)
@@ -1441,6 +1467,9 @@ void StarScoreService::setPartStatus(const QString& partId, int status)
         data.partStatus[partId] = statusKey(static_cast<StarScoreStatus>(status));
     }
     store(data);
+    if (status == int(StarScoreStatus::Finished)) {
+        offerLowAlternates({ partId });
+    }
 }
 
 void StarScoreService::setSectionSkipSheet(const QString& sectionId, const QString& which, bool skip)

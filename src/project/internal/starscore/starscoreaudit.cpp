@@ -1226,7 +1226,7 @@ StarScoreAuditReport StarScoreService::auditScore(const MasterScore* ms, const D
                 hornPartIds.insert(pid);
                 hornParts.push_back(p);
             }
-            if (!auditIsAny(s)) {
+            if (!auditIsAny(s) && !s.alternates.count(pid)) {   // a stand-in version isn't a line of its own
                 sectionLines.push_back(p);
             }
         }
@@ -1243,6 +1243,27 @@ StarScoreAuditReport StarScoreService::auditScore(const MasterScore* ms, const D
             if (auditHasVersions(groups)) {
                 auditAnyKeys(ctx, add, groups);
             }
+        }
+        // Stand-in versions (7-Horn Baritone and Bass Saxophone) against the part they stand in for
+        if (!s.alternates.empty()) {
+            std::map<QString, std::vector<const Part*> > byMain;
+            for (const auto& [alt, main] : s.alternates) {
+                const Part* a = ms->partById(ID(alt));
+                const Part* m = ms->partById(ID(main));
+                if (!a || !m || !ctx.lines.count(alt) || !ctx.lines.count(main)) {
+                    continue;
+                }
+                auto& group = byMain[main];
+                if (group.empty()) {
+                    group.push_back(m);
+                }
+                group.push_back(a);
+            }
+            std::vector<std::vector<const Part*> > groups;
+            for (auto& [main, group] : byMain) {
+                groups.push_back(group);
+            }
+            auditAnyKeys(ctx, add, groups);
         }
     }
 
@@ -1629,7 +1650,11 @@ void StarScoreService::playListenStep(const StarScoreListenStep& step, bool with
                 play.insert(idText(group.front()));
             }
         } else {
-            play.insert(s.partIds.begin(), s.partIds.end());
+            for (const QString& pid : s.partIds) {
+                if (!s.alternates.count(pid)) {   // stand-in versions don't play along
+                    play.insert(pid);
+                }
+            }
         }
     }
     if (withRhythmSection) {

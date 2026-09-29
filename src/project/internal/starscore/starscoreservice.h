@@ -21,6 +21,7 @@
 #include "dockwindow/idockwindowprovider.h"
 #include "dockwindow/idockwindow.h"
 #include "actions/iactionsdispatcher.h"
+#include "iinteractive.h"
 
 namespace mu::engraving {
 class MasterScore;
@@ -40,6 +41,7 @@ class StarScoreService : public IStarScoreService, public muse::Contextable, pub
     muse::ContextInject<INotationWritersRegister> writers = { this };
     muse::ContextInject<muse::dock::IDockWindowProvider> dockWindowProvider = { this };
     muse::ContextInject<muse::actions::IActionsDispatcher> dispatcher = { this };
+    muse::ContextInject<muse::IInteractive> interactive = { this };
 
 public:
     explicit StarScoreService(const muse::modularity::ContextPtr& iocCtx);
@@ -236,6 +238,9 @@ private:
     void standardizeImported();
     //! A new "N-Horn Any" section starts with the music of the "N-Horn" section, chair by chair
     void fillAnyHornsFromStandard(const StarScoreSection& anySection);
+    //! A 7-Horn Bass Trombone part marked Finished: offer Baritone and Bass Saxophone versions of it
+    void offerLowAlternates(const QStringList& partIds);
+    muse::RetVal<QStringList> createLowAlternates(const QString& sectionId, const QString& mainPartId);
     //! Name the new parts, hide default-hidden parts/staves, make part books; returns the new section
     StarScoreSection finishNewParts(const std::vector<mu::engraving::Part*>& newParts,
                                     const std::vector<StarScoreInstrument>& instruments);
