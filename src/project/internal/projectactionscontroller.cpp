@@ -187,6 +187,7 @@ bool ProjectActionsController::canReceiveAction(const ActionCode& code) const
             "file-new-musescore",
             "starscore-part-styles",
             "starscore-toggle-panel",
+            "starscore-audit-library",
             "file-open",
             "file-import-pdf",
             "file-import-audio-to-score",

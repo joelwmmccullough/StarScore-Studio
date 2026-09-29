@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.5.1
+
+- Audit library works with no score open, and is also in the File menu (under Open recent). Before, it was greyed out until a score was open.
+
 ## 1.5.0
 
 - **Audit all songs** (Audit library › Audit all songs): opens the songs that still need work one at a time, in the library's order, with the Audit panel showing. A strip at the top of the Audit panel says which song you're on (“Song 3 of 42 · Bet”) and has Previous song, Next song (Finish on the last one) and Stop. Moving on asks to save as usual. The place in the list is kept after quitting, so you can pick up where you left off. If nothing has been checked yet, it goes through every song in the folder.
