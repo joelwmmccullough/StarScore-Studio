@@ -8,7 +8,7 @@
       at 0.71 of the root, raised half a cap height (quality set here; extensions and
       alterations through the style's extension/modifier size and offset);
       minor (typed "-", "m", "mi", "min" or "minor") as a larger hyphen, major seventh as a triangle, half-diminished as ø,
-      diminished as a raised small circle; slash bass full size.
+      diminished as a raised small circle (StarScore Jost U+E040, in Jost's line weight); slash bass full size.
     Units: 1 = cap height of the root font; negative y is up.
 -->
 <museScore version="4.60">
@@ -42,6 +42,7 @@
     <sym code="0xE001" name="trimin"/>
     <sym code="0xE021" name="diamin"/>
     <sym code="0xE020" name="diadim"/>
+    <sym code="0xE040" name="dimc"/>
   </font>
   <font class="modifier" family="StarScore Jost">
     <sym code="0xE000" name="stri"/>
@@ -204,7 +205,7 @@
     </token>
   <token class="quality">
     <name>o</name>
-    <render>m:0.05:0 sc:0.71 m:0:-0.5 circle m:0:0.5 sc:1.408451</render>
+    <render>m:0.05:0 sc:0.71 m:0:-0.5 dimc m:0:0.5 sc:1.408451</render>
     </token>
   <token class="quality">
     <name>0</name>

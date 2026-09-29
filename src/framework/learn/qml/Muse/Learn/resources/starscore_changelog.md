@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.6.1
+
+- Chord symbols: the diminished circle (C♯°7) is a smaller ring in the chord font's line weight, with its top level with the extension, instead of Bravura's large thin circle.
+
 ## 1.6.0
 
 - **Saxophone versions of the 7-Horn Bass Trombone part**: when you mark the 7-Horn section's Bass Trombone part Finished, StarScore asks whether to create Baritone Saxophone and Bass Saxophone parts. “Create parts” adds both to the 7-Horn section with the Bass Trombone's music, transposed for each saxophone, and sets them to Needs review. They're hidden in the score and have their own part scores and sheets. Check them there: notes too low for a saxophone are colored as out of range. It asks once; after the parts exist it doesn't ask again.

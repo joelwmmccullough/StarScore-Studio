@@ -10,6 +10,7 @@ The triangle is the font's own chord-symbol triangle (SMuFL csymMajorSeventh) wh
 the font's own chord minus (csymMinor), stretched across the triangle, so hand-drawn fonts keep their look.
 Jost (i = 0) uses the geometric triangle already in the font.
 Diamonds (U+E020 + 2*i diminished-major, U+E021 + 2*i minor-major) are geometric, in each font's line weight. All source fonts are SIL OFL.
+U+E040 is the diminished circle: a small ring in Jost's line weight whose top is at the capital height.
 
 Run from the repository root:  python3 fonts/starscorejost/build_chord_triangles.py
 """
@@ -216,6 +217,54 @@ def build_diamonds(target, index, stroke, ticks=None):
     add_glyph(target, 0xE021 + 2 * index, barred, w + 2 * SIDE + 2 * ext)
 
 
+# Diminished circle: outer diameter as a share of the capital height, line weight as a share of Jost's stroke
+DIM_DIAMETER = 0.60
+DIM_WEIGHT = 0.80
+
+
+def jost_stroke(target):
+    rec, (x0, y0, x1, y1) = record(target, 0xE000)
+    s = CAP / (y1 - y0)
+    t = (s, 0, 0, s, SIDE - x0 * s, -y0 * s)
+    width = int((x1 - x0) * s + 2 * SIDE)
+    stroke, _mid, _edges = measure(raster(rec, t, width + 1, CAP + 1))
+    return stroke
+
+
+def build_dim_circle(target, stroke):
+    """U+E040: the diminished circle, a ring whose top is at the capital height (the chord file raises it)."""
+    d = CAP * DIM_DIAMETER
+    r = d / 2
+    w = max(30, stroke * DIM_WEIGHT)
+    ri = r - w
+    cx, cy = SIDE + r, CAP - r
+    k = 0.5522847498
+
+    def ring(pen, rad, ccw):
+        pts = [(cx - rad, cy), (cx, cy - rad), (cx + rad, cy), (cx, cy + rad)]   # left, bottom, right, top
+        if not ccw:
+            pts = [pts[0], pts[3], pts[2], pts[1]]
+        pen.moveTo((round(pts[0][0]), round(pts[0][1])))
+        for i in range(4):
+            a, b = pts[i], pts[(i + 1) % 4]
+            # control points: tangent at each quadrant point
+            ta = (a[0] - cx, a[1] - cy)
+            tb = (b[0] - cx, b[1] - cy)
+            sgn = 1 if ccw else -1
+            da = (-ta[1] * sgn, ta[0] * sgn)   # tangent direction at a (perpendicular to radius)
+            db = (-tb[1] * sgn, tb[0] * sgn)
+            c1 = (a[0] + da[0] * k, a[1] + da[1] * k)
+            c2 = (b[0] - db[0] * k, b[1] - db[1] * k)
+            pen.curveTo((round(c1[0]), round(c1[1])), (round(c2[0]), round(c2[1])), (round(b[0]), round(b[1])))
+        pen.closePath()
+
+    def draw(pen):
+        ring(pen, r, True)
+        ring(pen, ri, False)
+
+    add_glyph(target, 0xE040, draw, round(d + 2 * SIDE))
+
+
 def add_glyph(font, code, draw, advance):
     name = f"uni{code:04X}"
     g = glyph_from(draw)
@@ -235,6 +284,7 @@ def main():
     font = TTFont(TARGET)
     for index, _name, path, tri, minus in SOURCES:
         build_variant(font, index, path, tri, minus)
+    build_dim_circle(font, jost_stroke(font))
     font["maxp"].numGlyphs = len(font.getGlyphOrder())
     font.save(TARGET)
     print("ok")
