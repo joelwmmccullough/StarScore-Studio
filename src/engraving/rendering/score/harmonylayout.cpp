@@ -849,6 +849,22 @@ void HarmonyLayout::renderActionScale(const RenderActionScalePtr& a, HarmonyRend
 
 void HarmonyLayout::renderActionParen(Harmony* item, const RenderActionParenPtr& a, HarmonyRenderCtx& harmonyCtx)
 {
+    // StarScore: with StarScore Jost as the chord font, use the font's own parentheses (same weight and height
+    // as the letters) instead of MuseScore's drawn, stretched ones
+    const Harmony::LayoutData* ldata = item->ldata();
+    if (ldata && !ldata->fontList.value().empty()) {
+        muse::draw::Font chordFont = ldata->fontList.value().front();
+        if (chordFont.family().id().toLower().contains(u"starscore jost")) {
+            chordFont.setPointSizeF(chordFont.pointSizeF() * harmonyCtx.scale);
+            const bool left = std::dynamic_pointer_cast<RenderActionParenLeft>(a) != nullptr;
+            TextSegment* ts = new TextSegment(left ? String(u"(") : String(u")"), chordFont, harmonyCtx.x(), harmonyCtx.y(),
+                                              harmonyCtx.hAlign);
+            harmonyCtx.movex(ts->width());
+            harmonyCtx.renderItemList.push_back(ts);
+            return;
+        }
+    }
+
     Parenthesis* p = Factory::createParenthesis(item);
     p->setParent(item);
     p->setDirection(a->direction());
@@ -996,6 +1012,9 @@ void HarmonyLayout::renderActionSet(Harmony* item, Harmony::LayoutData* ldata, c
             const TextSegment* last = nullptr;
             for (const HarmonyRenderItem* ri : harmonyCtx.renderItemList) {
                 if (const TextSegment* t = dynamic_cast<const TextSegment*>(ri)) {
+                    if (t->text() == u"(") {
+                        continue;   // an opening parenthesis before the root doesn't count
+                    }
                     ++textItems;
                     last = t;
                 }
@@ -1003,7 +1022,9 @@ void HarmonyLayout::renderActionSet(Harmony* item, Harmony::LayoutData* ldata, c
             if (textItems == 1 && last && last->text().size() == 1) {
                 const char16_t c = last->text().at(0).unicode();
                 if (c >= u'A' && c <= u'G') {
-                    harmonyCtx.movex(-0.08 * FontMetrics::capHeight(item->font()) * item->mag());
+                    // A's sloping right side leaves the widest gap, so it pulls in further
+                    const double pull = c == u'A' ? 0.12 : 0.08;
+                    harmonyCtx.movex(-pull * FontMetrics::capHeight(item->font()) * item->mag());
                 }
             }
         }
