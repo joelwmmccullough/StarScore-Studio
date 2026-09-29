@@ -2009,8 +2009,9 @@ void StarScoreService::stopAuditWalk()
 
 void StarScoreService::openAuditWalkSong()
 {
+    // The stored place, not the open song: when the walk starts or moves, the open song is the one being left
     const QStringList paths = auditWalkPaths();
-    const int index = auditWalkIndex();
+    const int index = QSettings().value(AUDIT_WALK_INDEX, 0).toInt();
     if (index < 0 || index >= int(paths.size())) {
         return;
     }
