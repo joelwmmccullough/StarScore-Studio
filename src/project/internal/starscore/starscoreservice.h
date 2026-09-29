@@ -103,6 +103,7 @@ public:
     muse::Ret exportSolo(const QString& soloId, const muse::io::path_t& msczPath) override;
     std::vector<StarScoreReference> references() const override;
     muse::RetVal<QString> addReference(const muse::io::path_t& pdfFile) override;
+    QString identicalReferenceName(const muse::io::path_t& pdfFile) const override;
     void removeReference(const QString& referenceId) override;
     muse::io::path_t referencePath(const QString& referenceId) const override;
     QString currentReferenceId() const override;

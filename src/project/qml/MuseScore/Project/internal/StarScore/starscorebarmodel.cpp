@@ -562,6 +562,21 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
         const muse::io::paths_t paths = interactive()->selectOpeningFilesSync(
             muse::trc("starscore", "Add reference PDFs"), muse::io::path_t(mainFile.absolutePath()), { "PDF (*.pdf)" });
         for (const muse::io::path_t& p : paths) {
+        const QString same = starScore()->identicalReferenceName(p);
+        if (!same.isEmpty()) {
+            constexpr int Add = static_cast<int>(muse::IInteractive::Button::CustomButton) + 1;
+            constexpr int Skip = static_cast<int>(muse::IInteractive::Button::CustomButton) + 2;
+            const muse::IInteractive::Result answer = interactive()->questionSync(
+                muse::trc("starscore", "This PDF is already here"),
+                muse::qtrc("starscore", "“%1” is identical to the reference PDF “%2” already in this score. Import it anyway?")
+                .arg(QFileInfo(p.toQString()).fileName(), same).toStdString(), {
+                muse::IInteractive::ButtonData(Skip, muse::trc("starscore", "Don't import"), true),
+                muse::IInteractive::ButtonData(Add, muse::trc("starscore", "Import anyway")),
+            }, Skip);
+            if (answer.button() != Add) {
+                continue;
+            }
+        }
             muse::RetVal<QString> ret = starScore()->addReference(p);
             if (!ret.ret) {
                 interactive()->error(muse::trc("starscore", "Couldn't add the reference PDF"), ret.ret.toString());

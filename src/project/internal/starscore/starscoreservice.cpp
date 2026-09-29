@@ -1987,6 +1987,22 @@ RetVal<QString> StarScoreService::addReference(const io::path_t& pdfFile)
     return RetVal<QString>::make_ok(ref.id);
 }
 
+QString StarScoreService::identicalReferenceName(const io::path_t& pdfFile) const
+{
+    QFile in(pdfFile.toQString());
+    if (!in.open(QIODevice::ReadOnly)) {
+        return QString();
+    }
+    const QByteArray data = in.readAll();
+    for (const StarScoreReference& r : references()) {
+        QFile existing(referencePath(r.id).toQString());
+        if (existing.size() == data.size() && existing.open(QIODevice::ReadOnly) && existing.readAll() == data) {
+            return r.name;
+        }
+    }
+    return QString();
+}
+
 QString StarScoreService::currentReferenceId() const
 {
     const std::vector<StarScoreReference> refs = references();

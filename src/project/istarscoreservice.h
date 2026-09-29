@@ -335,6 +335,8 @@ public:
     // --- reference PDFs (kept inside the .starscore; saved with it) ---
     virtual std::vector<StarScoreReference> references() const = 0;
     virtual muse::RetVal<QString> addReference(const muse::io::path_t& pdfFile) = 0;
+    //! Name of a reference PDF in this score with exactly the same contents as pdfFile, or empty
+    virtual QString identicalReferenceName(const muse::io::path_t& pdfFile) const = 0;
     virtual void removeReference(const QString& referenceId) = 0;
     virtual muse::io::path_t referencePath(const QString& referenceId) const = 0;   // working copy on disk
     //! The reference shown in the Reference PDF panel beside the score
