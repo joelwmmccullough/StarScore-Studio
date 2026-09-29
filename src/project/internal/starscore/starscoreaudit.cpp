@@ -2017,7 +2017,15 @@ void StarScoreService::openAuditWalkSong()
     const QString path = paths.at(index);
     auto current = globalContext() ? globalContext()->currentProject() : nullptr;
     if (current && QFileInfo(current->path().toQString()).absoluteFilePath() == QFileInfo(path).absoluteFilePath()) {
-        return;   // already open
+        // Already open: just make sure the Audit panel (with the walk strip) is showing
+        auto d = dispatcher();
+        auto docks = dockWindowProvider();
+        QTimer::singleShot(0, qApp, [d, docks]() {
+            if (docks && docks->window() && !docks->window()->isDockOpen("starscoreAuditPanel")) {
+                d->dispatch("toggle-starscore-audit");
+            }
+        });
+        return;
     }
     // After the current action has finished: opening a file closes the current one (asking to save if needed)
     auto d = dispatcher();

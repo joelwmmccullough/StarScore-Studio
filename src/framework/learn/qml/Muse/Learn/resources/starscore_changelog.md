@@ -7,6 +7,7 @@ Version numbers: the first number changes when files stop being compatible, the 
 ## 1.5.1
 
 - Audit library works with no score open, and is also in the File menu (under Open recent). Before, it was greyed out until a score was open.
+- Audit all songs: when the first song is the one already open, it now shows the Audit panel with the song strip. Before, nothing seemed to happen.
 
 ## 1.5.0
 
