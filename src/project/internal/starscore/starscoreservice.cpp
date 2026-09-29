@@ -1372,15 +1372,15 @@ std::map<QString, StarScoreStatus> StarScoreService::partStatuses() const
 }
 
 //! Main-score part ids of the parts in a part score
-static QStringList starscorePartIdsOfScore(const engraving::Score* score, const engraving::MasterScore* ms)
+static QStringList starscorePartIdsOfScore(const mu::engraving::Score* score, const mu::engraving::MasterScore* ms)
 {
     QStringList ids;
     if (!score || !ms || score == ms) {
         return ids;
     }
-    for (const engraving::Part* p : score->parts()) {
-        for (engraving::Staff* staff : p->staves()) {
-            if (engraving::Staff* linked = staff->findLinkedInScore(ms)) {
+    for (const mu::engraving::Part* p : score->parts()) {
+        for (mu::engraving::Staff* staff : p->staves()) {
+            if (mu::engraving::Staff* linked = staff->findLinkedInScore(ms)) {
                 const QString id = QString::fromStdString(linked->part()->id().toStdString());
                 if (!ids.contains(id)) {
                     ids << id;
