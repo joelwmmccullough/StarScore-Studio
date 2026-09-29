@@ -154,15 +154,15 @@ static bool starscoreIsUntitled(const QString& title)
 }
 
 //! The text of the Title in the score's title frame
-static QString starscoreTitleFrameText(const engraving::MasterScore* ms)
+static QString starscoreTitleFrameText(const mu::engraving::MasterScore* ms)
 {
-    const engraving::MeasureBase* first = ms ? ms->first() : nullptr;
+    const mu::engraving::MeasureBase* first = ms ? ms->first() : nullptr;
     if (!first || !first->isVBox()) {
         return QString();
     }
-    for (engraving::EngravingItem* e : first->el()) {
-        if (e && e->isText() && engraving::toText(e)->textStyleType() == engraving::TextStyleType::TITLE) {
-            return engraving::toText(e)->plainText().toQString().simplified();
+    for (mu::engraving::EngravingItem* e : first->el()) {
+        if (e && e->isText() && mu::engraving::toText(e)->textStyleType() == mu::engraving::TextStyleType::TITLE) {
+            return mu::engraving::toText(e)->plainText().toQString().simplified();
         }
     }
     return QString();
