@@ -4465,7 +4465,21 @@ void TLayout::layoutRehearsalMark(const RehearsalMark* item, RehearsalMark::Layo
     const System* sys = m->system();
     bool systemFirst = (sys && m->isFirstInSystem());
 
-    if (!header || repeat || !systemFirst) {
+    // StarScore: a start repeat at the beginning of a system doesn't push the mark to the right. Place it
+    // as if the repeat weren't there: just after the clef / key signature, like any other system start.
+    bool repeatPlacesMark = repeat != nullptr;
+    if (repeat && systemFirst) {
+        const Segment* beforeRepeat = repeat->prev();
+        while (beforeRepeat && beforeRepeat->isType(Segment::CHORD_REST_OR_TIME_TICK_TYPE)) {
+            beforeRepeat = beforeRepeat->prev();
+        }
+        if (beforeRepeat) {
+            header = beforeRepeat;
+            repeatPlacesMark = false;
+        }
+    }
+
+    if (!header || repeatPlacesMark || !systemFirst) {
         // no header, or header with repeat, or header mid-system - align with barline
         ldata->setPosX(barlineX);
         checkRehearsalMarkVSBigTimeSig(item, ldata);
