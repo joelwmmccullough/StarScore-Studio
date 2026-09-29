@@ -208,23 +208,40 @@ Item {
             readonly property int pageWidth: Math.max(100, Math.round((flick.width - 12) * root.zoom))
             readonly property int renderWidth: Math.max(100, Math.round((flick.width - 12) * root.renderZoom))
 
-            // Trackpad pinch to zoom
+            // Trackpad pinch to zoom, keeping the point under the cursor in place
             PinchHandler {
+                id: pinch
                 target: null
                 property real startZoom: 1.0
+                property real anchorX: 0      // content point under the cursor when the pinch began (at startZoom)
+                property real anchorY: 0
+
+                function viewportPoint() {
+                    return flick.mapFromItem(null, pinch.centroid.scenePosition.x, pinch.centroid.scenePosition.y)
+                }
+
                 onActiveChanged: {
                     if (active) {
                         startZoom = root.zoom
+                        const p = viewportPoint()
+                        anchorX = flick.contentX + p.x
+                        anchorY = flick.contentY + p.y
                         root.pinching = true
                     } else {
                         root.pinching = false
                         root.renderZoom = root.zoom
+                        flick.returnToBounds()
                     }
                 }
                 onActiveScaleChanged: {
-                    if (active) {
-                        root.zoom = Math.max(0.4, Math.min(4.0, startZoom * activeScale))
+                    if (!active) {
+                        return
                     }
+                    root.zoom = Math.max(0.4, Math.min(4.0, startZoom * activeScale))
+                    const r = root.zoom / startZoom
+                    const p = viewportPoint()
+                    flick.contentX = Math.max(0, Math.min(anchorX * r - p.x, flick.contentWidth - flick.width))
+                    flick.contentY = Math.max(0, Math.min(anchorY * r - p.y, flick.contentHeight - flick.height))
                 }
             }
 
