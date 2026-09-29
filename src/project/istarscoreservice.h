@@ -83,6 +83,7 @@ struct StarScoreInstrument
 {
     QString instrumentId;        // MuseScore instrument id, e.g. "bb-trumpet"
     QString partName;            // name for the part, e.g. "Trumpet" (empty = MuseScore default)
+    QString shortName;           // short name (empty = the instrument's own, numbered like the part name)
     bool hidden = false;         // hidden when the section is first created (e.g. Congas)
     std::vector<int> hiddenStaves;  // staves of the instrument hidden by default (e.g. 1 = bass staff of a grand staff)
     bool autoHideLowerStaff = false; // lead sheet: the bass staff shows only in systems where it has music

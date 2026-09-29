@@ -915,6 +915,7 @@ std::vector<StarScoreSectionTemplate> StarScoreService::sectionTemplates() const
     return {
         { "lead-sheet", "Lead Sheet", { [&]() {
               StarScoreInstrument lead = inst("piano", "Lead");
+              lead.shortName = "Lead";
               lead.autoHideLowerStaff = true;
               return lead;
           }() } },
@@ -1096,6 +1097,25 @@ StarScoreSection StarScoreService::finishNewParts(const std::vector<engraving::P
         if (!inst.partName.isEmpty()) {
             master->parts()->setInstrumentName(InstrumentKey { p->instrumentId(), p->id(), engraving::Fraction(0, 1) }, inst.partName);
             p->setPartName(String::fromQString(inst.partName));
+
+            // Short name: MuseScore numbers instruments of the same kind ("Pno. 2" when the lead sheet is also a
+            // piano); use the instrument's own short name, numbered only when the part name is ("Tpt. 1")
+            QString shortName = inst.shortName;
+            if (shortName.isEmpty()) {
+                const InstrumentTemplate& tpl = instrumentsRepository()->instrumentTemplate(String::fromQString(inst.instrumentId));
+                if (!tpl.shortNames.empty()) {
+                    shortName = tpl.shortNames.front().name().toQString();
+                    static const QRegularExpression numberRe("\\s(\\d+)$");
+                    const QRegularExpressionMatch m = numberRe.match(inst.partName);
+                    if (m.hasMatch() && !shortName.isEmpty()) {
+                        shortName += " " + m.captured(1);
+                    }
+                }
+            }
+            if (!shortName.isEmpty()) {
+                master->parts()->setInstrumentAbbreviature(InstrumentKey { p->instrumentId(), p->id(), engraving::Fraction(0, 1) },
+                                                           shortName);
+            }
         }
 
         if (engraving::Instrument* ins = p->instrument()) {
@@ -2479,6 +2499,18 @@ void StarScoreService::pickReferenceForCurrentScore()
         }
         m_restoringReferenceView = false;
         return;
+    }
+
+    // Nothing remembered for this score: the panel is open only if it was open with the main score (a part score
+    // seen for the first time). A new file, or one that never had the panel open, starts with it closed.
+    {
+        const QString mainRemembered = scoreKey == "(main score)" ? QString() : loadReferenceView().value("(main score)").toString();
+        const bool wantOpen = !data.references.empty() && !mainRemembered.isEmpty() && mainRemembered != REFERENCE_PANEL_CLOSED;
+        if (window && window->isDockOpen(STARSCORE_REFERENCE_PANEL) != wantOpen) {
+            m_restoringReferenceView = true;
+            window->setDockOpen(STARSCORE_REFERENCE_PANEL, wantOpen);
+            m_restoringReferenceView = false;
+        }
     }
 
     if (data.references.empty()) {

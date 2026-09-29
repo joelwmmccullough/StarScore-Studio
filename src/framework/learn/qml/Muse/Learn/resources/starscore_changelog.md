@@ -8,6 +8,8 @@ Version numbers: the first number changes when files stop being compatible, the 
 
 - **Saxophone versions of the 7-Horn Bass Trombone part**: when you mark the 7-Horn section's Bass Trombone part Finished, StarScore asks whether to create Baritone Saxophone and Bass Saxophone parts. “Create parts” adds both to the 7-Horn section with the Bass Trombone's music, transposed for each saxophone, and sets them to Needs review. They're hidden in the score and have their own part scores and sheets. Check them there: notes too low for a saxophone are colored as out of range. It asks once; after the parts exist it doesn't ask again.
 - The audit treats them as versions of the Bass Trombone line: they're compared with it (a note moved up an octave shows as a minor issue), they're checked for range, and they aren't counted as extra lines or played in the listen-through. On “Auto”, the section's status counts them.
+- New files: the lead sheet instrument's short name is “Lead” (its long name already was), and the other instruments get their own short names without MuseScore's automatic numbers. Before, the rhythm section's piano was numbered (“Pno. 2”) because the lead sheet is also a piano.
+- The Reference PDF panel opens with a file only if it was open when that file was last closed. New files, and files that never had it open, start with it closed. A part score opened for the first time follows the main score.
 
 ## 1.5.1
 
