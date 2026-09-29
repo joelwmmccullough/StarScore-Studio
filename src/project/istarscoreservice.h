@@ -47,7 +47,7 @@ struct StarScoreSection
     QString name;
     QString templateKey;     // "lead-sheet", "3-horn", "rhythm", … or "custom"
     StarScoreStatus status = StarScoreStatus::InProgress;   // when autoStatus: worked out from its parts
-    bool autoStatus = false; // "Auto": the least-finished status of the section's parts (a part with no tag counts as Empty)
+    bool autoStatus = true;  // new sections start on "Auto": the least-finished status of the section's parts (a part with no tag counts as Empty)
     bool on = true;          // derived, not stored
     QStringList partIds;     // muse::ID of each part, as text
     QStringList shownPartIds;  // parts to show when the section is turned on
