@@ -73,13 +73,13 @@ void ProjectActionsController::init()
     dispatcher()->reg(this, "file-new", [this]() { newProject(false); });
     dispatcher()->reg(this, "file-new-musescore", [this]() { newProject(true); });
     dispatcher()->reg(this, "starscore-copy-layout", [this]() {
-        interactive()->open(Uri("musescore://starscore/copylayout"));
+        interactive()->open(UriQuery("musescore://starscore/copylayout?mode=copy"));
     });
     dispatcher()->reg(this, "starscore-layout-from", [this]() {
-        interactive()->open(UriQuery("musescore://starscore/copylayout?mode=from"));
+        interactive()->open(UriQuery("musescore://starscore/copylayout?mode=copy"));
     });
     dispatcher()->reg(this, "starscore-layout-to", [this]() {
-        interactive()->open(UriQuery("musescore://starscore/copylayout?mode=to"));
+        interactive()->open(UriQuery("musescore://starscore/copylayout?mode=copy"));
     });
     dispatcher()->reg(this, "starscore-part-styles", [this]() {
         interactive()->open(Uri("musescore://starscore/styles"));

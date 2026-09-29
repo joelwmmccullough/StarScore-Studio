@@ -13,11 +13,11 @@ import MuseScore.Project
 StyledDialogView {
     id: root
 
-    // "to": apply this part's system formatting to other parts; "from": take it from another part
-    property string mode: "to"
+    // "copy": Copy part formatting (from the part being viewed, or any other, into the parts you tick).
+    // "to" / "from" are the older two dialogs, kept for anything that still opens them.
+    property string mode: "copy"
 
-    title: mode === "from" ? qsTrc("starscore", "Apply system formatting from another part")
-                           : qsTrc("starscore", "Apply this system formatting to other parts")
+    title: qsTrc("starscore", "Copy part formatting")
 
     contentWidth: 480
     contentHeight: 600

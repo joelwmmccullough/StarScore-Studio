@@ -18,7 +18,7 @@ Version numbers: the first number changes when files stop being compatible, the 
 - New sections get the default mixer settings once their instruments' sounds are loaded. Before, they were applied too early and didn't take.
 - The Reference PDF panel no longer opens with songs that don't use it (it could be reopened by the page restoring its panels after the song opened).
 - Chord symbols: C♭, F♭, E♯, B♯ and double sharps or flats in a chord's root or bass are written as the easier note (B, E, F, C, …), including in transposed parts.
-- “Apply system formatting from another part”: you pick one part to copy from, and it goes into the part you're viewing. The list of parts to tick is gone from this dialog (it stays in “Apply this part's system formatting to other parts”).
+- **Copy part formatting** (Format menu and the StarScore “…” menu) replaces “Apply system formatting from another part” and “Apply this system formatting to other parts”: choose the part to copy from (the part you're viewing to start with) and tick the parts to copy into.
 - A multimeasure rest no longer shows a double barline that belonged to bars it used to end on. A double barline written at the end of its last bar still shows.
 
 ## 1.7.0

@@ -58,6 +58,12 @@ void CopyLayoutModel::load(const QString& mode)
         if (m_sourceIndex == currentIndex) {
             m_sourceIndex = 0;
         }
+    } else if (mode == "copy") {
+        // Copy part formatting: from the part being viewed (change it in the list), into the parts you tick
+        m_sourceIndex = currentIndex;
+        for (Entry& e : m_entries) {
+            e.checked = false;
+        }
     } else {
         // The part being viewed is the source; every other part is ticked
         m_sourceIndex = currentIndex;
