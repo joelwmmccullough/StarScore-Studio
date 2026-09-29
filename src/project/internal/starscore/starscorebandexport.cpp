@@ -1578,10 +1578,12 @@ RetVal<std::vector<StarScoreSongbookSheet> > StarScoreService::songbookChartShee
                     continue;
                 }
                 const QString iid = part->instrumentId().toQString();
+                // Horns by the band's name for them plus their number ("Trumpet 1 in B♭", "Alto Saxophone 2")
+                static const QRegularExpression numberRe("\\s(\\d+)$");
+                const QRegularExpressionMatch num = numberRe.match(part->partName().toQString());
+                const QString horn = starscoreHornName(iid);
                 QString name = sec.templateKey == "lead-sheet" ? QString("Lead Sheet")
-                               : !starscoreHornName(iid).isEmpty() ? starscoreSheetHornName(part->partName().toQString().isEmpty()
-                                                                                             ? starscoreHornName(iid)
-                                                                                             : part->partName().toQString())
+                               : !horn.isEmpty() ? starscoreSheetHornName(horn + (num.hasMatch() ? " " + num.captured(1) : QString()))
                                : part->partName().toQString();
                 QString file = starscoreSafeFileName(QString(name).replace(QString::fromUtf8("♭"), "b"));
                 if (used[file]++ > 0) {
