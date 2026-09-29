@@ -22,6 +22,7 @@
 #include "macosmainwindowbridge.h"
 
 #include <Cocoa/Cocoa.h>
+#include <QTimer>
 #include <QWindow>
 
 using namespace muse::ui;
@@ -37,6 +38,31 @@ static NSWindow* nsWindowForQWindow(QWindow* qWindow)
     return nsWindow;
 }
 
+//! StarScore: the title bar's document icon for .starscore files is the StarScore document icon, whatever macOS
+//! has cached for the file type (an older registration can still point at the MuseScore icon)
+static void starscoreApplyDocumentIcon(QWindow* qWindow)
+{
+    NSWindow* nsWindow = nsWindowForQWindow(qWindow);
+    if (!nsWindow) {
+        return;
+    }
+    NSString* path = qWindow->filePath().toNSString();
+    if (![[[path pathExtension] lowercaseString] isEqualToString:@"starscore"]) {
+        return;
+    }
+    NSButton* button = [nsWindow standardWindowButton:NSWindowDocumentIconButton];
+    NSString* iconPath = [[NSBundle mainBundle] pathForResource:@"StarScoreIcon" ofType:@"icns"];
+    if (!button || !iconPath) {
+        return;
+    }
+    NSImage* image = [[NSImage alloc] initWithContentsOfFile:iconPath];
+    if (!image) {
+        return;
+    }
+    [image setSize:NSMakeSize(16, 16)];
+    [button setImage:image];
+}
+
 MacOSMainWindowBridge::MacOSMainWindowBridge(QObject* parent)
     : MainWindowBridge(parent)
 {
@@ -50,6 +76,12 @@ void MacOSMainWindowBridge::init()
 
     uiConfiguration()->currentThemeChanged().onNotify(this, [this]() {
         uiConfiguration()->applyPlatformStyle(m_window);
+    });
+
+    // after Qt has set the window's file (and its own icon for it)
+    connect(this, &MainWindowBridge::filePathChanged, this, [this]() {
+        QTimer::singleShot(0, this, [this]() { starscoreApplyDocumentIcon(m_window); });
+        QTimer::singleShot(300, this, [this]() { starscoreApplyDocumentIcon(m_window); });
     });
 }
 

@@ -433,13 +433,8 @@ void StarScoreService::standardizeImported()
         if (s.templateKey == "lead-sheet") {
             if (engraving::Part* p = s.partIds.isEmpty() ? nullptr : partById(s.partIds.front())) {
                 rename(p, "Lead");
-                // The lead sheet shows only the treble staff, unless the bass staff has music in it
-                if (p->nstaves() > 1) {
-                    const engraving::Staff* bass = p->staves().at(1);
-                    if (bass->show() && !staffHasNotes(ms, bass->idx())) {
-                        master->parts()->setStaffVisible(bass->id(), false);
-                    }
-                }
+                // The lead sheet's bass staff shows only in systems where it has music
+                autoHideLeadBassStaff(master, p);
             }
             continue;
         }

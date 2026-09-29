@@ -360,12 +360,15 @@ static int starscoreSaxRank(const QString& fam)
 
 std::vector<StarScoreVoiceSection> StarScoreService::checkVoiceOrder() const
 {
+    return checkVoiceOrderIn(masterScore(), load());
+}
+
+std::vector<StarScoreVoiceSection> StarScoreService::checkVoiceOrderIn(const MasterScore* ms, const Data& data) const
+{
     std::vector<StarScoreVoiceSection> result;
-    const MasterScore* ms = masterScore();
     if (!ms) {
         return result;
     }
-    const Data data = load();
 
     int barCount = 0;
     std::vector<int> barStarts;

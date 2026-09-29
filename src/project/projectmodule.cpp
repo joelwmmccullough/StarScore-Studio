@@ -133,6 +133,7 @@ void ProjectModule::resolveImports()
         ir->registerQmlUri(Uri("musescore://starscore/exportband"), "MuseScore.Project", "BandExportDialog");
         ir->registerQmlUri(Uri("musescore://starscore/compare"), "MuseScore.Project", "ComparePartsDialog");
         ir->registerQmlUri(Uri("musescore://starscore/voiceorder"), "MuseScore.Project", "VoiceOrderDialog");
+        ir->registerQmlUri(Uri("musescore://starscore/auditlibrary"), "MuseScore.Project", "AuditLibraryDialog");
         ir->registerQmlUri(Uri("musescore://starscore/import"), "MuseScore.Project", "StarScoreImportDialog");
     }
 

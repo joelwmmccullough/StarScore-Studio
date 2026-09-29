@@ -20,6 +20,7 @@
 #include "global/iglobalconfiguration.h"
 #include "dockwindow/idockwindowprovider.h"
 #include "dockwindow/idockwindow.h"
+#include "actions/iactionsdispatcher.h"
 
 namespace mu::engraving {
 class MasterScore;
@@ -38,6 +39,7 @@ class StarScoreService : public IStarScoreService, public muse::Contextable, pub
     muse::ContextInject<playback::IPlaybackController> playbackController = { this };
     muse::ContextInject<INotationWritersRegister> writers = { this };
     muse::ContextInject<muse::dock::IDockWindowProvider> dockWindowProvider = { this };
+    muse::ContextInject<muse::actions::IActionsDispatcher> dispatcher = { this };
 
 public:
     explicit StarScoreService(const muse::modularity::ContextPtr& iocCtx);
@@ -153,6 +155,22 @@ public:
 
     muse::Ret exportArrangement(const QString& arrangementId, const muse::io::path_t& msczPath) override;
 
+    StarScoreAuditReport audit() const override;
+    void setAuditReferenceSection(const QString& sectionId) override;
+    void setAuditIntentional(const QString& issueKey, bool intentional) override;
+    void setArrangementAudited(const QString& arrangementId, bool audited) override;
+    void setListenApproved(const QString& stepKey, bool approved) override;
+    void showAuditIssue(const StarScoreAuditIssue& issue) override;
+    void playListenStep(const StarScoreListenStep& step, bool withRhythmSection) override;
+    void stopListening() override;
+    bool isListening() const override;
+    muse::async::Notification listeningChanged() const override;
+    QString auditLibraryFolder() const override;
+    void setAuditLibraryFolder(const QString& path) override;
+    QStringList auditLibraryFiles(const QString& folder) const override;
+    StarScoreAuditFileSummary auditFile(const QString& path, bool force) override;
+    std::vector<StarScoreAuditFileSummary> cachedLibraryAudit(const QString& folder) const override;
+
     struct Data {
         std::vector<StarScoreSection> sections;
         std::vector<StarScoreArrangement> arrangements;
@@ -160,6 +178,13 @@ public:
         std::vector<StarScoreReference> references;
         std::map<QString, QString> referenceForScore;   // part score name ("" = main score) -> reference shown with it
         QString version;   // "4.0.1"; printed in the footer
+        QString fileId;    // permanent id of this .starscore (kept when the file is moved or renamed)
+
+        // Audit mode
+        QString auditReferenceSectionId;          // section the others are compared with (empty = automatic)
+        QStringList auditIntentional;             // issue keys marked "intentional"
+        std::map<QString, std::pair<QString, QString> > auditAudited;   // arrangement id -> (date, fingerprint)
+        QStringList auditListened;                // approved listen steps
     };
 
     // (de)serialisation of the "starscore" meta tag; public for tests
@@ -167,6 +192,7 @@ public:
     static QString toJson(const Data& data);
     static QString statusKey(StarScoreStatus status);
     static StarScoreStatus statusFromKey(const QString& key);
+    static QString idTextOf(const mu::engraving::Part* part);
 
 private:
     mu::engraving::MasterScore* masterScore() const;
@@ -201,6 +227,7 @@ private:
     StarScoreSection finishNewParts(const std::vector<mu::engraving::Part*>& newParts,
                                     const std::vector<StarScoreInstrument>& instruments);
     const StarScoreSectionTemplate* sectionTemplate(const QString& key) const;
+    static void autoHideLeadBassStaff(const notation::IMasterNotationPtr& master, mu::engraving::Part* part);
     void removePartsKeepingSystemObjects(const QStringList& partIdsToRemove);
     static void removePartsKeepingSystemObjects(const notation::IMasterNotationPtr& master, const QStringList& partIdsToRemove);
 
@@ -227,10 +254,21 @@ private:
     QString m_currentReferenceId;
     QString currentScoreKey() const;
     void pickReferenceForCurrentScore();
-    QString referenceViewSettingsKey() const;
+    QStringList referenceViewSettingsKeys() const;
+    void ensureFileId();
     QJsonObject loadReferenceView() const;
     void recordReferenceView();
     void listenReferencePanel();
+
+    // audit
+    StarScoreAuditReport auditScore(const mu::engraving::MasterScore* ms, const Data& data) const;
+    std::vector<StarScoreVoiceSection> checkVoiceOrderIn(const mu::engraving::MasterScore* ms, const Data& data) const;
+    void onPlaybackPosition(int tick);
+    muse::async::Notification m_listeningChanged;
+    std::map<QString, bool> m_listenVisibility;   // every part's visibility before listening
+    bool m_listening = false;
+    int m_listenStartTick = -1;
+    int m_listenEndTick = -1;
     bool m_restoringReferenceView = false;
     bool m_switching = false;
 };

@@ -303,6 +303,7 @@ MenuItem* AppMenuModel::makeViewMenu()
 #endif
         makeMenuItem("starscore-toggle-panel"),
         makeMenuItem("toggle-starscore-reference"),
+        makeMenuItem("toggle-starscore-audit"),
         makeMenuItem("toggle-palettes"),
         makeMenuItem("masterpalette"),
         makeMenuItem("toggle-instruments"),
@@ -369,6 +370,7 @@ MenuItem* AppMenuModel::makeFormatMenu()
         makeMenuItem("starscore-add-solo"),
         makeMenuItem("starscore-compare-parts"),
         makeMenuItem("starscore-voice-order"),
+        makeMenuItem("starscore-audit-library"),
         makeMenuItem("starscore-toggle-minmaj"),
         makeMenuItem("starscore-check-ranges"),
         makeMenuItem("starscore-color-notes"),

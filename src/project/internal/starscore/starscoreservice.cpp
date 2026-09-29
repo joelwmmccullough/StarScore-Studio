@@ -92,6 +92,11 @@ void StarScoreService::init()
         pickReferenceForCurrentScore();
     });
     listenReferencePanel();
+
+    // Audit listen-through: stop at the end of the rehearsal section
+    playbackController()->currentPlaybackPositionChanged().onReceive(this, [this](muse::audio::secs_t, muse::midi::tick_t tick) {
+        onPlaybackPosition(int(tick));
+    });
 }
 
 void StarScoreService::listenCurrentProject()
@@ -248,6 +253,21 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
     }
 
     data.version = root.value("scoreVersion").toString();
+    data.fileId = root.value("fileId").toString();
+
+    const QJsonObject audit = root.value("audit").toObject();
+    data.auditReferenceSectionId = audit.value("reference").toString();
+    for (const QJsonValue& v : audit.value("intentional").toArray()) {
+        data.auditIntentional << v.toString();
+    }
+    for (const QJsonValue& v : audit.value("listened").toArray()) {
+        data.auditListened << v.toString();
+    }
+    const QJsonObject audited = audit.value("audited").toObject();
+    for (auto it = audited.begin(); it != audited.end(); ++it) {
+        const QJsonObject o = it.value().toObject();
+        data.auditAudited[it.key()] = { o.value("date").toString(), o.value("fp").toString() };
+    }
 
     for (const QJsonValue& v : root.value("arrangements").toArray()) {
         const QJsonObject o = v.toObject();
@@ -341,6 +361,29 @@ QString StarScoreService::toJson(const Data& data)
     }
     if (!refForScore.isEmpty()) {
         root["referenceForScore"] = refForScore;
+    }
+    if (!data.fileId.isEmpty()) {
+        root["fileId"] = data.fileId;
+    }
+    QJsonObject audit;
+    if (!data.auditReferenceSectionId.isEmpty()) {
+        audit["reference"] = data.auditReferenceSectionId;
+    }
+    if (!data.auditIntentional.isEmpty()) {
+        audit["intentional"] = QJsonArray::fromStringList(data.auditIntentional);
+    }
+    if (!data.auditListened.isEmpty()) {
+        audit["listened"] = QJsonArray::fromStringList(data.auditListened);
+    }
+    QJsonObject audited;
+    for (const auto& [arrId, entry] : data.auditAudited) {
+        audited[arrId] = QJsonObject { { "date", entry.first }, { "fp", entry.second } };
+    }
+    if (!audited.isEmpty()) {
+        audit["audited"] = audited;
+    }
+    if (!audit.isEmpty()) {
+        root["audit"] = audit;
     }
 
     return QString::fromUtf8(QJsonDocument(root).toJson(QJsonDocument::Compact));
@@ -725,6 +768,27 @@ void StarScoreService::setAllSectionsOn(bool on)
 //  Templates
 // ---------------------------------------------------------------------------
 
+//! Lead sheet: the bass staff is shown only in systems where it has music (staff setting "Hide when empty: Always",
+//! which also applies to the first system), in the main score and every part book
+void StarScoreService::autoHideLeadBassStaff(const IMasterNotationPtr& master, engraving::Part* part)
+{
+    if (!master || !part || part->nstaves() < 2) {
+        return;
+    }
+    engraving::Staff* bass = part->staves().at(1);
+    if (!bass->show()) {
+        master->parts()->setStaffVisible(bass->id(), true);
+    }
+    bass->setHideWhenEmpty(engraving::AutoOnOff::ON);
+    for (engraving::Staff* linked : bass->staffList()) {
+        linked->setHideWhenEmpty(engraving::AutoOnOff::ON);
+    }
+    master->masterScore()->setLayoutAll();
+    for (engraving::Score* score : master->masterScore()->scoreList()) {
+        score->setLayoutAll();
+    }
+}
+
 std::vector<StarScoreSectionTemplate> StarScoreService::sectionTemplates() const
 {
     auto inst = [](const char* id, const char* name, bool hidden = false, std::vector<int> hiddenStaves = {}) {
@@ -748,7 +812,11 @@ std::vector<StarScoreSectionTemplate> StarScoreService::sectionTemplates() const
     };
 
     return {
-        { "lead-sheet", "Lead Sheet", { inst("piano", "Lead", false, { 1 }) } },
+        { "lead-sheet", "Lead Sheet", { [&]() {
+              StarScoreInstrument lead = inst("piano", "Lead");
+              lead.autoHideLowerStaff = true;
+              return lead;
+          }() } },
         { "rhythm", "Rhythm Section", {
               inst("piano", "Piano"), inst("electric-guitar", "Electric Guitar"), inst("electric-bass", "Electric Bass"),
               inst("drumset", "Drum Kit"), inst("congas", "Congas", true) } },
@@ -958,6 +1026,12 @@ StarScoreSection StarScoreService::finishNewParts(const std::vector<engraving::P
     }
 
     addPartBooksFor(section.partIds);
+
+    for (size_t i = 0; i < newParts.size() && i < instruments.size(); ++i) {
+        if (instruments[i].autoHideLowerStaff) {
+            autoHideLeadBassStaff(master, newParts[i]);
+        }
+    }
 
     if (!hide.empty()) {
         master->parts()->setPartsVisible(hide, TranslatableString::untranslatable("Hide instruments"));
@@ -1861,6 +1935,19 @@ int StarScoreService::applyStyles(const QStringList& partIds)
 {
     const int restyled = applyStylesOnly(partIds);
     applyMixerDefaults(partIds);
+
+    // Default layout: the lead sheet's bass staff shows only where it has music
+    if (partIds.isEmpty()) {
+        IMasterNotationPtr master = globalContext()->currentMasterNotation();
+        engraving::MasterScore* ms = masterScore();
+        if (master && ms) {
+            for (const StarScoreSection& s : load().sections) {
+                if (s.templateKey == "lead-sheet" && !s.partIds.isEmpty()) {
+                    autoHideLeadBassStaff(master, ms->partById(ID(s.partIds.front())));
+                }
+            }
+        }
+    }
     return restyled;
 }
 
@@ -2055,22 +2142,56 @@ QString StarScoreService::currentReferenceId() const
 static const QString STARSCORE_REFERENCE_PANEL("starscoreReferencePanel");
 static const QString REFERENCE_PANEL_CLOSED("-");
 
-QString StarScoreService::referenceViewSettingsKey() const
+//! Settings keys for this file: by its permanent id (survives moving and renaming) and, as a fallback for
+//! files that haven't been saved with an id yet, by its path
+QStringList StarScoreService::referenceViewSettingsKeys() const
 {
+    QStringList keys;
     if (!m_mainProject) {
-        return QString();
+        return keys;
+    }
+    const QString fileId = loadFrom(m_mainProject->masterNotation()->masterScore()).fileId;
+    if (!fileId.isEmpty()) {
+        keys << "StarScore/referenceView/id-" + fileId;
     }
     const QByteArray path = m_mainProject->path().toQString().toUtf8();
-    return "StarScore/referenceView/" + QString::fromLatin1(QCryptographicHash::hash(path, QCryptographicHash::Md5).toHex());
+    keys << "StarScore/referenceView/" + QString::fromLatin1(QCryptographicHash::hash(path, QCryptographicHash::Md5).toHex());
+    return keys;
 }
 
 QJsonObject StarScoreService::loadReferenceView() const
 {
-    const QString key = referenceViewSettingsKey();
-    if (key.isEmpty()) {
-        return QJsonObject();
+    QSettings settings;
+    for (const QString& key : referenceViewSettingsKeys()) {
+        if (settings.contains(key)) {
+            return QJsonDocument::fromJson(settings.value(key).toByteArray()).object();
+        }
     }
-    return QJsonDocument::fromJson(QSettings().value(key).toByteArray()).object();
+    return QJsonObject();
+}
+
+//! Give the main score a permanent id if it has none (saved with the file the next time it is saved).
+//! Doesn't mark the score as changed.
+void StarScoreService::ensureFileId()
+{
+    if (!m_mainProject) {
+        return;
+    }
+    engraving::MasterScore* ms = m_mainProject->masterNotation()->masterScore();
+    if (!ms || ms->metaTag(STARSCORE_META_TAG).isEmpty()) {
+        return;
+    }
+    Data data = fromJson(ms->metaTag(STARSCORE_META_TAG).toQString());
+    if (!data.fileId.isEmpty()) {
+        return;
+    }
+    // Carry over the reference PDF memory stored by path before the file had an id
+    const QJsonObject view = loadReferenceView();
+    data.fileId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    ms->setMetaTag(STARSCORE_META_TAG, String::fromQString(toJson(data)));
+    if (!view.isEmpty()) {
+        QSettings().setValue("StarScore/referenceView/id-" + data.fileId, QJsonDocument(view).toJson(QJsonDocument::Compact));
+    }
 }
 
 void StarScoreService::recordReferenceView()
@@ -2078,9 +2199,9 @@ void StarScoreService::recordReferenceView()
     if (m_restoringReferenceView || !m_mainProject) {
         return;
     }
-    const QString settingsKey = referenceViewSettingsKey();
+    const QStringList settingsKeys = referenceViewSettingsKeys();
     muse::dock::IDockWindow* window = dockWindowProvider()->window();
-    if (settingsKey.isEmpty() || !window) {
+    if (settingsKeys.isEmpty() || !window) {
         return;
     }
     const bool open = window->isDockOpen(STARSCORE_REFERENCE_PANEL);
@@ -2092,7 +2213,10 @@ void StarScoreService::recordReferenceView()
     const QString scoreKey = currentScoreKey().isEmpty() ? QString("(main score)") : currentScoreKey();
     if (view.value(scoreKey).toString() != value) {
         view[scoreKey] = value;
-        QSettings().setValue(settingsKey, QJsonDocument(view).toJson(QJsonDocument::Compact));
+        QSettings settings;
+        for (const QString& settingsKey : settingsKeys) {
+            settings.setValue(settingsKey, QJsonDocument(view).toJson(QJsonDocument::Compact));
+        }
     }
 }
 
@@ -2339,6 +2463,13 @@ void StarScoreService::onCurrentProjectChanged()
 
     clearSolos();
     m_mainProject = current;
+    if (m_listening) {
+        // a different score: nothing of the old one to restore
+        m_listening = false;
+        m_listenVisibility.clear();
+        m_listenEndTick = -1;
+        m_listeningChanged.notify();
+    }
 
     m_mainProject->saveComplited().onReceive(this, [this](const io::path_t& path, SaveMode mode) {
         if (mode == SaveMode::Save || mode == SaveMode::SaveAs || mode == SaveMode::SaveCopy) {
@@ -2352,6 +2483,7 @@ void StarScoreService::onCurrentProjectChanged()
     });
 
     extractSolos();
+    ensureFileId();
 }
 
 void StarScoreService::clearSolos()

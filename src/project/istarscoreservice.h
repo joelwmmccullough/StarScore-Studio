@@ -72,6 +72,7 @@ struct StarScoreInstrument
     QString partName;            // name for the part, e.g. "Trumpet" (empty = MuseScore default)
     bool hidden = false;         // hidden when the section is first created (e.g. Congas)
     std::vector<int> hiddenStaves;  // staves of the instrument hidden by default (e.g. 1 = bass staff of a grand staff)
+    bool autoHideLowerStaff = false; // lead sheet: the bass staff shows only in systems where it has music
     // Playable ranges in concert pitch (MIDI numbers; -1 = keep the instrument's own). MuseScore colours notes
     // outside the amateur range dark yellow and outside the pro range red.
     int minPitchA = -1;
@@ -232,6 +233,71 @@ struct StarScoreImportPlan
     std::vector<StarScoreImportPart> parts;
     QStringList suggestedArrangements;   // arrangement template keys
     QString summary;                     // e.g. "Looks like 3-Horn Standard: Lead Sheet, 3-Horn Section, Rhythm Section (no congas)"
+};
+
+//! Audit mode: one thing to look at in the horn parts (or a structural problem in any part)
+struct StarScoreAuditIssue
+{
+    QString key;                 // stable id, used to mark it intentional
+    QString check;               // "any-keys", "reference", "melody", "structure", "range", "crossing", "doubling", "dynamics"
+    int severity = 1;            // 2 = likely error, 1 = worth a look, 0 = minor
+    int bar = 0;                 // 1-based, first bar
+    int endBar = 0;              // last bar (same as bar for one bar)
+    QString partId;
+    QString otherPartId;         // the part it was compared with, if any
+    QStringList sectionIds;      // sections holding partId
+    QString title;               // e.g. "Differs from the reference"
+    QString partLabel;           // e.g. "Alto Saxophone — 3-Horn Section"
+    QString message;             // e.g. "Beat 3: E♭ here, D in Trumpet A (6-Horn Section)"
+    bool intentional = false;
+};
+
+struct StarScoreAuditArrangementState
+{
+    QString id;
+    QString name;
+    int openIssues = 0;          // severity ≥ 1, not intentional
+    int likelyErrors = 0;        // severity 2, not intentional
+    bool audited = false;
+    bool changedSinceAudit = false;
+    QString auditedDate;         // yyyy-MM-dd
+};
+
+//! Listen-through: one horn section at one rehearsal mark
+struct StarScoreListenStep
+{
+    QString key;                 // stable id; changes when the music changes
+    QString rehearsal;           // e.g. "C" ("Start" for the bars before the first rehearsal mark)
+    int startBar = 1;
+    int endBar = 1;
+    QString sectionId;
+    QString sectionName;
+    bool approved = false;
+};
+
+struct StarScoreAuditReport
+{
+    std::vector<StarScoreAuditIssue> issues;          // bar order
+    std::vector<StarScoreAuditArrangementState> arrangements;
+    std::vector<StarScoreListenStep> listen;          // rehearsal order, then biggest horn section first
+    QString referenceSectionId;                       // the section actually used as reference
+    QStringList referenceChoiceIds;                   // horn sections that can be the reference
+    QStringList referenceChoiceNames;
+};
+
+//! One file's line in the library audit
+struct StarScoreAuditFileSummary
+{
+    QString path;
+    QString title;
+    int openIssues = 0;
+    int likelyErrors = 0;
+    int arrangements = 0;
+    int arrangementsAudited = 0;     // audited and unchanged since
+    int arrangementsChanged = 0;     // audited, but changed since
+    int listenSteps = 0;
+    int listenApproved = 0;
+    QString error;                   // couldn't be read
 };
 
 struct StarScorePartInfo
@@ -416,5 +482,28 @@ public:
 
     //! Save a .mscz holding only the instruments and part books of this arrangement's sections.
     virtual muse::Ret exportArrangement(const QString& arrangementId, const muse::io::path_t& msczPath) = 0;
+
+    // --- Audit mode (the audit data is saved in the .starscore)
+    virtual StarScoreAuditReport audit() const = 0;
+    virtual void setAuditReferenceSection(const QString& sectionId) = 0;   // empty = automatic
+    virtual void setAuditIntentional(const QString& issueKey, bool intentional) = 0;
+    virtual void setArrangementAudited(const QString& arrangementId, bool audited) = 0;
+    virtual void setListenApproved(const QString& stepKey, bool approved) = 0;
+    //! Select the issue's bars in the main score (both parts when it compares two), showing them if hidden
+    virtual void showAuditIssue(const StarScoreAuditIssue& issue) = 0;
+    //! Play one horn section over a rehearsal section: every other instrument is hidden (and so silent) until
+    //! stopListening(); playback stops at the end of the section
+    virtual void playListenStep(const StarScoreListenStep& step, bool withRhythmSection) = 0;
+    virtual void stopListening() = 0;
+    virtual bool isListening() const = 0;
+    virtual muse::async::Notification listeningChanged() const = 0;
+
+    // --- Library audit: every .starscore in a folder
+    virtual QString auditLibraryFolder() const = 0;
+    virtual void setAuditLibraryFolder(const QString& path) = 0;
+    virtual QStringList auditLibraryFiles(const QString& folder) const = 0;
+    //! Cached result when the file hasn't changed since it was last checked (unless force)
+    virtual StarScoreAuditFileSummary auditFile(const QString& path, bool force) = 0;
+    virtual std::vector<StarScoreAuditFileSummary> cachedLibraryAudit(const QString& folder) const = 0;
 };
 }

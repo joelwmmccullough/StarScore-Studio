@@ -105,12 +105,16 @@ target_sources(project PRIVATE
     internal/starscore/starscorehouse.cpp
     internal/starscore/starscorehouse.h
     internal/starscore/starscorecompare.cpp
+    internal/starscore/starscoreaudit.cpp
     internal/starscore/starscoreimport.cpp
     internal/starscore/starscoremixer.cpp
     internal/starscore/starscorepdf.cpp
     internal/starscore/starscorepdf.h
     internal/starscore/starscoreengraving.h
 )
+
+# StarScore audit: its own translation unit (file-local helper types)
+set_source_files_properties(internal/starscore/starscoreaudit.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 
 if (OS_IS_MAC)
     target_sources(project PRIVATE

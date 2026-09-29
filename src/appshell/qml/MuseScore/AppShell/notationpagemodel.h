@@ -76,6 +76,7 @@ public:
     Q_INVOKABLE QString selectionFiltersPanelName() const;
     Q_INVOKABLE QString undoHistoryPanelName() const;
     Q_INVOKABLE QString starscoreReferencePanelName() const;
+    Q_INVOKABLE QString starscoreAuditPanelName() const;
 
     Q_INVOKABLE QString mixerPanelName() const;
     Q_INVOKABLE QString pianoKeyboardPanelName() const;

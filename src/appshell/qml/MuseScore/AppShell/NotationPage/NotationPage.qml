@@ -418,6 +418,36 @@ DockPage {
                 navigationOrderStart: starscoreReferencePanel.contentNavigationPanelOrderStart
             }
         },
+
+        // StarScore: audit the parts (automatic checks and the horn listen-through)
+        DockPanel {
+            id: starscoreAuditPanel
+
+            objectName: root.pageModel.starscoreAuditPanelName()
+            title: qsTrc("starscore", "Audit")
+
+            navigationSection: root.navigationPanelSec(starscoreAuditPanel.location)
+
+            width: 380
+            minimumWidth: 280
+            maximumWidth: root.panelMaxDimension
+
+            minimumHeight: root.panelMinDimension
+            maximumHeight: root.panelMaxDimension
+
+            groupName: root.verticalPanelsGroup
+            location: Location.Right
+
+            //! NOTE: hidden by default
+            visible: false
+
+            dropDestinations: root.verticalPanelDropDestinations
+
+            StarScoreAuditPanel {
+                navigationSection: starscoreAuditPanel.navigationSection
+                navigationOrderStart: starscoreAuditPanel.contentNavigationPanelOrderStart
+            }
+        },
         
         // =============================================
         // Horizontal Panels

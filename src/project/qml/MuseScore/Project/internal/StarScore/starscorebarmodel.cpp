@@ -375,6 +375,8 @@ QVariantList StarScoreBarModel::moreMenu() const
                         : muse::qtrc("starscore", "Minor-major / diminished-major symbols in this part: off (switch on)") },
                       { "enabled", true } },
         QVariantMap { { "id", "voice-order" }, { "title", muse::qtrc("starscore", "Check voice order…") }, { "enabled", true } },
+        QVariantMap { { "id", "audit" }, { "title", muse::qtrc("starscore", "Audit this song") }, { "enabled", true } },
+        QVariantMap { { "id", "audit-library" }, { "title", muse::qtrc("starscore", "Audit library…") }, { "enabled", true } },
         QVariantMap { { "id", "sync-scores" }, { "title", muse::qtrc("starscore", "Make / update arrangement scores") }, { "enabled", true } },
         QVariantMap { { "id", "check-ranges" }, { "title", muse::qtrc("starscore", "Check instrument ranges") }, { "enabled", true } },
         QVariantMap { { "id", "set-version" }, { "title", muse::qtrc("starscore", "Version number (%1)…").arg(starScore()->scoreVersion()) },
@@ -645,6 +647,12 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
         starScore()->setMinMajSymbolInCurrentScore(!starScore()->minMajSymbolInCurrentScore());
     } else if (action == "voice-order") {
         dispatcher()->dispatch("starscore-voice-order");
+    } else if (action == "audit") {
+        if (dockWindowProvider()->window() && !dockWindowProvider()->window()->isDockOpen("starscoreAuditPanel")) {
+            dispatcher()->dispatch("toggle-starscore-audit");
+        }
+    } else if (action == "audit-library") {
+        dispatcher()->dispatch("starscore-audit-library");
     } else if (action == "sync-scores") {
         starScore()->syncArrangementScores();
     } else if (action == "check-ranges") {

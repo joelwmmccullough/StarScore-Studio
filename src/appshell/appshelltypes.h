@@ -35,6 +35,7 @@ static const DockName INSPECTOR_PANEL_NAME("inspectorPanel");
 static const DockName SELECTION_FILTERS_PANEL_NAME("selectionFiltersPanel");
 static const DockName UNDO_HISTORY_PANEL_NAME("undoHistoryPanel");
 static const DockName STARSCORE_REFERENCE_PANEL_NAME("starscoreReferencePanel");
+static const DockName STARSCORE_AUDIT_PANEL_NAME("starscoreAuditPanel");
 
 static const DockName NOTATION_NAVIGATOR_PANEL_NAME("notationNavigatorPanel");
 static const DockName NOTATION_BRAILLE_PANEL_NAME("notationBraillePanel");

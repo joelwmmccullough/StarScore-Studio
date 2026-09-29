@@ -92,6 +92,9 @@ void ProjectActionsController::init()
     });
     dispatcher()->reg(this, "starscore-export-band", [this]() { exportToBandFolder(); });
     dispatcher()->reg(this, "starscore-export-arrangements", [this]() { exportArrangementsAsMscz(); });
+    dispatcher()->reg(this, "starscore-audit-library", [this]() {
+        interactive()->open(Uri("musescore://starscore/auditlibrary"));
+    });
     dispatcher()->reg(this, "starscore-compare-parts", [this]() {
         interactive()->open(Uri("musescore://starscore/compare"));
     });

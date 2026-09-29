@@ -99,6 +99,12 @@ const UiActionList ProjectUiActions::m_actions = {
              TranslatableString("action", "Export arrangements as MuseScore files…"),
              TranslatableString("action", "Export each arrangement as its own MuseScore file (.mscz)")
              ),
+    UiAction("starscore-audit-library",
+             mu::context::UiCtxAny,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Audit library…"),
+             TranslatableString("action", "Every .starscore in your projects folder, with what's left to audit in each")
+             ),
     UiAction("starscore-compare-parts",
              mu::context::UiCtxProjectOpened,
              mu::context::CTX_ANY,

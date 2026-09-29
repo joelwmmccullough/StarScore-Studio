@@ -20,6 +20,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include "font.h"
+
+#ifndef NO_QT_SUPPORT
+#include <mutex>
+#include <QFontDatabase>
+#include <QHash>
+#include <QRegularExpression>
+#endif
 #include "global/realfn.h"
 
 using namespace muse;
@@ -159,9 +166,34 @@ void Font::setHinting(Hinting hinting)
 }
 
 #ifndef NO_QT_SUPPORT
+//! StarScore: Qt's PDF export only embeds the default (regular) instance of a variable font, so bold or italic
+//! text in a variable font ("TT Modernoir VF Trial") comes out regular in exported PDFs. When the same design is
+//! installed as static fonts ("TT Modernoir Trial"), use those for bold and italic text.
+static QString starscoreStaticFamilyFor(const QString& family)
+{
+    static const QRegularExpression vfRe("\\s*\\bVF\\b\\s*");
+    if (!family.contains(vfRe)) {
+        return family;
+    }
+    static std::mutex mutex;
+    static QHash<QString, QString> cache;
+    std::lock_guard<std::mutex> lock(mutex);
+    auto it = cache.constFind(family);
+    if (it != cache.constEnd()) {
+        return it.value();
+    }
+    QString candidate = family;
+    candidate.replace(vfRe, " ");
+    candidate = candidate.simplified();
+    const QString result = QFontDatabase::hasFamily(candidate) ? candidate : family;
+    cache.insert(family, result);
+    return result;
+}
+
 QFont Font::toQFont() const
 {
-    QFont qf(family().id());
+    const QString familyName = (bold() || italic()) ? starscoreStaticFamilyFor(family().id().toQString()) : family().id().toQString();
+    QFont qf(familyName);
 
     if (pointSizeF() > 0) {
         qf.setPointSizeF(pointSizeF());
