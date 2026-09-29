@@ -6,6 +6,7 @@ Version numbers: the first number changes when files stop being compatible, the 
 
 ## 1.4.4
 
+- A rehearsal mark that would touch a chord symbol right after it slides a little to the left (up to 4 spaces) instead of jumping up above the chord, so it stays at its usual height.
 - Part styles dialog: removed the outdated line naming the built-in default style.
 
 ## 1.4.3

@@ -47,6 +47,7 @@
 #include "dom/ornament.h"
 #include "dom/part.h"
 #include "dom/parenthesis.h"
+#include "dom/rehearsalmark.h"
 #include "dom/pedal.h"
 #include "dom/playcounttext.h"
 #include "dom/rest.h"
@@ -1166,6 +1167,54 @@ void SystemLayout::layoutFretDiagrams(const ElementsToLayout& elements, System* 
     }
 }
 
+//! StarScore: a rehearsal mark that would touch a chord symbol just to its right slides left (up to 4 spaces) instead
+//! of being pushed up above the chord, so it stays at its normal height
+static void starscoreClearRehearsalMarkFromChords(RehearsalMark* mark, System* system)
+{
+    if (!mark->autoplace() || !mark->placeAbove() || !mark->explicitParent()) {
+        return;
+    }
+    const staff_idx_t si = mark->effectiveStaffIdx();
+    if (si == muse::nidx || si >= system->staves().size()) {
+        return;
+    }
+    const double sp = mark->spatium();
+    const double clearance = mark->style().styleMM(Sid::skylineMinHorizontalClearance) * mark->mag() + 0.3 * sp;
+    const double vertical = mark->minDistance().val() * sp;
+    const RectF markRect = mark->ldata()->shape().translated(mark->systemPos()).bbox();
+    if (markRect.isEmpty()) {
+        return;
+    }
+    const double markCenter = markRect.center().x();
+
+    auto isChord = [](const EngravingItem* item) {
+        if (!item) {
+            return false;
+        }
+        if (item->isHarmony()) {
+            return true;
+        }
+        const EngravingItem* parent = item->parentItem();
+        return item->isParenthesis() && parent && parent->isHarmony();
+    };
+
+    double shift = 0.0;
+    for (const ShapeElement& el : system->staff(si)->skyline().north().elements()) {
+        if (!isChord(el.item())) {
+            continue;
+        }
+        // same height band (would collide vertically) and starting to the right of the mark's centre
+        const bool verticalOverlap = el.top() < markRect.bottom() + vertical && el.bottom() > markRect.top() - vertical;
+        if (!verticalOverlap || el.left() <= markCenter || el.left() >= markRect.right() + clearance) {
+            continue;
+        }
+        shift = std::max(shift, markRect.right() + clearance - el.left());
+    }
+    if (shift > 0.0 && shift <= 4.0 * sp) {
+        mark->mutldata()->moveX(-shift);
+    }
+}
+
 void SystemLayout::layoutSystemElements(System* system, LayoutContext& ctx)
 {
     TRACEFUNC;
@@ -1354,6 +1403,7 @@ void SystemLayout::layoutSystemElements(System* system, LayoutContext& ctx)
     AlignmentLayout::alignItemsWithTheirSnappingChain(tempoElementsToAlign, system);
 
     for (RehearsalMark* rehearsMark : elementsToLayout.rehMarks) {
+        starscoreClearRehearsalMarkFromChords(rehearsMark, system);
         Autoplace::autoplaceSegmentElement(rehearsMark, rehearsMark->mutldata());
     }
 
