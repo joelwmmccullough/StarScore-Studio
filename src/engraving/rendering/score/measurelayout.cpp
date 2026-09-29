@@ -347,6 +347,15 @@ void MeasureLayout::createMMRest(LayoutContext& ctx, Measure* firstMeasure, Meas
             mmr->setTrack(track);
             mmr->setParent(s);
             ctx.mutDom().doUndoAddElement(mmr);
+        } else if (s->element(track)->isRest()) {
+            // StarScore: a reused multimeasure rest (or one read from a file) keeps its old length when the
+            // measures it covers change. Its rest must always be as long as the mmrest measure, otherwise a range
+            // selection that reaches it runs on to wherever the stale length ends, and the wrong length is saved.
+            Rest* mmr = toRest(s->element(track));
+            if (mmr->ticks() != mmrMeasure->ticks()) {
+                mmr->setDurationType(DurationType::V_MEASURE);
+                mmr->setTicks(mmrMeasure->ticks());
+            }
         }
     }
 

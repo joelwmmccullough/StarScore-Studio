@@ -6,6 +6,7 @@ Version numbers: the first number changes when files stop being compatible, the 
 
 ## 1.4.3
 
+- Selecting bars across a multimeasure rest no longer grabs far more than you picked (for example selecting bars 47–48 selected all of page 2). The rest inside a multimeasure rest kept an old, wrong length (hundreds of bars) after the bars it covers changed, and that length was saved in the file. It is now corrected whenever the score is laid out, so existing files are fixed as soon as they are opened, and saving them stores the right length. (A MuseScore bug.)
 - Slash chords: after an extension (G♭△7/B♭) the slash sits closer, so the chord and its bass read as one unit. Chords without an extension (C/E) are unchanged.
 - The installer disk is named “StarScore Studio 1.4.3” (the StarScore version) instead of “StarScore-Studio-4.7.5”.
 
