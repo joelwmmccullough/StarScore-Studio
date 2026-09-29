@@ -13,7 +13,8 @@ Version numbers: the first number changes when files stop being compatible, the 
     The book starts with a cover, “How to use this book” and contents, with headings in TT Modernoir and page numbers throughout.
   - **Song charts**: 4-, 5-, 6- and 7-Horn, Big Band, Marching Band and Orchestra. A folder with the arrangement's score and every part, each titled with the instrument and the arrangement.
   - Only finished parts go in: Finished for Top Hat, Bet, Another One and new songs; audited for songs converted from older files. The page shows, song by song, which sheets are ready and why the others aren't. Songs that aren't ready are left out of a book and listed in it as not in this edition yet.
-  - Album tracklists can be edited (Edit tracklist); Ichiban is filled in, and Feed Your Kid Bugs has the five songs confirmed so far.
+  - Album tracklists can be edited (Edit tracklist); Ichiban and Feed Your Kids Bugs are filled in.
+  - In horn books, bars the lead sheet writes in bass clef (a bass riff) are rests marked “(bass)”, and the whole Solo sheet is in treble clef.
   - Songbooks are saved in “Songbooks” next to your songs (Projects and Sheets) unless you pick another folder. A book or chart written again moves the old one to Songbooks/Deprecated/<date>.
 
 ## 1.8.0

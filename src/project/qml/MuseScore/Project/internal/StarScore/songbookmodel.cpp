@@ -305,9 +305,9 @@ void SongbookModel::load()
     if (m_albumOrder.isEmpty()) {
         m_albums["Ichiban"] = { "Seagrass", "Fish Oil", "Cumulonimbus", "Deimos", "Shatter", "Amplitudes", "Royal", "Deep Speech",
                                 "Last Pint", "Okane" };
-        // Five songs confirmed on 27 Sep 2026; the other three and the running order still to come
-        m_albums["Feed Your Kid Bugs"] = { "Double Entendre", "Everpresent", "Feed Your Kids Bugs", "February", "Updog" };
-        m_albumOrder = { "Ichiban", "Feed Your Kid Bugs" };
+        m_albums["Feed Your Kids Bugs"] = { "Double Entendre", "Feed Your Kids Bugs", "Everpresent", "Branston Pickle", "February",
+                                            "Hit List", "Dream of Mushroom", "Updog" };
+        m_albumOrder = { "Ichiban", "Feed Your Kids Bugs" };
     }
     if (!m_albums.count(m_album)) {
         m_album = m_albumOrder.value(0);

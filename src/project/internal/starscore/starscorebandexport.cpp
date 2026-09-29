@@ -37,6 +37,10 @@
 #include "engraving/dom/box.h"
 #include "engraving/dom/text.h"
 #include "engraving/dom/factory.h"
+#include "engraving/dom/select.h"
+#include "engraving/dom/stafftext.h"
+#include "engraving/dom/segment.h"
+#include "engraving/dom/measure.h"
 
 #include "notation/iexcerptnotation.h"
 #include "notation/inotationelements.h"
@@ -1474,6 +1478,65 @@ void StarScoreService::songbookRenderSheets(const QString& songPath, std::vector
         instrument.setClefType(0, engraving::ClefTypeList(clef, clef));
         const InstrumentKey key { part->instrumentId(), part->id(), engraving::Fraction(0, 1) };
         vm->parts()->replaceInstrument(key, instrument);
+        // Horn books read the lead sheet in treble clef: bars it writes in bass clef (a bass riff) become rests
+        // marked "(bass)", and its clef changes go
+        if (sheet.kind == "lead" && sheet.clef == 0 && !part->staves().empty()) {
+            engraving::MasterScore* vs = vm->masterScore();
+            engraving::Staff* st = part->staves().front();
+            const engraving::staff_idx_t sidx = st->idx();
+            auto isBass = [](engraving::ClefType ct) {
+                return int(ct) >= int(engraving::ClefType::F) && int(ct) <= int(engraving::ClefType::F_19C);
+            };
+            std::vector<std::pair<engraving::Measure*, engraving::Measure*> > regions;
+            engraving::Measure* start = nullptr;
+            engraving::Measure* last = nullptr;
+            for (engraving::Measure* m = vs->firstMeasure(); m; m = m->nextMeasure()) {
+                const bool bass = isBass(st->clef(m->tick()));
+                if (bass && !start) {
+                    start = m;
+                } else if (!bass && start) {
+                    regions.emplace_back(start, last);
+                    start = nullptr;
+                }
+                last = m;
+            }
+            if (start) {
+                regions.emplace_back(start, last);
+            }
+            vm->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Bass bars as rests"));
+            for (const auto& [first, lastM] : regions) {
+                engraving::Segment* s1 = first->first(engraving::SegmentType::ChordRest);
+                engraving::Measure* after = lastM->nextMeasure();
+                engraving::Segment* s2 = after ? after->first(engraving::SegmentType::ChordRest) : nullptr;
+                if (!s1) {
+                    continue;
+                }
+                vs->selection().setRange(s1, s2, sidx, sidx + 1);
+                vs->cmdDeleteSelection();
+                vs->deselectAll();
+                engraving::Segment* at = first->first(engraving::SegmentType::ChordRest);
+                if (at) {
+                    engraving::StaffText* t = engraving::Factory::createStaffText(at);
+                    t->setTrack(sidx * engraving::VOICES);
+                    t->setParent(at);
+                    t->setPlainText(u"(bass)");
+                    vs->undoAddElement(t);
+                }
+            }
+            std::vector<engraving::EngravingItem*> clefs;
+            for (engraving::Segment* seg = vs->firstSegment(engraving::SegmentType::Clef | engraving::SegmentType::HeaderClef); seg;
+                 seg = seg->next1(engraving::SegmentType::Clef | engraving::SegmentType::HeaderClef)) {
+                engraving::EngravingItem* e = seg->element(sidx * engraving::VOICES);
+                if (e && e->isClef() && !e->generated()) {
+                    clefs.push_back(e);
+                }
+            }
+            for (engraving::EngravingItem* e : clefs) {
+                vs->undoRemoveElement(e);
+            }
+            vm->notation()->undoStack()->commitChanges();
+        }
+
         const QString bookName = "StarScore songbook " + QUuid::createUuid().toString(QUuid::Id128);
         vm->parts()->setInstrumentName(InstrumentKey { part->instrumentId(), part->id(), engraving::Fraction(0, 1) }, bookName);
         part->setPartName(String::fromQString(bookName));
