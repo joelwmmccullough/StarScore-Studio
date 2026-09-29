@@ -294,7 +294,7 @@
     <harmonyPlacement>0</harmonyPlacement>
     <romanNumeralPlacement>1</romanNumeralPlacement>
     <nashvilleNumberPlacement>0</nashvilleNumberPlacement>
-    <harmonyVoiceLiteral>1</harmonyVoiceLiteral>
+    <harmonyVoiceLiteral>0</harmonyVoiceLiteral>
     <harmonyVoicing>0</harmonyVoicing>
     <harmonyDuration>0</harmonyDuration>
     <chordSymbolAPosAbove x="0" y="-2.5"/>
@@ -519,7 +519,7 @@
     <evenFooterR></evenFooterR>
     <oddFooterL></oddFooterL>
     <oddFooterC>$C</oddFooterC>
-    <oddFooterR>Version 1.0.0</oddFooterR>
+    <oddFooterR>Version 4.0.0</oddFooterR>
     <voltaPosAbove x="0" y="-3"/>
     <voltaHook>2.2</voltaHook>
     <voltaLineWidth>0.16</voltaLineWidth>
@@ -736,7 +736,7 @@
     <subTitleFontStyle>0</subTitleFontStyle>
     <subTitleColor r="0" g="0" b="0" a="255"/>
     <subTitleAlign>center,top</subTitleAlign>
-    <subTitleOffset x="0" y="10"/>
+    <subTitleOffset x="0" y="16.5"/>
     <subTitleOffsetType>0</subTitleOffsetType>
     <subTitleFrameType>0</subTitleFrameType>
     <subTitleFramePadding>0.2</subTitleFramePadding>
@@ -1972,6 +1972,6 @@
     <palmMuteBeginFilledArrowWidth>0.85</palmMuteBeginFilledArrowWidth>
     <palmMuteEndFilledArrowHeight>1</palmMuteEndFilledArrowHeight>
     <palmMuteEndFilledArrowWidth>0.85</palmMuteEndFilledArrowWidth>
-    <spatium>1.625</spatium>
+    <spatium>1.25</spatium>
     </Style>
   </museScore>

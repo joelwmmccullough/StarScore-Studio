@@ -16,6 +16,7 @@
 #include "context/iglobalcontext.h"
 #include "notationscene/iselectinstrumentscenario.h"
 #include "dockwindow/idockwindowprovider.h"
+#include "dockwindow/idockwindow.h"
 
 #include "project/istarscoreservice.h"
 
