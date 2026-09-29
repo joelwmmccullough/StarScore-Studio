@@ -11,6 +11,7 @@ Version numbers: the first number changes when files stop being compatible, the 
   - Dashboard: a 1-Horn column. In the priority order, originals' 1-Horn comes after covers' 3-Horn Flexible and before originals' 4-Horn; covers' 1-Horn comes after covers' 4-Horn.
   - Export to Sheets and Demos puts the 1-Horn sheets in a “1H” folder, one sheet per horn, titled “1-Horn Arrangement”. The mixer gives them the 4-Horn Section's levels.
 - **Older songs**: marking a sheet Finished marks it as no longer needing an audit, and marking a section Finished does the same for all its sheets. An arrangement whose sheets are all marked that way counts as audited. If the music of such a sheet changes afterwards, the arrangement shows as changed since the audit. Sheets already marked Finished before this version count too. Setting a sheet back to something other than Finished takes the mark off.
+- **Export to Sheets and Demos**: the arrangement name (“3-Horn Arrangement”) now sits at the top right of each horn sheet. It was showing under the instrument name on the left.
 - **Changelog** has its own page on Home, below Learn, instead of a tab inside Learn.
 - **Dashboard**: Next up lists the existing arrangements to audit or finish first. After those, it goes on to recommend which missing arrangements to write next, in the same priority order as the audit list.
 - **Audit**: the “Differs from the reference section” check is gone, and so is the “Compare with” choice. The library audit reads every song again once to update the counts.

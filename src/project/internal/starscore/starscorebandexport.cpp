@@ -719,8 +719,11 @@ static void starscoreRetitleSheet(mu::engraving::Score* score, const QString& le
         t->setParent(box);
         t->setTrack(0);
         t->setXmlText(escape(right));
+        // placed at the frame's right edge (position), and right-justified (align)
         t->setAlign(mu::engraving::Align(mu::engraving::AlignH::RIGHT, mu::engraving::AlignV::TOP));
         t->setPropertyFlags(mu::engraving::Pid::ALIGN, mu::engraving::PropertyFlags::UNSTYLED);
+        t->setPosition(mu::engraving::AlignH::RIGHT);
+        t->setPropertyFlags(mu::engraving::Pid::POSITION, mu::engraving::PropertyFlags::UNSTYLED);
         score->undoAddElement(t);
     }
     score->setLayoutAll();
