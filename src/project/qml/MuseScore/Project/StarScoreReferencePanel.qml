@@ -21,6 +21,10 @@ Item {
 
     // 1.0 = fit the panel width
     property real zoom: 1.0
+    // pages are drawn at this zoom; while pinching, the drawn pages are stretched and redrawn when the pinch ends
+    property real renderZoom: 1.0
+    property bool pinching: false
+    onZoomChanged: if (!root.pinching) root.renderZoom = root.zoom
 
     // the list of reference PDFs (rename, instrument, order, delete) instead of the pages
     property bool managing: false
@@ -202,6 +206,27 @@ Item {
             ScrollBar.horizontal: StyledScrollBar {}
 
             readonly property int pageWidth: Math.max(100, Math.round((flick.width - 12) * root.zoom))
+            readonly property int renderWidth: Math.max(100, Math.round((flick.width - 12) * root.renderZoom))
+
+            // Trackpad pinch to zoom
+            PinchHandler {
+                target: null
+                property real startZoom: 1.0
+                onActiveChanged: {
+                    if (active) {
+                        startZoom = root.zoom
+                        root.pinching = true
+                    } else {
+                        root.pinching = false
+                        root.renderZoom = root.zoom
+                    }
+                }
+                onActiveScaleChanged: {
+                    if (active) {
+                        root.zoom = Math.max(0.4, Math.min(4.0, startZoom * activeScale))
+                    }
+                }
+            }
 
             Column {
                 id: pages
@@ -226,7 +251,7 @@ Item {
                             cache: false
                             smooth: true
                             mipmap: true
-                            source: refModel.currentId !== "" && (refModel.invert || !refModel.invert) ? refModel.pageUrl(parent.index, Math.round(parent.width * Screen.devicePixelRatio)) : ""
+                            source: refModel.currentId !== "" && (refModel.invert || !refModel.invert) ? refModel.pageUrl(parent.index, Math.round(flick.renderWidth * Screen.devicePixelRatio)) : ""
                         }
                     }
                 }
