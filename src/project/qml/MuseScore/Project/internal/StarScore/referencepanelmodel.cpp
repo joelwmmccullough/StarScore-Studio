@@ -62,6 +62,23 @@ int ReferencePanelModel::pageCount() const
     return m_pageCount;
 }
 
+bool ReferencePanelModel::invert() const
+{
+    for (const StarScoreReference& r : starScore()->references()) {
+        if (r.id == m_currentId) {
+            return r.invert;
+        }
+    }
+    return true;
+}
+
+void ReferencePanelModel::setInvert(bool invert)
+{
+    if (!m_currentId.isEmpty()) {
+        starScore()->setReferenceInvert(m_currentId, invert);   // saved in the .starscore; notifies changed
+    }
+}
+
 void ReferencePanelModel::selectIndex(int index)
 {
     const std::vector<StarScoreReference> refs = starScore()->references();

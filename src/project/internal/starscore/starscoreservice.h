@@ -108,6 +108,7 @@ public:
     QString currentReferenceId() const override;
     void setCurrentReferenceId(const QString& referenceId) override;
     int referencePageCount(const QString& referenceId) const override;
+    void setReferenceInvert(const QString& referenceId, bool invert) override;
     QString referencePageImage(const QString& referenceId, int page, int widthPx) const override;
     muse::Ret saveAll() override;
 

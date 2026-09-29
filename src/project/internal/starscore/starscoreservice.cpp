@@ -13,6 +13,7 @@
 #include <set>
 
 #include <QDir>
+#include <QImage>
 #include <QFileInfo>
 #include <QFile>
 #include <QJsonArray>
@@ -217,6 +218,7 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
         ref.id = o.value("id").toString();
         ref.name = o.value("name").toString();
         ref.file = o.value("file").toString();
+        ref.invert = o.value("invert").toBool(true);
         if (!ref.id.isEmpty()) {
             data.references.push_back(ref);
         }
@@ -301,6 +303,7 @@ QString StarScoreService::toJson(const Data& data)
         o["id"] = ref.id;
         o["name"] = ref.name;
         o["file"] = ref.file;
+        o["invert"] = ref.invert;
         refs.append(o);
     }
     if (!refs.isEmpty()) {
@@ -2012,14 +2015,43 @@ QString StarScoreService::referencePageImage(const QString& referenceId, int pag
 {
     // Cached per width, in steps of 100 px so resizing the panel doesn't redraw every pixel
     const int w = std::clamp(((widthPx + 99) / 100) * 100, 200, 4000);
-    const QString png = QString("%1/ref-%2-p%3-w%4.png").arg(m_workDir, referenceId).arg(page).arg(w);
+    bool invert = true;
+    for (const StarScoreReference& r : references()) {
+        if (r.id == referenceId) {
+            invert = r.invert;
+        }
+    }
+    const QString png = QString("%1/ref-%2-p%3-w%4%5.png").arg(m_workDir, referenceId).arg(page).arg(w).arg(invert ? "-inv" : "");
     if (QFileInfo::exists(png)) {
         return png;
     }
     if (m_workDir.isEmpty() || !starscore::renderPdfPage(referencePath(referenceId).toQString(), page, w, png)) {
         return QString();
     }
+    if (invert) {
+        // white-on-black to match the app's dark theme; the stored PDF and exports are unchanged
+        QImage image(png);
+        if (!image.isNull()) {
+            image.invertPixels(QImage::InvertRgb);
+            image.save(png, "PNG");
+        }
+    }
     return png;
+}
+
+void StarScoreService::setReferenceInvert(const QString& referenceId, bool invert)
+{
+    if (!m_mainProject) {
+        return;
+    }
+    Data data = loadFrom(m_mainProject->masterNotation()->masterScore());
+    for (StarScoreReference& r : data.references) {
+        if (r.id == referenceId && r.invert != invert) {
+            r.invert = invert;
+            storeTo(m_mainProject->masterNotation()->masterScore(), data, m_mainProject);
+            return;
+        }
+    }
 }
 
 void StarScoreService::removeReference(const QString& referenceId)

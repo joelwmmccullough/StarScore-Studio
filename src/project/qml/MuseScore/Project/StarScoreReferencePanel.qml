@@ -63,6 +63,14 @@ Item {
                 onClicked: root.zoom = 1.0
             }
             FlatButton {
+                text: qsTrc("starscore", "Invert")
+                toolTipTitle: qsTrc("starscore", "Invert colors")
+                toolTipDescription: qsTrc("starscore", "White on black, to match the dark theme. Saved for each PDF; exports are never inverted.")
+                enabled: refModel.currentId !== ""
+                accentButton: refModel.invert
+                onClicked: refModel.setInvert(!refModel.invert)
+            }
+            FlatButton {
                 icon: IconCode.PLUS
                 toolTipTitle: qsTrc("starscore", "Add reference PDF…")
                 onClicked: refModel.addReference()
@@ -112,7 +120,7 @@ Item {
                         required property int index
                         width: flick.pageWidth
                         height: img.status === Image.Ready ? img.paintedHeight : Math.round(width * 1.294)
-                        color: "white"
+                        color: refModel.invert ? "black" : "white"
                         border.width: 1
                         border.color: ui.theme.strokeColor
 
@@ -124,7 +132,7 @@ Item {
                             cache: false
                             smooth: true
                             mipmap: true
-                            source: refModel.currentId !== "" ? refModel.pageUrl(parent.index, Math.round(parent.width * Screen.devicePixelRatio)) : ""
+                            source: refModel.currentId !== "" && (refModel.invert || !refModel.invert) ? refModel.pageUrl(parent.index, Math.round(parent.width * Screen.devicePixelRatio)) : ""
                         }
                     }
                 }
