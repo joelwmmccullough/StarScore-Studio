@@ -38,6 +38,10 @@ public:
     static void layoutChordParentheses(const Chord* chord, const LayoutContext& ctx);
     static void layoutParenthesis(Parenthesis* item, Parenthesis::LayoutData* ldata, const LayoutContext& ctx);
 
+    //! StarScore: parentheses around a chord symbol set in StarScore Jost are the font's own "(" and ")".
+    //! Gives the font and the baseline (in the parenthesis' coordinates); false for any other parenthesis.
+    static bool starscoreFontParen(const Parenthesis* item, muse::draw::Font& font, double& baselineY);
+
     static double computeParenthesisPadding(const EngravingItem* item1, const EngravingItem* item2);
     static double computeInternalParenthesisPadding(const EngravingItem* item1, const EngravingItem* item2);
 

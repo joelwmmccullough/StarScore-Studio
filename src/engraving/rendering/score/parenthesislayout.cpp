@@ -20,6 +20,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "draw/fontmetrics.h"
 #include "dom/chord.h"
 #include "dom/harmony.h"
 #include "dom/ledgerline.h"
@@ -157,9 +158,45 @@ void ParenthesisLayout::layoutParentheses(Parenthesis* leftParen, Parenthesis* r
     rightLdata->moveX(-(itemToRightParen - parenToItemDist));
 }
 
+bool ParenthesisLayout::starscoreFontParen(const Parenthesis* item, muse::draw::Font& font, double& baselineY)
+{
+    const EngravingItem* parent = item->parentItem();
+    if (!parent || !parent->isHarmony()) {
+        return false;
+    }
+    const Harmony* harmony = toHarmony(parent);
+    const Harmony::LayoutData* hl = harmony->ldata();
+    if (!hl || hl->fontList.value().empty()) {
+        return false;
+    }
+    font = hl->fontList.value().front();
+    if (!font.family().id().toLower().contains(u"starscore jost")) {
+        return false;
+    }
+    // on the root's baseline
+    baselineY = 0.0;
+    for (const HarmonyRenderItem* renderItem : hl->renderItemList.value()) {
+        if (const TextSegment* ts = dynamic_cast<const TextSegment*>(renderItem)) {
+            baselineY = ts->pos().y();
+            break;
+        }
+    }
+    return true;
+}
+
 void ParenthesisLayout::layoutParenthesis(Parenthesis* item, Parenthesis::LayoutData* ldata, const LayoutContext& ctx)
 {
     setLayoutValues(item, ldata, ctx);
+
+    muse::draw::Font font;
+    double baselineY = 0.0;
+    if (starscoreFontParen(item, font, baselineY)) {
+        ldata->symId = SymId::noSym;
+        const muse::draw::FontMetrics fm(font);
+        const RectF glyph = fm.tightBoundingRect(item->direction() == DirectionH::LEFT ? String(u"(") : String(u")"));
+        ldata->setShape(Shape(glyph.translated(0.0, baselineY), item));
+        return;
+    }
 
     if (ldata->symId == SymId::noSym) {
         createPathAndShape(item, ldata);

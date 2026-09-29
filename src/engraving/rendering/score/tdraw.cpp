@@ -24,6 +24,7 @@
 #include "defer.h"
 
 #include "draw/fontmetrics.h"
+#include "parenthesislayout.h"
 #include "draw/svgrenderer.h"
 
 #include "rendering/paintoptions.h"
@@ -2502,6 +2503,16 @@ void TDraw::draw(const Parenthesis* item, muse::draw::Painter* painter, const Pa
     Color penColor = item->curColor(opt);
 
     Pen pen(penColor);
+
+    // StarScore: chord symbols in StarScore Jost use the font's own parentheses
+    muse::draw::Font parenFont;
+    double parenBaseline = 0.0;
+    if (ParenthesisLayout::starscoreFontParen(item, parenFont, parenBaseline)) {
+        painter->setPen(pen);
+        painter->setFont(parenFont);
+        painter->drawText(PointF(0.0, parenBaseline), item->direction() == DirectionH::LEFT ? String(u"(") : String(u")"));
+        return;
+    }
 
     if (item->ldata()->symId != SymId::noSym) {
         painter->setPen(pen);
