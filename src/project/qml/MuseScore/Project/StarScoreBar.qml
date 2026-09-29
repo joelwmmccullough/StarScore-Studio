@@ -45,6 +45,7 @@ Rectangle {
 
         signal leftClicked(var mouse)
         signal menuItemChosen(string itemId)
+        signal menuOpenChanged(bool isOpen)
 
         implicitHeight: 26
         implicitWidth: chipRow.implicitWidth + 20
@@ -113,6 +114,17 @@ Rectangle {
             onHandleMenuItem: function(itemId) {
                 chip.menuItemChosen(itemId)
             }
+
+            // Status items: the menu stays open and shows the new ticks
+            onKeepOpenItemChosen: function(itemId) {
+                chip.menuItemChosen(itemId)
+                if (chip.menuItemsProvider) {
+                    chipMenu.refreshOpen(chip.menuItemsProvider())
+                }
+            }
+
+            onOpened: chip.menuOpenChanged(true)
+            onClosed: chip.menuOpenChanged(false)
         }
 
         function openMenu(items) {
@@ -263,6 +275,9 @@ Rectangle {
                                  + "\n" + qsTrc("starscore", "Status: ") + barModel.statusName(modelData.status)
                                  + "\n" + qsTrc("starscore", "Click: show/hide · Alt-click: show only this · Right-click: options")
                         menuItemsProvider: function() { return barModel.sectionMenu(modelData.id) }
+                        // the chips are rebuilt when the panel updates, which would close the open menu
+                        onMenuOpenChanged: function(isOpen) { barModel.setHoldUpdates(isOpen) }
+                        Component.onDestruction: barModel.setHoldUpdates(false)
 
                         onLeftClicked: function(mouse) {
                             if (mouse.modifiers & (Qt.AltModifier | Qt.MetaModifier | Qt.ControlModifier)) {

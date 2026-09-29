@@ -37,6 +37,8 @@ MenuView {
     required property bool hasSiblingMenus
 
     signal handleMenuItem(string itemId)
+    // StarScore: an item with "keepOpen": true is reported here and the menu stays open
+    signal keepOpenItemChosen(string itemId)
     signal openPrevMenu()
     signal openNextMenu()
 
@@ -241,6 +243,10 @@ MenuView {
 
             root.subMenuLoader.handleMenuItem.connect(function(itemId) {
                 root.handleMenuItem(itemId)
+            })
+
+            root.subMenuLoader.keepOpenItemChosen.connect(function(itemId) {
+                root.keepOpenItemChosen(itemId)
             })
 
             root.subMenuLoader.opened.connect(function(itemId) {
@@ -543,6 +549,11 @@ MenuView {
                         onHandleMenuItem: function(itemId) {
                             // NOTE: reset view state
                             listView.update()
+
+                            if (Boolean(item.modelData) && Boolean(item.modelData.keepOpen)) {
+                                root.keepOpenItemChosen(itemId)
+                                return
+                            }
 
                             root.handleMenuItem(itemId)
                         }

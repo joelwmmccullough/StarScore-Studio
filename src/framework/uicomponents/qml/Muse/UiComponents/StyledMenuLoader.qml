@@ -31,6 +31,7 @@ Loader {
     id: loader
 
     signal handleMenuItem(string itemId)
+    signal keepOpenItemChosen(string itemId)   // StarScore: item with "keepOpen": true; the menu stays open
     signal openPrevMenu()
     signal openNextMenu()
     signal opened()
@@ -76,6 +77,10 @@ Loader {
         onHandleMenuItem: function(itemId) {
             itemMenu.close()
             Qt.callLater(loader.handleMenuItem, itemId)
+        }
+
+        onKeepOpenItemChosen: function(itemId) {
+            loader.keepOpenItemChosen(itemId)
         }
 
         onOpenPrevMenu: {
@@ -126,6 +131,31 @@ Loader {
         loader.menu.preferredAlign = align
 
         toggleOpened(model)
+    }
+
+    // StarScore: show new items in the open menu without closing it. When a submenu is open, it
+    // gets the new subitems of the entry with the same title (and that entry keeps them for next time).
+    function refreshOpen(model) {
+        var menu = loader.menu
+        if (!Boolean(menu) || !Boolean(model)) {
+            return
+        }
+
+        if (!menu.isSubMenuOpen) {
+            menu.model = model
+            return
+        }
+
+        var parentItem = menu.subMenuLoader.parent
+        var title = (Boolean(parentItem) && Boolean(parentItem.modelData)) ? parentItem.modelData.title : ""
+        for (var i = 0; i < model.length; ++i) {
+            var entry = model[i]
+            if (Boolean(entry) && entry.title === title && Boolean(entry.subitems)) {
+                parentItem.modelData = entry
+                menu.subMenuLoader.refreshOpen(entry.subitems)
+                return
+            }
+        }
     }
 
     function close() {

@@ -57,6 +57,8 @@ public:
     Q_INVOKABLE QVariantList soloMenu(const QString& id) const;
 
     Q_INVOKABLE void load();
+    //! While a chip's menu is open, panel updates wait until it closes (rebuilding the chips would close the menu)
+    Q_INVOKABLE void setHoldUpdates(bool hold);
     Q_INVOKABLE void hidePanel();
     bool panelVisible() const;
 
@@ -84,5 +86,8 @@ private:
     void createCustomSection();
     void askRename(bool isSection, const QString& id);
     void exportArrangement(const QString& id);
+
+    bool m_holdUpdates = false;
+    bool m_pendingUpdate = false;
 };
 }

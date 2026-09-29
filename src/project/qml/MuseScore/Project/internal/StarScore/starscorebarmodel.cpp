@@ -24,9 +24,22 @@ StarScoreBarModel::StarScoreBarModel(QObject* parent)
 void StarScoreBarModel::load()
 {
     starScore()->changed().onNotify(this, [this]() {
+        if (m_holdUpdates) {
+            m_pendingUpdate = true;
+            return;
+        }
         emit changed();
     });
     emit changed();
+}
+
+void StarScoreBarModel::setHoldUpdates(bool hold)
+{
+    m_holdUpdates = hold;
+    if (!hold && m_pendingUpdate) {
+        m_pendingUpdate = false;
+        emit changed();
+    }
 }
 
 bool StarScoreBarModel::hasScore() const
@@ -182,7 +195,8 @@ QVariantList StarScoreBarModel::statusSubmenu(const QString& prefix, int current
     for (int i = 0; i <= int(StarScoreStatus::Finished); ++i) {
         items << QVariantMap {
             { "id", prefix + QString::number(i) }, { "title", statusName(i) },
-            { "checkable", true }, { "checked", i == current }, { "enabled", true }
+            { "checkable", true }, { "checked", i == current }, { "enabled", true },
+            { "keepOpen", true }   // the menu stays open, so several things can be ticked in a row
         };
     }
     return items;
@@ -231,7 +245,8 @@ QVariantList StarScoreBarModel::sectionMenu(const QString& id) const
         for (const auto& [key, title] : sheets) {
             statusItems << QVariantMap {
                 { "id", "sec-skip:" + id + ":" + key }, { "title", title },
-                { "checkable", true }, { "checked", finished && skip.contains(key) }, { "enabled", finished }
+                { "checkable", true }, { "checked", finished && skip.contains(key) }, { "enabled", finished },
+                { "keepOpen", true }
             };
         }
     }
