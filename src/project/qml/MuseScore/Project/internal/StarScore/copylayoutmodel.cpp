@@ -47,6 +47,7 @@ void CopyLayoutModel::load(const QString& mode)
         }
     }
 
+    m_currentIndex = currentIndex;
     if (m_fromMode) {
         // Copy into the part being viewed, from the first other part book (or the main score)
         for (Entry& e : m_entries) {
@@ -87,6 +88,10 @@ void CopyLayoutModel::setSourceIndex(int index)
     if (index < 0 || index >= int(m_entries.size()) || index == m_sourceIndex) {
         return;
     }
+    if (m_fromMode && index == m_currentIndex) {
+        emit sourceIndexChanged();   // the part being viewed can't copy from itself: keep the previous choice
+        return;
+    }
     m_sourceIndex = index;
     m_entries[index].checked = false;   // a part can't be both the source and a target
     emit sourceIndexChanged();
@@ -108,7 +113,7 @@ QVariantList CopyLayoutModel::targets() const
 
 void CopyLayoutModel::setTargetChecked(int index, bool checked)
 {
-    if (index < 0 || index >= int(m_entries.size())) {
+    if (m_fromMode || index < 0 || index >= int(m_entries.size())) {
         return;
     }
     m_entries[index].checked = checked;
@@ -117,6 +122,9 @@ void CopyLayoutModel::setTargetChecked(int index, bool checked)
 
 void CopyLayoutModel::setAllTargets(bool checked)
 {
+    if (m_fromMode) {
+        return;
+    }
     for (size_t i = 0; i < m_entries.size(); ++i) {
         m_entries[i].checked = checked && int(i) != m_sourceIndex;
     }

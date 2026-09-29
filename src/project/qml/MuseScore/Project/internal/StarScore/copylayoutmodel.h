@@ -66,6 +66,7 @@ private:
     std::vector<Entry> m_entries;   // 0 = main score, then part books
     int m_sourceIndex = 0;
     bool m_fromMode = false;
+    int m_currentIndex = 0;     // the part being viewed: in "from" mode, the only one formatting is copied into
 
     bool m_lineBreaks = true;
     bool m_pageBreaks = true;

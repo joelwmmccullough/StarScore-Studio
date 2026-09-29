@@ -57,8 +57,24 @@ StyledDialogView {
             }
         }
 
+        // "From another part": formatting goes into the part being viewed only
+        StyledTextLabel {
+            Layout.fillWidth: true
+            visible: root.mode === "from"
+            horizontalAlignment: Text.AlignLeft
+            wrapMode: Text.WordWrap
+            text: qsTrc("starscore", "Copy into: %1").arg(layoutModel.targets.filter(function(t) { return t.checked })
+                                                         .map(function(t) { return t.title }).join(", "))
+        }
+
+        Item {
+            Layout.fillHeight: true
+            visible: root.mode === "from"
+        }
+
         RowLayout {
             Layout.fillWidth: true
+            visible: root.mode !== "from"
 
             StyledTextLabel {
                 Layout.fillWidth: true
@@ -81,6 +97,7 @@ StyledDialogView {
         Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
+            visible: root.mode !== "from"
             color: ui.theme.textFieldColor
             border.width: 1
             border.color: ui.theme.strokeColor
