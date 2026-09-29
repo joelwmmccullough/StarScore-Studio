@@ -30,6 +30,9 @@ FlatRadioButton {
 
     property bool needSave: false
     property bool isCloud: false
+    // StarScore: the part score's status (a coloured dot, like the section and arrangement buttons)
+    property string statusColor: ""
+    property string statusName: ""
 
     property alias contextMenuItems: contextMenuLoader.items
 
@@ -47,11 +50,21 @@ FlatRadioButton {
         anchors.fill: parent
         spacing: 4
 
+        Rectangle {
+            Layout.alignment: Qt.AlignVCenter
+            Layout.leftMargin: 10
+            visible: root.statusColor !== ""
+            width: 8
+            height: 8
+            radius: 4
+            color: root.statusColor !== "" ? root.statusColor : "transparent"
+        }
+
         StyledTextLabel {
             Layout.alignment: Qt.AlignLeft
             Layout.fillWidth: root.implicitContentWidth > 200
             Layout.preferredWidth: implicitWidth
-            Layout.leftMargin: 12
+            Layout.leftMargin: root.statusColor !== "" ? 2 : 12
 
             horizontalAlignment: Text.AlignLeft
 

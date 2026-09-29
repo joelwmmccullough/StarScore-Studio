@@ -29,6 +29,7 @@
 #include "async/asyncable.h"
 #include "context/iglobalcontext.h"
 #include "actions/iactionsdispatcher.h"
+#include "project/istarscoreservice.h"
 
 namespace mu::notation {
 class NotationSwitchListModel : public QAbstractListModel, public muse::Contextable, public muse::async::Asyncable
@@ -38,6 +39,7 @@ class NotationSwitchListModel : public QAbstractListModel, public muse::Contexta
 
     muse::ContextInject<context::IGlobalContext> context = { this };
     muse::ContextInject<muse::actions::IActionsDispatcher> dispatcher = { this };
+    muse::ContextInject<mu::project::IStarScoreService> starScore = { this };
 
 public:
     explicit NotationSwitchListModel(QObject* parent = nullptr);
@@ -77,8 +79,11 @@ private:
     enum Roles {
         RoleTitle = Qt::UserRole + 1,
         RoleNeedSave,
-        RoleIsCloud
+        RoleIsCloud,
+        RoleStatusColor,   // StarScore: colour of the part score's status dot ("" = no dot)
+        RoleStatusName
     };
+    int starscoreStatus(const INotationPtr& notation) const;
 
     QList<INotationPtr> m_notations;
     std::unique_ptr<muse::async::Asyncable> m_notationChangedReceiver;

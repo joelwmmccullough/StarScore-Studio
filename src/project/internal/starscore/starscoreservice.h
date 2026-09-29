@@ -74,6 +74,8 @@ public:
     void setSectionAutoStatus(const QString& sectionId) override;
     std::map<QString, StarScoreStatus> partStatuses() const override;
     void setPartStatus(const QString& partId, int status) override;
+    int partScoreStatus(const mu::engraving::Score* score) const override;
+    void setPartScoreStatus(const mu::engraving::Score* score, int status) override;
     void setSectionSkipSheet(const QString& sectionId, const QString& which, bool skip) override;
     void renameSection(const QString& sectionId, const QString& name) override;
     void setSectionParts(const QString& sectionId, const QStringList& partIds) override;

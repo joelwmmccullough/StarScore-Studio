@@ -23,6 +23,8 @@
 #include "notationswitchlistmodel.h"
 
 #include "notation/inotationparts.h"
+#include "notation/inotationelements.h"
+#include "translation.h"
 
 #include "log.h"
 
@@ -70,6 +72,13 @@ void NotationSwitchListModel::onCurrentProjectChanged()
     });
 
     listenProjectSavingStatusChanged();
+
+    // StarScore: part score status dots follow the parts' tags
+    starScore()->changed().onNotify(this, [this]() {
+        if (!m_notations.isEmpty()) {
+            emit dataChanged(index(0), index(m_notations.size() - 1), { RoleStatusColor, RoleStatusName });
+        }
+    });
 }
 
 void NotationSwitchListModel::onCurrentNotationChanged()
@@ -218,6 +227,16 @@ QVariant NotationSwitchListModel::data(const QModelIndex& index, int role) const
         bool isCloud = context()->currentProject()->isCloudProject() && isMasterNotation(notation);
         return QVariant::fromValue(isCloud);
     }
+    case RoleStatusColor: {
+        static const char* COLORS[] = { "#8A8A8A", "#E0463A", "#F29B30", "#3C8CE7", "#3FB05A" };
+        const int status = starscoreStatus(notation);
+        return status < 0 || status > 4 ? QString() : QString(COLORS[status]);
+    }
+    case RoleStatusName: {
+        const int status = starscoreStatus(notation);
+        static const char* NAMES[] = { "Empty", "Sketch", "In progress", "Needs review", "Finished" };
+        return status < 0 || status > 4 ? QString() : muse::qtrc("starscore", NAMES[status]);
+    }
     }
 
     return QVariant();
@@ -233,7 +252,9 @@ QHash<int, QByteArray> NotationSwitchListModel::roleNames() const
     static const QHash<int, QByteArray> roles {
         { RoleTitle, "title" },
         { RoleNeedSave, "needSave" },
-        { RoleIsCloud, "isCloud" }
+        { RoleIsCloud, "isCloud" },
+        { RoleStatusColor, "statusColor" },
+        { RoleStatusName, "statusName" }
     };
 
     return roles;
@@ -291,6 +312,14 @@ void NotationSwitchListModel::closeAllNotations()
     dispatcher()->dispatch("file-close");
 }
 
+int NotationSwitchListModel::starscoreStatus(const INotationPtr& notation) const
+{
+    if (!notation || isMasterNotation(notation) || !notation->elements() || !starScore()) {
+        return -1;
+    }
+    return starScore()->partScoreStatus(notation->elements()->msScore());
+}
+
 QVariantList NotationSwitchListModel::contextMenuItems(int index) const
 {
     if (!isIndexValid(index)) {
@@ -311,6 +340,22 @@ QVariantList NotationSwitchListModel::contextMenuItems(int index) const
         result << QVariantMap { { "id", "close-all-tabs" }, { "title", muse::qtrc("notation", "Close all tabs") } };
     }
 
+    // StarScore: the part score's status (tags every part in it)
+    if (!isMasterNotation(m_notations[index]) && starScore() && starScore()->isStarScoreFile()) {
+        const int current = starscoreStatus(m_notations[index]);
+        static const char* NAMES[] = { "Empty", "Sketch", "In progress", "Needs review", "Finished" };
+        QVariantList statusItems;
+        for (int i = 0; i < 5; ++i) {
+            statusItems << QVariantMap { { "id", "starscore-status:" + QString::number(i) }, { "title", muse::qtrc("starscore", NAMES[i]) },
+                                         { "checkable", true }, { "checked", i == current }, { "enabled", true } };
+        }
+        statusItems << QVariantMap {};
+        statusItems << QVariantMap { { "id", "starscore-status:-1" }, { "title", muse::qtrc("starscore", "No tag") },
+                                     { "checkable", true }, { "checked", current < 0 }, { "enabled", true } };
+        result << QVariantMap {};
+        result << QVariantMap { { "title", muse::qtrc("starscore", "Part status") }, { "subitems", statusItems }, { "enabled", true } };
+    }
+
     return result;
 }
 
@@ -322,6 +367,11 @@ void NotationSwitchListModel::handleContextMenuItem(int index, const QString& it
         closeOtherNotations(index);
     } else if (itemId == "close-all-tabs") {
         closeAllNotations();
+    } else if (itemId.startsWith("starscore-status:") && isIndexValid(index)) {
+        const INotationPtr notation = m_notations[index];
+        if (notation->elements()) {
+            starScore()->setPartScoreStatus(notation->elements()->msScore(), itemId.mid(QString("starscore-status:").size()).toInt());
+        }
     }
 }
 

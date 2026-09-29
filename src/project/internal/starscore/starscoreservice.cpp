@@ -1319,6 +1319,67 @@ std::map<QString, StarScoreStatus> StarScoreService::partStatuses() const
     return result;
 }
 
+//! Main-score part ids of the parts in a part score
+static QStringList starscorePartIdsOfScore(const engraving::Score* score, const engraving::MasterScore* ms)
+{
+    QStringList ids;
+    if (!score || !ms || score == ms) {
+        return ids;
+    }
+    for (const engraving::Part* p : score->parts()) {
+        for (engraving::Staff* staff : p->staves()) {
+            if (engraving::Staff* linked = staff->findLinkedInScore(ms)) {
+                const QString id = QString::fromStdString(linked->part()->id().toStdString());
+                if (!ids.contains(id)) {
+                    ids << id;
+                }
+                break;
+            }
+        }
+    }
+    return ids;
+}
+
+int StarScoreService::partScoreStatus(const engraving::Score* score) const
+{
+    const engraving::MasterScore* ms = score ? score->masterScore() : nullptr;
+    const QStringList ids = starscorePartIdsOfScore(score, ms);
+    if (ids.isEmpty()) {
+        return -1;
+    }
+    const Data data = loadFrom(ms);
+    bool anyTag = false;
+    StarScoreStatus result = StarScoreStatus::Finished;
+    for (const QString& id : ids) {
+        auto it = data.partStatus.find(id);
+        if (it == data.partStatus.end()) {
+            result = StarScoreStatus::Empty;
+        } else {
+            anyTag = true;
+            result = std::min(result, statusFromKey(it->second));
+        }
+    }
+    return anyTag ? int(result) : -1;
+}
+
+void StarScoreService::setPartScoreStatus(const engraving::Score* score, int status)
+{
+    engraving::MasterScore* ms = score ? const_cast<engraving::MasterScore*>(score->masterScore()) : nullptr;
+    const QStringList ids = starscorePartIdsOfScore(score, ms);
+    if (ids.isEmpty()) {
+        return;
+    }
+    Data data = loadFrom(ms);
+    for (const QString& id : ids) {
+        if (status < 0) {
+            data.partStatus.erase(id);
+        } else {
+            data.partStatus[id] = statusKey(static_cast<StarScoreStatus>(status));
+        }
+    }
+    storeTo(ms, data, m_mainProject ? m_mainProject : globalContext()->currentProject());
+}
+
 void StarScoreService::setPartStatus(const QString& partId, int status)
 {
     Data data = load();

@@ -23,6 +23,10 @@
 #include "global/types/retval.h"
 #include "global/async/notification.h"
 
+namespace mu::engraving {
+class Score;
+}
+
 namespace mu::project {
 class INotationProject;
 
@@ -354,6 +358,11 @@ public:
     //! Completion tag of each part (instrument); parts without a tag are missing from the map
     virtual std::map<QString, StarScoreStatus> partStatuses() const = 0;
     virtual void setPartStatus(const QString& partId, int status) = 0;   // -1 = no tag
+    //! A part score's status (for its tab): the least-finished of its parts' tags, a part without a tag
+    //! counting as Empty; -1 when none of its parts has a tag, or for the main score
+    virtual int partScoreStatus(const mu::engraving::Score* score) const = 0;
+    //! Tag every part in a part score
+    virtual void setPartScoreStatus(const mu::engraving::Score* score, int status) = 0;
     //! which: "drums", "percussion" or "keys"
     virtual void setSectionSkipSheet(const QString& sectionId, const QString& which, bool skip) = 0;
     virtual void renameSection(const QString& sectionId, const QString& name) = 0;

@@ -101,6 +101,8 @@ Rectangle {
                 required property string title
                 required needSave
                 required isCloud
+                required statusColor
+                required statusName
 
                 navigation.name: "NotationTab" + index
                 navigation.panel: root.navigationPanel
