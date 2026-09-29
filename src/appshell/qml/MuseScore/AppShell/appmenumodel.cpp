@@ -213,6 +213,7 @@ MenuItem* AppMenuModel::makeFileMenu()
         makeMenuItem("file-import-audio-to-score"),
         makeMenuItem("file-export"),
         makeMenuItem("starscore-export-band"),
+        makeMenuItem("starscore-export-arrangements"),
         makeSeparator(),
         makeMenuItem("project-properties"),
         makeMenuItem("parts", TranslatableString("action", "Parts…")),

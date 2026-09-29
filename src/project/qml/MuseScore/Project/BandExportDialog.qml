@@ -21,12 +21,32 @@ StyledDialogView {
     margins: 16
 
     property bool done: false
+    // the sheet list shows once the song has a folder in Sheets and Demos
+    readonly property bool listMode: exportModel.errorText === "" && !exportModel.newSong && !root.done
+
+    // new song form
+    property string newTitle: ""
+    property string newCode: ""
+    property int newCategory: 1
+    property string newError: ""
 
     BandExportModel {
         id: exportModel
     }
 
-    Component.onCompleted: exportModel.load()
+    Component.onCompleted: {
+        exportModel.load()
+        root.newTitle = exportModel.songTitle
+        root.newCode = exportModel.suggestedCode
+    }
+
+    function folderPreview() {
+        var t = root.newTitle.trim()
+        if (t === "") {
+            return ""
+        }
+        return root.newCategory === 4 ? "4 Works In Progress/" + t : root.newCategory + " " + t
+    }
 
     ColumnLayout {
         anchors.fill: parent
@@ -45,14 +65,14 @@ StyledDialogView {
             horizontalAlignment: Text.AlignLeft
             wrapMode: Text.WordWrap
             color: ui.theme.fontSecondaryColor
-            visible: exportModel.errorText === "" && !root.done
+            visible: root.listMode
             text: qsTrc("starscore", "Sheets that already exist are moved to Version History/Superseded <today> first. "
                         + "Your ticks are remembered for this song.")
         }
 
         // Version: keep it, or raise one of the three numbers for this export
         RowLayout {
-            visible: exportModel.errorText === "" && !root.done
+            visible: root.listMode
             spacing: 12
 
             StyledTextLabel {
@@ -81,7 +101,7 @@ StyledDialogView {
         }
 
         RowLayout {
-            visible: exportModel.errorText === "" && !root.done
+            visible: root.listMode
             spacing: 8
             FlatButton { text: qsTrc("starscore", "Tick all"); onClicked: exportModel.setAllChecked(true) }
             FlatButton { text: qsTrc("starscore", "Untick all"); onClicked: exportModel.setAllChecked(false) }
@@ -91,7 +111,7 @@ StyledDialogView {
             id: list
             Layout.fillWidth: true
             Layout.fillHeight: true
-            visible: exportModel.errorText === "" && !root.done
+            visible: root.listMode
             spacing: 2
             model: exportModel.items
 
@@ -113,6 +133,72 @@ StyledDialogView {
             }
         }
 
+
+        // --- New song: where it goes in Sheets and Demos, and its code
+        ColumnLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            visible: exportModel.newSong && !root.done
+            spacing: 10
+
+            StyledTextLabel {
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignLeft
+                wrapMode: Text.WordWrap
+                text: qsTrc("starscore", "This song isn't in Sheets and Demos yet. StarScore will make its folder (with Demos and Version History), "
+                            + "add its code to 6 Inbox/.organizer/codes.json, and then list the sheets to export. "
+                            + "Sheets are named “CODE - …” and sorted into the same folders as the other songs.")
+            }
+
+            StyledTextLabel { text: qsTrc("starscore", "Song title"); font: ui.theme.bodyBoldFont }
+            TextInputField {
+                Layout.fillWidth: true
+                currentText: root.newTitle
+                hint: qsTrc("starscore", "Song title")
+                onTextEdited: function(t) { root.newTitle = t }
+            }
+
+            StyledTextLabel { text: qsTrc("starscore", "Kind of song"); font: ui.theme.bodyBoldFont }
+            StyledDropdown {
+                Layout.preferredWidth: 360
+                model: [
+                    { text: qsTrc("starscore", "1 – Original"), value: 1 },
+                    { text: qsTrc("starscore", "2 – Cover"), value: 2 },
+                    { text: qsTrc("starscore", "3 – Cover that needs a vocalist"), value: 3 },
+                    { text: qsTrc("starscore", "4 – Work in progress"), value: 4 }
+                ]
+                currentIndex: indexOfValue(root.newCategory)
+                onActivated: function(i, value) { root.newCategory = value }
+            }
+
+            StyledTextLabel { text: qsTrc("starscore", "Four-letter code"); font: ui.theme.bodyBoldFont }
+            TextInputField {
+                Layout.preferredWidth: 120
+                currentText: root.newCode
+                maximumLength: 4
+                onTextEdited: function(t) { root.newCode = t.toUpperCase() }
+            }
+
+            StyledTextLabel {
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignLeft
+                color: ui.theme.fontSecondaryColor
+                visible: root.folderPreview() !== ""
+                text: qsTrc("starscore", "Folder: Sheets and Demos/%1").arg(root.folderPreview())
+            }
+
+            StyledTextLabel {
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignLeft
+                wrapMode: Text.WordWrap
+                visible: root.newError !== ""
+                color: "#d04040"
+                text: root.newError
+            }
+
+            Item { Layout.fillHeight: true }
+        }
+
         StyledTextLabel {
             id: resultLabel
             Layout.fillWidth: true
@@ -120,7 +206,7 @@ StyledDialogView {
             horizontalAlignment: Text.AlignLeft
             verticalAlignment: Text.AlignTop
             wrapMode: Text.WordWrap
-            visible: root.done || (exportModel.notes !== "" && exportModel.errorText === "")
+            visible: root.done || (exportModel.notes !== "" && root.listMode)
             color: root.done ? ui.theme.fontPrimaryColor : ui.theme.fontSecondaryColor
             text: exportModel.notes
         }
@@ -133,7 +219,19 @@ StyledDialogView {
             navigationPanel.order: 2
 
             FlatButton {
-                visible: exportModel.errorText === "" && !root.done
+                visible: exportModel.newSong && !root.done
+                enabled: root.newTitle.trim() !== "" && root.newCode.length === 4
+                text: qsTrc("starscore", "Add song")
+                accentButton: true
+                buttonRole: ButtonBoxModel.ApplyRole
+                buttonId: ButtonBoxModel.CustomButton + 2
+                onClicked: {
+                    root.newError = exportModel.createSong(root.newTitle, root.newCategory, root.newCode)
+                }
+            }
+
+            FlatButton {
+                visible: root.listMode
                 enabled: exportModel.checkedCount > 0
                 text: qsTrc("starscore", "Export %n sheet(s)", "", exportModel.checkedCount)
                 accentButton: true

@@ -34,6 +34,8 @@
 #include "engraving/dom/instrument.h"
 #include "engraving/dom/interval.h"
 #include "engraving/dom/clef.h"
+#include "engraving/dom/box.h"
+#include "engraving/dom/text.h"
 
 #include "notation/iexcerptnotation.h"
 #include "notation/inotationelements.h"
@@ -145,6 +147,134 @@ static QString starscoreSafeFileName(QString s)
     return s.trimmed();
 }
 
+static bool starscoreIsUntitled(const QString& title)
+{
+    const QString t = title.trimmed().toLower();
+    return t.isEmpty() || t == "untitled score" || t == "untitled";
+}
+
+//! The text of the Title in the score's title frame
+static QString starscoreTitleFrameText(const engraving::MasterScore* ms)
+{
+    const engraving::MeasureBase* first = ms ? ms->first() : nullptr;
+    if (!first || !first->isVBox()) {
+        return QString();
+    }
+    for (engraving::EngravingItem* e : first->el()) {
+        if (e && e->isText() && engraving::toText(e)->textStyleType() == engraving::TextStyleType::TITLE) {
+            return engraving::toText(e)->plainText().toQString().simplified();
+        }
+    }
+    return QString();
+}
+
+//! The song's title: the score's title, or the title frame's when that is empty or "Untitled score",
+//! or the file name without its "CODE - " prefix
+static QString starscoreSongTitle(const INotationProjectPtr& project)
+{
+    if (!project) {
+        return QString();
+    }
+    QString title = project->metaInfo().title.trimmed();
+    if (starscoreIsUntitled(title) && project->masterNotation()) {
+        title = starscoreTitleFrameText(project->masterNotation()->masterScore());
+    }
+    if (starscoreIsUntitled(title)) {
+        const QString fileBase = QFileInfo(project->path().toQString()).completeBaseName();
+        const QRegularExpressionMatch m = QRegularExpression("^([A-Z]{3,4})\\s*-\\s*(.*)$").match(fileBase);
+        title = m.hasMatch() ? m.captured(2).trimmed() : fileBase;
+    }
+    return starscoreIsUntitled(title) ? QString() : title;
+}
+
+static std::map<QString, QString> starscoreReadCodes(const QString& bandFolder)
+{
+    std::map<QString, QString> folderToCode;
+    QFile f(bandFolder + "/6 Inbox/.organizer/codes.json");
+    if (f.open(QIODevice::ReadOnly)) {
+        const QJsonObject o = QJsonDocument::fromJson(f.readAll()).object();
+        for (auto it = o.begin(); it != o.end(); ++it) {
+            folderToCode[it.key()] = it.value().toString();
+        }
+    }
+    return folderToCode;
+}
+
+//! A four-letter code for a new song, in the style of the others (AMPL, FYKB, HTLS…), that no song uses yet
+static QString starscoreSuggestCode(const QString& title, const std::set<QString>& taken)
+{
+    QStringList words;
+    for (const QString& w : title.normalized(QString::NormalizationForm_D).toUpper().split(QRegularExpression("[^A-Z0-9]+"),
+                                                                                             Qt::SkipEmptyParts)) {
+        words << w;
+    }
+    if (words.isEmpty()) {
+        words << "SONG";
+    }
+    const QString letters = words.join("");
+
+    QStringList candidates;
+    if (words.size() >= 4) {
+        QString c;
+        for (int i = 0; i < 4; ++i) {
+            c += words[i].at(0);
+        }
+        candidates << c;
+    }
+    if (words.size() == 1) {
+        candidates << words[0].left(4);
+    }
+    if (words.size() >= 2) {
+        candidates << words[0].left(2) + words[1].left(2);
+        candidates << words[0].left(1) + words[1].left(3);
+        candidates << words[0].left(3) + words[1].left(1);
+        candidates << words.last().left(4);
+        candidates << words[0].left(4);
+    }
+    if (words.size() == 3) {
+        candidates << words[0].left(2) + words[1].left(1) + words[2].left(1);
+        candidates << words[0].left(1) + words[1].left(1) + words[2].left(2);
+    }
+    // first letter plus any three later letters, in order
+    for (int a = 1; a < letters.size(); ++a) {
+        for (int b = a + 1; b < letters.size(); ++b) {
+            for (int c = b + 1; c < letters.size(); ++c) {
+                candidates << QString(letters.at(0)) + letters.at(a) + letters.at(b) + letters.at(c);
+            }
+        }
+    }
+    for (const QString& c : candidates) {
+        if (c.size() == 4 && !taken.count(c)) {
+            return c;
+        }
+    }
+    const QString stem = (letters + "XXX").left(3);
+    for (char ch = 'A'; ch <= 'Z'; ++ch) {
+        if (!taken.count(stem + QChar(ch))) {
+            return stem + QChar(ch);
+        }
+    }
+    return QString();
+}
+
+static QString starscoreJsonString(const QString& s)
+{
+    // like Python's json.dump (which the organizer uses): ASCII only, other characters as \uXXXX
+    QString out = "\"";
+    for (const QChar ch : s) {
+        const ushort u = ch.unicode();
+        if (ch == '"' || ch == '\\') {
+            out += '\\';
+            out += ch;
+        } else if (u < 0x20 || u > 0x7e) {
+            out += QString("\\u%1").arg(u, 4, 16, QChar('0'));
+        } else {
+            out += ch;
+        }
+    }
+    return out + "\"";
+}
+
 QString StarScoreService::bandFolder() const
 {
     const StyleSettings settings = loadStyleSettings();
@@ -190,29 +320,14 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
     }
 
     // --- which song folder? codes.json maps "1 Amplitudes" -> "AMPL"
-    std::map<QString, QString> folderToCode;
-    {
-        QFile f(plan.bandFolder + "/6 Inbox/.organizer/codes.json");
-        if (f.open(QIODevice::ReadOnly)) {
-            const QJsonObject o = QJsonDocument::fromJson(f.readAll()).object();
-            for (auto it = o.begin(); it != o.end(); ++it) {
-                folderToCode[it.key()] = it.value().toString();
-            }
-        }
-    }
+    const std::map<QString, QString> folderToCode = starscoreReadCodes(plan.bandFolder);
 
     const QString fileBase = QFileInfo(project->path().toQString()).completeBaseName();
-    QString title = project->metaInfo().title.trimmed();
+    const QString title = starscoreSongTitle(project);
     QString codeFromName;
     const QRegularExpressionMatch codeMatch = QRegularExpression("^([A-Z]{3,4})\\s*-\\s*(.*)$").match(fileBase);
     if (codeMatch.hasMatch()) {
         codeFromName = codeMatch.captured(1);
-        if (title.isEmpty()) {
-            title = codeMatch.captured(2).trimmed();
-        }
-    }
-    if (title.isEmpty()) {
-        title = fileBase;
     }
 
     auto plainName = [](const QString& folder) {
@@ -230,7 +345,7 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
     }
     if (plan.songFolder.isEmpty()) {
         for (const auto& [folder, code] : folderToCode) {
-            if (plainName(folder) == title.toLower()) {
+            if (plainName(folder) == starscoreSafeFileName(title).toLower()) {
                 plan.songFolder = folder;
                 plan.code = code;
                 break;
@@ -238,12 +353,18 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
         }
     }
     if (plan.songFolder.isEmpty()) {
-        return RetVal<StarScoreBandExportPlan>::make_ret(
-            Ret::Code::UnknownError,
-            muse::qtrc("starscore", "Couldn't find “%1” in Sheets and Demos. Name the file “CODE - %1.starscore” "
-                                    "with the song's code from 6 Inbox/.organizer/codes.json, or add the song there first.")
-            .arg(title).toStdString());
+        // A new song: the dialog asks where it goes and what its code is (registerBandSong), then plans again
+        std::set<QString> taken;
+        for (const auto& [folder, code] : folderToCode) {
+            taken.insert(code);
+        }
+        plan.newSong = true;
+        plan.title = title;
+        plan.suggestedCode = !codeFromName.isEmpty() && !taken.count(codeFromName) ? codeFromName
+                             : starscoreSuggestCode(title, taken);
+        return RetVal<StarScoreBandExportPlan>::make_ok(plan);
     }
+    plan.title = title;
 
     // --- one entry per sheet
     engraving::MasterScore* ms = project->masterNotation()->masterScore();
@@ -782,10 +903,7 @@ QString StarScoreService::scoreVersion() const
     const QString fileBase = QFileInfo(project->path().toQString()).completeBaseName();
     const QRegularExpressionMatch m = QRegularExpression("^([A-Z]{3,4})\\s*-\\s*(.*)$").match(fileBase);
     const QString code = m.hasMatch() ? m.captured(1) : QString();
-    QString title = project->metaInfo().title.trimmed();
-    if (title.isEmpty()) {
-        title = m.hasMatch() ? m.captured(2).trimmed() : fileBase;
-    }
+    const QString title = starscoreSongTitle(project);
     const bool existingSong = STARSCORE_V4_CODES.count(code) || STARSCORE_V4_TITLES.count(title.toLower());
     return existingSong ? QString("4.0.0") : QString("1.0.0");
 }
@@ -820,4 +938,165 @@ void StarScoreService::setScoreVersion(const QString& version)
         }
     }
     project->markAsUnsaved();
+}
+
+// ---------------------------------------------------------------------------
+//  A new song in Sheets and Demos
+// ---------------------------------------------------------------------------
+
+Ret StarScoreService::registerBandSong(const QString& titleIn, int category, const QString& codeIn)
+{
+    const QString band = bandFolder();
+    if (band.isEmpty()) {
+        return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "Choose the Sheets and Demos folder first."));
+    }
+    const QString title = starscoreSafeFileName(titleIn.simplified());
+    const QString code = codeIn.trimmed().toUpper();
+    if (starscoreIsUntitled(title)) {
+        return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "Type the song's title."));
+    }
+    if (!QRegularExpression("^[A-Z]{4}$").match(code).hasMatch()) {
+        return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "The code must be four capital letters, like AMPL."));
+    }
+    if (category < 1 || category > 4) {
+        return make_ret(Ret::Code::UnknownError);
+    }
+
+    const QString organizer = band + "/6 Inbox/.organizer";
+    const QString codesPath = organizer + "/codes.json";
+    if (!QFileInfo::exists(codesPath)) {
+        return make_ret(Ret::Code::UnknownError,
+                        muse::qtrc("starscore", "Couldn't find %1. Is the Sheets and Demos folder right?").arg(codesPath).toStdString());
+    }
+    std::map<QString, QString> codes = starscoreReadCodes(band);
+
+    const QString folder = category == 4 ? "4 Works In Progress/" + title : QString("%1 %2").arg(category).arg(title);
+    for (const auto& [f, c] : codes) {
+        if (c == code && f != folder) {
+            return make_ret(Ret::Code::UnknownError,
+                            muse::qtrc("starscore", "%1 is already the code for “%2”. Choose another code.").arg(code, f).toStdString());
+        }
+        QString plain = f.section('/', -1);
+        plain.remove(QRegularExpression("^\\d+\\s+"));
+        if (plain.trimmed().toLower() == title.toLower() && f != folder) {
+            return make_ret(Ret::Code::UnknownError,
+                            muse::qtrc("starscore", "“%1” is already in Sheets and Demos as “%2”.").arg(title, f).toStdString());
+        }
+    }
+
+    // The song folder, with the folders every song has before its first export
+    const QString songDir = band + "/" + folder;
+    if (!QDir().mkpath(songDir) || !QDir().mkpath(songDir + "/Demos") || !QDir().mkpath(songDir + "/Version History")) {
+        return make_ret(Ret::Code::UnknownError,
+                        muse::qtrc("starscore", "Couldn't make the folder %1.").arg(songDir).toStdString());
+    }
+
+    // codes.json, written the way the organizer writes it (sorted, one-space indent)
+    codes[folder] = code;
+    QString json = "{\n";
+    int i = 0;
+    for (const auto& [f, c] : codes) {
+        json += " " + starscoreJsonString(f) + ": " + starscoreJsonString(c);
+        json += (++i < int(codes.size())) ? ",\n" : "\n";
+    }
+    json += "}";
+    QFile out(codesPath);
+    if (!out.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        return make_ret(Ret::Code::UnknownError,
+                        muse::qtrc("starscore", "Couldn't write %1.").arg(codesPath).toStdString());
+    }
+    out.write(json.toUtf8());
+    out.close();
+
+    // Give the score its title so the sheets and later exports use it
+    INotationProjectPtr project = exportSourceProject();
+    if (project && starscoreIsUntitled(project->metaInfo().title)) {
+        ProjectMeta meta = project->metaInfo();
+        meta.title = titleIn.simplified();
+        project->setMetaInfo(meta);
+    }
+    return make_ok();
+}
+
+// ---------------------------------------------------------------------------
+//  Every arrangement as its own .mscz
+// ---------------------------------------------------------------------------
+
+RetVal<QString> StarScoreService::exportArrangementsAsMscz(const QString& folder)
+{
+    INotationProjectPtr project = globalContext()->currentProject();
+    if (!project) {
+        return RetVal<QString>::make_ret(Ret::Code::InternalError);
+    }
+    const std::vector<StarScoreArrangement> list = arrangements();
+    if (list.empty()) {
+        return RetVal<QString>::make_ret(Ret::Code::UnknownError, muse::trc("starscore", "This score has no arrangements."));
+    }
+
+    // "AMPL - 3-Horn Standard.mscz": the song's code when the file name or Sheets and Demos has one, else its title
+    QString prefix;
+    const QString fileBase = QFileInfo(project->path().toQString()).completeBaseName();
+    const QRegularExpressionMatch m = QRegularExpression("^([A-Z]{3,4})\\s*-\\s*(.*)$").match(fileBase);
+    if (m.hasMatch()) {
+        prefix = m.captured(1);
+    } else {
+        const QString band = bandFolder();
+        const QString title = starscoreSongTitle(project);
+        if (!band.isEmpty() && !title.isEmpty()) {
+            for (const auto& [f, c] : starscoreReadCodes(band)) {
+                QString plain = f.section('/', -1);
+                plain.remove(QRegularExpression("^\\d+\\s+"));
+                if (plain.trimmed().toLower() == starscoreSafeFileName(title).toLower()) {
+                    prefix = c;
+                    break;
+                }
+            }
+        }
+        if (prefix.isEmpty()) {
+            prefix = !title.isEmpty() ? starscoreSafeFileName(title) : fileBase;
+        }
+    }
+
+    QDir().mkpath(folder);
+    const QString today = QDate::currentDate().toString(Qt::ISODate);
+    QStringList written;
+    QStringList failed;
+    QStringList superseded;
+    for (const StarScoreArrangement& a : list) {
+        const QString name = prefix + " - " + starscoreSafeFileName(a.name) + ".mscz";
+        const QString target = folder + "/" + name;
+
+        // An older copy moves to Version History/Superseded <today>/ instead of being overwritten
+        if (QFileInfo::exists(target)) {
+            QString archived = folder + "/Version History/Superseded " + today + "/" + name;
+            QDir().mkpath(QFileInfo(archived).absolutePath());
+            const QString base = archived.left(archived.length() - 5);
+            for (int n = 2; QFileInfo::exists(archived); ++n) {
+                archived = QString("%1 (%2).mscz").arg(base).arg(n);
+            }
+            if (QFile::rename(target, archived)) {
+                superseded << name;
+            }
+        }
+
+        const Ret ret = exportArrangement(a.id, io::path_t(target));
+        if (ret) {
+            written << name;
+        } else {
+            failed << QString("%1 (%2)").arg(name, QString::fromStdString(ret.toString()));
+        }
+    }
+
+    QString summary = muse::qtrc("starscore", "Wrote %1 MuseScore file(s) to %2:").arg(written.size()).arg(folder);
+    for (const QString& w : written) {
+        summary += "\n  • " + w;
+    }
+    if (!superseded.isEmpty()) {
+        summary += "\n\n" + muse::qtrc("starscore", "Older copies of %1 file(s) moved to Version History/Superseded %2.")
+                   .arg(superseded.size()).arg(today);
+    }
+    if (!failed.isEmpty()) {
+        summary += "\n\n" + muse::qtrc("starscore", "Couldn't export:") + "\n  • " + failed.join("\n  • ");
+    }
+    return RetVal<QString>::make_ok(summary);
 }

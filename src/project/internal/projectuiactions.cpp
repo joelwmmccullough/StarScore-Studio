@@ -93,6 +93,12 @@ const UiActionList ProjectUiActions::m_actions = {
              TranslatableString("action", "Export to Sheets and Demos…"),
              TranslatableString("action", "Export every sheet to the band's Sheets and Demos folder")
              ),
+    UiAction("starscore-export-arrangements",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Export arrangements as MuseScore files…"),
+             TranslatableString("action", "Export each arrangement as its own MuseScore file (.mscz)")
+             ),
     UiAction("starscore-compare-parts",
              mu::context::UiCtxProjectOpened,
              mu::context::CTX_ANY,

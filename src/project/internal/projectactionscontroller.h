@@ -119,6 +119,7 @@ private:
     void newProject(bool museScoreWizard = false);
     void colorNotes(bool colorize);
     void exportToBandFolder();
+    void exportArrangementsAsMscz();
 
     void openProject(const muse::actions::ActionData& args);
     muse::Ret openProject(const muse::io::path_t& path, const QString& displayNameOverride = QString());

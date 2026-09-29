@@ -102,7 +102,11 @@ Ret MscLoader::loadMscz(MasterScore* masterScore, const MscReader& mscReader, rw
         {
             bool chordListOk = false;
             ByteArray chordListData = mscReader.readChordListFile();
-            if (!chordListData.empty()) {
+            // StarScore: the Starsign chord file is bundled with the app, so always load the current bundled copy
+            // instead of the copy saved in the file. The saved copy lost its auto-adjust settings, which dropped
+            // extensions (the 7 in A△7) to the baseline after reopening.
+            const bool bundledStarsignChords = masterScore->style().styleSt(Sid::chordDescriptionFile) == u"chords_starsign.xml";
+            if (!chordListData.empty() && !bundledStarsignChords) {
                 Buffer buf(&chordListData);
                 buf.open(IODevice::ReadOnly);
 

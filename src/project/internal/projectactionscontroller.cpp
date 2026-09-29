@@ -91,6 +91,7 @@ void ProjectActionsController::init()
         interactive()->open(Uri("musescore://starscore/addsolo"));
     });
     dispatcher()->reg(this, "starscore-export-band", [this]() { exportToBandFolder(); });
+    dispatcher()->reg(this, "starscore-export-arrangements", [this]() { exportArrangementsAsMscz(); });
     dispatcher()->reg(this, "starscore-compare-parts", [this]() {
         interactive()->open(Uri("musescore://starscore/compare"));
     });
@@ -734,6 +735,35 @@ void ProjectActionsController::exportToBandFolder()
     }
 
     interactive()->open(muse::UriQuery("musescore://starscore/exportband"));
+}
+
+void ProjectActionsController::exportArrangementsAsMscz()
+{
+    if (starScoreService()->arrangements().empty()) {
+        interactive()->infoSync(muse::trc("starscore", "No arrangements"),
+                            muse::trc("starscore", "This score has no arrangements to export."));
+        return;
+    }
+
+    QString startDir = QDir::homePath();
+    if (INotationProjectPtr project = globalContext()->currentProject()) {
+        const QString path = project->path().toQString();
+        if (!path.isEmpty() && QFileInfo(path).isAbsolute()) {
+            startDir = QFileInfo(path).absolutePath();
+        }
+    }
+    const muse::io::path_t dir = interactive()->selectDirectory(
+        muse::trc("starscore", "Choose a folder for the MuseScore files"), muse::io::path_t(startDir));
+    if (dir.empty()) {
+        return;
+    }
+
+    const muse::RetVal<QString> result = starScoreService()->exportArrangementsAsMscz(dir.toQString());
+    if (!result.ret) {
+        interactive()->errorSync(muse::trc("starscore", "Couldn't export the arrangements"), result.ret.toString());
+        return;
+    }
+    interactive()->infoSync(muse::trc("starscore", "Arrangements exported"), result.val.toStdString());
 }
 
 void ProjectActionsController::colorNotes(bool colorize)

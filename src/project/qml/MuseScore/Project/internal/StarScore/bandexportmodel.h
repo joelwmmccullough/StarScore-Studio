@@ -27,6 +27,9 @@ class BandExportModel : public QObject, public muse::Contextable
     Q_PROPERTY(QString currentVersion READ currentVersion NOTIFY loaded)
     Q_PROPERTY(int bump READ bump WRITE setBump NOTIFY bumpChanged)   // 0 none, 1 first number, 2 second, 3 third
     Q_PROPERTY(QString exportVersion READ exportVersion NOTIFY bumpChanged)
+    Q_PROPERTY(bool newSong READ newSong NOTIFY loaded)                 // not in Sheets and Demos yet
+    Q_PROPERTY(QString songTitle READ songTitle NOTIFY loaded)
+    Q_PROPERTY(QString suggestedCode READ suggestedCode NOTIFY loaded)
 
     QML_ELEMENT
 
@@ -44,6 +47,12 @@ public:
     int bump() const;
     void setBump(int bump);
     QString exportVersion() const;
+    bool newSong() const;
+    QString songTitle() const;
+    QString suggestedCode() const;
+
+    //! Adds the song to Sheets and Demos (category 1–4) and plans the export. Returns an error, or "" when done.
+    Q_INVOKABLE QString createSong(const QString& title, int category, const QString& code);
 
     Q_INVOKABLE void load();
     Q_INVOKABLE void setChecked(int index, bool checked);
@@ -70,5 +79,8 @@ private:
     QVariantList m_items;
     QString m_version;
     int m_bump = 0;
+    bool m_newSong = false;
+    QString m_songTitle;
+    QString m_suggestedCode;
 };
 }

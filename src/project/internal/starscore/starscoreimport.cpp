@@ -23,6 +23,8 @@
 #include "engraving/dom/chord.h"
 #include "engraving/rw/xmlreader.h"
 #include "engraving/dom/select.h"
+#include "engraving/dom/box.h"
+#include "engraving/dom/text.h"
 
 #include "notation/inotationparts.h"
 #include "notation/iexcerptnotation.h"
@@ -285,6 +287,27 @@ Ret StarScoreService::applyImport(const std::map<QString, QString>& sectionByPar
     engraving::MasterScore* ms = masterScore();
     if (!master || !ms) {
         return make_ret(Ret::Code::InternalError);
+    }
+
+    // The score's title: when it's empty or "Untitled score", take the title frame's
+    if (INotationProjectPtr project = globalContext()->currentProject()) {
+        const QString current = project->metaInfo().title.trimmed().toLower();
+        if (current.isEmpty() || current == "untitled score" || current == "untitled") {
+            const engraving::MeasureBase* first = ms->first();
+            if (first && first->isVBox()) {
+                for (engraving::EngravingItem* e : first->el()) {
+                    if (e && e->isText() && engraving::toText(e)->textStyleType() == engraving::TextStyleType::TITLE) {
+                        const QString frameTitle = engraving::toText(e)->plainText().toQString().simplified();
+                        if (!frameTitle.isEmpty()) {
+                            ProjectMeta meta = project->metaInfo();
+                            meta.title = frameTitle;
+                            project->setMetaInfo(meta);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     Data data = load();

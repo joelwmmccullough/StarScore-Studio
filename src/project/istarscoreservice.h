@@ -199,6 +199,11 @@ struct StarScoreBandExportPlan
     QString code;                // e.g. "AMPL"
     std::vector<StarScoreBandFile> files;
     QStringList notes;           // things that were skipped, and why
+
+    // The song isn't in Sheets and Demos yet: the dialog asks for its folder and code first (registerBandSong)
+    bool newSong = false;
+    QString title;               // song title (title frame when the score's title is empty or "Untitled score")
+    QString suggestedCode;       // a four-letter code no other song uses
 };
 
 //! Opening a .mscz (or any file that isn't a .starscore): the instruments, with StarScore's guess for each one's section
@@ -322,6 +327,14 @@ public:
     virtual QString bandFolder() const = 0;          // saved choice, or the usual Google Drive location if it exists
     virtual void setBandFolder(const QString& path) = 0;
     virtual muse::RetVal<StarScoreBandExportPlan> planBandExport() const = 0;
+    //! Add a new song to Sheets and Demos: make its folder ("1 Title", "2 Title", "3 Title" or
+    //! "4 Works In Progress/Title") with Demos and Version History inside, record its code in
+    //! 6 Inbox/.organizer/codes.json, and give the score this title if it had none. category is 1–4.
+    virtual muse::Ret registerBandSong(const QString& title, int category, const QString& code) = 0;
+
+    //! "Export as MuseScore files": each arrangement as its own .mscz in folder, named "CODE - <arrangement>.mscz"
+    //! (or "<title> - <arrangement>.mscz" when the song has no code). Returns a summary.
+    virtual muse::RetVal<QString> exportArrangementsAsMscz(const QString& folder) = 0;
     //! Write every PDF in the plan, moving any file it replaces to "Version History/Superseded <date>/".
     //! Returns a summary.
     //! Exports the planned sheets whose relative paths are in onlyPaths (all of them when onlyPaths is empty)

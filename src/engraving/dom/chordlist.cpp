@@ -2140,7 +2140,8 @@ void ChordList::write(XmlWriter& xml) const
         ++fontIdx;
     }
     if (m_autoAdjust) {
-        xml.tag("autoAdjust", { { "mag", m_nmag }, { "adjust", m_nadjust } });
+        // StarScore: write the flag itself too; without it the saved copy reads back with auto-adjust off
+        xml.tag("autoAdjust", { { "mag", m_nmag }, { "adjust", m_nadjust } }, 1);
     }
     for (const ChordToken& t : chordTokenList) {
         t.write(xml);

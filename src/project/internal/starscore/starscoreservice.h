@@ -106,6 +106,8 @@ public:
     QString bandFolder() const override;
     void setBandFolder(const QString& path) override;
     muse::RetVal<StarScoreBandExportPlan> planBandExport() const override;
+    muse::Ret registerBandSong(const QString& title, int category, const QString& code) override;
+    muse::RetVal<QString> exportArrangementsAsMscz(const QString& folder) override;
     muse::RetVal<QString> exportToBandFolder(const QStringList& onlyPaths) override;
     QStringList bandExportUnticked(const QString& code) const override;
     void setBandExportUnticked(const QString& code, const QStringList& paths) override;

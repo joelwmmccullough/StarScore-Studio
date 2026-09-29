@@ -84,6 +84,31 @@ QString BandExportModel::exportVersion() const
     return QString("%1.%2.%3").arg(major).arg(minor).arg(patch);
 }
 
+bool BandExportModel::newSong() const
+{
+    return m_newSong;
+}
+
+QString BandExportModel::songTitle() const
+{
+    return m_songTitle;
+}
+
+QString BandExportModel::suggestedCode() const
+{
+    return m_suggestedCode;
+}
+
+QString BandExportModel::createSong(const QString& title, int category, const QString& code)
+{
+    const muse::Ret ret = starScore()->registerBandSong(title, category, code);
+    if (!ret) {
+        return QString::fromStdString(ret.text().empty() ? ret.toString() : ret.text());
+    }
+    load();
+    return QString();
+}
+
 void BandExportModel::load()
 {
     m_version = starScore()->scoreVersion();
@@ -95,10 +120,18 @@ void BandExportModel::load()
     m_notes.clear();
     m_heading.clear();
     m_code.clear();
+    m_newSong = false;
+    m_songTitle.clear();
+    m_suggestedCode.clear();
 
     muse::RetVal<StarScoreBandExportPlan> plan = starScore()->planBandExport();
     if (!plan.ret) {
         m_error = QString::fromStdString(plan.ret.text().empty() ? plan.ret.toString() : plan.ret.text());
+    } else if (plan.val.newSong) {
+        m_newSong = true;
+        m_songTitle = plan.val.title;
+        m_suggestedCode = plan.val.suggestedCode;
+        m_heading = muse::qtrc("starscore", "New song in Sheets and Demos");
     } else {
         m_code = plan.val.code;
         m_heading = muse::qtrc("starscore", "Sheets and Demos / %1").arg(plan.val.songFolder);

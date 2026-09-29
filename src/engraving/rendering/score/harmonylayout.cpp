@@ -1023,7 +1023,7 @@ void HarmonyLayout::renderActionSet(Harmony* item, Harmony::LayoutData* ldata, c
                 const char16_t c = last->text().at(0).unicode();
                 if (c >= u'A' && c <= u'G') {
                     // A's sloping right side leaves the widest gap, so it pulls in further
-                    const double pull = c == u'A' ? 0.12 : 0.08;
+                    const double pull = c == u'A' ? 0.15 : 0.08;
                     harmonyCtx.movex(-pull * FontMetrics::capHeight(item->font()) * item->mag());
                 }
             }
