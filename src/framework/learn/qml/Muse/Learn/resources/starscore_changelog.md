@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.4.1
+
+- Installer window: the “STAR” sticky note covers “muse” in the logo, and the instructions say “drag the StarScore Studio icon”.
+
 ## 1.4.0
 
 - Each part score's tab shows a colored dot for its status (the same colors as the section and arrangement buttons). A part score holding several instruments shows the least-finished one. No dot means none of its parts is tagged yet.

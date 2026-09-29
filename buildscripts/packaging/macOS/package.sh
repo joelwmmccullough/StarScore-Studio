@@ -127,7 +127,7 @@ cp -Rp ${APP_PATH} "${VOLUME}/${APP_NAME}.app"
 
 # Copy in background image
 echo "Copy in background image"
-BACKGROUND=buildscripts/packaging/macOS/musescore-dmg-background.tiff
+BACKGROUND=buildscripts/packaging/macOS/starscore-dmg-background.tiff
 mkdir -p "${VOLUME}/Pictures"
 cp ${BACKGROUND} "${VOLUME}/Pictures/background.tiff"
 
