@@ -22,6 +22,9 @@ Item {
     // 1.0 = fit the panel width
     property real zoom: 1.0
 
+    // the list of reference PDFs (rename, instrument, order, delete) instead of the pages
+    property bool managing: false
+
     ReferencePanelModel {
         id: refModel
     }
@@ -72,6 +75,13 @@ Item {
                 onClicked: refModel.setInvert(!refModel.invert)
             }
             FlatButton {
+                icon: IconCode.SETTINGS_COG
+                toolTipTitle: qsTrc("starscore", "Manage reference PDFs")
+                toolTipDescription: qsTrc("starscore", "Rename, mark the instrument, reorder or delete")
+                accentButton: root.managing
+                onClicked: root.managing = !root.managing
+            }
+            FlatButton {
                 icon: IconCode.PLUS
                 toolTipTitle: qsTrc("starscore", "Add reference PDF…")
                 onClicked: refModel.addReference()
@@ -87,7 +97,7 @@ Item {
         StyledTextLabel {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            visible: refModel.pageCount === 0
+            visible: refModel.pageCount === 0 && !(root.managing && refModel.references.length > 0)
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
             wrapMode: Text.WordWrap
@@ -96,11 +106,94 @@ Item {
                   : qsTrc("starscore", "This PDF can't be shown. Save the score and open it again, or use “Open in another app”.")
         }
 
+        StyledListView {
+            id: manageList
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            visible: root.managing && refModel.references.length > 0
+            spacing: 6
+            clip: true
+            model: refModel.references
+
+            delegate: Rectangle {
+                id: row
+                required property var modelData
+                required property int index
+
+                width: manageList.width
+                height: rowColumn.implicitHeight + 12
+                radius: 4
+                color: modelData.id === refModel.currentId ? ui.theme.accentColor : ui.theme.backgroundSecondaryColor
+                opacity: modelData.id === refModel.currentId ? 1.0 : 0.95
+
+                ColumnLayout {
+                    id: rowColumn
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.margins: 6
+                    spacing: 4
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 4
+
+                        TextInputField {
+                            Layout.fillWidth: true
+                            currentText: row.modelData.name
+                            hint: qsTrc("starscore", "Name")
+                            onTextEditingFinished: function(newTextValue) {
+                                if (newTextValue !== row.modelData.name) {
+                                    refModel.rename(row.modelData.id, newTextValue)
+                                }
+                            }
+                        }
+                        FlatButton {
+                            icon: IconCode.ARROW_UP
+                            toolTipTitle: qsTrc("starscore", "Move up")
+                            enabled: row.index > 0
+                            onClicked: refModel.move(row.modelData.id, -1)
+                        }
+                        FlatButton {
+                            icon: IconCode.ARROW_DOWN
+                            toolTipTitle: qsTrc("starscore", "Move down")
+                            enabled: row.index < refModel.references.length - 1
+                            onClicked: refModel.move(row.modelData.id, 1)
+                        }
+                        FlatButton {
+                            icon: IconCode.DELETE_TANK
+                            toolTipTitle: qsTrc("starscore", "Delete")
+                            onClicked: refModel.remove(row.modelData.id)
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 4
+
+                        StyledDropdown {
+                            Layout.fillWidth: true
+                            model: refModel.instrumentChoices
+                            currentIndex: indexOfValue(row.modelData.instrument)
+                            onActivated: function(index, value) { refModel.setInstrument(row.modelData.id, value) }
+                        }
+                        FlatButton {
+                            text: qsTrc("starscore", "Show")
+                            onClicked: {
+                                refModel.selectId(row.modelData.id)
+                                root.managing = false
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         Flickable {
             id: flick
             Layout.fillWidth: true
             Layout.fillHeight: true
-            visible: refModel.pageCount > 0
+            visible: refModel.pageCount > 0 && !root.managing
             clip: true
             contentWidth: pages.width
             contentHeight: pages.height

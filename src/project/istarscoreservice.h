@@ -137,6 +137,7 @@ struct StarScoreReference
     QString name;                // shown in the menu and used as the exported file name, e.g. "Bet - Original Chart"
     QString file;                // entry inside the .starscore
     bool invert = true;          // shown with inverted colours in the panel (never in exports)
+    QString instrument;          // which part it is for, e.g. "Bass Guitar" (empty = the whole band / none)
 };
 
 //! What adding a solo file would do, shown before the user confirms
@@ -344,6 +345,11 @@ public:
     virtual void setCurrentReferenceId(const QString& referenceId) = 0;
     virtual int referencePageCount(const QString& referenceId) const = 0;          // 0 when it can't be read
     virtual void setReferenceInvert(const QString& referenceId, bool invert) = 0;
+    virtual void renameReference(const QString& referenceId, const QString& name) = 0;
+    virtual void setReferenceInstrument(const QString& referenceId, const QString& instrument) = 0;
+    virtual void moveReference(const QString& referenceId, int newIndex) = 0;
+    //! Instrument names in this score, for tagging reference PDFs
+    virtual QStringList referenceInstrumentChoices() const = 0;
     //! One page (0-based) drawn at widthPx wide; the PNG's path, or empty on failure
     virtual QString referencePageImage(const QString& referenceId, int page, int widthPx) const = 0;
     //! Save changed solos and the main score (used when Save is pressed while a solo is showing)

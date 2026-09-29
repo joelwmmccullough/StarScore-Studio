@@ -110,6 +110,10 @@ public:
     void setCurrentReferenceId(const QString& referenceId) override;
     int referencePageCount(const QString& referenceId) const override;
     void setReferenceInvert(const QString& referenceId, bool invert) override;
+    void renameReference(const QString& referenceId, const QString& name) override;
+    void setReferenceInstrument(const QString& referenceId, const QString& instrument) override;
+    void moveReference(const QString& referenceId, int newIndex) override;
+    QStringList referenceInstrumentChoices() const override;
     QString referencePageImage(const QString& referenceId, int page, int widthPx) const override;
     muse::Ret saveAll() override;
 
@@ -151,6 +155,7 @@ public:
         std::vector<StarScoreArrangement> arrangements;
         std::vector<StarScoreSolo> solos;
         std::vector<StarScoreReference> references;
+        std::map<QString, QString> referenceForScore;   // part score name ("" = main score) -> reference shown with it
         QString version;   // "4.0.1"; printed in the footer
     };
 
@@ -217,6 +222,8 @@ private:
     std::map<QString, std::shared_ptr<INotationProject> > m_soloProjects;
     QString m_workDir;
     QString m_currentReferenceId;
+    QString currentScoreKey() const;
+    void pickReferenceForCurrentScore();
     bool m_switching = false;
 };
 }

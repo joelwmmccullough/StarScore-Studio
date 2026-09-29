@@ -25,6 +25,7 @@ class ReferencePanelModel : public QObject, public muse::Contextable, public mus
     Q_PROPERTY(int currentIndex READ currentIndex NOTIFY changed)
     Q_PROPERTY(int pageCount READ pageCount NOTIFY changed)
     Q_PROPERTY(bool invert READ invert NOTIFY changed)   // current PDF shown with inverted colours
+    Q_PROPERTY(QVariantList instrumentChoices READ instrumentChoices NOTIFY changed)   // [{ text, value }]
 
     QML_ELEMENT
 
@@ -39,6 +40,14 @@ public:
     int currentIndex() const;
     int pageCount() const;
     bool invert() const;
+    QVariantList instrumentChoices() const;
+
+    // Managing the list
+    Q_INVOKABLE void selectId(const QString& id);
+    Q_INVOKABLE void rename(const QString& id, const QString& name);
+    Q_INVOKABLE void setInstrument(const QString& id, const QString& instrument);
+    Q_INVOKABLE void move(const QString& id, int delta);
+    Q_INVOKABLE void remove(const QString& id);
     Q_INVOKABLE void setInvert(bool invert);
 
     Q_INVOKABLE void load();

@@ -35,7 +35,8 @@ QVariantList ReferencePanelModel::references() const
 {
     QVariantList list;
     for (const StarScoreReference& r : starScore()->references()) {
-        list << QVariantMap { { "id", r.id }, { "text", r.name }, { "value", r.id } };
+        list << QVariantMap { { "id", r.id }, { "text", r.name }, { "value", r.id }, { "name", r.name },
+                              { "instrument", r.instrument } };
     }
     return list;
 }
@@ -60,6 +61,72 @@ int ReferencePanelModel::currentIndex() const
 int ReferencePanelModel::pageCount() const
 {
     return m_pageCount;
+}
+
+QVariantList ReferencePanelModel::instrumentChoices() const
+{
+    QVariantList list;
+    list << QVariantMap { { "text", muse::qtrc("starscore", "No instrument") }, { "value", QString() } };
+    QStringList names = starScore()->referenceInstrumentChoices();
+    // tags already used stay selectable even if the instrument is no longer in the score
+    for (const StarScoreReference& r : starScore()->references()) {
+        if (!r.instrument.isEmpty() && !names.contains(r.instrument, Qt::CaseInsensitive)) {
+            names << r.instrument;
+        }
+    }
+    for (const QString& n : names) {
+        list << QVariantMap { { "text", n }, { "value", n } };
+    }
+    return list;
+}
+
+void ReferencePanelModel::selectId(const QString& id)
+{
+    starScore()->setCurrentReferenceId(id);
+    refresh();
+}
+
+void ReferencePanelModel::rename(const QString& id, const QString& name)
+{
+    starScore()->renameReference(id, name);
+}
+
+void ReferencePanelModel::setInstrument(const QString& id, const QString& instrument)
+{
+    starScore()->setReferenceInstrument(id, instrument);
+}
+
+void ReferencePanelModel::move(const QString& id, int delta)
+{
+    const std::vector<StarScoreReference> refs = starScore()->references();
+    for (size_t i = 0; i < refs.size(); ++i) {
+        if (refs[i].id == id) {
+            starScore()->moveReference(id, int(i) + delta);
+            return;
+        }
+    }
+}
+
+void ReferencePanelModel::remove(const QString& id)
+{
+    QString name;
+    for (const StarScoreReference& r : starScore()->references()) {
+        if (r.id == id) {
+            name = r.name;
+        }
+    }
+    constexpr int Remove = static_cast<int>(muse::IInteractive::Button::CustomButton) + 1;
+    constexpr int Keep = static_cast<int>(muse::IInteractive::Button::CustomButton) + 2;
+    const muse::IInteractive::Result answer = interactive()->questionSync(
+        muse::trc("starscore", "Delete this reference PDF?"),
+        muse::qtrc("starscore", "“%1” will be removed from this score when you save. The original file on your computer is not touched.")
+        .arg(name).toStdString(), {
+        muse::IInteractive::ButtonData(Keep, muse::trc("starscore", "Cancel"), true),
+        muse::IInteractive::ButtonData(Remove, muse::trc("starscore", "Delete")),
+    }, Keep);
+    if (answer.button() == Remove) {
+        starScore()->removeReference(id);
+    }
 }
 
 bool ReferencePanelModel::invert() const

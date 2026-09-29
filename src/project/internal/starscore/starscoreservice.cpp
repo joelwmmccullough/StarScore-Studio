@@ -75,6 +75,11 @@ void StarScoreService::init()
         listenCurrentProject();
         m_changed.notify();
     });
+
+    // Reference PDF panel: each part score shows the reference PDF last chosen for it
+    globalContext()->currentNotationChanged().onNotify(this, [this]() {
+        pickReferenceForCurrentScore();
+    });
 }
 
 void StarScoreService::listenCurrentProject()
@@ -219,9 +224,15 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
         ref.name = o.value("name").toString();
         ref.file = o.value("file").toString();
         ref.invert = o.value("invert").toBool(true);
+        ref.instrument = o.value("instrument").toString();
         if (!ref.id.isEmpty()) {
             data.references.push_back(ref);
         }
+    }
+
+    const QJsonObject refForScore = root.value("referenceForScore").toObject();
+    for (auto it = refForScore.begin(); it != refForScore.end(); ++it) {
+        data.referenceForScore[it.key()] = it.value().toString();
     }
 
     data.version = root.value("scoreVersion").toString();
@@ -304,10 +315,20 @@ QString StarScoreService::toJson(const Data& data)
         o["name"] = ref.name;
         o["file"] = ref.file;
         o["invert"] = ref.invert;
+        if (!ref.instrument.isEmpty()) {
+            o["instrument"] = ref.instrument;
+        }
         refs.append(o);
     }
     if (!refs.isEmpty()) {
         root["references"] = refs;
+    }
+    QJsonObject refForScore;
+    for (const auto& [score, id] : data.referenceForScore) {
+        refForScore[score] = id;
+    }
+    if (!refForScore.isEmpty()) {
+        root["referenceForScore"] = refForScore;
     }
 
     return QString::fromUtf8(QJsonDocument(root).toJson(QJsonDocument::Compact));
@@ -2016,10 +2037,141 @@ QString StarScoreService::currentReferenceId() const
 
 void StarScoreService::setCurrentReferenceId(const QString& referenceId)
 {
-    if (m_currentReferenceId != referenceId) {
-        m_currentReferenceId = referenceId;
+    const bool changed = m_currentReferenceId != referenceId;
+    m_currentReferenceId = referenceId;
+
+    // Remember it for the score or part score being viewed. A viewing choice: stored in the score
+    // without marking it as modified (kept with the next save).
+    if (m_mainProject && !referenceId.isEmpty()) {
+        engraving::MasterScore* ms = m_mainProject->masterNotation()->masterScore();
+        Data data = loadFrom(ms);
+        const QString key = currentScoreKey();
+        if (data.referenceForScore[key] != referenceId) {
+            data.referenceForScore[key] = referenceId;
+            ms->setMetaTag(STARSCORE_META_TAG, String::fromQString(toJson(data)));
+        }
+    }
+    if (changed) {
         m_changed.notify();
     }
+}
+
+QString StarScoreService::currentScoreKey() const
+{
+    INotationPtr current = globalContext()->currentNotation();
+    if (!current || !m_mainProject || current == m_mainProject->masterNotation()->notation()) {
+        return QString();
+    }
+    return current->name();
+}
+
+void StarScoreService::pickReferenceForCurrentScore()
+{
+    if (!m_mainProject) {
+        return;
+    }
+    const Data data = loadFrom(m_mainProject->masterNotation()->masterScore());
+    if (data.references.empty()) {
+        return;
+    }
+    auto exists = [&](const QString& id) {
+        return std::any_of(data.references.begin(), data.references.end(), [&](const StarScoreReference& r) { return r.id == id; });
+    };
+
+    QString chosen;
+    const QString key = currentScoreKey();
+    auto it = data.referenceForScore.find(key);
+    if (it != data.referenceForScore.end() && exists(it->second)) {
+        chosen = it->second;
+    } else if (INotationPtr current = globalContext()->currentNotation()) {
+        // Not chosen before: a PDF tagged with one of this part score's instruments
+        QStringList names;
+        if (current->elements() && current->elements()->msScore()) {
+            for (const engraving::Part* p : current->elements()->msScore()->parts()) {
+                names << p->partName().toQString().toLower() << p->instrument()->nameAsPlainText().toQString().toLower();
+            }
+        }
+        for (const StarScoreReference& r : data.references) {
+            const QString tag = r.instrument.trimmed().toLower();
+            if (tag.isEmpty()) {
+                continue;
+            }
+            if (std::any_of(names.begin(), names.end(), [&](const QString& n) { return n == tag || n.contains(tag); })) {
+                chosen = r.id;
+                break;
+            }
+        }
+    }
+    if (!chosen.isEmpty() && chosen != m_currentReferenceId) {
+        m_currentReferenceId = chosen;
+        m_changed.notify();
+    }
+}
+
+void StarScoreService::renameReference(const QString& referenceId, const QString& name)
+{
+    const QString n = name.simplified();
+    if (!m_mainProject || n.isEmpty()) {
+        return;
+    }
+    Data data = loadFrom(m_mainProject->masterNotation()->masterScore());
+    for (StarScoreReference& r : data.references) {
+        if (r.id == referenceId && r.name != n) {
+            r.name = n;
+            storeTo(m_mainProject->masterNotation()->masterScore(), data, m_mainProject);
+            return;
+        }
+    }
+}
+
+void StarScoreService::setReferenceInstrument(const QString& referenceId, const QString& instrument)
+{
+    if (!m_mainProject) {
+        return;
+    }
+    Data data = loadFrom(m_mainProject->masterNotation()->masterScore());
+    for (StarScoreReference& r : data.references) {
+        if (r.id == referenceId && r.instrument != instrument) {
+            r.instrument = instrument;
+            storeTo(m_mainProject->masterNotation()->masterScore(), data, m_mainProject);
+            return;
+        }
+    }
+}
+
+void StarScoreService::moveReference(const QString& referenceId, int newIndex)
+{
+    if (!m_mainProject) {
+        return;
+    }
+    Data data = loadFrom(m_mainProject->masterNotation()->masterScore());
+    auto it = std::find_if(data.references.begin(), data.references.end(), [&](const StarScoreReference& r) { return r.id == referenceId; });
+    if (it == data.references.end() || newIndex < 0 || newIndex >= int(data.references.size())) {
+        return;
+    }
+    StarScoreReference ref = *it;
+    data.references.erase(it);
+    data.references.insert(data.references.begin() + newIndex, ref);
+    storeTo(m_mainProject->masterNotation()->masterScore(), data, m_mainProject);
+}
+
+QStringList StarScoreService::referenceInstrumentChoices() const
+{
+    QStringList names;
+    if (!m_mainProject) {
+        return names;
+    }
+    for (const engraving::Part* p : m_mainProject->masterNotation()->masterScore()->parts()) {
+        QString n = p->instrument()->nameAsPlainText().toQString().trimmed();
+        n.remove(QRegularExpression("\\s+\\d+$"));   // "Trumpet 2" -> "Trumpet"
+        if (n.isEmpty()) {
+            n = p->partName().toQString();
+        }
+        if (!names.contains(n, Qt::CaseInsensitive)) {
+            names << n;
+        }
+    }
+    return names;
 }
 
 int StarScoreService::referencePageCount(const QString& referenceId) const
