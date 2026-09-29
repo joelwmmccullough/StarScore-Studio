@@ -12,7 +12,9 @@
 #include <map>
 #include <set>
 
+#include <QCryptographicHash>
 #include <QDir>
+#include <QTimer>
 #include <QImage>
 #include <QFileInfo>
 #include <QFile>
@@ -76,10 +78,20 @@ void StarScoreService::init()
         m_changed.notify();
     });
 
-    // Reference PDF panel: each part score shows the reference PDF last chosen for it
+    // Reference PDF panel: each part score shows the reference PDF last chosen for it (or stays closed)
     globalContext()->currentNotationChanged().onNotify(this, [this]() {
         pickReferenceForCurrentScore();
     });
+    globalContext()->currentProjectChanged().onNotify(this, [this]() {
+        // the notation page and its panels may still be loading: restore once they are there
+        QTimer::singleShot(0, [this]() { pickReferenceForCurrentScore(); });
+        QTimer::singleShot(1000, [this]() { pickReferenceForCurrentScore(); });
+    });
+    dockWindowProvider()->windowChanged().onNotify(this, [this]() {
+        listenReferencePanel();
+        pickReferenceForCurrentScore();
+    });
+    listenReferencePanel();
 }
 
 void StarScoreService::listenCurrentProject()
@@ -2035,22 +2047,73 @@ QString StarScoreService::currentReferenceId() const
     return refs.empty() ? QString() : refs.front().id;
 }
 
+// ---------------------------------------------------------------------------
+//  Reference PDF view per part score: which PDF is showing, or that the panel is closed.
+//  Kept in the app settings per file, so it comes back after quitting even without saving the score.
+// ---------------------------------------------------------------------------
+
+static const QString STARSCORE_REFERENCE_PANEL("starscoreReferencePanel");
+static const QString REFERENCE_PANEL_CLOSED("-");
+
+QString StarScoreService::referenceViewSettingsKey() const
+{
+    if (!m_mainProject) {
+        return QString();
+    }
+    const QByteArray path = m_mainProject->path().toQString().toUtf8();
+    return "StarScore/referenceView/" + QString::fromLatin1(QCryptographicHash::hash(path, QCryptographicHash::Md5).toHex());
+}
+
+QJsonObject StarScoreService::loadReferenceView() const
+{
+    const QString key = referenceViewSettingsKey();
+    if (key.isEmpty()) {
+        return QJsonObject();
+    }
+    return QJsonDocument::fromJson(QSettings().value(key).toByteArray()).object();
+}
+
+void StarScoreService::recordReferenceView()
+{
+    if (m_restoringReferenceView || !m_mainProject) {
+        return;
+    }
+    const QString settingsKey = referenceViewSettingsKey();
+    muse::dock::IDockWindow* window = dockWindowProvider()->window();
+    if (settingsKey.isEmpty() || !window) {
+        return;
+    }
+    const bool open = window->isDockOpen(STARSCORE_REFERENCE_PANEL);
+    const QString value = open ? currentReferenceId() : REFERENCE_PANEL_CLOSED;
+    if (open && value.isEmpty()) {
+        return;
+    }
+    QJsonObject view = loadReferenceView();
+    const QString scoreKey = currentScoreKey().isEmpty() ? QString("(main score)") : currentScoreKey();
+    if (view.value(scoreKey).toString() != value) {
+        view[scoreKey] = value;
+        QSettings().setValue(settingsKey, QJsonDocument(view).toJson(QJsonDocument::Compact));
+    }
+}
+
+void StarScoreService::listenReferencePanel()
+{
+    muse::dock::IDockWindow* window = dockWindowProvider()->window();
+    if (!window) {
+        return;
+    }
+    window->docksOpenStatusChanged().onReceive(this, [this](const QStringList& names) {
+        if (names.contains(STARSCORE_REFERENCE_PANEL)) {
+            recordReferenceView();
+        }
+    });
+}
+
 void StarScoreService::setCurrentReferenceId(const QString& referenceId)
 {
     const bool changed = m_currentReferenceId != referenceId;
     m_currentReferenceId = referenceId;
-
-    // Remember it for the score or part score being viewed. A viewing choice: stored in the score
-    // without marking it as modified (kept with the next save).
-    if (m_mainProject && !referenceId.isEmpty()) {
-        engraving::MasterScore* ms = m_mainProject->masterNotation()->masterScore();
-        Data data = loadFrom(ms);
-        const QString key = currentScoreKey();
-        if (data.referenceForScore[key] != referenceId) {
-            data.referenceForScore[key] = referenceId;
-            ms->setMetaTag(STARSCORE_META_TAG, String::fromQString(toJson(data)));
-        }
-    }
+    recordReferenceView();
     if (changed) {
         m_changed.notify();
     }
@@ -2071,20 +2134,36 @@ void StarScoreService::pickReferenceForCurrentScore()
         return;
     }
     const Data data = loadFrom(m_mainProject->masterNotation()->masterScore());
-    if (data.references.empty()) {
-        return;
-    }
     auto exists = [&](const QString& id) {
         return std::any_of(data.references.begin(), data.references.end(), [&](const StarScoreReference& r) { return r.id == id; });
     };
 
+    // What was showing with this score or part score last time (a PDF, or the panel closed)
+    const QString scoreKey = currentScoreKey().isEmpty() ? QString("(main score)") : currentScoreKey();
+    const QString remembered = loadReferenceView().value(scoreKey).toString();
+    muse::dock::IDockWindow* window = dockWindowProvider()->window();
+
+    if (remembered == REFERENCE_PANEL_CLOSED || (!remembered.isEmpty() && exists(remembered))) {
+        m_restoringReferenceView = true;
+        if (remembered != REFERENCE_PANEL_CLOSED && remembered != m_currentReferenceId) {
+            m_currentReferenceId = remembered;
+            m_changed.notify();
+        }
+        const bool wantOpen = remembered != REFERENCE_PANEL_CLOSED;
+        if (window && window->isDockOpen(STARSCORE_REFERENCE_PANEL) != wantOpen) {
+            window->setDockOpen(STARSCORE_REFERENCE_PANEL, wantOpen);
+        }
+        m_restoringReferenceView = false;
+        return;
+    }
+
+    if (data.references.empty()) {
+        return;
+    }
+
+    // Nothing remembered: a PDF tagged with one of this part score's instruments
     QString chosen;
-    const QString key = currentScoreKey();
-    auto it = data.referenceForScore.find(key);
-    if (it != data.referenceForScore.end() && exists(it->second)) {
-        chosen = it->second;
-    } else if (INotationPtr current = globalContext()->currentNotation()) {
-        // Not chosen before: a PDF tagged with one of this part score's instruments
+    if (INotationPtr current = globalContext()->currentNotation()) {
         QStringList names;
         if (current->elements() && current->elements()->msScore()) {
             for (const engraving::Part* p : current->elements()->msScore()->parts()) {

@@ -18,6 +18,8 @@
 #include "inotationwritersregister.h"
 #include "playback/iplaybackcontroller.h"
 #include "global/iglobalconfiguration.h"
+#include "dockwindow/idockwindowprovider.h"
+#include "dockwindow/idockwindow.h"
 
 namespace mu::engraving {
 class MasterScore;
@@ -35,6 +37,7 @@ class StarScoreService : public IStarScoreService, public muse::Contextable, pub
     muse::ContextInject<notation::IInstrumentsRepository> instrumentsRepository = { this };
     muse::ContextInject<playback::IPlaybackController> playbackController = { this };
     muse::ContextInject<INotationWritersRegister> writers = { this };
+    muse::ContextInject<muse::dock::IDockWindowProvider> dockWindowProvider = { this };
 
 public:
     explicit StarScoreService(const muse::modularity::ContextPtr& iocCtx);
@@ -224,6 +227,11 @@ private:
     QString m_currentReferenceId;
     QString currentScoreKey() const;
     void pickReferenceForCurrentScore();
+    QString referenceViewSettingsKey() const;
+    QJsonObject loadReferenceView() const;
+    void recordReferenceView();
+    void listenReferencePanel();
+    bool m_restoringReferenceView = false;
     bool m_switching = false;
 };
 }
