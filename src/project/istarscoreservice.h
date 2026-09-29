@@ -523,5 +523,13 @@ public:
     //! Cached result when the file hasn't changed since it was last checked (unless force)
     virtual StarScoreAuditFileSummary auditFile(const QString& path, bool force) = 0;
     virtual std::vector<StarScoreAuditFileSummary> cachedLibraryAudit(const QString& folder) const = 0;
+
+    // --- Audit all songs: go through the songs one by one, each opened with the Audit panel (remembered across restarts)
+    virtual void startAuditWalk(const QStringList& paths) = 0;
+    virtual bool auditWalkActive() const = 0;
+    virtual int auditWalkIndex() const = 0;          // 0-based
+    virtual QStringList auditWalkPaths() const = 0;
+    virtual void auditWalkStep(int delta) = 0;       // open the next (+1) or previous (-1) song
+    virtual void stopAuditWalk() = 0;
 };
 }

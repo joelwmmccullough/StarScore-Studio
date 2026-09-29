@@ -168,6 +168,14 @@ StyledDialogView {
 
         RowLayout {
             Layout.fillWidth: true
+            FlatButton {
+                text: qsTrc("starscore", "Audit all songs")
+                toolTipTitle: qsTrc("starscore", "Audit all songs")
+                toolTipDescription: qsTrc("starscore", "Opens the songs that still need work one at a time, in this order, with the Audit panel. Use Next song in the Audit panel to move on.")
+                accentButton: true
+                enabled: libraryModel.folder !== "" && !libraryModel.scanning
+                onClicked: libraryModel.auditAll()
+            }
             Item { Layout.fillWidth: true }
             FlatButton {
                 text: qsTrc("global", "Close")

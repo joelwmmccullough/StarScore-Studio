@@ -187,3 +187,35 @@ void AuditLibraryModel::openSong(int index)
     });
     QTimer::singleShot(0, this, [this]() { emit closeRequested(); });
 }
+
+void AuditLibraryModel::auditAll()
+{
+    QStringList paths;
+    for (const StarScoreAuditFileSummary& s : m_results) {
+        const bool done = s.error.isEmpty() && s.openIssues == 0 && s.arrangementsAudited == s.arrangements
+                          && s.listenApproved == s.listenSteps;
+        if (!done) {
+            paths << s.path;
+        }
+    }
+    if (m_results.empty()) {
+        // Nothing checked yet: go through every song in the folder
+        paths = starScore()->auditLibraryFiles(m_folder);
+    }
+    if (paths.isEmpty()) {
+        interactive()->info(muse::qtrc("starscore", "Audit all songs").toStdString(),
+                            muse::qtrc("starscore", "Every song is fully audited.").toStdString());
+        return;
+    }
+    m_scanning = false;
+    m_queue.clear();
+
+    // As in openSong: the dialog (and this model) closes before the first song opens
+    auto ss = starScore();
+    QTimer::singleShot(0, qApp, [ss, paths]() {
+        if (ss) {
+            ss->startAuditWalk(paths);
+        }
+    });
+    QTimer::singleShot(0, this, [this]() { emit closeRequested(); });
+}

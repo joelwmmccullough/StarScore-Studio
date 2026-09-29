@@ -175,6 +175,13 @@ public:
     QStringList auditLibraryFiles(const QString& folder) const override;
     StarScoreAuditFileSummary auditFile(const QString& path, bool force) override;
     std::vector<StarScoreAuditFileSummary> cachedLibraryAudit(const QString& folder) const override;
+    void startAuditWalk(const QStringList& paths) override;
+    bool auditWalkActive() const override;
+    int auditWalkIndex() const override;
+    QStringList auditWalkPaths() const override;
+    void auditWalkStep(int delta) override;
+    void stopAuditWalk() override;
+    void openAuditWalkSong();
 
     struct Data {
         std::vector<StarScoreSection> sections;

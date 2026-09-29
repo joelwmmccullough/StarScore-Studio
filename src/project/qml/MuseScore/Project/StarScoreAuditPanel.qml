@@ -40,6 +40,54 @@ Item {
         anchors.margins: 8
         spacing: 8
 
+        // Audit all songs: which song this is, and moving between them
+        Rectangle {
+            Layout.fillWidth: true
+            visible: auditModel.walkActive
+            implicitHeight: walkColumn.implicitHeight + 12
+            radius: 4
+            color: ui.theme.backgroundSecondaryColor
+            border.color: ui.theme.accentColor
+            border.width: 1
+
+            ColumnLayout {
+                id: walkColumn
+                anchors.fill: parent
+                anchors.margins: 6
+                spacing: 6
+
+                StyledTextLabel {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignLeft
+                    elide: Text.ElideRight
+                    font: ui.theme.bodyBoldFont
+                    text: auditModel.walkText
+                }
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 6
+
+                    FlatButton {
+                        text: qsTrc("starscore", "Previous song")
+                        enabled: auditModel.walkHasPrevious
+                        onClicked: auditModel.walkPrevious()
+                    }
+                    FlatButton {
+                        Layout.fillWidth: true
+                        text: auditModel.walkIsLast ? qsTrc("starscore", "Finish") : qsTrc("starscore", "Next song")
+                        accentButton: true
+                        onClicked: auditModel.walkNext()
+                    }
+                    FlatButton {
+                        text: qsTrc("starscore", "Stop")
+                        toolTipTitle: qsTrc("starscore", "Stop auditing all songs")
+                        toolTipDescription: qsTrc("starscore", "Leaves this song open. Start again from the Audit library.")
+                        onClicked: auditModel.walkStop()
+                    }
+                }
+            }
+        }
+
         RowLayout {
             Layout.fillWidth: true
             spacing: 6

@@ -36,6 +36,8 @@
 #include <QSettings>
 #include <QStandardPaths>
 #include <QTimer>
+#include <QUrl>
+#include <QCoreApplication>
 #include <QUuid>
 
 #include "engraving/dom/masterscore.h"
@@ -1931,4 +1933,101 @@ std::vector<StarScoreAuditFileSummary> StarScoreService::cachedLibraryAudit(cons
         }
     }
     return out;
+}
+
+// ---------------------------------------------------------------------------
+//  Audit all songs: one song after another, each opened with the Audit panel
+// ---------------------------------------------------------------------------
+
+static const char* AUDIT_WALK_PATHS = "StarScore/auditWalk/paths";
+static const char* AUDIT_WALK_INDEX = "StarScore/auditWalk/index";
+
+void StarScoreService::startAuditWalk(const QStringList& paths)
+{
+    if (paths.isEmpty()) {
+        return;
+    }
+    QSettings settings;
+    settings.setValue(AUDIT_WALK_PATHS, paths);
+    settings.setValue(AUDIT_WALK_INDEX, 0);
+    m_changed.notify();
+    openAuditWalkSong();
+}
+
+bool StarScoreService::auditWalkActive() const
+{
+    return !auditWalkPaths().isEmpty();
+}
+
+int StarScoreService::auditWalkIndex() const
+{
+    // The song that's open, if it's one of the walk's songs (opening can be cancelled at the save prompt)
+    const QStringList paths = auditWalkPaths();
+    auto current = globalContext() ? globalContext()->currentProject() : nullptr;
+    if (current) {
+        const QString open = QFileInfo(current->path().toQString()).absoluteFilePath();
+        for (int i = 0; i < int(paths.size()); ++i) {
+            if (QFileInfo(paths.at(i)).absoluteFilePath() == open) {
+                return i;
+            }
+        }
+    }
+    return std::clamp(QSettings().value(AUDIT_WALK_INDEX, 0).toInt(), 0, std::max(0, int(auditWalkPaths().size()) - 1));
+}
+
+QStringList StarScoreService::auditWalkPaths() const
+{
+    return QSettings().value(AUDIT_WALK_PATHS).toStringList();
+}
+
+void StarScoreService::auditWalkStep(int delta)
+{
+    const QStringList paths = auditWalkPaths();
+    if (paths.isEmpty()) {
+        return;
+    }
+    const int next = auditWalkIndex() + delta;
+    if (next < 0) {
+        return;
+    }
+    if (next >= int(paths.size())) {
+        stopAuditWalk();
+        return;
+    }
+    QSettings().setValue(AUDIT_WALK_INDEX, next);
+    m_changed.notify();
+    openAuditWalkSong();
+}
+
+void StarScoreService::stopAuditWalk()
+{
+    QSettings settings;
+    settings.remove(AUDIT_WALK_PATHS);
+    settings.remove(AUDIT_WALK_INDEX);
+    m_changed.notify();
+}
+
+void StarScoreService::openAuditWalkSong()
+{
+    const QStringList paths = auditWalkPaths();
+    const int index = auditWalkIndex();
+    if (index < 0 || index >= int(paths.size())) {
+        return;
+    }
+    const QString path = paths.at(index);
+    auto current = globalContext() ? globalContext()->currentProject() : nullptr;
+    if (current && QFileInfo(current->path().toQString()).absoluteFilePath() == QFileInfo(path).absoluteFilePath()) {
+        return;   // already open
+    }
+    // After the current action has finished: opening a file closes the current one (asking to save if needed)
+    auto d = dispatcher();
+    auto docks = dockWindowProvider();
+    QTimer::singleShot(0, qApp, [d, path]() {
+        d->dispatch("file-open", muse::actions::ActionData::make_arg1<QUrl>(QUrl::fromLocalFile(path)));
+    });
+    QTimer::singleShot(2000, qApp, [d, docks]() {
+        if (docks && docks->window() && !docks->window()->isDockOpen("starscoreAuditPanel")) {
+            d->dispatch("toggle-starscore-audit");
+        }
+    });
 }

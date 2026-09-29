@@ -5,6 +5,8 @@
  */
 #include "auditpanelmodel.h"
 
+#include <QFileInfo>
+
 #include <algorithm>
 
 #include "translation.h"
@@ -641,5 +643,54 @@ void AuditPanelModel::setWithRhythm(bool on)
 void AuditPanelModel::setAutoPlay(bool on)
 {
     m_autoPlay = on;
+    emit changed();
+}
+
+bool AuditPanelModel::walkActive() const
+{
+    return starScore()->auditWalkActive();
+}
+
+QString AuditPanelModel::walkText() const
+{
+    const QStringList paths = starScore()->auditWalkPaths();
+    if (paths.isEmpty()) {
+        return QString();
+    }
+    const int i = starScore()->auditWalkIndex();
+    return muse::qtrc("starscore", "Song %1 of %2 · %3").arg(i + 1).arg(paths.size()).arg(QFileInfo(paths.at(i)).completeBaseName());
+}
+
+bool AuditPanelModel::walkHasPrevious() const
+{
+    return starScore()->auditWalkIndex() > 0;
+}
+
+bool AuditPanelModel::walkIsLast() const
+{
+    return starScore()->auditWalkIndex() >= int(starScore()->auditWalkPaths().size()) - 1;
+}
+
+void AuditPanelModel::walkNext()
+{
+    if (starScore()->isListening()) {
+        starScore()->stopListening();
+    }
+    starScore()->auditWalkStep(1);
+    emit changed();
+}
+
+void AuditPanelModel::walkPrevious()
+{
+    if (starScore()->isListening()) {
+        starScore()->stopListening();
+    }
+    starScore()->auditWalkStep(-1);
+    emit changed();
+}
+
+void AuditPanelModel::walkStop()
+{
+    starScore()->stopAuditWalk();
     emit changed();
 }

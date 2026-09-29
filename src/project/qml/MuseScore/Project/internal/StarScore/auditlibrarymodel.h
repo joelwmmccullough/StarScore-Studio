@@ -49,6 +49,8 @@ public:
     Q_INVOKABLE void scan(bool force);
     Q_INVOKABLE void cancel();
     Q_INVOKABLE void openSong(int index);
+    //! Opens the songs that still need work one by one, starting with the first (the Audit panel steps through them)
+    Q_INVOKABLE void auditAll();
 
 signals:
     void changed();

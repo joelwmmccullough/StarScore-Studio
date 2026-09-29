@@ -46,6 +46,12 @@ class AuditPanelModel : public QObject, public muse::Contextable, public muse::a
     Q_PROPERTY(bool autoPlay READ autoPlay NOTIFY changed)
     Q_PROPERTY(bool hasListenSteps READ hasListenSteps NOTIFY changed)
 
+    // Audit all songs
+    Q_PROPERTY(bool walkActive READ walkActive NOTIFY changed)
+    Q_PROPERTY(QString walkText READ walkText NOTIFY changed)
+    Q_PROPERTY(bool walkHasPrevious READ walkHasPrevious NOTIFY changed)
+    Q_PROPERTY(bool walkIsLast READ walkIsLast NOTIFY changed)
+
     QML_ELEMENT
 
     muse::ContextInject<IStarScoreService> starScore = { this };
@@ -77,6 +83,14 @@ public:
     bool withRhythm() const;
     bool autoPlay() const;
     bool hasListenSteps() const;
+
+    bool walkActive() const;
+    QString walkText() const;
+    bool walkHasPrevious() const;
+    bool walkIsLast() const;
+    Q_INVOKABLE void walkNext();
+    Q_INVOKABLE void walkPrevious();
+    Q_INVOKABLE void walkStop();
 
     Q_INVOKABLE void load();
     Q_INVOKABLE void setActive(bool active);
