@@ -500,7 +500,27 @@ StarScoreService::Data StarScoreService::loadFrom(const engraving::MasterScore* 
             result = std::min(result, it == data.partStatus.end() ? StarScoreStatus::Empty : statusFromKey(it->second));
         }
         s.status = countedParts == 0 ? StarScoreStatus::Empty : result;
-        s.leadSheetFinish = s.status == StarScoreStatus::Finished && !s.autoSkipSheets.isEmpty();
+    }
+
+    // Players who read the lead sheet are only as done as the lead sheet: the section can't be further along than it.
+    // With no lead sheet section, nobody can read it, so those parts count as Empty after all.
+    bool hasLeadSheet = false;
+    StarScoreStatus leadSheetStatus = StarScoreStatus::Finished;
+    for (const StarScoreSection& s : data.sections) {
+        if (s.templateKey == "lead-sheet") {
+            hasLeadSheet = true;
+            leadSheetStatus = std::min(leadSheetStatus, s.status);
+        }
+    }
+    for (StarScoreSection& s : data.sections) {
+        if (!s.autoStatus || s.autoSkipSheets.isEmpty()) {
+            continue;
+        }
+        s.status = hasLeadSheet ? std::min(s.status, leadSheetStatus) : StarScoreStatus::Empty;
+        s.leadSheetFinish = s.status == StarScoreStatus::Finished;
+        if (!hasLeadSheet) {
+            s.autoSkipSheets.clear();
+        }
     }
 
     return data;
