@@ -3485,7 +3485,13 @@ void TWrite::writeSegments(XmlWriter& xml, WriteContext& ctx, track_idx_t strack
 
         for (Segment* segment = sseg; segment && segment != eseg; segment = segment->next1()) {
             if (!segment->enabled()) {
-                continue;
+                // StarScore: a barline the user set at the end of a bar is only hidden while a start repeat follows
+                // on the same system. Save it anyway, or it is lost as soon as the bars land on different systems
+                // (for example in a part with a different layout).
+                const EngravingItem* userBarLine = segment->isEndBarLineType() ? segment->element(track) : nullptr;
+                if (!(userBarLine && userBarLine->isBarLine() && !userBarLine->generated())) {
+                    continue;
+                }
             }
             if (track == 0) {
                 segment->setWritten(false);

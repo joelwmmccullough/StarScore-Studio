@@ -6,12 +6,9 @@ Version numbers: the first number changes when files stop being compatible, the 
 
 ## 1.2.2
 
+- A double (or other) barline at the end of a bar followed by a start repeat is no longer lost when the score is saved. It used to disappear from any score or part where the two bars were on the same system at save time, so it went missing in parts where they're on different systems. Barlines already lost need to be added once more; after that they stay.
+- Audit library: clicking a song no longer crashes the app, and the library audit checks only “1 Starsign Originals” and “2 Starsign Covers” (these were 1.2.1, which was not released on its own).
 - Multimeasure rests: the H-bar's horizontal stroke is 0.70sp thick (was 1.00sp), in the Starsign style and on every sheet when part styles are applied.
-
-## 1.2.1
-
-- Audit library: clicking a song no longer crashes the app. The song opens with the Audit panel.
-- Audit library checks only the songs in “1 Starsign Originals” and “2 Starsign Covers”.
 
 ## 1.2.0
 
