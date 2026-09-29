@@ -118,6 +118,28 @@ void ProjectActionsController::init()
     dispatcher()->reg(this, "starscore-color-notes", [this]() { colorNotes(true); });
     dispatcher()->reg(this, "starscore-uncolor-notes", [this]() { colorNotes(false); });
     dispatcher()->reg(this, "file-open", this, &ProjectActionsController::openProject);
+    // StarScore audit: open a song in this window in place of the open one (asking to save it first)
+    dispatcher()->reg(this, "starscore-audit-open", [this](const ActionData& args) {
+        const QUrl url = !args.empty() ? args.arg<QUrl>(0) : QUrl();
+        if (!url.isLocalFile()) {
+            return;
+        }
+        const muse::io::path_t path = fileSystem()->absoluteFilePath(muse::io::path_t(url.toLocalFile()));
+        if (isProjectOpened(path)) {
+            return;
+        }
+        if (multiwindowsProvider()->isProjectAlreadyOpened(path)) {
+            multiwindowsProvider()->activateWindowWithProject(path);
+            return;
+        }
+        if (currentNotationProject() && !closeOpenedProject(false)) {
+            return;   // save prompt cancelled: stay on this song
+        }
+        Ret ret = openProject(path);
+        if (!ret) {
+            LOGE() << ret.toString();
+        }
+    });
 
     dispatcher()->reg(this, "file-close", [this]() {
         auto anyInstanceWithoutProject = multiwindowsProvider()->isHasWindowWithoutProject();
@@ -188,6 +210,7 @@ bool ProjectActionsController::canReceiveAction(const ActionCode& code) const
             "starscore-part-styles",
             "starscore-toggle-panel",
             "starscore-audit-library",
+            "starscore-audit-open",
             "file-open",
             "file-import-pdf",
             "file-import-audio-to-score",

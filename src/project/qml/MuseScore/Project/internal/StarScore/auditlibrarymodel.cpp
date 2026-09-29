@@ -178,7 +178,7 @@ void AuditLibraryModel::openSong(int index)
     auto d = dispatcher();
     auto docks = dockWindowProvider();
     QTimer::singleShot(0, qApp, [d, path]() {
-        d->dispatch("file-open", muse::actions::ActionData::make_arg1<QUrl>(QUrl::fromLocalFile(path)));
+        d->dispatch("starscore-audit-open", muse::actions::ActionData::make_arg1<QUrl>(QUrl::fromLocalFile(path)));
     });
     QTimer::singleShot(2000, qApp, [d, docks]() {
         if (docks && docks->window() && !docks->window()->isDockOpen("starscoreAuditPanel")) {

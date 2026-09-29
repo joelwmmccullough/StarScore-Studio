@@ -7,6 +7,7 @@ Version numbers: the first number changes when files stop being compatible, the 
 ## 1.5.1
 
 - Audit library works with no score open, and is also in the File menu (under Open recent). Before, it was greyed out until a score was open.
+- Audit all songs and the Audit library open each song in the same window, in place of the song that was open (asking to save it first, as closing does). Before, each song opened in a new window, without the Audit panel. If you cancel at the save prompt, you stay on the current song.
 - Audit all songs: it now always opens the first song on the list. Before, if the open song was also on the list, it stayed on that song and nothing seemed to happen. When the first song is the one already open, it shows the Audit panel with the song strip.
 
 ## 1.5.0
