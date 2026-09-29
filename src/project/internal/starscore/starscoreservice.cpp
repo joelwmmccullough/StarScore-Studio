@@ -412,6 +412,23 @@ StarScoreService::Data StarScoreService::load() const
     return loadFrom(masterScore());
 }
 
+//! Rhythm players who can read the lead sheet instead of their own sheet: "drums", "percussion", "keys"
+//! (empty for guitar and bass)
+static QString starscoreLeadSheetKind(const QString& id)
+{
+    if (id == "drumset" || id == "drum-kit" || id.startsWith("drum")) {
+        return "drums";
+    }
+    if (id == "congas" || id == "bongos" || id == "percussion" || id == "timbales" || id == "cajon"
+        || id.contains("shaker") || id.contains("tambourine") || id.contains("cowbell") || id.contains("conga")) {
+        return "percussion";
+    }
+    if (id.contains("guitar") || id.contains("bass")) {
+        return QString();
+    }
+    return "keys";
+}
+
 StarScoreService::Data StarScoreService::loadFrom(const engraving::MasterScore* ms) const
 {
     if (!ms) {
@@ -457,18 +474,33 @@ StarScoreService::Data StarScoreService::loadFrom(const engraving::MasterScore* 
         a.sectionIds = kept;
     }
 
-    // "Auto" sections: the least-finished of the parts the section shows (a part with no tag counts as Empty)
+    // "Auto" sections: the least-finished of the parts the section shows (a part with no tag counts as Empty).
+    // Rhythm sections: drums, percussion and keys parts with no tag read the lead sheet, so they don't count.
     for (StarScoreSection& s : data.sections) {
         if (!s.autoStatus) {
             continue;
         }
+        const bool rhythm = s.templateKey == "rhythm" || s.templateKey == "bigband-rhythm";
         const QStringList& counted = s.shownPartIds.isEmpty() ? s.partIds : s.shownPartIds;
         StarScoreStatus result = StarScoreStatus::Finished;
+        int countedParts = 0;
         for (const QString& pid : counted) {
             auto it = data.partStatus.find(pid);
+            if (it == data.partStatus.end() && rhythm) {
+                const engraving::Part* p = ms->partById(ID(pid));
+                const QString kind = p ? starscoreLeadSheetKind(p->instrumentId().toQString()) : QString();
+                if (!kind.isEmpty()) {
+                    if (!s.autoSkipSheets.contains(kind)) {
+                        s.autoSkipSheets << kind;
+                    }
+                    continue;
+                }
+            }
+            ++countedParts;
             result = std::min(result, it == data.partStatus.end() ? StarScoreStatus::Empty : statusFromKey(it->second));
         }
-        s.status = counted.isEmpty() ? StarScoreStatus::Empty : result;
+        s.status = countedParts == 0 ? StarScoreStatus::Empty : result;
+        s.leadSheetFinish = s.status == StarScoreStatus::Finished && !s.autoSkipSheets.isEmpty();
     }
 
     return data;

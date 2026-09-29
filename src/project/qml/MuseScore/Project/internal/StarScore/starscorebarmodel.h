@@ -84,6 +84,7 @@ signals:
     void changed();
 
 private:
+    QString leadSheetText(const QStringList& kinds) const;
     QVariantList statusSubmenu(const QString& prefix, int current, bool rhythm = false) const;
     void openEditDialog(const QString& mode, const QString& id, const QString& slot = QString());
     void createCustomSection();

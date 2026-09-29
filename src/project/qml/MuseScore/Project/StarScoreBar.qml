@@ -270,9 +270,10 @@ Rectangle {
                         text: modelData.name
                         active: modelData.on
                         showCheck: true
-                        dotColor: barModel.statusColor(modelData.status)
+                        // teal: finished, with drums / percussion / keys reading the lead sheet
+                        dotColor: modelData.leadSheet ? "#2FB5A8" : barModel.statusColor(modelData.status)
                         toolTip: qsTrc("starscore", "%1 instrument(s)").arg(modelData.instrumentCount)
-                                 + "\n" + qsTrc("starscore", "Status: ") + barModel.statusName(modelData.status)
+                                 + "\n" + qsTrc("starscore", "Status: ") + modelData.statusText
                                  + "\n" + qsTrc("starscore", "Click: show/hide · Alt-click: show only this · Right-click: options")
                         menuItemsProvider: function() { return barModel.sectionMenu(modelData.id) }
                         // the chips are rebuilt when the panel updates, which would close the open menu

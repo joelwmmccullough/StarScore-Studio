@@ -58,6 +58,10 @@ struct StarScoreSection
     //! Rhythm sections marked Finished: players that read from the lead sheet instead of their own sheet
     //! ("drums", "percussion", "keys"); those sheets start unticked in the band export
     QStringList skipSheets;
+    //! Derived, not stored. Rhythm section on "Auto": drums, percussion and keys parts with no tag read the lead sheet.
+    //! leadSheetFinish = Finished that way (the tagged parts are all finished); autoSkipSheets = which of them.
+    bool leadSheetFinish = false;
+    QStringList autoSkipSheets;
 };
 
 //! An arrangement is a named set of sections, e.g. "3-Horn Standard" = Lead Sheet + 3-Horn Section + Rhythm Section.

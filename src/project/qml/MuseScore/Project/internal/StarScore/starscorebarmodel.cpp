@@ -90,6 +90,9 @@ QVariantList StarScoreBarModel::sections() const
         item["on"] = s.on;
         item["status"] = int(s.status);
         item["instrumentCount"] = s.partIds.size();
+        // Finished with drums / percussion / keys reading the lead sheet: its own dot colour and description
+        item["leadSheet"] = s.leadSheetFinish;
+        item["statusText"] = s.leadSheetFinish ? leadSheetText(s.autoSkipSheets) : statusName(int(s.status));
         result << item;
     }
     return result;
@@ -190,6 +193,19 @@ QString StarScoreBarModel::statusName(int status) const
     return QString();
 }
 
+QString StarScoreBarModel::leadSheetText(const QStringList& kinds) const
+{
+    QStringList names;
+    for (const QString& k : { QString("drums"), QString("percussion"), QString("keys") }) {
+        if (kinds.contains(k)) {
+            names << (k == "drums" ? muse::qtrc("starscore", "drums") : k == "percussion" ? muse::qtrc("starscore", "percussion")
+                      : muse::qtrc("starscore", "keys"));
+        }
+    }
+    const QString who = names.size() <= 1 ? names.join("") : names.mid(0, names.size() - 1).join(", ") + " " + muse::qtrc("starscore", "and") + " " + names.last();
+    return muse::qtrc("starscore", "Finished — %1 use the lead sheet").arg(who);
+}
+
 QVariantList StarScoreBarModel::statusSubmenu(const QString& prefix, int current, bool rhythm) const
 {
     QVariantList items;
@@ -225,6 +241,8 @@ QVariantList StarScoreBarModel::sectionMenu(const QString& id) const
     int status = 0;
     bool rhythm = false;
     bool autoStatus = false;
+    bool leadSheet = false;
+    QStringList autoSkip;
     QStringList skip;
     QStringList partIds;
     for (const StarScoreSection& s : starScore()->sections()) {
@@ -234,6 +252,8 @@ QVariantList StarScoreBarModel::sectionMenu(const QString& id) const
             skip = s.skipSheets;
             autoStatus = s.autoStatus;
             partIds = s.partIds;
+            leadSheet = s.leadSheetFinish;
+            autoSkip = s.autoSkipSheets;
         }
     }
 
@@ -241,7 +261,7 @@ QVariantList StarScoreBarModel::sectionMenu(const QString& id) const
     QVariantList statusItems;
     statusItems << QVariantMap {
         { "id", "sec-auto:" + id },
-        { "title", autoStatus ? muse::qtrc("starscore", "Auto (from its parts: %1)").arg(statusName(status))
+        { "title", autoStatus ? muse::qtrc("starscore", "Auto (from its parts: %1)").arg(leadSheet ? leadSheetText(autoSkip) : statusName(status))
           : muse::qtrc("starscore", "Auto (from its parts)") },
         { "checkable", true }, { "checked", autoStatus }, { "enabled", true }, { "keepOpen", true }
     };

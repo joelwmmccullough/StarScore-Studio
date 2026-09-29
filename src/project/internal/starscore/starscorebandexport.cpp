@@ -419,7 +419,8 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
                 addFile("1 Rhythm", name, { pid }, false);
                 // Finished rhythm section with "No Drums / Percussion / Keys Sheet": that player reads the lead
                 // sheet, so the sheet starts unticked
-                if (sec.status == StarScoreStatus::Finished && !sec.skipSheets.isEmpty()) {
+                const QStringList& skipSheets = sec.autoStatus ? sec.autoSkipSheets : sec.skipSheets;
+                if (sec.status == StarScoreStatus::Finished && !skipSheets.isEmpty()) {
                     const QString id = p->instrumentId().toQString();
                     QString kind;
                     if (id == "drumset" || id == "drum-kit") {
@@ -430,7 +431,7 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
                     } else if (role != "Guitar" && role != "Bass" && role != "Bass Synth") {
                         kind = "keys";
                     }
-                    if (!kind.isEmpty() && sec.skipSheets.contains(kind)) {
+                    if (!kind.isEmpty() && skipSheets.contains(kind)) {
                         plan.files.back().defaultUnchecked = true;
                     }
                 }
