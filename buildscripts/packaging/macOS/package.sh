@@ -123,7 +123,11 @@ hdiutil attach "applebuild/${DMG_NAME}"
 DEVS=$(hdiutil attach "applebuild/${DMG_NAME}" | cut -f 1)
 DEV=$(echo $DEVS | cut -f 1 -d ' ')
 # (the mount point may contain spaces: take everything between " on " and " (")
-VOLUME=$(mount | grep "^${DEV} " | sed -E 's|^[^ ]+ on (.*) \(.*$|\1|')
+VOLUME=$(mount | grep "^${DEV}" | grep " on /Volumes/" | head -1 | sed -E 's|^[^ ]+ on (.*) \(.*$|\1|')
+echo "Volume: ${VOLUME}"
+if [ -z "${VOLUME}" ]; then
+    VOLUME="/Volumes/${VOL_TITLE}"
+fi
 
 # copy in the application bundle
 cp -Rp ${APP_PATH} "${VOLUME}/${APP_NAME}.app"
