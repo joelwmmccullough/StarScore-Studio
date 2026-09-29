@@ -101,6 +101,10 @@ public:
     void renameSolo(const QString& soloId, const QString& name) override;
     void removeSolo(const QString& soloId) override;
     muse::Ret exportSolo(const QString& soloId, const muse::io::path_t& msczPath) override;
+    std::vector<StarScoreReference> references() const override;
+    muse::RetVal<QString> addReference(const muse::io::path_t& pdfFile) override;
+    void removeReference(const QString& referenceId) override;
+    muse::io::path_t referencePath(const QString& referenceId) const override;
     muse::Ret saveAll() override;
 
     QString bandFolder() const override;
@@ -140,6 +144,7 @@ public:
         std::vector<StarScoreSection> sections;
         std::vector<StarScoreArrangement> arrangements;
         std::vector<StarScoreSolo> solos;
+        std::vector<StarScoreReference> references;
         QString version;   // "4.0.1"; printed in the footer
     };
 

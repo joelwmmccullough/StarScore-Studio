@@ -210,6 +210,17 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
         }
     }
 
+    for (const QJsonValue& v : root.value("references").toArray()) {
+        const QJsonObject o = v.toObject();
+        StarScoreReference ref;
+        ref.id = o.value("id").toString();
+        ref.name = o.value("name").toString();
+        ref.file = o.value("file").toString();
+        if (!ref.id.isEmpty()) {
+            data.references.push_back(ref);
+        }
+    }
+
     data.version = root.value("scoreVersion").toString();
 
     for (const QJsonValue& v : root.value("arrangements").toArray()) {
@@ -282,6 +293,17 @@ QString StarScoreService::toJson(const Data& data)
     }
     if (!solos.isEmpty()) {
         root["solos"] = solos;
+    }
+    QJsonArray refs;
+    for (const StarScoreReference& ref : data.references) {
+        QJsonObject o;
+        o["id"] = ref.id;
+        o["name"] = ref.name;
+        o["file"] = ref.file;
+        refs.append(o);
+    }
+    if (!refs.isEmpty()) {
+        root["references"] = refs;
     }
 
     return QString::fromUtf8(QJsonDocument(root).toJson(QJsonDocument::Compact));
@@ -1905,6 +1927,78 @@ int StarScoreService::applyStylesOnly(const QStringList& partIds)
 // ---------------------------------------------------------------------------
 
 static const QString STARSCORE_SOLOS_DIR("StarScoreSolos");
+static const QString STARSCORE_REFS_DIR("StarScoreReferences");
+
+// ---------------------------------------------------------------------------
+//  Reference PDFs
+// ---------------------------------------------------------------------------
+
+std::vector<StarScoreReference> StarScoreService::references() const
+{
+    if (!m_mainProject) {
+        return {};
+    }
+    return loadFrom(m_mainProject->masterNotation()->masterScore()).references;
+}
+
+io::path_t StarScoreService::referencePath(const QString& referenceId) const
+{
+    return io::path_t(m_workDir + "/ref-" + referenceId + ".pdf");
+}
+
+RetVal<QString> StarScoreService::addReference(const io::path_t& pdfFile)
+{
+    if (!m_mainProject || m_workDir.isEmpty()) {
+        return RetVal<QString>::make_ret(Ret::Code::InternalError);
+    }
+    const QFileInfo fi(pdfFile.toQString());
+    if (!fi.exists()) {
+        return RetVal<QString>::make_ret(Ret::Code::UnknownError, muse::trc("starscore", "File not found."));
+    }
+
+    Data data = loadFrom(m_mainProject->masterNotation()->masterScore());
+    QStringList ids;
+    QStringList names;
+    for (const StarScoreReference& r : data.references) {
+        ids << r.id;
+        names << r.name.toLower();
+    }
+
+    StarScoreReference ref;
+    ref.id = uniqueId(ids, "ref");
+    ref.name = fi.completeBaseName();
+    for (int n = 2; names.contains(ref.name.toLower()); ++n) {
+        ref.name = QString("%1 (%2)").arg(fi.completeBaseName()).arg(n);
+    }
+    ref.file = STARSCORE_REFS_DIR + "/" + ref.id + ".pdf";
+
+    QFile::remove(referencePath(ref.id).toQString());
+    if (!QFile::copy(fi.absoluteFilePath(), referencePath(ref.id).toQString())) {
+        return RetVal<QString>::make_ret(Ret::Code::UnknownError, muse::trc("starscore", "Couldn't copy the file."));
+    }
+
+    data.references.push_back(ref);
+    storeTo(m_mainProject->masterNotation()->masterScore(), data, m_mainProject);
+    m_changed.notify();
+    return RetVal<QString>::make_ok(ref.id);
+}
+
+void StarScoreService::removeReference(const QString& referenceId)
+{
+    if (!m_mainProject) {
+        return;
+    }
+    Data data = loadFrom(m_mainProject->masterNotation()->masterScore());
+    auto it = std::remove_if(data.references.begin(), data.references.end(),
+                             [&](const StarScoreReference& r) { return r.id == referenceId; });
+    if (it == data.references.end()) {
+        return;
+    }
+    data.references.erase(it, data.references.end());
+    storeTo(m_mainProject->masterNotation()->masterScore(), data, m_mainProject);
+    QFile::remove(referencePath(referenceId).toQString());
+    m_changed.notify();
+}
 
 void StarScoreService::onCurrentProjectChanged()
 {
@@ -1927,7 +2021,7 @@ void StarScoreService::onCurrentProjectChanged()
 
     m_mainProject->saveComplited().onReceive(this, [this](const io::path_t& path, SaveMode mode) {
         if (mode == SaveMode::Save || mode == SaveMode::SaveAs || mode == SaveMode::SaveCopy) {
-            if (!solos().empty()) {
+            if (!solos().empty() || !references().empty()) {
                 Ret ret = injectSolos(path);
                 if (!ret) {
                     LOGE() << "[starscore] could not store solos in " << path << ": " << ret.toString();
@@ -1967,11 +2061,23 @@ void StarScoreService::extractSolos()
     QDir().mkpath(m_workDir);
 
     const std::vector<StarScoreSolo> list = solos();
-    if (list.empty() || !QFileInfo::exists(m_mainProject->path().toQString())) {
+    const std::vector<StarScoreReference> refs = references();
+    if ((list.empty() && refs.empty()) || !QFileInfo::exists(m_mainProject->path().toQString())) {
         return;
     }
 
     ZipReader zip(m_mainProject->path());
+    for (const StarScoreReference& ref : refs) {
+        ByteArray data = zip.fileData(ref.file.toStdString());
+        if (data.empty()) {
+            LOGW() << "[starscore] reference file missing from the .starscore: " << ref.file;
+            continue;
+        }
+        QFile out(referencePath(ref.id).toQString());
+        if (out.open(QIODevice::WriteOnly)) {
+            out.write(data.toQByteArrayNoCopy());
+        }
+    }
     for (const StarScoreSolo& solo : list) {
         ByteArray data = zip.fileData(solo.file.toStdString());
         if (data.empty()) {
@@ -2533,7 +2639,8 @@ Ret StarScoreService::injectSolos(const io::path_t& starscorePath)
         ZipWriter writer { io::path_t(tmp) };
         for (const ZipReader::FileInfo& info : reader.fileInfoList()) {
             const std::string name = info.filePath.toStdString();
-            if (!info.isFile || QString::fromStdString(name).startsWith(STARSCORE_SOLOS_DIR + "/")) {
+            if (!info.isFile || QString::fromStdString(name).startsWith(STARSCORE_SOLOS_DIR + "/")
+                || QString::fromStdString(name).startsWith(STARSCORE_REFS_DIR + "/")) {
                 continue;
             }
             writer.addFile(name, reader.fileData(name));
@@ -2545,6 +2652,14 @@ Ret StarScoreService::injectSolos(const io::path_t& starscorePath)
                 continue;
             }
             writer.addFile(solo.file.toStdString(), ByteArray::fromQByteArray(f.readAll()));
+        }
+        for (const StarScoreReference& ref : references()) {
+            QFile f(referencePath(ref.id).toQString());
+            if (!f.open(QIODevice::ReadOnly)) {
+                LOGW() << "[starscore] missing working copy of reference " << ref.id;
+                continue;
+            }
+            writer.addFile(ref.file.toStdString(), ByteArray::fromQByteArray(f.readAll()));
         }
         writer.close();
         if (writer.hasError()) {

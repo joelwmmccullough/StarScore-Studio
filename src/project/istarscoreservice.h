@@ -129,6 +129,15 @@ struct StarScoreSolo
     int soloBars = 0;
 };
 
+//! A reference PDF (e.g. the original chart of a cover) stored inside the .starscore
+//! (entry "StarScoreReferences/<file>"). Copied to "Reference PDFs/" when exporting to Sheets and Demos.
+struct StarScoreReference
+{
+    QString id;
+    QString name;                // shown in the menu and used as the exported file name, e.g. "Bet - Original Chart"
+    QString file;                // entry inside the .starscore
+};
+
 //! What adding a solo file would do, shown before the user confirms
 struct StarScoreSoloPlan
 {
@@ -183,6 +192,7 @@ struct StarScoreBandFile
     QStringList partIds;         // one part = its part book; several = a score of just those instruments
     bool isScore = false;
     bool defaultUnchecked = false;   // left unticked in the export dialog unless the user ticks it
+    QString sourceFile;          // a file copied as it is (reference PDFs) instead of printing the score
 
     // "Any Horns" chair versions: the chair is re-written for a transposition and clef at export time
     bool isVersion = false;
@@ -320,6 +330,12 @@ public:
     virtual void renameSolo(const QString& soloId, const QString& name) = 0;
     virtual void removeSolo(const QString& soloId) = 0;
     virtual muse::Ret exportSolo(const QString& soloId, const muse::io::path_t& msczPath) = 0;
+
+    // --- reference PDFs (kept inside the .starscore; saved with it) ---
+    virtual std::vector<StarScoreReference> references() const = 0;
+    virtual muse::RetVal<QString> addReference(const muse::io::path_t& pdfFile) = 0;
+    virtual void removeReference(const QString& referenceId) = 0;
+    virtual muse::io::path_t referencePath(const QString& referenceId) const = 0;   // working copy on disk
     //! Save changed solos and the main score (used when Save is pressed while a solo is showing)
     virtual muse::Ret saveAll() = 0;
 

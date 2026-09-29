@@ -6,6 +6,7 @@
 #include "starscorebarmodel.h"
 
 #include <QFileInfo>
+#include <QUrl>
 
 #include "types/uri.h"
 #include "log.h"
@@ -325,7 +326,29 @@ QVariantList StarScoreBarModel::addSectionMenu() const
 
 QVariantList StarScoreBarModel::moreMenu() const
 {
+    // Reference PDFs (e.g. the original chart of a cover), kept inside the .starscore
+    QVariantList refItems;
+    refItems << QVariantMap { { "id", "ref-add" }, { "title", muse::qtrc("starscore", "Add reference PDF…") }, { "enabled", true } };
+    const std::vector<StarScoreReference> refs = starScore()->references();
+    if (!refs.empty()) {
+        refItems << QVariantMap {};
+    }
+    for (const StarScoreReference& r : refs) {
+        refItems << QVariantMap {
+            { "title", r.name }, { "enabled", true },
+            { "subitems", QVariantList {
+                  QVariantMap { { "id", "ref-open:" + r.id }, { "title", muse::qtrc("starscore", "Open") }, { "enabled", true } },
+                  QVariantMap { { "id", "ref-remove:" + r.id }, { "title", muse::qtrc("starscore", "Remove from this score") },
+                                { "enabled", true } },
+              } }
+        };
+    }
+
     return {
+        QVariantMap { { "title", refs.empty() ? muse::qtrc("starscore", "Reference PDFs")
+                                              : muse::qtrc("starscore", "Reference PDFs (%1)").arg(refs.size()) },
+                      { "subitems", refItems }, { "enabled", true } },
+        QVariantMap {},
         QVariantMap { { "id", "all-on" }, { "title", muse::qtrc("starscore", "Show all sections") }, { "enabled", true } },
         QVariantMap { { "id", "all-off" }, { "title", muse::qtrc("starscore", "Hide all sections") }, { "enabled", true } },
         QVariantMap {},
@@ -531,6 +554,26 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
         }
     } else if (action == "solo-rename") {
         openEditDialog("rename-solo", arg);
+    } else if (action == "ref-add") {
+        const QFileInfo mainFile(starScore()->mainProjectPath().toQString());
+        const muse::io::paths_t paths = interactive()->selectOpeningFilesSync(
+            muse::trc("starscore", "Add reference PDFs"), muse::io::path_t(mainFile.absolutePath()), { "PDF (*.pdf)" });
+        for (const muse::io::path_t& p : paths) {
+            muse::RetVal<QString> ret = starScore()->addReference(p);
+            if (!ret.ret) {
+                interactive()->error(muse::trc("starscore", "Couldn't add the reference PDF"), ret.ret.toString());
+            }
+        }
+    } else if (action == "ref-open") {
+        const muse::io::path_t p = starScore()->referencePath(arg);
+        if (QFileInfo::exists(p.toQString())) {
+            interactive()->openUrl(QUrl::fromLocalFile(p.toQString()));
+        } else {
+            interactive()->error(muse::trc("starscore", "Reference PDF not found"),
+                                 muse::trc("starscore", "Save the score and open it again."));
+        }
+    } else if (action == "ref-remove") {
+        starScore()->removeReference(arg);
     } else if (action == "solo-export") {
         QString name = arg;
         for (const StarScoreSolo& solo : starScore()->solos()) {

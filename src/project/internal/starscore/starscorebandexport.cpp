@@ -578,6 +578,14 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
         plan.notes << muse::qtrc("starscore", "Solo transcriptions are not exported (Sheets and Demos has no place for them yet).");
     }
 
+    // Reference PDFs go as they are into "Reference PDFs/"
+    for (const StarScoreReference& ref : references()) {
+        StarScoreBandFile f;
+        f.relativePath = "Reference PDFs/" + starscoreSafeFileName(ref.name) + ".pdf";
+        f.sourceFile = referencePath(ref.id).toQString();
+        plan.files.push_back(f);
+    }
+
     // A path should appear once only
     std::set<QString> seenPaths;
     std::vector<StarScoreBandFile> unique;
@@ -803,7 +811,10 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         const QString tmpPdf = tmpDir + "/" + QString::number(written.size() + problems.size()) + ".pdf";
         Ret ret;
 
-        if (file.isVersion) {
+        if (!file.sourceFile.isEmpty()) {
+            ret = QFile::copy(file.sourceFile, tmpPdf) ? make_ok()
+                  : make_ret(Ret::Code::UnknownError, muse::trc("starscore", "the reference PDF is missing; save and reopen the score"));
+        } else if (file.isVersion) {
             ret = writeVersion(file, tmpPdf);
         } else if (!file.isScore) {
             auto it = bookForPart.find(file.partIds.value(0));
