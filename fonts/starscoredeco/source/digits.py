@@ -87,7 +87,7 @@ def _figs(H, w, W_of):
 
     # 4: closed pointed top, crossbar running past the stem
     W = W_of('4')
-    xs1 = W - 0.20 * W                        # stem right edge (crossbar runs past it)
+    xs1 = W / 2 + 0.0775 * H + w / 2           # stem right edge: stem centre just right of centre, like the 1's
     xs0 = xs1 - w
     cb = -h + 0.25 * H                        # crossbar bottom
     outer = M.Polygon([(xs0, -h), (xs1, -h), (xs1, cb), (W, cb), (W, cb + w), (xs1, cb + w),

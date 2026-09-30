@@ -138,8 +138,29 @@ def L_s(w=None, H=XH, wh=0.175, k=1.22, a_top=32, a_bot=-148):
     if a2 > 90:
         a2 -= 360
     # arcs run on to the extreme right/left and are then cut vertically at the terminal angles
-    sk = Mo.chain(Mo.arc(*Eu, a_top, a1), Mo.line(p1, p2), Mo.arc(*El, a2, a_bot))
-    g = affinity.scale(Mo.buf(sk, wh, join='round'), k, 1.0, origin=(0, 0))
+    # The ends are cut square to the stroke as it looks AFTER widening: the arcs run a few
+    # degrees past each terminal and are trimmed along the widened stroke's normal.
+    ext = 8
+    sk = Mo.chain(Mo.arc(*Eu, a_top - ext, a1), Mo.line(p1, p2), Mo.arc(*El, a2, a_bot + ext))
+    g = Mo.buf(sk, wh, join='round')
+
+    def trim(g, E, a, sgn):
+        cx, cy, rx, ry = E
+        t = math.radians(a)
+        P = (cx + rx * math.cos(t), cy + ry * math.sin(t))
+        tx, ty = -rx * math.sin(t) * sgn, ry * math.cos(t) * sgn     # toward the extension (narrow space)
+        L = math.hypot(tx, ty); tx, ty = tx / L, ty / L
+        cxl, cyl = -ty / k, k * tx                                   # cut line: final-space normal, mapped back
+        L = math.hypot(cxl, cyl); cxl, cyl = cxl / L, cyl / L
+        Rn = wh * 0.5 + 0.02
+        Rd = max(rx, ry) * math.radians(ext) + 0.03
+        # extend along the narrow-space tangent; the polygon only covers the extension
+        q = [(P[0] + cxl * Rn, P[1] + cyl * Rn), (P[0] - cxl * Rn, P[1] - cyl * Rn)]
+        q += [(q[1][0] + tx * Rd, q[1][1] + ty * Rd), (q[0][0] + tx * Rd, q[0][1] + ty * Rd)]
+        return g.difference(Mo.Polygon(q))
+    g = trim(g, Eu, a_top, -1)
+    g = trim(g, El, a_bot, +1)
+    g = affinity.scale(g, k, 1.0, origin=(0, 0))
     return Mo.to_path(g), 0.0, w
 
 
@@ -159,8 +180,14 @@ def L_e():
     p = union(b, bar)
     cx, cy = w / 2, XH / 2
     far = 5
-    wedge = poly([(cx, cy), (cx + far, cy), (cx + far * math.cos(math.radians(-32)), cy + far * math.sin(math.radians(-32)))])
-    p = diff(p, wedge)                                           # open lower right, radial cut
+    # open lower right: cut square to the stroke at -32 deg on the bowl's mid-line
+    tt = math.radians(-32)
+    rxm, rym = w / 2 - T / 2, XH / 2 - t / 2
+    P = (cx + rxm * math.cos(tt), cy + rym * math.sin(tt))
+    nx, ny = math.cos(tt) / rxm, math.sin(tt) / rym
+    L = math.hypot(nx, ny); nx, ny = nx / L, ny / L
+    wedge = poly([(cx, cy), (cx + far, cy), (P[0] + nx * 1.0, P[1] + ny * 1.0), (P[0] - nx * T * 0.8, P[1] - ny * T * 0.8)])
+    p = diff(p, wedge)
     return p, 0.0, w
 
 

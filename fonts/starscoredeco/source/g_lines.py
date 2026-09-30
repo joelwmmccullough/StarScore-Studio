@@ -1,18 +1,29 @@
 """Tiling line glyphs (trill/arpeggio/glissando wiggles), pedal marks, metronome notes."""
 from kit import *
+import math
 from shapes import *
 from registry import add
 import registry
 import g_dynamics as gd
 
 
-def zig_tile(period, y0, y1, w_up, w_down, eps=0.006):
-    """One period of a zigzag that tiles seamlessly: advance = period."""
+def zig_tile(period, y0, y1, w_up, w_down, eps=0.004):
+    """One period of a zigzag that tiles seamlessly (advance = period). The tile is cut halfway
+    up a rising stroke, square to that stroke, so the first and last tiles of a line end in a
+    clean square end instead of half a corner. Neighbouring tiles meet on the same slanted cut."""
     h = period / 2
-    pts = [(-h, y1), (0, y0), (h, y1), (period, y0), (period + h, y1)]
-    ws = [w_down, w_up, w_down, w_up]
+    pts = [(-period, y0), (-h, y1), (0, y0), (h, y1), (period, y0), (period + h, y1), (2 * period, y0), (2 * period + h, y1)]
+    ws = [w_up, w_down, w_up, w_down, w_up, w_down, w_up]
     p = polyline(pts, ws)
-    return inter(p, rect(-eps, -5, period + eps, 5))
+    # cut square to the rising stroke at its midpoint, and again one period later
+    dx, dy = h, y1 - y0
+    L = math.hypot(dx, dy); ux, uy = dx / L, dy / L          # rising direction
+    nx, ny = -uy, ux                                          # along the cut
+    mx, my = h / 2, (y0 + y1) / 2
+    big = 3
+    strip = poly([(mx - eps * ux + nx * big, my - eps * uy + ny * big), (mx - eps * ux - nx * big, my - eps * uy - ny * big),
+                  (mx + period + eps * ux - nx * big, my + eps * uy - ny * big), (mx + period + eps * ux + nx * big, my + eps * uy + ny * big)])
+    return move(inter(p, strip), -mx, 0)
 
 
 wt = zig_tile(0.96, 0.40, 0.84, 0.10, 0.22)

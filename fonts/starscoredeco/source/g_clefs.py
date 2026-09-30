@@ -82,22 +82,19 @@ def fclef():
 
 
 def f_stencil():
-    """Stencil bass clef: the head is a separate disc, and breaks cross the top, the heavy side
-    and the tail; each dot is split."""
-    skel = [(0.42, 0.46),
-            ('C', (0.42, 0.80), (0.80, 1.04), (1.28, 1.04)),
+    """Stencil bass clef: the ball grows out of the stroke (as in the treble clef's tail), solid
+    round dots, and narrow breaks across the top, the heavy side and the tail."""
+    skel = [(0.42, 0.0),
+            ('C', (0.42, 0.64), (0.82, 1.04), (1.28, 1.04)),
             ('C', (1.82, 1.04), (2.16, 0.64), (2.16, 0.02)),
             ('C', (2.16, -0.86), (1.44, -1.74), (0.18, -2.46))]
     taper = lambda u: 1.0 if u < 0.52 else max(0.22, 1.0 - (u - 0.52) / 0.48 * 0.80)
-    body = _cv.to_shapely(stroke(skel, Nib(0.11, 0.42, 1.5), cap1='perp', wfun=taper))
-    head = M.Polygon(M.arc(0.42, 0.0, 0.37, 0.37, 0, 360))
-    body = body.difference(head.buffer(GAP_ST))
-    g = M.G(body, head, M.Polygon(M.arc(2.66, 0.5, 0.21, 0.21, 0, 360)),
+    body = _cv.to_shapely(stroke(skel, Nib(0.11, 0.42, 1.5), cap1='perp', wfun=taper, ball0=(0.68, 0.62)))
+    g = M.G(body, M.Polygon(M.arc(2.66, 0.5, 0.21, 0.21, 0, 360)),
             M.Polygon(M.arc(2.66, -0.5, 0.21, 0.21, 0, 360)))
     g = _cv.stencil(g, [(1.34, 0.95, 90, 0.5, GAP_ST),          # across the top
                         (2.02, -0.25, 0, 0.9, GAP_ST),          # across the heavy side
-                        (1.54, -1.40, -50, 0.8, GAP_ST * 0.9),    # across the tail
-                        (2.66, 0.5, 90, 0.6, 0.06), (2.66, -0.5, 90, 0.6, 0.06)])  # split dots
+                        (1.54, -1.40, -50, 0.8, GAP_ST * 0.9)])  # across the tail
     return g
 
 

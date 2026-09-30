@@ -11,11 +11,15 @@ SMOOTH = os.environ.get('DECO_SMOOTH', '1') == '1'
 
 FAMILY = "StarScore Deco"
 TEXT_SB = 0.08
-VERSION = "0.5"
+VERSION = "0.6"
 MODULES = ["g_noteheads", "g_clefs", "g_accidentals", "g_rests", "g_flags",
            "g_timesig", "g_dynamics", "g_artic", "g_misc", "g_lines"]
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+CUSTOM = {   # Joel's own glyphs, outside SMuFL (optional-glyph range)
+    "csymDiminishedMajorSeventh": {"codepoint": "U+F4C0", "description": "Diminished-major seventh (diamond)"},
+    "csymMinorMajorSeventh": {"codepoint": "U+F4C1", "description": "Minor-major seventh (diamond with a bar)"},
+}
 GLYPHNAMES = json.load(open(os.path.join(HERE, '..', '..', 'smufl', 'glyphnames.json')))
 
 
@@ -42,7 +46,7 @@ def build(out_otf, out_meta, family=FAMILY, text=False):
     charstrings["space"] = pen.getCharString()
     metrics["space"] = (250, 0)
     for name, g in G.items():
-        cp = GLYPHNAMES[name]["codepoint"]
+        cp = (GLYPHNAMES.get(name) or CUSTOM[name])["codepoint"]
         code = int(cp[2:], 16)
         path = g["path"]
         if SMOOTH:
@@ -92,6 +96,7 @@ def build(out_otf, out_meta, family=FAMILY, text=False):
         "engravingDefaults": registry.ENGRAVING_DEFAULTS,
         "glyphBBoxes": bboxes,
         "glyphsWithAnchors": anchors,
+        "optionalGlyphs": {k: v for k, v in CUSTOM.items() if k in G},
     }
     json.dump(meta, open(out_meta, "w"), indent=1, sort_keys=True)
     return len(G)

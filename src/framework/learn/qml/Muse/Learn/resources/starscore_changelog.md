@@ -4,6 +4,16 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.12.6
+
+- **StarScore Deco 0.6**, from Joel's review of 0.4:
+  - New glyphs for Joel's own chord marks: the minor-major seventh (a diamond with a full bar through it) and the diminished-major seventh (the plain diamond), at U+F4C1 and U+F4C0.
+  - The triangle, plus and minus chord marks are as heavy as the diminished circle.
+  - Bass clef: the head grows out of the stroke again and the dots are solid; the stencil breaks stay.
+  - The 4 is narrower with its stem nearer the middle, so it lines up with the other figures in time signatures.
+  - The ends of the s (dynamics, turn, segno) and the opening of the e in Ped. are cut square to the stroke.
+  - Trill, arpeggio and glissando wiggles end in a clean square end instead of half a corner.
+
 ## 1.12.5
 
 - **StarScore Deco 0.5**: stencil clefs refined. The treble clef's stem is slightly heavier; the bass clef's stroke starts with a clean cut just above the head, with an even gap; the alto clef's arms meet the bowls without a step.

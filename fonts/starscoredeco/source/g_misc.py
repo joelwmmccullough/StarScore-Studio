@@ -135,10 +135,28 @@ add("bracketBottom", mirror_y(bt))
 ring = diff(ellipse(0.8, 0.8, 0.8, 0.8), ellipse(0.8, 0.8, 0.8 - S * 0.9, 0.8 - s_ * 0.9))
 add("csymDiminished", ring)
 add("csymHalfDiminished", union(ring, polyline([(0.06, -0.02), (1.54, 1.62)], s_ * 0.6)))
-tri = diff(poly([(0.0, 0.0), (1.9, 0.0), (0.95, 1.7)]), poly([(0.36, 0.13), (1.54, 0.13), (0.95, 1.20)]))
+import mono as _M
+CS = 0.27                               # chord-symbol stroke, the same as the diminished ring
+
+
+def outline(pts, w=CS):
+    """A closed shape drawn as an outline of even width w (inside the given edge), mitred corners."""
+    outer = _M.Polygon(pts)
+    return _M.to_path(outer.difference(outer.buffer(-w, join_style='mitre', mitre_limit=10)))
+
+
+tri = outline([(0.0, 0.0), (1.9, 0.0), (0.95, 1.7)])
 add("csymMajorSeventh", tri)
-add("csymAugmented", union(rect(0, 0.8 - s_ * 0.35, 1.44, 0.8 + s_ * 0.35), rect(0.72 - s_ * 0.35, 0.0, 0.72 + s_ * 0.35, 1.6)))
-add("csymMinor", rect(0, 0.8 - s_ * 0.35, 1.1, 0.8 + s_ * 0.35))
+add("csymAugmented", union(rect(0, 0.8 - CS / 2, 1.44, 0.8 + CS / 2), rect(0.72 - CS / 2, 0.08, 0.72 + CS / 2, 1.52)))
+add("csymMinor", rect(0, 0.8 - CS / 2, 1.1, 0.8 + CS / 2))
+
+# Joel's own chord marks (not in SMuFL): diminished-major seventh = a diamond, minor-major
+# seventh = the diamond with a full bar through it, running past both side corners.
+DW, DH = 1.33, 1.70
+dia = outline([(0.0, DH / 2), (DW / 2, 0.0), (DW, DH / 2), (DW / 2, DH)])
+add("csymDiminishedMajorSeventh", dia)
+EXT, BAR = 0.30, 0.22
+add("csymMinorMajorSeventh", union(move(dia, EXT, 0), rect(0.0, DH / 2 - BAR / 2, DW + 2 * EXT, DH / 2 + BAR / 2)))
 
 # ---- repeat measure signs: slash with two dots
 def repeat_bars(n):

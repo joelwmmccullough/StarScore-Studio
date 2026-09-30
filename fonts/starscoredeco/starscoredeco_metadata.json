@@ -31,7 +31,7 @@
   "tupletBracketThickness": 0.14
  },
  "fontName": "StarScore Deco",
- "fontVersion": 0.5,
+ "fontVersion": 0.6,
  "glyphBBoxes": {
   "accidentalBracketLeft": {
    "bBoxNE": [
@@ -606,6 +606,16 @@
   "csymAugmented": {
    "bBoxNE": [
     1.44,
+    1.52
+   ],
+   "bBoxSW": [
+    0.0,
+    0.08
+   ]
+  },
+  "csymDiminished": {
+   "bBoxNE": [
+    1.6,
     1.6
    ],
    "bBoxSW": [
@@ -613,10 +623,10 @@
     0.0
    ]
   },
-  "csymDiminished": {
+  "csymDiminishedMajorSeventh": {
    "bBoxNE": [
-    1.6,
-    1.6
+    1.33,
+    1.7
    ],
    "bBoxSW": [
     0.0,
@@ -646,11 +656,21 @@
   "csymMinor": {
    "bBoxNE": [
     1.1,
-    0.886
+    0.935
    ],
    "bBoxSW": [
     0.0,
-    0.714
+    0.665
+   ]
+  },
+  "csymMinorMajorSeventh": {
+   "bBoxNE": [
+    1.93,
+    1.7
+   ],
+   "bBoxSW": [
+    0.0,
+    0.0
    ]
   },
   "dynamicFF": {
@@ -885,12 +905,12 @@
   },
   "dynamicSforzando": {
    "bBoxNE": [
-    0.662,
+    0.657,
     1.061
    ],
    "bBoxSW": [
-    0.058,
-    -0.001
+    0.089,
+    -0.0
    ]
   },
   "dynamicSforzando1": {
@@ -899,7 +919,7 @@
     1.484
    ],
    "bBoxSW": [
-    0.058,
+    0.089,
     -0.424
    ]
   },
@@ -909,7 +929,7 @@
     1.484
    ],
    "bBoxSW": [
-    0.058,
+    0.089,
     -0.424
    ]
   },
@@ -919,7 +939,7 @@
     1.484
    ],
    "bBoxSW": [
-    0.058,
+    0.089,
     -0.424
    ]
   },
@@ -929,7 +949,7 @@
     1.484
    ],
    "bBoxSW": [
-    0.058,
+    0.089,
     -0.424
    ]
   },
@@ -939,7 +959,7 @@
     1.484
    ],
    "bBoxSW": [
-    0.058,
+    0.089,
     -0.424
    ]
   },
@@ -949,7 +969,7 @@
     1.484
    ],
    "bBoxSW": [
-    0.058,
+    0.089,
     -0.424
    ]
   },
@@ -965,57 +985,57 @@
   },
   "fClef": {
    "bBoxNE": [
-    2.819,
+    2.79,
     1.095
    ],
    "bBoxSW": [
-    0.0,
+    0.003,
     -2.481
    ]
   },
   "fClef15ma": {
    "bBoxNE": [
-    2.819,
-    2.315
+    2.79,
+    2.316
    ],
    "bBoxSW": [
-    0.0,
+    0.003,
     -2.481
    ]
   },
   "fClef15mb": {
    "bBoxNE": [
-    2.819,
+    2.79,
     1.095
    ],
    "bBoxSW": [
-    0.0,
+    0.003,
     -3.701
    ]
   },
   "fClef8va": {
    "bBoxNE": [
-    2.819,
-    2.315
+    2.79,
+    2.316
    ],
    "bBoxSW": [
-    0.0,
+    0.003,
     -2.481
    ]
   },
   "fClef8vb": {
    "bBoxNE": [
-    2.819,
+    2.79,
     1.095
    ],
    "bBoxSW": [
-    0.0,
+    0.003,
     -3.701
    ]
   },
   "fClefChange": {
    "bBoxNE": [
-    2.255,
+    2.232,
     0.876
    ],
    "bBoxSW": [
@@ -1696,17 +1716,17 @@
   "ornamentTurn": {
    "bBoxNE": [
     1.901,
-    0.907
+    0.906
    ],
    "bBoxSW": [
-    -0.001,
+    -0.0,
     -0.0
    ]
   },
   "ornamentTurnInverted": {
    "bBoxNE": [
-    1.901,
-    0.907
+    1.9,
+    0.906
    ],
    "bBoxSW": [
     -0.001,
@@ -2045,7 +2065,7 @@
   },
   "timeSig4": {
    "bBoxNE": [
-    1.32,
+    1.2,
     1.0
    ],
    "bBoxSW": [
@@ -2265,7 +2285,7 @@
   },
   "tuplet4": {
    "bBoxNE": [
-    0.97,
+    0.88,
     1.5
    ],
    "bBoxSW": [
@@ -2375,11 +2395,11 @@
   },
   "wiggleArpeggiatoDown": {
    "bBoxNE": [
-    1.006,
+    1.032,
     0.548
    ],
    "bBoxSW": [
-    -0.006,
+    -0.032,
     -0.048
    ]
   },
@@ -2389,17 +2409,17 @@
     0.8
    ],
    "bBoxSW": [
-    -0.006,
+    -0.032,
     -0.3
    ]
   },
   "wiggleArpeggiatoUp": {
    "bBoxNE": [
-    1.006,
+    1.032,
     0.548
    ],
    "bBoxSW": [
-    -0.006,
+    -0.032,
     -0.048
    ]
   },
@@ -2409,27 +2429,27 @@
     0.8
    ],
    "bBoxSW": [
-    -0.006,
+    -0.032,
     -0.3
    ]
   },
   "wiggleGlissando": {
    "bBoxNE": [
-    0.966,
+    0.992,
     0.521
    ],
    "bBoxSW": [
-    -0.006,
+    -0.032,
     -0.041
    ]
   },
   "wiggleTrill": {
    "bBoxNE": [
-    0.966,
+    0.997,
     0.949
    ],
    "bBoxSW": [
-    -0.006,
+    -0.037,
     0.291
    ]
   }
@@ -2916,6 +2936,16 @@
     0.96,
     0
    ]
+  }
+ },
+ "optionalGlyphs": {
+  "csymDiminishedMajorSeventh": {
+   "codepoint": "U+F4C0",
+   "description": "Diminished-major seventh (diamond)"
+  },
+  "csymMinorMajorSeventh": {
+   "codepoint": "U+F4C1",
+   "description": "Minor-major seventh (diamond with a bar)"
   }
  }
 }
