@@ -709,6 +709,8 @@ static void starscoreRetitleSheet(mu::engraving::Score* score, const QString& le
             mu::engraving::Text* t = mu::engraving::Factory::createText(box, mu::engraving::TextStyleType::INSTRUMENT_EXCERPT);
             t->setParent(box);
             t->setTrack(0);
+            t->setPlacement(mu::engraving::PlacementV::ABOVE);
+            t->setPropertyFlags(mu::engraving::Pid::PLACEMENT, mu::engraving::PropertyFlags::UNSTYLED);
             t->setXmlText(escape(left));
             score->undoAddElement(t);
             partText = t;
@@ -726,6 +728,9 @@ static void starscoreRetitleSheet(mu::engraving::Score* score, const QString& le
         t->setPropertyFlags(mu::engraving::Pid::ALIGN, mu::engraving::PropertyFlags::UNSTYLED);
         t->setPosition(mu::engraving::AlignH::RIGHT);
         t->setPropertyFlags(mu::engraving::Pid::POSITION, mu::engraving::PropertyFlags::UNSTYLED);
+        // placement: a text made here defaults to "below", which drops it by a staff height
+        t->setPlacement(partText ? partText->placement() : mu::engraving::PlacementV::ABOVE);
+        t->setPropertyFlags(mu::engraving::Pid::PLACEMENT, mu::engraving::PropertyFlags::UNSTYLED);
         if (partText) {
             t->setOffset(mu::engraving::PointF(0.0, partText->offset().y()));
             t->setPropertyFlags(mu::engraving::Pid::OFFSET, mu::engraving::PropertyFlags::UNSTYLED);

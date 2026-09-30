@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.12.2
+
+- **Export to Sheets and Demos** (and songbook sheets): the arrangement name at the top right is now actually level with the instrument name. A title-frame text created by StarScore defaulted to “below” placement, which pushed it down by a staff height. It now takes the instrument name's placement.
+
 ## 1.12.1
 
 - **StarScore Deco 0.2**: every glyph redrawn to one style sheet measured from TT Modernoir Bold, so the whole font now hangs together and matches the text next to it.
