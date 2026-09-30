@@ -4,6 +4,15 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.12.3
+
+- **StarScore Deco 0.3**, redrawn from Joel's glyph-by-glyph review of 0.2:
+  - Figures (time signatures, tuplets, 8va/15ma/22ma, octave clef numbers) are each one even-width stroke, so no part is heavier than another and curves run into straight lines without steps. New 1 flag, a real 8 with a pinched waist, wider 3 and 5.
+  - Double sharp is an X of four tapering arms (no more square blocks). The flat's bowl meets the stem horizontally, giving a full round bottom. The natural has no small steps where its parts meet.
+  - Marcato is symmetric. The very long fermata has equal bars and gaps, and the very short fermata's dot no longer touches the chevrons.
+  - Treble and bass clefs redrawn with thick-and-thin contrast, a ball at the start of the treble clef's curl, a pointed top loop, and a bass clef tail that thins to a point. The alto clef's bowls match.
+  - The f, r and s in every dynamic are rebuilt with clean hooks and a straight-spined s. The trill's t no longer runs into the r, and the turn and segno use the new s.
+
 ## 1.12.2
 
 - **Export to Sheets and Demos** (and songbook sheets): the arrangement name at the top right is now actually level with the instrument name. A title-frame text created by StarScore defaulted to “below” placement, which pushed it down by a staff height. It now takes the instrument name's placement.

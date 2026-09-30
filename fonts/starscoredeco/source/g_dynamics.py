@@ -5,6 +5,7 @@ from shapes import *
 from registry import add
 from digits import diag
 import style
+import math
 from style import K
 
 XH = 1.06
@@ -78,43 +79,67 @@ def L_m():
                  rect(0, XH - t, (P + T) / 2, XH), rect(P, XH - t, P + (P + T) / 2, XH)), 0.0, w
 
 
-def quarter_ring(cx, cy, r, wall, thin_, left=None):
-    """Quarter ring from the top of a stem at (cx, cy+r) curving right and down to (cx+r, cy):
-    cut flat where the curve turns vertical, as Modernoir's r and f. `left` = how far left of
-    the centre line to keep (default: the stem's left edge)."""
-    left = T * 0.5 if left is None else left
-    q = bowl(cx, cy, r, r, wall, thin_)
-    return inter(q, rect(cx - left, cy, cx + r + 1, cy + r + 1))
+def hook(x0, top, R, a_end, ri=0.12):
+    """A stem (left edge x0) turning over the top into a hook that ends in a radial cut at
+    a_end degrees. Outer curve: circle of radius R touching the stem's left edge and the top
+    line. Inner curve: a smaller circle touching the stem's right edge and sitting t below the
+    top, so the stroke stays T thick on the side and t thick on top."""
+    cx, cy = x0 + R, top - R
+    outer = ellipse(cx, cy, R, R)
+    icx, icy = x0 + T + ri, top - t - ri
+    inner = ellipse(icx, icy, ri, ri)
+    # below the inner circle's centre the counter is open (a vertical slot as wide as 2*ri)
+    inner = union(inner, rect(icx - ri, icy - 5, icx + ri + 5, icy))
+    far = 5
+    keep = poly([(cx, cy)] + [(cx + far * math.cos(math.radians(a)), cy + far * math.sin(math.radians(a)))
+                              for a in range(int(a_end), 271, 5)])
+    return diff(inter(outer, keep), inner)
 
 
 def L_r():
-    w = W('r')
-    r = w - T * 0.5
-    arm = quarter_ring(T * 0.5, XH - r, r, T * 0.9, t * 0.9)
-    return union(rect(0, 0, T, XH), arm), 0.0, w
+    R = W('n') / 2                               # same outer radius as the n and m arches
+    arm = hook(0.0, XH, R, 40, ri=0.10)
+    x1 = bounds(arm)[2]
+    return union(rect(0, 0, T, XH), arm, rect(0, XH - t, R, XH)), 0.0, x1
 
 
 def L_f():
-    w = W('f')
-    xs = 0.05
-    r = w - xs - T * 0.5
-    cyt = ASC - r
-    stem = rect(xs, DESC + r, xs + T, cyt)
-    hook = quarter_ring(xs + T * 0.5, cyt, r, r, r * 0.9)
-    tail = rotate(hook, 180, xs + T / 2, (ASC + DESC) / 2)
-    bar = rect(0, XH - t, w, XH)
-    return union(stem, hook, tail, bar), 0.0, w
+    xs = 0.0
+    R = 0.29
+    cyt = ASC - R
+    top = hook(xs, ASC, R, 28)
+    tail = rotate(top, 180, xs + T / 2, (ASC + DESC) / 2)
+    stem = rect(xs, DESC + R, xs + T, ASC - R)
+    p = union(stem, top, tail, rect(xs - 0.10, XH - t, xs + T + 0.24, XH))
+    x0 = bounds(p)[0]
+    p = move(p, -x0, 0)
+    return p, 0.0, bounds(p)[2]
 
 
-def L_s():
-    w = W('s')
-    Tw = T * 0.84
-    ry = XH / 4
-    cyu = XH - ry
-    up = inter(bowl(w / 2, cyu, w / 2, ry, Tw, t), rect(-5, cyu, 5, 5))
-    up = diff(up, rect(w / 2, -5, 5, cyu + 0.10))                 # top-right terminal, flat
-    spine = diag(0.0, Tw, cyu, w - Tw, w, ry)
-    return union(up, spine, rotate(up, 180, w / 2, XH / 2)), 0.0, w
+def L_s(w=None, H=XH, wh=0.19, k=1.22, a_top=32, a_bot=-148):
+    """Modernoir s: two elliptic arcs joined by a straight spine tangent to both. Drawn as one
+    even stroke of width wh on a narrower skeleton, then widened by k, so the sides come out
+    k times heavier than the tops and bottoms (the letter's vertical stress)."""
+    import mono as Mo
+    from shapely import affinity
+    w = W('s') if w is None else w
+    wn = w / k
+    e = wh / 2
+    ryu = (H - wh) * 0.205
+    ryl = (H - wh) * 0.225
+    Eu = (wn / 2 + 0.01, H - e - ryu, wn / 2 - e - 0.01, ryu)
+    El = (wn / 2, e + ryl, wn / 2 - e, ryl)
+    for which in (0, 1):
+        p1, p2 = Mo.common_tangent(Eu, El, internal=True, which=which)
+        if p1[0] < Eu[0]:
+            break
+    a1 = Mo.ell_angle(*Eu, p1) % 360
+    a2 = Mo.ell_angle(*El, p2)
+    if a2 > 90:
+        a2 -= 360
+    sk = Mo.chain(Mo.arc(*Eu, a_top, a1), Mo.line(p1, p2), Mo.arc(*El, a2, a_bot))
+    g = affinity.scale(Mo.buf(sk, wh, join='round'), k, 1.0, origin=(0, 0))
+    return Mo.to_path(g), 0.0, w
 
 
 def L_z():

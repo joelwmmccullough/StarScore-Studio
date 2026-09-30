@@ -12,14 +12,20 @@ def dot_at(cx, cy, s=DOT):
     return term(cx, cy, s)
 
 
+def chevron(W, H, th):
+    ang = math.atan2(H, W / 2)
+    a = th / math.sin(ang)          # horizontal width of each arm at the base
+    b = th / math.cos(ang)          # vertical drop of the inner apex
+    return poly([(0, 0), (W / 2, H), (W, 0), (W - a, 0), (W / 2, H - b), (a, 0)])
+
+
 def accent():
     p = polyline([(-0.2, 0.90), (1.32, 0.45), (-0.2, 0.0)], [0.22, 0.22])
     return inter(p, rect(0.0, -0.1, 2, 1.0))
 
 
 def marcato():
-    p = polyline([(-0.08, -0.25), (0.47, 1.02), (1.02, -0.25)], [0.30, 0.24])
-    return inter(p, rect(0, 0, 0.94, 1.2))
+    return chevron(0.96, 1.02, 0.25)          # symmetric, both arms the same weight
 
 
 def tenuto():
@@ -68,13 +74,6 @@ above_below("articTenutoAccent", stack(tenuto(), accent()))
 above_below("articStaccatissimoStroke", rect(0, 0, 0.22, 0.9))
 
 
-def chevron(W, H, th):
-    ang = math.atan2(H, W / 2)
-    a = th / math.sin(ang)          # horizontal width of each arm at the base
-    b = th / math.cos(ang)          # vertical drop of the inner apex
-    return poly([(0, 0), (W / 2, H), (W, 0), (W - a, 0), (W / 2, H - b), (a, 0)])
-
-
 # ---- fermatas: a squarish arch, thick at the crown, cut flat at the base
 def fermata(kind="normal"):
     W = 2.36
@@ -86,12 +85,22 @@ def fermata(kind="normal"):
         arc_ = chevron(W, 1.26, 0.24)
     elif kind == "long":    # square arch
         arc_ = union(rect(0, 0, 0.26, 1.20), rect(W - 0.26, 0, W, 1.20), rect(0, 0.98, W, 1.20))
-    elif kind == "veryLong":
-        arc_ = union(rect(0, 0, 0.24, 1.20), rect(W - 0.24, 0, W, 1.20), rect(0, 1.0, W, 1.20),
-                     rect(0.40, 0, 0.62, 0.76), rect(W - 0.62, 0, W - 0.40, 0.76), rect(0.40, 0.58, W - 0.40, 0.76))
-    elif kind == "veryShort":
-        arc_ = union(chevron(W, 1.34, 0.22), move(chevron(W - 1.0, 0.86, 0.19), 0.50, 0))
-    d = dot_at(W / 2, 0.26 if kind in ('short', 'veryShort') else 0.30, 0.36 if kind in ('short', 'veryShort') else 0.40)
+    elif kind == "veryLong":         # two nested square arches: equal bars, equal gaps
+        th, g, Hh = 0.22, 0.20, 1.32
+        o = union(rect(0, 0, th, Hh), rect(W - th, 0, W, Hh), rect(0, Hh - th, W, Hh))
+        i0, iH = th + g, Hh - th - g
+        i = union(rect(i0, 0, i0 + th, iH), rect(W - i0 - th, 0, W - i0, iH), rect(i0, iH - th, W - i0, iH))
+        arc_ = union(o, i)
+    elif kind == "veryShort":        # two nested chevrons, the same gap all the way along
+        th, g = 0.20, 0.15
+        Hh = 1.40
+        W = 2.60
+        ang = math.atan2(Hh, W / 2)
+        d = (th + g) / math.sin(ang)             # horizontal inset that keeps the gap even
+        Wi = W - 2 * d
+        arc_ = union(chevron(W, Hh, th), move(chevron(Wi, Wi / 2 * math.tan(ang), th), d, 0))
+    ds = {'short': 0.36, 'veryShort': 0.30}.get(kind, 0.40)
+    d = dot_at(W / 2, ds * 0.58 + 0.01 if kind == 'veryShort' else (0.26 if kind == 'short' else 0.30), ds)
     return union(arc_, d)
 
 
@@ -106,7 +115,7 @@ comma = stroke([(0.26, 0.72), ('C', (0.40, 0.64), (0.47, 0.44), (0.40, 0.27)),
                 ('C', (0.33, 0.12), (0.21, 0.04), (0.06, 0.0))], style.pen(0.24),
                ball0=(0.46, 0.50), wfun=lambda s: 1.0 - 0.45 * s)
 add("breathMarkComma", move(comma, -bounds(comma)[0], -bounds(comma)[1]))
-tick = polyline([(0.0, 0.9), (0.42, 0.0), (1.2, 1.9)], [0.20, 0.26])
+tick = polyline([(0.0, 0.9), (0.42, 0.0), (1.2, 1.9)], [0.23, 0.23])
 add("breathMarkTick", move(tick, -bounds(tick)[0], -bounds(tick)[1]))
 cz = union(polyline([(0.0, 0.0), (0.62, 2.1)], 0.24), polyline([(0.62, 0.0), (1.24, 2.1)], 0.24))
 cz = inter(cz, rect(-1, 0, 3, 2.1))

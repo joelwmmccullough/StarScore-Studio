@@ -3,8 +3,10 @@ from shapes import *
 from registry import add
 
 import style
-BOWL = style.pen(0.34)
-STEM = style.pen(0.27)
+import os
+CONTRAST = os.environ.get('DECO_CLEF', 'c') == 'c'
+BOWL = Nib(0.10, 0.42, 1.5) if CONTRAST else style.pen(0.34)
+STEM = style.pen(0.20) if CONTRAST else style.pen(0.27)
 
 
 def gclef():
@@ -24,7 +26,7 @@ def gclef():
         ('C', (dx_ + tx * 0.34, dy_ + ty * 0.34), (2.31, 3.10), (2.31, 3.50)),
         ('C', (2.31, 3.92), (2.13, 4.22), apex),
     ]
-    body = stroke(skel, BOWL, cap0='perp')
+    body = stroke(skel, BOWL, cap0='perp', ball0=(0.40, 0.45) if CONTRAST else None)
     cb = caps()
     dot_c = (0.58, -2.02)
     stem = stroke([apex, ('C', (1.74, 4.22), (1.55, 3.98), (1.55, 3.62)),
@@ -32,7 +34,11 @@ def gclef():
                    ('C', (1.55, -2.25), (1.25, -2.56), (0.95, -2.56)),
                    ('C', (0.74, -2.56), (0.60, -2.40), dot_c)], STEM, ball1=(0.60, 0.95))
     cs = caps()
-    apx = join_point((cb[2], cb[3]), (cs[0], cs[1]), (apex[0] + 0.02, apex[1] + 0.07))
+    from kit import _lineint
+    hb = (apex[0] - 2.13, apex[1] - 4.22)          # body's heading into the apex
+    hs = (1.74 - apex[0], 4.22 - apex[1])          # stem's heading out of it
+    tip = _lineint(cb[3], hb, cs[1], (-hs[0], -hs[1])) or (apex[0] + 0.02, apex[1] + 0.07)
+    apx = join_point((cb[2], cb[3]), (cs[0], cs[1]), tip)
     return union(body, stem, apx)
 
 
@@ -43,16 +49,20 @@ add("gClef", g)
 
 
 def fclef():
-    skel = [(0.40, -0.06),
-            ('C', (0.40, 0.62), (0.80, 1.00), (1.20, 1.00)),
-            ('C', (1.70, 1.00), (2.02, 0.62), (2.02, 0.05)),
-            ('C', (2.02, -0.45), (1.77, -1.06), (1.40, -1.40)),
-            ('L', (0.20, -2.50))]
-    body = stroke(skel, style.pen(0.36), cap1='perp', ball0=(0.66, 0.85))
-    knob = None
-    d1 = term(2.52, 0.5, 0.36)
-    d2 = term(2.52, -0.5, 0.36)
-    return union(body, knob, d1, d2)
+    """Ball head on the F line, a hairline over the top, a heavy right side, and a tail that
+    sweeps down to the left and thins to a point."""
+    skel = [(0.42, 0.0),
+            ('C', (0.42, 0.64), (0.82, 1.04), (1.28, 1.04)),
+            ('C', (1.82, 1.04), (2.16, 0.64), (2.16, 0.02)),
+            ('C', (2.16, -0.86), (1.44, -1.74), (0.18, -2.46))]
+    if CONTRAST:
+        taper = lambda u: 1.0 if u < 0.52 else max(0.22, 1.0 - (u - 0.52) / 0.48 * 0.80)
+        body = stroke(skel, Nib(0.11, 0.46, 1.5), cap1='perp', ball0=(0.72, 0.62), wfun=taper)
+    else:
+        body = stroke(skel, style.pen(0.36), cap1='perp', ball0=(0.66, 0.85))
+    d1 = term(2.66, 0.5, 0.36)
+    d2 = term(2.66, -0.5, 0.36)
+    return union(body, d1, d2)
 
 
 fc = fclef()
@@ -63,7 +73,7 @@ add("fClef", fc)
 
 def cclef():
     bars = union(rect(0, -2.0, 0.52, 2.0), rect(0.72, -2.0, 0.94, 2.0))
-    nib = style.pen(0.34)
+    nib = Nib(0.12, 0.40, 1.5) if CONTRAST else style.pen(0.34)
     yb = 0.46                                   # height of the bowl's thin bottom stroke
     skel = [(1.32, 1.44),
             ('C', (1.32, 1.82), (1.62, 1.95), (1.98, 1.95)),

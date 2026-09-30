@@ -13,16 +13,11 @@ s_ = style.thin(S)
 
 
 # ---- segno: a big Modernoir S (narrow, straight spine, flat terminals), slash, two dots
-def big_s(H=3.0, W=None, T=None):
-    W = 0.45 * H if W is None else W           # Modernoir S = 0.45 cap
-    T = S * 1.2 if T is None else T
-    t = style.thin(T)
-    ry = H / 4
-    cyu = H - ry
-    up = inter(gd.bowl(W / 2, cyu, W / 2, ry, T, t), rect(-5, cyu, 5, 9))
-    up = diff(up, rect(W / 2, -5, 5, cyu + 0.12))
-    spine = diag(0.0, T, cyu, W - T, W, ry)
-    return union(up, spine, rotate(up, 180, W / 2, H / 2))
+def big_s(H=3.0, W=None):
+    """The dynamics s drawn large: arcs and a straight spine in one stroke."""
+    W = 0.45 * H if W is None else W
+    p, _, _ = gd.L_s(w=W, H=H, wh=S * 0.95)
+    return p
 
 
 def segno():
@@ -42,7 +37,7 @@ def coda(square=False):
         ring = diff(rect(cx - 0.95, cy - 1.2, cx + 0.95, cy + 1.2), rect(cx - 0.95 + S, cy - 1.2 + s_, cx + 0.95 - S, cy + 1.2 - s_))
     else:
         ring = diff(ellipse(cx, cy, 0.95, 1.22, 0, K), ellipse(cx, cy, 0.95 - S, 1.22 - s_, 0, K))
-    lw = s_ * 0.55
+    lw = s_ * 0.72
     cross = union(rect(0, cy - lw / 2, 2 * cx, cy + lw / 2), rect(cx - lw / 2, -0.62, cx + lw / 2, 3.58))
     return union(ring, cross)
 
@@ -89,16 +84,18 @@ add("ornamentTurnSlash", union(tn, rect(bounds(tn)[2] / 2 - 0.06, -0.3, bounds(t
 def trill():
     T, t = gd.T, gd.t
     XH = gd.XH
-    # t: stem, crossbar, and a quarter-circle foot turning right (Modernoir t)
-    xs = 0.14
-    r = 0.36
-    cx, cy = xs + T * 0.5 + r, r          # centre of the foot's arc
-    tstem = rect(xs, cy, xs + T, ASC_T)
-    tbar = rect(0.0, XH - t, xs + T + 0.22, XH)
-    foot = inter(gd.bowl(cx, cy, r, r, T, t), rect(-5, -5, cx, cy))   # lower-left quadrant
+    # t: stem, crossbar, and a foot that turns right along the baseline, cut radially
+    xs = 0.12
+    R = 0.30
+    foot = mirror_y(gd.hook(xs, 0.0, R, 32, ri=0.11))
+    x0f, y0f, x1f, y1f = bounds(foot)
+    tstem = rect(xs, R, xs + T, ASC_T)
+    tbar = rect(0.0, XH - t, xs + T + 0.20, XH)
     tt = union(tstem, tbar, foot)
     rr, _, w_r = gd.L_r()
-    p = union(tt, move(rr, xs + T + 0.30, 0))
+    gap = 0.12
+    xr = max(xs + T + 0.20, bounds(tt)[2]) + gap
+    p = union(tt, move(rr, xr, 0))
     return slant(p, gd.SLANT)
 
 

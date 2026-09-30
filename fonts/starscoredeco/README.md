@@ -24,7 +24,7 @@ Status: first draft (0.1). Glyphs it doesn't have fall back to Bravura.
 
 ## Rebuilding
 
-    pip install fonttools skia-pathops
+    pip install fonttools skia-pathops shapely
     python3 fonts/starscoredeco/source/build.py
 
 This rewrites StarScoreDeco.otf, StarScoreDecoText.otf and starscoredeco_metadata.json.

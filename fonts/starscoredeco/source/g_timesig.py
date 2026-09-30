@@ -2,7 +2,7 @@ from kit import *
 from shapes import *
 from registry import add
 import registry
-from digits import figs
+from digits import figs, FIG_STROKE
 import style
 from style import K
 
@@ -15,8 +15,8 @@ for d in "0123456789":
 
 def common(cut=False):
     """Modernoir C: a circle open on the right, with flat horizontal terminals."""
-    T = style.STEM_FIG
-    t = style.thin(T)
+    T = FIG_STROKE * 1.08               # a touch heavier than the figures: the C is a big round
+    t = FIG_STROKE * 0.92
     r = 1.0
     c = diff(ellipse(r, 0, r * 0.74, r, 0, K), ellipse(r, 0, r * 0.74 - T, r - t, 0, K))
     c = diff(c, rect(r, -0.40, 5, 0.40))
@@ -30,10 +30,10 @@ cm = common()
 add("timeSigCommon", cm, adv=bounds(cm)[2] + SB)
 ct = common(True)
 add("timeSigCutCommon", ct, adv=bounds(ct)[2] + SB)
-pl = move(union(rect(0, -style.thin(style.STEM_FIG) / 2, 1.5, style.thin(style.STEM_FIG) / 2), rect(0.75 - style.STEM_FIG / 2, -0.75, 0.75 + style.STEM_FIG / 2, 0.75)), SB, 0)
+pl = move(union(rect(0, -FIG_STROKE / 2, 1.5, FIG_STROKE / 2), rect(0.75 - FIG_STROKE / 2, -0.75, 0.75 + FIG_STROKE / 2, 0.75)), SB, 0)
 add("timeSigPlus", pl, adv=1.5 + 2 * SB)
 add("timeSigPlusSmall", scale(pl, 0.6), adv=0.9 + 2 * SB)
-add("timeSigFractionalSlash", polyline([(0.1, -1.0), (1.1, 1.0)], style.STEM_FIG * 0.8))
+add("timeSigFractionalSlash", polyline([(0.1, -1.0), (1.1, 1.0)], FIG_STROKE * 0.8))
 add("timeSigParensLeft", move(scale(registry.G["accidentalParensLeft"]["path"], 1.0, 0.85), SB, 0))
 add("timeSigParensRight", move(scale(registry.G["accidentalParensRight"]["path"], 1.0, 0.85), SB, 0))
 
