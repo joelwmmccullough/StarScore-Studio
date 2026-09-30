@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.12.13
+
+- **Export to Sheets and Demos** (and songbook sheets): the arrangement name at the top right is leveled with the instrument name when the sheet is printed. After layout, StarScore measures where both texts landed and moves the arrangement name to the instrument name's height. (The 1.11.3 and 1.12.2 fixes didn't change its position; it was still one staff height too low.)
+
 ## 1.12.12
 
 - **StarScore Deco 0.12**: the s in sf, sfz, sfp and the other s dynamics is turned 6° instead of 4°.

@@ -14,8 +14,11 @@
  */
 #include "starscoreservice.h"
 
+#include <algorithm>
+#include <cmath>
 #include <map>
 #include <set>
+#include <vector>
 
 #include <QDate>
 #include <QDir>
@@ -672,12 +675,72 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
     return RetVal<StarScoreBandExportPlan>::make_ok(plan);
 }
 
+//! Scores whose title frame got an arrangement label for printing. writePdf measures where the label and the
+//! instrument name actually landed and moves the label to the instrument name's height. Only the score pointer is
+//! kept (compared, never followed): the texts are looked up again in the score being printed.
+static std::vector<const mu::engraving::Score*> s_levelScores;
+
+//! Moves the arrangement label (right-positioned instrument-name text) to the instrument name's height
+static void starscoreLevelSheetLabels(mu::engraving::Score* score)
+{
+    auto it = std::find(s_levelScores.begin(), s_levelScores.end(), score);
+    if (!score || it == s_levelScores.end()) {
+        return;
+    }
+    s_levelScores.erase(it);
+
+    mu::engraving::Box* box = nullptr;
+    for (mu::engraving::MeasureBase* mb = score->first(); mb; mb = mb->next()) {
+        if (mb->isVBox()) {
+            box = mu::engraving::toBox(mb);
+            break;
+        }
+        if (mb->isMeasure()) {
+            break;
+        }
+    }
+    if (!box) {
+        return;
+    }
+    mu::engraving::Text* ref = nullptr;
+    std::vector<mu::engraving::Text*> labels;
+    for (mu::engraving::EngravingItem* e : box->el()) {
+        if (!e || !e->isText() || mu::engraving::toText(e)->textStyleType() != mu::engraving::TextStyleType::INSTRUMENT_EXCERPT) {
+            continue;
+        }
+        mu::engraving::Text* t = mu::engraving::toText(e);
+        if (t->position() == mu::engraving::AlignH::RIGHT) {
+            labels.push_back(t);
+        } else if (!ref) {
+            ref = t;
+        }
+    }
+    if (!ref) {
+        return;
+    }
+    bool moved = false;
+    const double refTop = ref->pagePos().y() + ref->ldata()->bbox().top();
+    for (mu::engraving::Text* label : labels) {
+        const double dy = refTop - (label->pagePos().y() + label->ldata()->bbox().top());
+        if (std::abs(dy) > 0.01) {
+            label->setOffset(label->offset() + mu::engraving::PointF(0.0, dy));
+            label->setPropertyFlags(mu::engraving::Pid::OFFSET, mu::engraving::PropertyFlags::UNSTYLED);
+            moved = true;
+        }
+    }
+    if (moved) {
+        score->setLayoutAll();
+        score->doLayout();
+    }
+}
+
 //! The sheet's title frame: the horn's name top left (the part name text), the arrangement top right
 static void starscoreRetitleSheet(mu::engraving::Score* score, const QString& left, const QString& right)
 {
     if (!score) {
         return;
     }
+
     mu::engraving::Box* box = nullptr;
     for (mu::engraving::MeasureBase* mb = score->first(); mb; mb = mb->next()) {
         if (mb->isVBox()) {
@@ -738,6 +801,9 @@ static void starscoreRetitleSheet(mu::engraving::Score* score, const QString& le
             t->setPropertyFlags(mu::engraving::Pid::FONT_SIZE, mu::engraving::PropertyFlags::UNSTYLED);
         }
         score->undoAddElement(t);
+        if (std::find(s_levelScores.begin(), s_levelScores.end(), score) == s_levelScores.end()) {
+            s_levelScores.push_back(score);
+        }
     }
     score->setLayoutAll();
     score->doLayout();
@@ -757,6 +823,10 @@ Ret StarScoreService::writePdf(const INotationPtr& notation, const QString& path
 
     const ViewMode oldMode = notation->painting()->viewMode();
     notation->painting()->setViewMode(ViewMode::PAGE);
+    if (score) {
+        score->doLayout();
+        starscoreLevelSheetLabels(score);
+    }
 
     io::FileStream out { io::path_t(path) };
     Ret ret = make_ret(Ret::Code::UnknownError);
