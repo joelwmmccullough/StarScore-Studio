@@ -6,14 +6,15 @@ An art deco SMuFL music font for StarScore Studio, drawn to go with TT Modernoir
 
 Status: first draft (0.1). Glyphs it doesn't have fall back to Bravura.
 
-## Design rules
+## Design rules (0.2: one style sheet, source/style.py, measured from TT Modernoir Bold)
 
-- One pen for every stroked glyph: vertical strokes are thick and horizontal strokes thin
-  (vertical stress, as in Modernoir).
-- Bowls are compass arcs (ellipses and slightly squared ellipses); curves run into straight
+- One pen for every stroked glyph: nearly monoline, horizontals 0.82 of verticals (Modernoir is 0.90).
+  Stem weights: letters 0.25 sp (x-height 1.06), figures 0.36 sp (height 2), symbols 0.30 sp.
+- Bowls are true circles and ellipses with small oval counters; curves run into straight tangent
   diagonals, like Modernoir's S, 2, 3 and 7 (the treble clef's spine, the bass clef's tail,
   the dynamics s).
-- Ends are cut flat. Counters are narrow vertical slots (half and whole noteheads, digits).
+- Ends are cut flat; diagonals end in sharp points cut along the horizontal. Counters are small ovals or slots.
+- Widths follow Modernoir: rounds wide, uprights narrow (figure and letter width tables in style.py).
 - Rests are a lightning-bolt quarter rest and "7"-shaped eighth rests; flags are solid blades.
 - Ball terminals grow out of their strokes: stroke(..., ball0/ball1=(diameter, ramp)) swells the
   line to the ball's width with a smooth ramp (clef knobs and tails, rest arms, comma). Free dots

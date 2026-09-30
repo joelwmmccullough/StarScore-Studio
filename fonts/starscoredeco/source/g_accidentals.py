@@ -3,8 +3,8 @@ from shapes import *
 from registry import add
 
 RISE = 0.24   # sharp/natural bar slope over the glyph width
-VT = 0.15     # thin vertical
-BT = 0.40     # thick bar (vertical thickness)
+VT = 0.22     # vertical
+BT = 0.30     # bar (vertical thickness)
 
 
 def _vertical(x, y0, y1, w, k):
@@ -35,22 +35,22 @@ def natural():
 
 
 def flat(stem_top=1.75):
-    S = 0.16                                    # stem width
+    S = 0.22                                    # stem width
     stem = rect(0.0, -0.64, S, stem_top)
-    outer = shape([(S, 0.46),
-                   ('C', (0.40, 0.66), (0.80, 0.60), (0.80, 0.12)),
-                   ('C', (0.80, -0.22), (0.50, -0.44), (S, -0.64)),
-                   ('L', (S, 0.46))])
-    inner = shape([(S, 0.30),
-                   ('C', (0.34, 0.44), (0.56, 0.40), (0.56, 0.10)),
-                   ('C', (0.56, -0.14), (0.38, -0.30), (S, -0.46)),
-                   ('L', (S, 0.30))])
+    outer = shape([(S, 0.50),
+                   ('C', (0.42, 0.66), (0.82, 0.60), (0.82, 0.12)),
+                   ('C', (0.82, -0.22), (0.52, -0.44), (S, -0.64)),
+                   ('L', (S, 0.50))])
+    inner = shape([(S, 0.28),
+                   ('C', (0.36, 0.42), (0.54, 0.38), (0.54, 0.10)),
+                   ('C', (0.54, -0.12), (0.38, -0.28), (S, -0.42)),
+                   ('L', (S, 0.28))])
     return union(stem, diff(outer, inner))
 
 
 def dsharp():
     s = 0.22
-    x = union(bar((0.14, 0.14), (0.86, 0.86), 0.12), bar((0.14, 0.86), (0.86, 0.14), 0.12))
+    x = union(bar((0.14, 0.14), (0.86, 0.86), 0.18), bar((0.14, 0.86), (0.86, 0.14), 0.18))
     blocks = union(*[poly([(cx - s, cy), (cx, cy + s), (cx + s, cy), (cx, cy - s)])
                      for cx, cy in ((0.22, 0.78), (0.78, 0.78), (0.22, 0.22), (0.78, 0.22))])
     p = union(x, blocks)
@@ -60,7 +60,7 @@ def dsharp():
 
 def paren(H=2.6, left=True):
     outer = ellipse(0.62, 0, 0.62, H / 2)
-    inner = ellipse(0.74, 0, 0.60, H / 2 - 0.02)
+    inner = ellipse(0.78, 0, 0.60, H / 2 - 0.02)
     p = inter(diff(outer, inner), rect(0, -H, 0.46, H))
     x0 = bounds(p)[0]
     p = move(p, -x0, 0)
@@ -83,8 +83,8 @@ add("accidentalNaturalFlat", union(na, move(fl, 0.84, 0)))
 add("accidentalNaturalSharp", union(na, move(sh, 0.84, 0)))
 add("accidentalParensLeft", paren(2.6, True))
 add("accidentalParensRight", paren(2.6, False))
-add("accidentalBracketLeft", union(rect(0, -1.3, 0.14, 1.3), rect(0, 1.16, 0.42, 1.3), rect(0, -1.3, 0.42, -1.16)))
-add("accidentalBracketRight", mirror_x(union(rect(0, -1.3, 0.14, 1.3), rect(0, 1.16, 0.42, 1.3), rect(0, -1.3, 0.42, -1.16)), 0.21))
+add("accidentalBracketLeft", union(rect(0, -1.3, 0.20, 1.3), rect(0, 1.14, 0.44, 1.3), rect(0, -1.3, 0.44, -1.14)))
+add("accidentalBracketRight", mirror_x(union(rect(0, -1.3, 0.20, 1.3), rect(0, 1.14, 0.44, 1.3), rect(0, -1.3, 0.44, -1.14)), 0.22))
 
 
 # ---- text-sized accidentals for chord symbols / figured bass (sit on the baseline)

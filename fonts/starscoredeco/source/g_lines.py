@@ -36,37 +36,18 @@ add("wiggleArpeggiatoDownArrow", arrow_tile(False), adv=2.06, anchors={"repeatOf
 
 
 # ---- pedal marks
-def letter_P(T=gd.T, t=gd.t):
-    H = 1.5
+def letter_P():
+    T, t = gd.T, gd.t
+    H = 1.42
+    w = 0.56 * H                    # Modernoir P = 0.56 cap
     stem = rect(0, 0, T, H)
-    W = 2 * T + gd.C + 0.06
-    ry = 0.42
-    b = gd.bowl(W / 2, H - ry, W / 2, ry, T, t)
-    joins = union(rect(0, H - t, W / 2, H), rect(0, H - 2 * ry, W / 2, H - 2 * ry + t))
-    return union(stem, b, joins), 0.0, W
-
-
-def letter_e():
-    T, t = gd.T, gd.t
-    W = 2 * T + gd.C
-    XH = gd.XH
-    ring_ = gd.bowl(W / 2, XH / 2, W / 2, XH / 2, T, t)
-    bar_ = rect(0.02, XH * 0.52, W - 0.02, XH * 0.52 + t * 1.2)
-    p = union(ring_, bar_)
-    p = diff(p, rect(W / 2 + 0.02, 0.18, 5, XH * 0.52 - 0.001))   # open lower right, flat terminal
-    return p, 0.0, W
-
-
-def letter_d():
-    T, t = gd.T, gd.t
-    W = 2 * T + gd.C + 0.02
-    b = gd.bowl(W / 2, gd.XH / 2, W / 2, gd.XH / 2, T, t)
-    return union(b, rect(W - T, 0, W, gd.ASC), gd.shoulders(W / 2, W)), 0.0, W
+    ry = 0.30 * H
+    b = gd.bowl(w / 2, H - ry, w / 2, ry, T, t)
+    joins = union(rect(0, H - t, w / 2, H), rect(0, H - 2 * ry, w / 2, H - 2 * ry + t))
+    return union(stem, b, joins), 0.0, w
 
 
 gd.LETTERS['P'] = letter_P
-gd.LETTERS['e'] = letter_e
-gd.LETTERS['d'] = letter_d
 
 
 def ped():

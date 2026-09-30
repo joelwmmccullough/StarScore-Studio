@@ -5,7 +5,8 @@ from registry import add
 # Flags hang from the stem end (y=0) with x=0 at the stem's left edge.
 # Shape: a thick wedge leaving the stem, a straight diagonal blade, then a short
 # curve down to a flat-cut tip (Modernoir's "7").
-NIB = Nib(0.13, 0.30, 1.3)
+import style
+NIB = style.pen(0.30)
 SPACING = 0.84
 
 

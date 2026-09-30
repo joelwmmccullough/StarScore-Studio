@@ -5,24 +5,30 @@ from registry import add
 import registry
 import g_dynamics as gd
 from digits import diag, figs
+import style
+from style import K
 
-# ---- segno: a large deco S (straight spine), slash, two dots
-def big_s(H=2.9, W=1.46, T=0.40, t=0.13):
-    ry = H * 0.25
+S = style.STEM_SYM          # 0.30
+s_ = style.thin(S)
+
+
+# ---- segno: a big Modernoir S (narrow, straight spine, flat terminals), slash, two dots
+def big_s(H=3.0, W=None, T=None):
+    W = 0.45 * H if W is None else W           # Modernoir S = 0.45 cap
+    T = S * 1.2 if T is None else T
+    t = style.thin(T)
+    ry = H / 4
     cyu = H - ry
-    KL = 0.70
-    def bowl(cx, cy, rx, ry_):
-        return diff(ellipse(cx, cy, rx, ry_, 0, KL), ellipse(cx, cy, rx - T, ry_ - t, 0, KL))
-    up = inter(bowl(W / 2, cyu, W / 2, ry), rect(-5, cyu, 5, 9))
-    up = diff(up, rect(W / 2 + 0.02, -5, 5, cyu + 0.18))
+    up = inter(gd.bowl(W / 2, cyu, W / 2, ry, T, t), rect(-5, cyu, 5, 9))
+    up = diff(up, rect(W / 2, -5, 5, cyu + 0.12))
     spine = diag(0.0, T, cyu, W - T, W, ry)
     return union(up, spine, rotate(up, 180, W / 2, H / 2))
 
 
 def segno():
-    s = move(big_s(), 0.38, 0.05)
-    slash = polyline([(0.06, 0.25), (2.14, 2.85)], 0.14)
-    d1 = term(0.36, 1.22, 0.40)
+    s = move(big_s(), 0.42, 0.04)
+    slash = polyline([(0.06, 0.25), (2.14, 2.85)], s_ * 0.7)
+    d1 = term(0.34, 1.20, 0.40)
     d2 = term(1.86, 1.86, 0.40)
     return union(s, slash, d1, d2)
 
@@ -33,10 +39,11 @@ add("segno", segno())
 def coda(square=False):
     cx, cy = 1.9, 1.48
     if square:
-        ring = diff(rect(cx - 0.95, cy - 1.2, cx + 0.95, cy + 1.2), rect(cx - 0.95 + 0.30, cy - 1.2 + 0.12, cx + 0.95 - 0.30, cy + 1.2 - 0.12))
+        ring = diff(rect(cx - 0.95, cy - 1.2, cx + 0.95, cy + 1.2), rect(cx - 0.95 + S, cy - 1.2 + s_, cx + 0.95 - S, cy + 1.2 - s_))
     else:
-        ring = diff(ellipse(cx, cy, 0.95, 1.22, 0, 0.60), ellipse(cx, cy, 0.95 - 0.30, 1.22 - 0.11, 0, 0.60))
-    cross = union(rect(0, cy - 0.07, 2 * cx, cy + 0.07), rect(cx - 0.07, -0.62, cx + 0.07, 3.58))
+        ring = diff(ellipse(cx, cy, 0.95, 1.22, 0, K), ellipse(cx, cy, 0.95 - S, 1.22 - s_, 0, K))
+    lw = s_ * 0.55
+    cross = union(rect(0, cy - lw / 2, 2 * cx, cy + lw / 2), rect(cx - lw / 2, -0.62, cx + lw / 2, 3.58))
     return union(ring, cross)
 
 
@@ -44,24 +51,23 @@ add("coda", coda())
 add("codaSquare", coda(True))
 
 
-# ---- ornaments
-def zigzag(n_up, W, H=0.86, thin=0.12, thick=0.30):
+# ---- ornaments: zigzags with the pen (diagonals a little heavier than the joins)
+def zigzag(n_up, W, H=0.86, w=None):
+    w = S * 0.8 if w is None else w
     xs = [i * W / (2 * n_up) for i in range(2 * n_up + 1)]
-    pts = [(x, 0.08 if i % 2 == 0 else H) for i, x in enumerate(xs)]
-    # run past both ends along the first and last strokes, then cut vertically
+    pts = [(x, 0.06 if i % 2 == 0 else H) for i, x in enumerate(xs)]
     def ext(p, q, d=0.4):
         dx, dy = p[0] - q[0], p[1] - q[1]
         L = math.hypot(dx, dy)
         return (p[0] + dx / L * d, p[1] + dy / L * d)
     pts = [ext(pts[0], pts[1])] + pts[1:-1] + [ext(pts[-1], pts[-2])]
-    ws = [thin if i % 2 == 0 else thick for i in range(len(pts) - 1)]
-    p = polyline(pts, ws)
+    p = polyline(pts, w)
     return inter(p, rect(0, -1, W, H + 1))
 
 
 short_trill = zigzag(2, 2.4)
 add("ornamentShortTrill", short_trill)
-add("ornamentMordent", union(short_trill, rect(1.14, -0.32, 1.26, 1.28)))
+add("ornamentMordent", union(short_trill, rect(1.20 - s_ * 0.35, -0.32, 1.20 + s_ * 0.35, 1.28)))
 add("ornamentTremblement", zigzag(3, 3.4))
 
 
@@ -81,19 +87,22 @@ add("ornamentTurnSlash", union(tn, rect(bounds(tn)[2] / 2 - 0.06, -0.3, bounds(t
 
 
 def trill():
-    T, t = 0.27, 0.11
-    XH = 1.05
-    # t: stem with crossbar and a flat foot turning right
-    tstem = rect(0.16, 0.36, 0.16 + T, 1.52)
-    tbar = rect(0.0, XH - t * 1.3, 0.76, XH)
-    foot = inter(diff(ellipse(0.52, 0.36, 0.36, 0.36, 0, 0.74), ellipse(0.52, 0.36, 0.36 - T, 0.36 - t, 0, 0.74)),
-                 rect(0.16, -1, 0.70, 0.36))
+    T, t = gd.T, gd.t
+    XH = gd.XH
+    # t: stem, crossbar, and a quarter-circle foot turning right (Modernoir t)
+    xs = 0.14
+    r = 0.36
+    cx, cy = xs + T * 0.5 + r, r          # centre of the foot's arc
+    tstem = rect(xs, cy, xs + T, ASC_T)
+    tbar = rect(0.0, XH - t, xs + T + 0.22, XH)
+    foot = inter(gd.bowl(cx, cy, r, r, T, t), rect(-5, -5, cx, cy))   # lower-left quadrant
     tt = union(tstem, tbar, foot)
-    r, _, _ = gd.L_r()
-    p = union(tt, move(r, 0.84, 0))
+    rr, _, w_r = gd.L_r()
+    p = union(tt, move(rr, xs + T + 0.30, 0))
     return slant(p, gd.SLANT)
 
 
+ASC_T = 1.34
 tr = trill()
 add("ornamentTrill", move(tr, -bounds(tr)[0], 0))
 
@@ -118,22 +127,21 @@ add("brace", move(b, -bounds(b)[0], 0))
 
 
 def bracket_top():
-    p = poly([(0.0, 0.0), (0.5, 0.0), (1.86, 1.02), (1.86, 1.16), (0.0, 0.56)])
-    return p
+    return poly([(0.0, 0.0), (0.5, 0.0), (1.86, 1.02), (1.86, 1.16), (0.0, 0.56)])
 
 
 bt = bracket_top()
 add("bracketTop", bt)
 add("bracketBottom", mirror_y(bt))
 
-# ---- chord-symbol marks
-add("csymDiminished", diff(ellipse(0.8, 0.8, 0.8, 0.8), ellipse(0.8, 0.8, 0.8 - 0.26, 0.8 - 0.12)))
-add("csymHalfDiminished", union(diff(ellipse(0.8, 0.8, 0.8, 0.8), ellipse(0.8, 0.8, 0.8 - 0.26, 0.8 - 0.12)),
-                                polyline([(0.06, -0.02), (1.54, 1.62)], 0.13)))
+# ---- chord-symbol marks (ring = true circle with the pen)
+ring = diff(ellipse(0.8, 0.8, 0.8, 0.8), ellipse(0.8, 0.8, 0.8 - S * 0.9, 0.8 - s_ * 0.9))
+add("csymDiminished", ring)
+add("csymHalfDiminished", union(ring, polyline([(0.06, -0.02), (1.54, 1.62)], s_ * 0.6)))
 tri = diff(poly([(0.0, 0.0), (1.9, 0.0), (0.95, 1.7)]), poly([(0.36, 0.13), (1.54, 0.13), (0.95, 1.20)]))
 add("csymMajorSeventh", tri)
-add("csymAugmented", union(rect(0, 0.72, 1.44, 0.88), rect(0.62, 0.0, 0.82, 1.6)))
-add("csymMinor", rect(0, 0.72, 1.1, 0.88))
+add("csymAugmented", union(rect(0, 0.8 - s_ * 0.35, 1.44, 0.8 + s_ * 0.35), rect(0.72 - s_ * 0.35, 0.0, 0.72 + s_ * 0.35, 1.6)))
+add("csymMinor", rect(0, 0.8 - s_ * 0.35, 1.1, 0.8 + s_ * 0.35))
 
 # ---- repeat measure signs: slash with two dots
 def repeat_bars(n):
@@ -150,43 +158,19 @@ add("repeat1Bar", repeat_bars(1))
 add("repeat2Bars", repeat_bars(2))
 add("repeat4Bars", repeat_bars(4))
 
-# ---- ottava: small slanted figures and letters
-F = figs(H=1.6, T=0.36, t=0.13, W=1.04)
+# ---- ottava: figures and Modernoir letters, slanted like the dynamics
+F = figs(H=1.6)
 eight = move(F['8'], 0, 0.8)
 fifteen = union(move(F['1'], 0, 0.8), move(F['5'], bounds(F['1'])[2] + 0.14, 0.8))
 twentytwo = union(move(F['2'], 0, 0.8), move(F['2'], bounds(F['2'])[2] + 0.14, 0.8))
-
-
-def small_letters(s, k=0.8):
-    p, w = gd.word(s)
-    return scale(p, k), w * k
-
-
-def letter_v():
-    return union(diag(0.0, 0.26, gd.XH, 0.22, 0.44, 0.0), diag(0.52, 0.72, gd.XH, 0.22, 0.44, 0.0))
-
-
-def letter_a():
-    W = 2 * gd.T + gd.C
-    b = gd.bowl(W / 2, gd.XH / 2, W / 2, gd.XH / 2, gd.T, gd.t)
-    return union(b, rect(W - gd.T, 0, W, gd.XH), gd.shoulders(W / 2, W))
-
-
-def letter_b():
-    p, _, W = gd.L_p()
-    return mirror_y(p, gd.XH / 2)
-
-
-gd.LETTERS['v'] = lambda: (letter_v(), 0.0, 0.72)
-gd.LETTERS['a'] = lambda: (letter_a(), 0.0, 2 * gd.T + gd.C)
-gd.LETTERS['b'] = lambda: (letter_b(), 0.0, 2 * gd.T + gd.C + 0.02)
 
 
 def ott(fig, text=None):
     f = slant(fig, gd.SLANT)
     if not text:
         return f
-    l, _ = small_letters(text)
+    l, _ = gd.word(text)
+    l = scale(l, 0.8)
     x = bounds(f)[2] + 0.08
     return union(f, move(l, x - bounds(l)[0], 0))
 

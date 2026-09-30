@@ -3,6 +3,8 @@ from shapes import *
 from registry import add
 import registry
 from digits import figs
+import style
+from style import K
 
 F = figs()
 SB = 0.08
@@ -12,37 +14,38 @@ for d in "0123456789":
 
 
 def common(cut=False):
-    """Modernoir-style C: a tall ring whose thick right wall is cut away in the middle,
-    leaving flat horizontal terminals top and bottom."""
-    W, T, t = 1.40, 0.46, 0.16
-    xm = W / 2
-    c = diff(ellipse(xm, 0, xm, 1.0, 0, 0.62), ellipse(xm, 0, xm - T, 1.0 - t, 0, 0.62))
-    c = diff(c, rect(xm, -0.42, 5, 0.42))
+    """Modernoir C: a circle open on the right, with flat horizontal terminals."""
+    T = style.STEM_FIG
+    t = style.thin(T)
+    r = 1.0
+    c = diff(ellipse(r, 0, r * 0.74, r, 0, K), ellipse(r, 0, r * 0.74 - T, r - t, 0, K))
+    c = diff(c, rect(r, -0.40, 5, 0.40))
     if cut:
-        c = union(c, rect(xm - 0.09, -1.45, xm + 0.09, 1.45))
-    return move(c, SB, 0)
+        c = union(c, rect(r - 0.07, -1.42, r + 0.07, 1.42))
+    x0 = bounds(c)[0]
+    return move(c, SB - x0, 0)
 
 
 cm = common()
 add("timeSigCommon", cm, adv=bounds(cm)[2] + SB)
 ct = common(True)
 add("timeSigCutCommon", ct, adv=bounds(ct)[2] + SB)
-pl = move(union(rect(0, -0.12, 1.6, 0.12), rect(0.65, -0.8, 0.95, 0.8)), SB, 0)
-add("timeSigPlus", pl, adv=1.6 + 2 * SB)
+pl = move(union(rect(0, -style.thin(style.STEM_FIG) / 2, 1.5, style.thin(style.STEM_FIG) / 2), rect(0.75 - style.STEM_FIG / 2, -0.75, 0.75 + style.STEM_FIG / 2, 0.75)), SB, 0)
+add("timeSigPlus", pl, adv=1.5 + 2 * SB)
 add("timeSigPlusSmall", scale(pl, 0.6), adv=0.9 + 2 * SB)
-add("timeSigFractionalSlash", polyline([(0.1, -1.0), (1.1, 1.0)], 0.2))
+add("timeSigFractionalSlash", polyline([(0.1, -1.0), (1.1, 1.0)], style.STEM_FIG * 0.8))
 add("timeSigParensLeft", move(scale(registry.G["accidentalParensLeft"]["path"], 1.0, 0.85), SB, 0))
 add("timeSigParensRight", move(scale(registry.G["accidentalParensRight"]["path"], 1.0, 0.85), SB, 0))
 
 # tuplet figures: 1.5 sp tall, sitting on the baseline
-Ft = figs(H=1.5, T=0.34, t=0.13, W=1.06)
+Ft = figs(H=1.5)
 for d in "0123456789":
     p = move(Ft[d], 0.04, 0.75)
     add(f"tuplet{d}", p, adv=bounds(p)[2] + 0.04)
 add("tupletColon", union(term(0.2, 0.35, 0.3), term(0.2, 1.05, 0.3)))
 
 # octave clef figures
-F8 = figs(H=1.1, T=0.24, t=0.10, W=0.80)
+F8 = figs(H=1.1)
 eight = F8['8']
 one5 = union(F8['1'], move(F8['5'], bounds(F8['1'])[2] + 0.14, 0))
 add("clef8", move(eight, 0, 0.55))

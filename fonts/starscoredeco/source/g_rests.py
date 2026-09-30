@@ -1,4 +1,5 @@
 from kit import *
+import style
 import math
 from shapes import *
 from registry import add
@@ -20,20 +21,20 @@ def quarter():
     ux, uy = p1[0] - top[0], p1[1] - top[1]
     L = math.hypot(ux, uy); ux, uy = ux / L, uy / L
     start = (top[0] - ux * 0.3, top[1] - uy * 0.3)          # run past the top so the cut is clean
-    hook_nib = Nib(0.11, 0.30, 1.2)
+    hook_nib = style.pen(0.30)
     corner = (0.86, -0.78)
     hcx, hcy, hrx, hry = 0.44, -1.11, 0.30, 0.33
     top_pt = (hcx, hcy + hry)                                  # top of the hook's arc
     hd = (top_pt[0] - corner[0], top_pt[1] - corner[1])
     Lh = math.hypot(*hd); hd = (hd[0] / Lh, hd[1] / Lh)
     hw = hook_nib.width(*hd)
-    bolt = polyline([start, p1, (0.26, -0.06), corner], [0.17, 0.44, 0.17])
+    bolt = polyline([start, p1, (0.26, -0.06), corner], [0.27, 0.34, 0.27])
     L3 = math.hypot(corner[0] - 0.26, corner[1] + 0.06)
     d3 = ((corner[0] - 0.26) / L3, (corner[1] + 0.06) / L3)
     _, harc = arc(hcx, hcy, hrx, hry, 90, 292)
     hook = stroke([corner, ('L', top_pt)] + harc, hook_nib,
                   wfun=lambda s: 1.0 if s < 0.7 else 1.0 - (s - 0.7) * 1.2)
-    wa, wb = 0.17 / 2, hw / 2
+    wa, wb = 0.27 / 2, hw / 2
     na, nb = (-d3[1], d3[0]), (-hd[1], hd[0])
     bevel = poly_hull([(corner[0] + na[0] * wa, corner[1] + na[1] * wa), (corner[0] - na[0] * wa, corner[1] - na[1] * wa),
                        (corner[0] + nb[0] * wb, corner[1] + nb[1] * wb), (corner[0] - nb[0] * wb, corner[1] - nb[1] * wb)])
@@ -62,15 +63,15 @@ def flagged_rest(n):
     def sx(y):
         return xtop - SLOPE * (top - y)
     parts = []
-    stem = poly([(sx(top) - 0.08, top + 0.02), (sx(top) + 0.10, top + 0.02),
-                 (sx(bot) + 0.12, bot), (sx(bot) - 0.10, bot)])
+    stem = poly([(sx(top) - 0.12, top + 0.02), (sx(top) + 0.14, top + 0.02),
+                 (sx(bot) + 0.14, bot), (sx(bot) - 0.12, bot)])
     parts.append(stem)
     for lv in levels:
         y = lv + 0.62
         x = sx(y)
         dot = None
         arm = stroke([(x - 0.64, y - 0.16), ('C', (x - 0.40, y - 0.20), (x - 0.12, y - 0.10), (x + 0.08, y + 0.06))],
-                     Nib(0.12, 0.2, 1.3), ball0=(0.50, 0.42))
+                     style.pen(0.24), ball0=(0.50, 0.42))
         # the arm ends exactly on the stem's right edge
         arm = inter(arm, halfplane((sx(bot) + 0.12, bot), (sx(top) + 0.10, top + 0.02)))
         arm = diff(arm, rect(sx(top) - 0.30, top + 0.02, 9, 9))   # flush with the stem's flat top, near the stem only

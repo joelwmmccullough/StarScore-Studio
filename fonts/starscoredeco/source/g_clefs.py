@@ -2,8 +2,9 @@ from kit import *
 from shapes import *
 from registry import add
 
-BOWL = Nib(0.10, 0.40, 1.4)
-STEM = Nib(0.10, 0.22, 1.4)
+import style
+BOWL = style.pen(0.34)
+STEM = style.pen(0.27)
 
 
 def gclef():
@@ -47,7 +48,7 @@ def fclef():
             ('C', (1.70, 1.00), (2.02, 0.62), (2.02, 0.05)),
             ('C', (2.02, -0.45), (1.77, -1.06), (1.40, -1.40)),
             ('L', (0.20, -2.50))]
-    body = stroke(skel, Nib(0.10, 0.42, 1.4), cap1='perp', ball0=(0.66, 0.85))
+    body = stroke(skel, style.pen(0.36), cap1='perp', ball0=(0.66, 0.85))
     knob = None
     d1 = term(2.52, 0.5, 0.36)
     d2 = term(2.52, -0.5, 0.36)
@@ -61,8 +62,8 @@ add("fClef", fc)
 
 
 def cclef():
-    bars = union(rect(0, -2.0, 0.52, 2.0), rect(0.72, -2.0, 0.86, 2.0))
-    nib = Nib(0.10, 0.40, 1.4)
+    bars = union(rect(0, -2.0, 0.52, 2.0), rect(0.72, -2.0, 0.94, 2.0))
+    nib = style.pen(0.34)
     yb = 0.46                                   # height of the bowl's thin bottom stroke
     skel = [(1.32, 1.44),
             ('C', (1.32, 1.82), (1.62, 1.95), (1.98, 1.95)),

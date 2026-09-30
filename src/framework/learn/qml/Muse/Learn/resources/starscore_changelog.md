@@ -4,6 +4,15 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.12.1
+
+- **StarScore Deco 0.2**: every glyph redrawn to one style sheet measured from TT Modernoir Bold, so the whole font now hangs together and matches the text next to it.
+  - Modernoir is nearly monoline (its O walls are only 10% heavier than its top and bottom); the font was drawn with 2.5–4:1 contrast. All strokes now use one pen with a stress of 0.82.
+  - Bowls are true circles and ellipses with small oval counters, as in Modernoir, instead of the squared shapes.
+  - Figures have Modernoir's own widths (0 wide, 1, 3 and 5 narrow) and its constructions: the 2 and 6 flow into straight tangent diagonals, the 3 and 5 have open round bowls, the 1, 4 and 7 end in sharp points.
+  - Dynamics letters have Modernoir's proportions (narrow s, f and r; wide m and p), semicircular arches, quarter-circle hooks, tiny slit counters, and “ff” shares one continuous crossbar. Also used in tr, Ped., 8va/15ma letters.
+  - Clefs, accidentals, rests, flags, articulations, fermatas, ornaments, chord-symbol marks and repeat signs are on the same stroke weight (0.30 sp for symbols, 0.36 for figures, 0.25 for letters).
+
 ## 1.12.0
 
 - **Deco button** in the StarScore panel: one press switches the main score and every part book to the StarScore Deco music font (music symbols, music text and dynamics). Pressing it again brings back exactly the fonts each one had before. The fonts to restore are saved in the file, so switching off works after saving and reopening too. The button is highlighted while Deco is on. Only the fonts change: line thicknesses and other style settings stay as they are.

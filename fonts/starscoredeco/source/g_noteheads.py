@@ -57,7 +57,7 @@ add("noteheadDoubleWhole", double_whole())
 add("noteheadNull", Path(), adv=HEAD_W)
 
 # ---- X noteheads (drums): two bars with flat horizontal-cut ends
-def xhead(W=1.16, H=1.0, t=0.17):
+def xhead(W=1.16, H=1.0, t=0.24):
     a = bar((0, -H / 2), (W, H / 2), t)
     c = bar((0, H / 2), (W, -H / 2), t)
     p = union(a, c)
@@ -66,16 +66,16 @@ def xhead(W=1.16, H=1.0, t=0.17):
 
 xb = xhead()
 add("noteheadXBlack", xb, anchors={"stemUpSE": (1.16, 0.5), "stemDownNW": (0, -0.5)})
-xh = union(xhead(1.16, 1.0, 0.12))
+xh = union(xhead(1.16, 1.0, 0.16))
 add("noteheadXHalf", xh, anchors={"stemUpSE": (1.16, 0.5), "stemDownNW": (0, -0.5)})
-xw = xhead(1.5, 1.0, 0.14)
+xw = xhead(1.5, 1.0, 0.18)
 add("noteheadXWhole", xw)
 
 def circlex():
     D = 1.12
-    r = ring(D / 2, 0, D / 2, 0.56, 0.16, 0.08)
+    r = ring(D / 2, 0, D / 2, 0.56, 0.24, 0.20)
     s = 0.56 * 0.7071
-    x = union(bar((D / 2 - s, -s), (D / 2 + s, s), 0.1), bar((D / 2 - s, s), (D / 2 + s, -s), 0.1))
+    x = union(bar((D / 2 - s, -s), (D / 2 + s, s), 0.16), bar((D / 2 - s, s), (D / 2 + s, -s), 0.16))
     x = inter(x, ellipse(D / 2, 0, D / 2 - 0.02, 0.54))
     return union(r, x)
 
@@ -87,7 +87,7 @@ def diamond(W, H, counter=False):
     p = poly([(0, 0), (W / 2, H / 2), (W, 0), (W / 2, -H / 2)])
     if counter:
         # thick left/right walls, thin top/bottom
-        q = poly([(0.30, 0), (W / 2, H / 2 - 0.14), (W - 0.30, 0), (W / 2, -H / 2 + 0.14)])
+        q = poly([(0.30, 0), (W / 2, H / 2 - 0.20), (W - 0.30, 0), (W / 2, -H / 2 + 0.20)])
         p = diff(p, q)
     return p
 
@@ -101,7 +101,7 @@ add("noteheadDiamondWhole", diamond(1.5, 1.0, True))
 def slash_black(W=1.9, H=2.0, top=0.72):
     return poly([(0, -H / 2), (top, -H / 2), (W, H / 2), (W - top, H / 2)])
 
-def slash_white(W, H=2.0, top=1.0, t_side=0.26, t_top=0.12):
+def slash_white(W, H=2.0, top=1.0, t_side=0.28, t_top=0.22):
     outer = poly([(0, -H / 2), (top, -H / 2), (W, H / 2), (W - top, H / 2)])
     # inner parallelogram: same slope
     slope = (W - top) / H
@@ -119,7 +119,7 @@ sw = slash_white(3.1, top=1.5, t_side=0.3)
 add("noteheadSlashWhiteWhole", sw)
 
 # ---- parentheses around noteheads
-def paren_left(H=1.6, t=0.16):
+def paren_left(H=1.6, t=0.20):
     outer = ellipse(0.55, 0, 0.55, H / 2)
     inner = ellipse(0.55 + t * 0.5, 0, 0.55 - t * 0.2, H / 2 - 0.03)
     p = diff(outer, inner)
