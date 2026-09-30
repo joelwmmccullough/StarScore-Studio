@@ -719,11 +719,19 @@ static void starscoreRetitleSheet(mu::engraving::Score* score, const QString& le
         t->setParent(box);
         t->setTrack(0);
         t->setXmlText(escape(right));
-        // placed at the frame's right edge (position), and right-justified (align)
-        t->setAlign(mu::engraving::Align(mu::engraving::AlignH::RIGHT, mu::engraving::AlignV::TOP));
+        // placed at the frame's right edge (position), and right-justified (align); on the same line as the
+        // instrument name: its vertical alignment and its offset (often moved by hand in the part book)
+        const mu::engraving::AlignV alignV = partText ? partText->align().vertical : mu::engraving::AlignV::TOP;
+        t->setAlign(mu::engraving::Align(mu::engraving::AlignH::RIGHT, alignV));
         t->setPropertyFlags(mu::engraving::Pid::ALIGN, mu::engraving::PropertyFlags::UNSTYLED);
         t->setPosition(mu::engraving::AlignH::RIGHT);
         t->setPropertyFlags(mu::engraving::Pid::POSITION, mu::engraving::PropertyFlags::UNSTYLED);
+        if (partText) {
+            t->setOffset(mu::engraving::PointF(0.0, partText->offset().y()));
+            t->setPropertyFlags(mu::engraving::Pid::OFFSET, mu::engraving::PropertyFlags::UNSTYLED);
+            t->setSize(partText->size());
+            t->setPropertyFlags(mu::engraving::Pid::FONT_SIZE, mu::engraving::PropertyFlags::UNSTYLED);
+        }
         score->undoAddElement(t);
     }
     score->setLayoutAll();

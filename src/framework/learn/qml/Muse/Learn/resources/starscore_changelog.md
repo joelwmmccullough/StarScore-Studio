@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.11.3
+
+- **Export to Sheets and Demos**: the arrangement name at the top right of a horn sheet is on the same line as the instrument name at the top left, with the same vertical alignment, offset and size. The part book's instrument name is often moved by hand, and the arrangement name didn't follow it.
+
 ## 1.11.2
 
 - **StarScore Deco**: ball ends now grow out of their strokes. The line swells smoothly to the full width of the ball instead of a ball being stuck on the end: the treble clef's tail, the bass and alto clef knobs, the eighth-rest family and the breath-mark comma.
