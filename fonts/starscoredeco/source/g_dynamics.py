@@ -182,7 +182,7 @@ def L_v():
                  diag(w - D, w, XH, (w - D) / 2, (w + D) / 2, 0.0)), 0.0, w
 
 
-S_TILT = 4.0      # degrees clockwise: Joel — the top of the s sits right, but its bottom is too close to the f
+S_TILT = 6.0      # degrees clockwise: Joel — the top of the s sits right, but its bottom is too close to the f
 
 
 def L_s_dyn():

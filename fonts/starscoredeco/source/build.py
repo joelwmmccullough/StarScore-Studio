@@ -11,7 +11,7 @@ SMOOTH = os.environ.get('DECO_SMOOTH', '1') == '1'
 
 FAMILY = "StarScore Deco"
 TEXT_SB = 0.08
-VERSION = "0.11"
+VERSION = "0.12"
 MODULES = ["g_noteheads", "g_clefs", "g_accidentals", "g_rests", "g_flags",
            "g_timesig", "g_dynamics", "g_artic", "g_misc", "g_lines"]
 
