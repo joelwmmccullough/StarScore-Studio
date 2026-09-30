@@ -91,12 +91,23 @@ F_BREAKS = {
 def f_stencil(breaks=("top",)):
     """Bass clef in the stencil family: the ball grows out of the stroke, solid round dots, and
     the chosen narrow breaks. (0.6 had all three breaks; Joel: 'still looks like a cyborg'.)"""
-    skel = [(0.42, 0.0),
-            ('C', (0.42, 0.64), (0.82, 1.04), (1.28, 1.04)),
+    # the neck leaves the ball from its upper left, so its outer edge runs on from the ball's
+    # outline instead of meeting it at a corner
+    skel = [(0.27, 0.10),
+            ('C', (0.29, 0.66), (0.80, 1.04), (1.28, 1.04)),
             ('C', (1.82, 1.04), (2.16, 0.64), (2.16, 0.02)),
             ('C', (2.16, -0.86), (1.44, -1.74), (0.18, -2.46))]
-    taper = lambda u: 1.0 if u < 0.52 else max(0.22, 1.0 - (u - 0.52) / 0.48 * 0.80)
-    body = _cv.to_shapely(stroke(skel, Nib(0.11, 0.42, 1.5), cap1='perp', wfun=taper, ball0=(0.68, 0.62)))
+    def taper(u):
+        # a slim neck out of the ball (so the head reads as a clean round ball, not a lump),
+        # full weight round the right side, then thinning to the tail
+        if u < 0.30:
+            e = u / 0.30
+            return 0.42 + 0.58 * e * e * (3 - 2 * e)
+        return 1.0 if u < 0.52 else max(0.22, 1.0 - (u - 0.52) / 0.48 * 0.80)
+    body = M.G(_cv.to_shapely(stroke(skel, Nib(0.11, 0.42, 1.5), cap1='perp', wfun=taper)),
+               M.Polygon(M.arc(0.42, 0.0, 0.33, 0.33, 0, 360, 2)))
+    # soften the two corners where the neck meets the ball (a closing: grow, then shrink)
+    body = body.buffer(0.07, quad_segs=32).buffer(-0.07, quad_segs=32)
     g = M.G(body, M.Polygon(M.arc(2.66, 0.5, 0.21, 0.21, 0, 360)),
             M.Polygon(M.arc(2.66, -0.5, 0.21, 0.21, 0, 360)))
     cuts = []

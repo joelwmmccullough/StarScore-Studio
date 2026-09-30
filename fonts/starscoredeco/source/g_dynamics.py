@@ -143,7 +143,12 @@ def L_s(w=None, H=XH, wh=0.19, k=1.22, a_top=32, a_bot=-148):
     sk = Mo.chain(Mo.arc(*Eu, a_top, a1, 0.25), Mo.line(p1, p2, 60), Mo.arc(*El, a2, a_bot, 0.25))
     g = Mo.LineString(sk).buffer(wh / 2, quad_segs=128, cap_style='flat', join_style='round')
     g = affinity.scale(g, k, 1.0, origin=(0, 0))
-    return Mo.to_path(Mo.thin_points(g, 0.012 * H / XH)), 0.0, w
+    # widening skews the square end cuts, leaving each end's inner corner as a tiny acute spike;
+    # a hair of opening (shrink, then grow) blunts it without visibly rounding anything else
+    r = 0.014 * H / XH
+    g = g.buffer(r, quad_segs=16).buffer(-r, quad_segs=16)          # fill the tiny notch
+    g = g.buffer(-r, quad_segs=16, join_style='mitre', mitre_limit=2).buffer(r, quad_segs=16, join_style='mitre', mitre_limit=2)
+    return Mo.to_path(Mo.thin_points(g, 0.006 * H / XH)), 0.0, w
 
 
 def L_z():
