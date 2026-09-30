@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.12.9
+
+- **StarScore Deco 0.9**: the s in dynamics and the turn no longer have jagged spots where the end cuts meet the inside curves (the curves were too tight for the stroke and folded; the s is now a little wider so they can't). The segno is frozen exactly as Joel approved it. The bass clef's ball flows into the stroke without a neck, and its dots are true circles.
+
 ## 1.12.8
 
 - **StarScore Deco 0.8**: the bass clef's head is a clean round ball with a slim neck (Joel: "make the nose less ugly"), keeping the one stencil break across the top. The s in dynamics, the turn and the segno lose the tiny spike and notch at the inner corners of their ends.

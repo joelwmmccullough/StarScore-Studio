@@ -11,7 +11,7 @@ SMOOTH = os.environ.get('DECO_SMOOTH', '1') == '1'
 
 FAMILY = "StarScore Deco"
 TEXT_SB = 0.08
-VERSION = "0.8"
+VERSION = "0.9"
 MODULES = ["g_noteheads", "g_clefs", "g_accidentals", "g_rests", "g_flags",
            "g_timesig", "g_dynamics", "g_artic", "g_misc", "g_lines"]
 
@@ -20,6 +20,25 @@ CUSTOM = {   # Joel's own glyphs, outside SMuFL (optional-glyph range)
     "csymMinorMajorSeventh": {"codepoint": "U+F4C1", "description": "Minor-major seventh (diamond with a bar)"},
 }
 GLYPHNAMES = json.load(open(os.path.join(HERE, '..', '..', 'smufl', 'glyphnames.json')))
+
+
+def load_frozen(G):
+    """Glyphs Joel has signed off: their outlines are kept exactly as approved (source/frozen/*.json,
+    recorded from the font in font units) instead of being redrawn from the scripts."""
+    import glob
+    from pathops import Path
+    here = os.path.dirname(os.path.abspath(__file__))
+    for fn in glob.glob(os.path.join(here, 'frozen', '*.json')):
+        fz = json.load(open(fn))
+        p = Path()
+        pen = p.getPen()
+        s = 1 / UNIT
+        for op, args in fz['ops']:
+            pts = [(x * s, y * s) for x, y in args]
+            getattr(pen, op)(*pts)
+        name = fz['glyph']
+        old = G.get(name, {})
+        G[name] = {"path": p, "adv": old.get("adv"), "anchors": old.get("anchors", {}), "frozen": True}
 
 
 def build(out_otf, out_meta, family=FAMILY, text=False):
@@ -31,6 +50,7 @@ def build(out_otf, out_meta, family=FAMILY, text=False):
         except ModuleNotFoundError:
             continue
     G = registry.G
+    load_frozen(G)
     order = [".notdef", "space"]
     cmap = {32: "space"}
     charstrings = {}
@@ -48,13 +68,13 @@ def build(out_otf, out_meta, family=FAMILY, text=False):
         cp = (GLYPHNAMES.get(name) or CUSTOM[name])["codepoint"]
         code = int(cp[2:], 16)
         path = g["path"]
-        if SMOOTH:
+        if SMOOTH and not g.get("frozen"):
             path = smooth.smooth_path(path)
         x0, y0, x1, y1 = bounds(path)
         adv = g["adv"] if g["adv"] is not None else x1
         if text and not name.startswith(("wiggle", "ornamentZigZag")):
             # text font: add side bearings so symbols sit comfortably in running text
-            path = smooth.smooth_path(g["path"]) if SMOOTH else g["path"]
+            path = smooth.smooth_path(g["path"]) if SMOOTH and not g.get("frozen") else g["path"]
             from kit import move as _mv
             path = _mv(path, TEXT_SB, 0)
             adv = adv + 2 * TEXT_SB

@@ -116,13 +116,16 @@ def L_f():
     return p, 0.0, bounds(p)[2]
 
 
-def L_s(w=None, H=XH, wh=0.19, k=1.22, a_top=32, a_bot=-148):
+def L_s(w=None, H=XH, wh=0.19, k=1.05, a_top=18, a_bot=-162):
     """Modernoir s (the 0.3 design Joel chose): two elliptic arcs joined by a straight spine
     tangent to both. Drawn as one even stroke of width wh on a narrower skeleton, then widened
     by k, so the sides come out k times heavier than the tops and bottoms.
-    0.7 cleanup: arcs sampled finely, and the outline simplified by a hair so the buffer's
-    micro-edges at the cap corners and along the inner (concave) curves don't survive as
-    small steps."""
+
+    0.9: the jagged inner corners came from the geometry, not the drawing: the skeleton ellipses
+    were so narrow that at the top and bottom their curvature radius (rx^2/ry) was smaller than
+    half the stroke, so the inner edge folded into a cusp near each end. The skeleton is now
+    wide enough that the counters' tightest curves keep a real radius (checked below): the
+    letter is 0.53 x-height wide instead of 0.47, and widened 1.05 instead of 1.22."""
     import mono as Mo
     from shapely import affinity
     w = W('s') if w is None else w
@@ -132,6 +135,8 @@ def L_s(w=None, H=XH, wh=0.19, k=1.22, a_top=32, a_bot=-148):
     ryl = (H - wh) * 0.225
     Eu = (wn / 2 + 0.01, H - e - ryu, wn / 2 - e - 0.01, ryu)
     El = (wn / 2, e + ryl, wn / 2 - e, ryl)
+    for E in (Eu, El):
+        assert E[2] ** 2 / E[3] > e + 0.045 * H / XH, "s skeleton too narrow: counter would come to a point"
     for which in (0, 1):
         p1, p2 = Mo.common_tangent(Eu, El, internal=True, which=which)
         if p1[0] < Eu[0]:
@@ -143,11 +148,6 @@ def L_s(w=None, H=XH, wh=0.19, k=1.22, a_top=32, a_bot=-148):
     sk = Mo.chain(Mo.arc(*Eu, a_top, a1, 0.25), Mo.line(p1, p2, 60), Mo.arc(*El, a2, a_bot, 0.25))
     g = Mo.LineString(sk).buffer(wh / 2, quad_segs=128, cap_style='flat', join_style='round')
     g = affinity.scale(g, k, 1.0, origin=(0, 0))
-    # widening skews the square end cuts, leaving each end's inner corner as a tiny acute spike;
-    # a hair of opening (shrink, then grow) blunts it without visibly rounding anything else
-    r = 0.014 * H / XH
-    g = g.buffer(r, quad_segs=16).buffer(-r, quad_segs=16)          # fill the tiny notch
-    g = g.buffer(-r, quad_segs=16, join_style='mitre', mitre_limit=2).buffer(r, quad_segs=16, join_style='mitre', mitre_limit=2)
     return Mo.to_path(Mo.thin_points(g, 0.006 * H / XH)), 0.0, w
 
 
