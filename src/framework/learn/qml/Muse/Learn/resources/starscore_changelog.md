@@ -4,6 +4,12 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.11.0
+
+- **StarScore Deco** (new music font, first draft): an art deco music font drawn to go with TT Modernoir. Choose it in Format › Style › Score › Musical symbols font; the musical text font is “StarScore Deco Text”. The Starsign style still uses Petaluma until you switch.
+  - It covers noteheads (including slash, x and diamond heads), clefs, accidentals, rests, flags, time signatures, dynamics, articulations, fermatas, repeat signs, segno and coda, ornaments, tremolos, pedal marks, octave signs, chord-symbol marks and metronome notes. Anything it doesn't have yet is drawn from Bravura.
+  - The font and the scripts that draw it are in fonts/starscoredeco.
+
 ## 1.10.0
 
 - **1-Horn arrangement** (new template): a 1-Horn Section with a melody sheet for each songbook horn (Trumpet, Alto Sax, Tenor Sax, Trombone), with the lead sheet and rhythm section. You write these sheets by hand; the lead sheet stays the full overview of the song.

@@ -202,6 +202,9 @@ void EngravingModule::onInit(const IApplication::RunMode&)
         fdb->addFont(FontDataKey(u"Finale Maestro Text"), ":/fonts/finalemaestro/FinaleMaestroText.otf");
         addMusicFont("Finale Broadway", FontDataKey(u"Finale Broadway"), ":/fonts/finalebroadway/FinaleBroadway.otf");
         fdb->addFont(FontDataKey(u"Finale Broadway Text"), ":/fonts/finalebroadway/FinaleBroadwayText.otf");
+        // StarScore: StarScore Deco, an art deco SMuFL font drawn to match TT Modernoir (fonts/starscoredeco)
+        addMusicFont("StarScore Deco", FontDataKey(u"StarScore Deco"), ":/fonts/starscoredeco/StarScoreDeco.otf");
+        fdb->addFont(FontDataKey(u"StarScore Deco Text"), ":/fonts/starscoredeco/StarScoreDecoText.otf");
 
         // Tabulature
         fdb->addFont(FontDataKey(u"FreeSerif"), ":/fonts/FreeSerif.ttf");
@@ -234,6 +237,7 @@ void EngravingModule::onInit(const IApplication::RunMode&)
         fdb->insertSubstitution(u"Petaluma Text",  u"MuseJazz Text");
         fdb->insertSubstitution(u"Finale Maestro Text", u"Leland Text");
         fdb->insertSubstitution(u"Finale Broadway Text", u"MuseJazz Text");
+        fdb->insertSubstitution(u"StarScore Deco Text", u"Leland Text");
         fdb->insertSubstitution(u"ScoreFont",      u"Leland Text");// alias for current Musical Text Font
 
         // Symbols

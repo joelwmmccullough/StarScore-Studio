@@ -1,0 +1,7 @@
+<RCC>
+    <qresource prefix="/">
+        <file alias="fonts/starscoredeco/metadata.json">../../../../fonts/starscoredeco/starscoredeco_metadata.json</file>
+        <file alias="fonts/starscoredeco/StarScoreDeco.otf">../../../../fonts/starscoredeco/StarScoreDeco.otf</file>
+        <file alias="fonts/starscoredeco/StarScoreDecoText.otf">../../../../fonts/starscoredeco/StarScoreDecoText.otf</file>
+    </qresource>
+</RCC>
