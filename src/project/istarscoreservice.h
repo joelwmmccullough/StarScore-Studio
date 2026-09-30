@@ -393,6 +393,12 @@ public:
     virtual void soloSection(const QString& sectionId) = 0;
     virtual void setAllSectionsOn(bool on) = 0;
 
+    //! StarScore Deco: on = the main score uses the StarScore Deco music font
+    virtual bool decoOn() const = 0;
+    //! Switches the main score and every part book to StarScore Deco, remembering their fonts; switching back
+    //! restores exactly what each had
+    virtual void toggleDeco() = 0;
+
     // --- templates ---
     virtual std::vector<StarScoreSectionTemplate> sectionTemplates() const = 0;
     virtual std::vector<StarScoreArrangementTemplate> arrangementTemplates() const = 0;

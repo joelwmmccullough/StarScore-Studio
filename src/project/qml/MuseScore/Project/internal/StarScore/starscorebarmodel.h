@@ -34,6 +34,7 @@ class StarScoreBarModel : public QObject, public muse::Contextable, public muse:
     Q_PROPERTY(QVariantList solos READ solos NOTIFY changed)
     Q_PROPERTY(bool isSoloView READ isSoloView NOTIFY changed)
     Q_PROPERTY(bool canAddSolos READ canAddSolos NOTIFY changed)
+    Q_PROPERTY(bool decoOn READ decoOn NOTIFY changed)
 
     QML_ELEMENT
 
@@ -60,9 +61,11 @@ public:
     Q_INVOKABLE QVariantList soloMenu(const QString& id) const;
 
     Q_INVOKABLE void load();
+    bool decoOn() const;
     //! While a chip's menu is open, panel updates wait until it closes (rebuilding the chips would close the menu)
     Q_INVOKABLE void setHoldUpdates(bool hold);
     Q_INVOKABLE void hidePanel();
+    Q_INVOKABLE void toggleDeco();
     bool panelVisible() const;
 
     Q_INVOKABLE void showArrangement(const QString& id);

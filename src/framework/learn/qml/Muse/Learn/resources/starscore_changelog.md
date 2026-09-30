@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.12.0
+
+- **Deco button** in the StarScore panel: one press switches the main score and every part book to the StarScore Deco music font (music symbols, music text and dynamics). Pressing it again brings back exactly the fonts each one had before. The fonts to restore are saved in the file, so switching off works after saving and reopening too. The button is highlighted while Deco is on. Only the fonts change: line thicknesses and other style settings stay as they are.
+
 ## 1.11.3
 
 - **Export to Sheets and Demos**: the arrangement name at the top right of a horn sheet is on the same line as the instrument name at the top left, with the same vertical alignment, offset and size. The part book's instrument name is often moved by hand, and the arrangement name didn't follow it.

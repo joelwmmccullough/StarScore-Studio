@@ -43,6 +43,17 @@ void StarScoreBarModel::setHoldUpdates(bool hold)
     }
 }
 
+bool StarScoreBarModel::decoOn() const
+{
+    return starScore()->decoOn();
+}
+
+void StarScoreBarModel::toggleDeco()
+{
+    starScore()->toggleDeco();
+    emit changed();
+}
+
 bool StarScoreBarModel::hasScore() const
 {
     return starScore()->hasScore();

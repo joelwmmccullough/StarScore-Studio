@@ -65,6 +65,8 @@ public:
     void setSectionOn(const QString& sectionId, bool on) override;
     void soloSection(const QString& sectionId) override;
     void setAllSectionsOn(bool on) override;
+    bool decoOn() const override;
+    void toggleDeco() override;
 
     std::vector<StarScoreSectionTemplate> sectionTemplates() const override;
     std::vector<StarScoreArrangementTemplate> arrangementTemplates() const override;
@@ -199,6 +201,9 @@ public:
         QString version;   // "4.0.1"; printed in the footer
         std::map<QString, QString> partStatus;   // part id -> status key
         QString fileId;    // permanent id of this .starscore (kept when the file is moved or renamed)
+        // StarScore Deco switched on: score ("" = main score, else the part book's name) -> its fonts before
+        // (music symbols, music text, dynamics)
+        std::map<QString, QStringList> decoRestore;
 
         // Audit mode
         QString auditReferenceSectionId;          // section the others are compared with (empty = automatic)

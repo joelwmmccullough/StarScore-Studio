@@ -267,6 +267,14 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
 
     data.version = root.value("scoreVersion").toString();
     data.fileId = root.value("fileId").toString();
+    const QJsonObject deco = root.value("decoRestore").toObject();
+    for (auto it = deco.begin(); it != deco.end(); ++it) {
+        QStringList fonts;
+        for (const QJsonValue& v : it.value().toArray()) {
+            fonts << v.toString();
+        }
+        data.decoRestore[it.key()] = fonts;
+    }
     const QJsonObject partStatus = root.value("partStatus").toObject();
     for (auto it = partStatus.begin(); it != partStatus.end(); ++it) {
         data.partStatus[it.key()] = it.value().toString();
@@ -397,6 +405,13 @@ QString StarScoreService::toJson(const Data& data)
     }
     if (!data.fileId.isEmpty()) {
         root["fileId"] = data.fileId;
+    }
+    if (!data.decoRestore.empty()) {
+        QJsonObject deco;
+        for (const auto& [key, fonts] : data.decoRestore) {
+            deco[key] = QJsonArray::fromStringList(fonts);
+        }
+        root["decoRestore"] = deco;
     }
     QJsonObject partStatus;
     for (const auto& [pid, key] : data.partStatus) {
@@ -885,6 +900,77 @@ void StarScoreService::setAllSectionsOn(bool on)
         }
     }
     applyOnSections(ids, on ? QString("Show all sections") : QString("Hide all sections"));
+}
+
+// ---------------------------------------------------------------------------
+//  StarScore Deco on / off
+// ---------------------------------------------------------------------------
+
+static const QString DECO_FONT = QStringLiteral("StarScore Deco");
+static const QString DECO_TEXT_FONT = QStringLiteral("StarScore Deco Text");
+
+bool StarScoreService::decoOn() const
+{
+    const engraving::MasterScore* ms = masterScore();
+    return ms && ms->style().value(engraving::Sid::musicalSymbolFont).value<String>().toQString() == DECO_FONT;
+}
+
+void StarScoreService::toggleDeco()
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    if (!master || !masterScore()) {
+        return;
+    }
+    Data data = load();
+    const bool turnOff = decoOn();
+
+    // the main score and every part book (each has its own style)
+    std::vector<std::pair<QString, INotationPtr> > notations { { QString(), master->notation() } };
+    for (const IExcerptNotationPtr& e : master->excerpts()) {
+        if (e && e->notation()) {
+            notations.emplace_back(e->name(), e->notation());
+        }
+    }
+
+    static const std::vector<StyleId> ids { StyleId::musicalSymbolFont, StyleId::musicalTextFont, StyleId::dynamicsFont };
+    for (const auto& [key, n] : notations) {
+        auto current = [&](StyleId id) {
+            return n->style()->styleValue(id).value<String>().toQString();
+        };
+        if (turnOff) {
+            auto it = data.decoRestore.find(key);
+            if (it == data.decoRestore.end() || it->second.size() != int(ids.size())) {
+                continue;   // not switched on by the button: leave it
+            }
+            n->undoStack()->prepareChanges(TranslatableString::untranslatable("StarScore Deco off"));
+            for (size_t i = 0; i < ids.size(); ++i) {
+                n->style()->setStyleValue(ids[i], PropertyValue(String::fromQString(it->second.at(int(i)))));
+            }
+            n->undoStack()->commitChanges();
+        } else {
+            if (current(StyleId::musicalSymbolFont) == DECO_FONT) {
+                continue;
+            }
+            QStringList before;
+            for (StyleId id : ids) {
+                before << current(id);
+            }
+            data.decoRestore[key] = before;
+            const bool ownDynamicsFont = n->style()->styleValue(StyleId::dynamicsOverrideFont).toBool();
+            n->undoStack()->prepareChanges(TranslatableString::untranslatable("StarScore Deco on"));
+            n->style()->setStyleValue(StyleId::musicalSymbolFont, PropertyValue(String::fromQString(DECO_FONT)));
+            n->style()->setStyleValue(StyleId::musicalTextFont, PropertyValue(String::fromQString(DECO_TEXT_FONT)));
+            if (!ownDynamicsFont) {
+                n->style()->setStyleValue(StyleId::dynamicsFont, PropertyValue(String::fromQString(DECO_FONT)));
+            }
+            n->undoStack()->commitChanges();
+        }
+    }
+    if (turnOff) {
+        data.decoRestore.clear();
+    }
+    store(data);
+    m_changed.notify();
 }
 
 // ---------------------------------------------------------------------------
