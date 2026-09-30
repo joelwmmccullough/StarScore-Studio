@@ -1,4 +1,5 @@
 from kit import *
+import math
 from shapes import *
 from registry import add
 
@@ -65,6 +66,13 @@ above_below("articTenutoAccent", stack(tenuto(), accent()))
 above_below("articStaccatissimoStroke", rect(0, 0, 0.16, 0.9))
 
 
+def chevron(W, H, th):
+    ang = math.atan2(H, W / 2)
+    a = th / math.sin(ang)          # horizontal width of each arm at the base
+    b = th / math.cos(ang)          # vertical drop of the inner apex
+    return poly([(0, 0), (W / 2, H), (W, 0), (W - a, 0), (W / 2, H - b), (a, 0)])
+
+
 # ---- fermatas: a squarish arch, thick at the crown, cut flat at the base
 def fermata(kind="normal"):
     W = 2.36
@@ -72,20 +80,16 @@ def fermata(kind="normal"):
         outer = ellipse(W / 2, 0, W / 2, 1.26, 0, 0.60)
         inner = ellipse(W / 2, 0, W / 2 - 0.13, 1.02, 0, 0.60)
         arc_ = inter(diff(outer, inner), rect(-1, 0, W + 1, 2))
-    elif kind == "short":   # pointed arch (chevron)
-        arc_ = inter(polyline([(-0.1, -0.2), (W / 2, 1.26), (W + 0.1, -0.2)], [0.13, 0.13]), rect(0, 0, W, 2))
-        # thicken the crown
-        arc_ = union(arc_, poly([(W / 2 - 0.25, 0.95), (W / 2, 1.26), (W / 2 + 0.25, 0.95), (W / 2, 0.80)]))
-        arc_ = inter(arc_, rect(0, 0, W, 1.4))
+    elif kind == "short":   # pointed arch (chevron) with mitred apex, flat feet
+        arc_ = chevron(W, 1.26, 0.15)
     elif kind == "long":    # square arch
         arc_ = union(rect(0, 0, 0.13, 1.20), rect(W - 0.13, 0, W, 1.20), rect(0, 0.96, W, 1.20))
     elif kind == "veryLong":
         arc_ = union(rect(0, 0, 0.13, 1.20), rect(W - 0.13, 0, W, 1.20), rect(0, 0.96, W, 1.20),
                      rect(0.30, 0, 0.42, 0.78), rect(W - 0.42, 0, W - 0.30, 0.78), rect(0.30, 0.66, W - 0.30, 0.78))
     elif kind == "veryShort":
-        arc_ = inter(polyline([(-0.1, -0.2), (W / 2, 1.26), (W + 0.1, -0.2)], [0.13, 0.13]), rect(0, 0, W, 2))
-        arc_ = union(arc_, inter(polyline([(0.2, -0.2), (W / 2, 0.84), (W - 0.2, -0.2)], [0.11, 0.11]), rect(0, 0, W, 2)))
-    d = dot_at(W / 2, 0.30, 0.40)
+        arc_ = union(chevron(W, 1.34, 0.13), move(chevron(W - 0.96, 0.94, 0.11), 0.48, 0))
+    d = dot_at(W / 2, 0.26 if kind in ('short', 'veryShort') else 0.30, 0.36 if kind in ('short', 'veryShort') else 0.40)
     return union(arc_, d)
 
 

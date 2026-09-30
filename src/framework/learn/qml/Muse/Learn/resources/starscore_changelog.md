@@ -4,6 +4,12 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.11.1
+
+- **StarScore Deco**: cleaned up the joins where shapes meet, so there are no more small steps or spurs.
+  - Dynamics letters now have square shoulders where bowls meet stems, the s is redrawn, and an f is spaced from its crossbar so it no longer runs into the letter before it.
+  - Also fixed: the flat, the alto clef's chevron, the quarter and eighth rests, the figures 1–7, the common and cut time C, the short fermatas, the trill and mordent ends, the segno, the ø slash and the pedal and 8va letters. The brace is bolder, and the 16th and 32nd notes in tempo marks have full-length stems.
+
 ## 1.11.0
 
 - **StarScore Deco** (new music font, first draft): an art deco music font drawn to go with TT Modernoir. Choose it in Format › Style › Score › Musical symbols font; the musical text font is “StarScore Deco Text”. The Starsign style still uses Petaluma until you switch.

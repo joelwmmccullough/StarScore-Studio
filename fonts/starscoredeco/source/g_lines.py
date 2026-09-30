@@ -42,7 +42,8 @@ def letter_P(T=gd.T, t=gd.t):
     W = 2 * T + gd.C + 0.06
     ry = 0.42
     b = gd.bowl(W / 2, H - ry, W / 2, ry, T, t)
-    return union(stem, b), 0.0, W
+    joins = union(rect(0, H - t, W / 2, H), rect(0, H - 2 * ry, W / 2, H - 2 * ry + t))
+    return union(stem, b, joins), 0.0, W
 
 
 def letter_e():
@@ -60,7 +61,7 @@ def letter_d():
     T, t = gd.T, gd.t
     W = 2 * T + gd.C + 0.02
     b = gd.bowl(W / 2, gd.XH / 2, W / 2, gd.XH / 2, T, t)
-    return union(b, rect(W - T, 0, W, gd.ASC)), 0.0, W
+    return union(b, rect(W - T, 0, W, gd.ASC), gd.shoulders(W / 2, W)), 0.0, W
 
 
 gd.LETTERS['P'] = letter_P
@@ -78,7 +79,7 @@ def ped():
 
 pd = ped()
 add("keyboardPedalPed", move(pd, -bounds(pd)[0], 0))
-add("keyboardPedalP", scale(letter_P()[0], 1.25))
+add("keyboardPedalP", scale(slant(letter_P()[0], gd.SLANT), 1.25))
 add("keyboardPedalDot", term(0.17, 0.17, 0.34))
 
 
@@ -112,10 +113,13 @@ def met(head, flag=None, stem=True):
     if stem:
         a = G[head]["anchors"]["stemUpSE"]
         sx = a[0]
-        parts.append(rect(sx - STEM, a[1], sx, STEM_TOP))
+        top = STEM_TOP
         if flag:
-            f = G[flag]["path"]
-            parts.append(move(f, sx - STEM, STEM_TOP))
+            # like MuseScore: lengthen the stem to the flag's attachment point
+            ext = G[flag]["anchors"].get("stemUpNW", (0, 0))[1]
+            top = STEM_TOP + max(0.0, ext)
+            parts.append(move(G[flag]["path"], sx - STEM, STEM_TOP))
+        parts.append(rect(sx - STEM, a[1], sx, top + 0.01))
     return union(*parts)
 
 

@@ -1,4 +1,5 @@
 from kit import *
+import math
 from shapes import *
 from registry import add
 import registry
@@ -14,14 +15,13 @@ def big_s(H=2.9, W=1.46, T=0.40, t=0.13):
         return diff(ellipse(cx, cy, rx, ry_, 0, KL), ellipse(cx, cy, rx - T, ry_ - t, 0, KL))
     up = inter(bowl(W / 2, cyu, W / 2, ry), rect(-5, cyu, 5, 9))
     up = diff(up, rect(W / 2 + 0.02, -5, 5, cyu + 0.18))
-    D = T * 1.3
-    spine = diag(0.0, D, cyu + 0.001, W - D, W, ry - 0.001)
+    spine = diag(0.0, T, cyu, W - T, W, ry)
     return union(up, spine, rotate(up, 180, W / 2, H / 2))
 
 
 def segno():
     s = move(big_s(), 0.38, 0.05)
-    slash = inter(polyline([(0.0, 0.25), (2.2, 2.85)], 0.14), rect(0, 0, 2.2, 3.1))
+    slash = polyline([(0.06, 0.25), (2.14, 2.85)], 0.14)
     d1 = term(0.36, 1.22, 0.40)
     d2 = term(1.86, 1.86, 0.40)
     return union(s, slash, d1, d2)
@@ -46,13 +46,17 @@ add("codaSquare", coda(True))
 
 # ---- ornaments
 def zigzag(n_up, W, H=0.86, thin=0.12, thick=0.30):
-    pts = []
     xs = [i * W / (2 * n_up) for i in range(2 * n_up + 1)]
-    for i, x in enumerate(xs):
-        pts.append((x, 0.08 if i % 2 == 0 else H))
+    pts = [(x, 0.08 if i % 2 == 0 else H) for i, x in enumerate(xs)]
+    # run past both ends along the first and last strokes, then cut vertically
+    def ext(p, q, d=0.4):
+        dx, dy = p[0] - q[0], p[1] - q[1]
+        L = math.hypot(dx, dy)
+        return (p[0] + dx / L * d, p[1] + dy / L * d)
+    pts = [ext(pts[0], pts[1])] + pts[1:-1] + [ext(pts[-1], pts[-2])]
     ws = [thin if i % 2 == 0 else thick for i in range(len(pts) - 1)]
     p = polyline(pts, ws)
-    return inter(p, rect(0, -0.2, W, H + 0.12))
+    return inter(p, rect(0, -1, W, H + 1))
 
 
 short_trill = zigzag(2, 2.4)
@@ -80,7 +84,7 @@ def trill():
     T, t = 0.27, 0.11
     XH = 1.05
     # t: stem with crossbar and a flat foot turning right
-    tstem = rect(0.16, 0.22, 0.16 + T, 1.52)
+    tstem = rect(0.16, 0.36, 0.16 + T, 1.52)
     tbar = rect(0.0, XH - t * 1.3, 0.76, XH)
     foot = inter(diff(ellipse(0.52, 0.36, 0.36, 0.36, 0, 0.74), ellipse(0.52, 0.36, 0.36 - T, 0.36 - t, 0, 0.74)),
                  rect(0.16, -1, 0.70, 0.36))
@@ -104,8 +108,8 @@ for i in range(1, 6):
 
 # ---- brace: straight verticals with a chevron point in the middle
 def brace():
-    pts = [(0.30, 4.06), (0.17, 3.60), (0.17, 2.36), (0.02, 2.0), (0.17, 1.64), (0.17, 0.40), (0.30, -0.06)]
-    p = polyline(pts, [0.07, 0.15, 0.13, 0.13, 0.15, 0.07])
+    pts = [(0.36, 4.08), (0.20, 3.58), (0.20, 2.38), (0.02, 2.0), (0.20, 1.62), (0.20, 0.42), (0.36, -0.08)]
+    p = polyline(pts, [0.08, 0.24, 0.20, 0.20, 0.24, 0.08])
     return inter(p, rect(-1, 0, 2, 4.0))
 
 
@@ -125,7 +129,7 @@ add("bracketBottom", mirror_y(bt))
 # ---- chord-symbol marks
 add("csymDiminished", diff(ellipse(0.8, 0.8, 0.8, 0.8), ellipse(0.8, 0.8, 0.8 - 0.26, 0.8 - 0.12)))
 add("csymHalfDiminished", union(diff(ellipse(0.8, 0.8, 0.8, 0.8), ellipse(0.8, 0.8, 0.8 - 0.26, 0.8 - 0.12)),
-                                inter(polyline([(0.0, -0.1), (1.6, 1.7)], 0.13), rect(-0.1, -0.1, 1.7, 1.7))))
+                                polyline([(0.06, -0.02), (1.54, 1.62)], 0.13)))
 tri = diff(poly([(0.0, 0.0), (1.9, 0.0), (0.95, 1.7)]), poly([(0.36, 0.13), (1.54, 0.13), (0.95, 1.20)]))
 add("csymMajorSeventh", tri)
 add("csymAugmented", union(rect(0, 0.72, 1.44, 0.88), rect(0.62, 0.0, 0.82, 1.6)))
@@ -165,7 +169,7 @@ def letter_v():
 def letter_a():
     W = 2 * gd.T + gd.C
     b = gd.bowl(W / 2, gd.XH / 2, W / 2, gd.XH / 2, gd.T, gd.t)
-    return union(b, rect(W - gd.T, 0, W, gd.XH))
+    return union(b, rect(W - gd.T, 0, W, gd.XH), gd.shoulders(W / 2, W))
 
 
 def letter_b():

@@ -28,4 +28,7 @@ Status: first draft (0.1). Glyphs it doesn't have fall back to Bravura.
 This rewrites StarScoreDeco.otf, StarScoreDecoText.otf and starscoredeco_metadata.json.
 Each g_*.py file draws one group of glyphs; kit.py has the drawing tools (pen strokes,
 boolean shape operations) and smooth.py fits smooth curves to the stroked outlines.
+`source/jaggies.py <font.otf>` lists sharp corners next to very short edges (where shapes meet badly);
+what it still reports after 1.11.1 is intentional (double sharp corners, tile edges of wiggle lines,
+the inner corners of the 3).
 TT Modernoir itself is not included or copied; the glyphs are drawn from scratch.

@@ -335,6 +335,8 @@ def stroke(skel, nib, cap0='perp', cap1='perp', wfun=None, step=0.012):
 
 
 def _cap(path, q, cap, start, nib):
+    """Cut the stroke end along a line through its end point. The cut only acts in a
+    small box around the end, so strokes that come back past the end are untouched."""
     if cap == 'perp' or cap is None:
         return path
     x, y, dx, dy, _ = q
@@ -344,21 +346,22 @@ def _cap(path, q, cap, start, nib):
         ang = 90.0
     else:
         ang = float(cap)
-    # cut line through (x,y) with angle ang; keep the side the stroke goes into
     c, s = math.cos(math.radians(ang)), math.sin(math.radians(ang))
     p0 = (x - c, y - s)
     p1 = (x + c, y + s)
     L = math.hypot(dx, dy) or 1
     ux, uy = dx / L, dy / L
-    if start:
-        into = (ux, uy)
-    else:
-        into = (-ux, -uy)
-    # left side of p0->p1 has normal (-s, c)
-    if (-s) * into[0] + c * into[1] < 0:
+    into = (ux, uy) if start else (-ux, -uy)
+    # halfplane() keeps the left side of p0->p1; we want the side AWAY from the stroke
+    if (-s) * into[0] + c * into[1] > 0:
         p0, p1 = p1, p0
-    # extend the stroke end first so the cut has material to cut
-    return inter(path, halfplane(p0, p1))
+    w = nib.width(ux, uy) * 0.5 + 0.004           # half the stroke width at the end
+    a = w * 3.0                                    # reach along the stroke, both ways
+    nx, ny = -uy, ux
+    box = poly([(x + ux * a + nx * w, y + uy * a + ny * w), (x - ux * a + nx * w, y - uy * a + ny * w),
+                (x - ux * a - nx * w, y - uy * a - ny * w), (x + ux * a - nx * w, y + uy * a - ny * w)])
+    away = inter(halfplane(p0, p1), box)
+    return diff(path, away)
 
 
 def _hull(pts):
@@ -461,9 +464,20 @@ def polyline(pts, widths, miter_limit=3.0):
     L.append(segs[0][0]); R.append(segs[0][2])
     for i in range(n - 1):
         a, b = segs[i], segs[i + 1]
-        pl = _lineint(a[0], a[1], b[0], b[1]) or b[0]
-        pr = _lineint(a[2], a[1], b[2], b[1]) or b[2]
-        L.append(pl); R.append(pr)
+        joint = pts[i + 1]
+        lim = miter_limit * max(widths[i], widths[i + 1]) / 2
+        wa, wb = widths[i] / 2, widths[i + 1] / 2
+        # end of segment a / start of segment b, on each side
+        na = (-a[1][1], a[1][0]); nb = (-b[1][1], b[1][0])
+        a_l = (joint[0] + na[0] * wa, joint[1] + na[1] * wa); a_r = (joint[0] - na[0] * wa, joint[1] - na[1] * wa)
+        b_l = (joint[0] + nb[0] * wb, joint[1] + nb[1] * wb); b_r = (joint[0] - nb[0] * wb, joint[1] - nb[1] * wb)
+        for side, (pa, pb, la, lb) in (('L', (a_l, b_l, a[0], b[0])), ('R', (a_r, b_r, a[2], b[2]))):
+            m = _lineint(la, a[1], lb, b[1])
+            out = L if side == 'L' else R
+            if m is None or math.hypot(m[0] - joint[0], m[1] - joint[1]) > lim:
+                out.append(pa); out.append(pb)          # bevel
+            else:
+                out.append(m)
     p, q = pts[-2], pts[-1]
     last = segs[-1]
     dx, dy = q[0] - p[0], q[1] - p[1]
@@ -510,3 +524,7 @@ def shape(skel):
             pen.curveTo(it[1], it[2], it[3])
     pen.closePath()
     return union(p)
+
+
+def poly_hull(pts):
+    return _hull(pts)

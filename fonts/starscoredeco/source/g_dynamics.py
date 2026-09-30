@@ -35,22 +35,32 @@ def arch(xl, xr, top=XH, ry=0.40):
 C = 0.27     # counter width
 
 
+def shoulders(x0, x1, top=True, bottom=True):
+    """Flat joins where a bowl leaves a stem (Modernoir's squared shoulders)."""
+    parts = []
+    if top:
+        parts.append(rect(x0, XH - t, x1, XH))
+    if bottom:
+        parts.append(rect(x0, 0, x1, t))
+    return union(*parts)
+
+
 def L_p():
     stem = rect(0, DESC, T, XH)
     W = 2 * T + C + 0.02
     b = bowl(W / 2, XH / 2, W / 2, XH / 2, T, t)
-    return union(stem, b), 0.0, W
+    return union(stem, b, shoulders(0, W / 2)), 0.0, W
 
 
 def L_m():
     P = T + C - 0.02
     s0 = rect(0, 0, T, XH)
-    return union(s0, arch(0.0, P + T), arch(P, 2 * P + T)), 0.0, 2 * P + T
+    return union(s0, arch(0.0, P + T), arch(P, 2 * P + T), shoulders(0, (P + T) / 2, bottom=False)), 0.0, 2 * P + T
 
 
 def L_n():
     W = 2 * T + C
-    return union(rect(0, 0, T, XH), arch(0.0, W)), 0.0, W
+    return union(rect(0, 0, T, XH), arch(0.0, W), shoulders(0, W / 2, bottom=False)), 0.0, W
 
 
 def L_r():
@@ -60,7 +70,7 @@ def L_r():
     s0 = rect(0, 0, T, XH)
     a = inter(bowl(W / 2, cy, W / 2, ry, T, t), rect(-5, cy, 5, 5))
     a = diff(a, rect(W / 2 + 0.02, -5, 5, cy + 0.20))     # short drop terminal
-    return union(s0, a), 0.0, W
+    return union(s0, a, shoulders(0, W / 2, bottom=False)), 0.0, W
 
 
 def L_f():
@@ -68,23 +78,50 @@ def L_f():
     W = 2 * T + 0.20
     ry = 0.34
     cyt = ASC - ry
-    stem = rect(xs, DESC + ry, xs + T, cyt + 0.01)
+    stem = rect(xs, DESC + ry, xs + T, cyt)
     hook = inter(bowl(xs + W / 2, cyt, W / 2, ry, T, t), rect(-5, cyt, 5, 5))
     hook = diff(hook, rect(xs + W / 2 + 0.02, -5, 5, cyt + 0.16))   # drop terminal, flat cut
     tail = rotate(hook, 180, xs + T / 2, (ASC + DESC) / 2)
     bar = rect(xs - 0.24, XH - t * 1.3, xs + T + 0.24, XH)
-    return union(stem, hook, tail, bar), xs - 0.02, xs + T + 0.02
+    return union(stem, hook, tail, bar), xs - 0.20, xs + T + 0.20
+
+
+def s_skeleton(W, H, th=0.10):
+    """Point-symmetric s: top-right terminal, round over the top, down the left shoulder,
+    then a straight spine through the centre into the mirrored lower half."""
+    cx, cy = W / 2, H / 2
+    yt = H - th / 2                       # skeleton height of the thin top stroke
+    xl = 0.13 * W + 0.02                  # skeleton x of the left shoulder
+    p_term = (W - 0.16 * W, H - 0.30 * H)
+    p_top = (0.52 * W, yt)
+    p_sh = (xl, H - 0.25 * H)
+    p_sp = (0.24 * W, H - 0.40 * H)       # spine start (upper-left)
+    half = [p_term,
+            ('C', (p_term[0], H - 0.12 * H), (0.72 * W, yt), p_top),
+            ('C', (0.30 * W, yt), (xl, H - 0.10 * H), p_sh),
+            ('C', (xl, H - 0.32 * H), (0.17 * W, H - 0.36 * H), p_sp)]
+
+    def rot(p):
+        return (2 * cx - p[0], 2 * cy - p[1])
+    pts = [half[0]] + [it[3] for it in half[1:]]
+    ctrl = [None] + [(it[1], it[2]) for it in half[1:]]
+    rev = []
+    for i in range(len(half) - 1, 0, -1):
+        c1, c2 = ctrl[i]
+        rev.append(('C', rot(c2), rot(c1), rot(pts[i - 1])))
+    return half + [('L', rot(p_sp))] + rev
 
 
 def L_s():
-    W = 2 * T + C - 0.04
-    ry = 0.27
+    # two half-rings joined by a straight spine exactly as wide as their walls
+    W = 2 * T + C + 0.04
+    ry = 0.28
     cyu = XH - ry
     up = inter(bowl(W / 2, cyu, W / 2, ry, T, t), rect(-5, cyu, 5, 5))
-    up = diff(up, rect(W / 2 + 0.02, -5, 5, cyu + 0.12))                    # top-right terminal
-    D = T * 1.3
-    spine = diag(0.0, D, cyu + 0.001, W - D, W, ry - 0.001)
-    return union(up, spine, rotate(up, 180, W / 2, XH / 2)), 0.0, W
+    up = diff(up, rect(W / 2, -5, 5, cyu + 0.12))                           # top-right terminal
+    spine = diag(0.0, T, cyu, W - T, W, ry)
+    lo = rotate(up, 180, W / 2, XH / 2)
+    return union(up, spine, lo), 0.0, W
 
 
 def L_z():

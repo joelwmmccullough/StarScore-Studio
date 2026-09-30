@@ -64,17 +64,17 @@ add("fClef", fc)
 def cclef():
     bars = union(rect(0, -2.0, 0.52, 2.0), rect(0.72, -2.0, 0.86, 2.0))
     nib = Nib(0.10, 0.40, 1.4)
+    yb = 0.46                                   # height of the bowl's thin bottom stroke
     skel = [(1.32, 1.44),
             ('C', (1.32, 1.82), (1.62, 1.95), (1.98, 1.95)),
             ('C', (2.40, 1.95), (2.64, 1.62), (2.64, 1.24)),
-            ('C', (2.64, 0.80), (2.36, 0.46), (1.92, 0.46)),
-            ('C', (1.62, 0.46), (1.40, 0.52), (1.20, 0.40)),
-            ('L', (0.86, 0.0))]
-    upper = stroke(skel, nib)
-    upper = union(upper, term(1.32, 1.44, 0.46))
-    upper = inter(upper, rect(0.86, 0, 4, 3))
+            ('C', (2.64, 0.80), (2.36, yb), (1.92, yb)),
+            ('L', (1.26, yb))]
+    bowl_ = stroke(skel, nib, cap1='v')
+    half = nib.wmin / 2
+    arm = poly([(0.86, 0.0), (1.26, yb - half), (1.26, yb + half), (0.86, 0.17)])
+    upper = union(bowl_, term(1.32, 1.44, 0.46), arm)
     lower = mirror_y(upper)
-    # small chevron point where the bowls meet the thin bar
     return union(bars, upper, lower)
 
 

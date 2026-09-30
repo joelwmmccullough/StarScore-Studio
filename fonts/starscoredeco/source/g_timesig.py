@@ -12,15 +12,16 @@ for d in "0123456789":
 
 
 def common(cut=False):
-    W, H, T, t = 1.40, 2.0, 0.44, 0.15
-    outer = ellipse(W / 2 + 0.04, 0, W / 2 + 0.04, 1.0, 0, 0.66)
-    inner = ellipse(W / 2 + 0.04 + 0.05, 0, W / 2 + 0.04 - T, 1.0 - t, 0, 0.66)
-    c = diff(outer, inner)
-    # open on the right with flat vertical cuts
-    c = diff(c, rect(W - 0.28, -0.52, 3, 0.52))
+    """Modernoir-style C: a tall ring whose thick right wall is cut away in the middle,
+    leaving flat horizontal terminals top and bottom."""
+    W, T, t = 1.40, 0.46, 0.16
+    xm = W / 2
+    c = diff(ellipse(xm, 0, xm, 1.0, 0, 0.62), ellipse(xm, 0, xm - T, 1.0 - t, 0, 0.62))
+    c = diff(c, rect(xm, -0.42, 5, 0.42))
     if cut:
-        c = union(c, rect(W / 2 - 0.04, -1.45, W / 2 + 0.14, 1.45))
+        c = union(c, rect(xm - 0.09, -1.45, xm + 0.09, 1.45))
     return move(c, SB, 0)
+
 
 cm = common()
 add("timeSigCommon", cm, adv=bounds(cm)[2] + SB)
