@@ -68,12 +68,12 @@ def flagged_rest(n):
     for lv in levels:
         y = lv + 0.62
         x = sx(y)
-        dot = term(x - 0.64, y - 0.18, 0.44)
-        arm = stroke([(x - 0.66, y - 0.10), ('C', (x - 0.40, y - 0.18), (x - 0.12, y - 0.10), (x + 0.08, y + 0.06))],
-                     Nib(0.12, 0.2, 1.3))
+        dot = None
+        arm = stroke([(x - 0.64, y - 0.16), ('C', (x - 0.40, y - 0.20), (x - 0.12, y - 0.10), (x + 0.08, y + 0.06))],
+                     Nib(0.12, 0.2, 1.3), ball0=(0.50, 0.42))
         # the arm ends exactly on the stem's right edge
         arm = inter(arm, halfplane((sx(bot) + 0.12, bot), (sx(top) + 0.10, top + 0.02)))
-        arm = inter(arm, rect(-5, -9, 9, top + 0.02))         # flush with the stem's flat top
+        arm = diff(arm, rect(sx(top) - 0.30, top + 0.02, 9, 9))   # flush with the stem's flat top, near the stem only
         parts += [dot, arm]
     p = union(*parts)
     x0 = bounds(p)[0]

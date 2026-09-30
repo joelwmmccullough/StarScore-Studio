@@ -29,11 +29,10 @@ def gclef():
     stem = stroke([apex, ('C', (1.74, 4.22), (1.55, 3.98), (1.55, 3.62)),
                    ('L', (1.55, -1.60)),
                    ('C', (1.55, -2.25), (1.25, -2.56), (0.95, -2.56)),
-                   ('C', (0.74, -2.56), (0.60, -2.40), dot_c)], STEM, cap1='perp')
+                   ('C', (0.74, -2.56), (0.60, -2.40), dot_c)], STEM, ball1=(0.60, 0.95))
     cs = caps()
     apx = join_point((cb[2], cb[3]), (cs[0], cs[1]), (apex[0] + 0.02, apex[1] + 0.07))
-    dot = term(dot_c[0], dot_c[1], 0.52)
-    return union(body, stem, apx, dot)
+    return union(body, stem, apx)
 
 
 g = gclef()
@@ -48,8 +47,8 @@ def fclef():
             ('C', (1.70, 1.00), (2.02, 0.62), (2.02, 0.05)),
             ('C', (2.02, -0.45), (1.77, -1.06), (1.40, -1.40)),
             ('L', (0.20, -2.50))]
-    body = stroke(skel, Nib(0.10, 0.42, 1.4), cap1='perp')
-    knob = term(0.40, -0.06, 0.58)
+    body = stroke(skel, Nib(0.10, 0.42, 1.4), cap1='perp', ball0=(0.66, 0.85))
+    knob = None
     d1 = term(2.52, 0.5, 0.36)
     d2 = term(2.52, -0.5, 0.36)
     return union(body, knob, d1, d2)
@@ -70,10 +69,10 @@ def cclef():
             ('C', (2.40, 1.95), (2.64, 1.62), (2.64, 1.24)),
             ('C', (2.64, 0.80), (2.36, yb), (1.92, yb)),
             ('L', (1.26, yb))]
-    bowl_ = stroke(skel, nib, cap1='v')
+    bowl_ = stroke(skel, nib, cap1='v', ball0=(0.54, 0.95))
     half = nib.wmin / 2
     arm = poly([(0.86, 0.0), (1.26, yb - half), (1.26, yb + half), (0.86, 0.17)])
-    upper = union(bowl_, term(1.32, 1.44, 0.46), arm)
+    upper = union(bowl_, arm)
     lower = mirror_y(upper)
     return union(bars, upper, lower)
 

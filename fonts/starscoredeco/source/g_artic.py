@@ -100,8 +100,9 @@ for kind, nm in (("normal", "fermata"), ("short", "fermataShort"), ("long", "fer
     add(nm + "Below", mirror_y(f))
 
 # ---- breath marks and caesuras
-comma = union(dot_at(0.30, 0.76, 0.42),
-              stroke([(0.52, 0.80), ('C', (0.56, 0.45), (0.40, 0.18), (0.10, 0.02))], Nib(0.07, 0.20, 1.2)))
+comma = stroke([(0.26, 0.72), ('C', (0.40, 0.64), (0.47, 0.44), (0.40, 0.27)),
+                ('C', (0.33, 0.12), (0.21, 0.04), (0.06, 0.0))], Nib(0.08, 0.20, 1.2),
+               ball0=(0.46, 0.50), wfun=lambda s: 1.0 - 0.45 * s)
 add("breathMarkComma", move(comma, -bounds(comma)[0], -bounds(comma)[1]))
 tick = polyline([(0.0, 0.9), (0.42, 0.0), (1.2, 1.9)], [0.12, 0.20])
 add("breathMarkTick", move(tick, -bounds(tick)[0], -bounds(tick)[1]))

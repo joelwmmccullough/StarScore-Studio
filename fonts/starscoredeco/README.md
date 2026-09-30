@@ -15,8 +15,9 @@ Status: first draft (0.1). Glyphs it doesn't have fall back to Bravura.
   the dynamics s).
 - Ends are cut flat. Counters are narrow vertical slots (half and whole noteheads, digits).
 - Rests are a lightning-bolt quarter rest and "7"-shaped eighth rests; flags are solid blades.
-- Terminal knobs and dots are round discs (the TERMINAL setting in source/shapes.py can
-  switch them to oval, diamond or square).
+- Ball terminals grow out of their strokes: stroke(..., ball0/ball1=(diameter, ramp)) swells the
+  line to the ball's width with a smooth ramp (clef knobs and tails, rest arms, comma). Free dots
+  (repeat, staccato, augmentation, bass clef colon) are round discs.
 - Metrics follow SMuFL and Bravura: 1 staff space = 250 units, noteheads 1.26 x 1.0 sp,
   left ink at x = 0 and advance = ink width (MuseScore spaces from the outlines).
 

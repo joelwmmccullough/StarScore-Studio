@@ -243,7 +243,7 @@ def sample(segs, step=0.012):
     for (p0, c1, c2, p3, kind) in segs:
         L = math.hypot(p3[0] - p0[0], p3[1] - p0[1]) + math.hypot(c1[0] - p0[0], c1[1] - p0[1]) \
             + math.hypot(c2[0] - c1[0], c2[1] - c1[1]) + math.hypot(p3[0] - c2[0], p3[1] - c2[1])
-        n = max(int(L / 2 / step), 2) if kind == 'C' else 1
+        n = max(int(L / 2 / step), 2) if kind == 'C' else max(int(L / 2 / step), 1)
         for i in range(n + 1):
             t = i / n
             if pts and i == 0:
@@ -261,12 +261,15 @@ def sample(segs, step=0.012):
     return pts
 
 
-def stroke(skel, nib, cap0='perp', cap1='perp', wfun=None, step=0.012):
+def stroke(skel, nib, cap0='perp', cap1='perp', wfun=None, step=0.012, ball0=None, ball1=None):
     """Stroke a skeleton with the direction-dependent nib.
 
     cap: 'perp' (flat, perpendicular to the stroke), 'h' (horizontal cut),
          'v' (vertical cut), or an angle in degrees for the cut line.
     wfun(s) optional multiplier by normalised position s in [0,1].
+    ball0 / ball1 = (diameter, ramp_length): the stroke swells smoothly to the full
+    diameter over ramp_length and ends in a round ball centred on the end point, so the
+    ball grows out of the line instead of sitting on it.
     Sharp corners in the skeleton get bevel-filled joins.
     """
     segs = parse_skel(skel)
@@ -312,11 +315,26 @@ def stroke(skel, nib, cap0='perp', cap1='perp', wfun=None, step=0.012):
             w = nib.width(ux, uy)
             if wfun:
                 w *= wfun(lens[ri][i] / total_len)
+            for ball, dist in ((ball0, lens[ri][i]), (ball1, total_len - lens[ri][i])):
+                if ball and dist < ball[1]:
+                    u = 1 - dist / ball[1]
+                    e = u * u * u * (u * (u * 6 - 15) + 10)      # smootherstep: flat at both ends
+                    w = w + (ball[0] * 0.98 - w) * e
             nx, ny = -uy, ux
             left.append((x + nx * w / 2, y + ny * w / 2))
             right.append((x - nx * w / 2, y - ny * w / 2))
-        # extend ends slightly so caps can be cut
-        pieces.append(poly(left + right[::-1]))
+        # sweep: one small quad per sample step, merged together. Robust where the
+        # inner edge folds over itself (tight curves, swelling ball terminals).
+        b = pathops.OpBuilder(fix_winding=False, keep_starting_points=False)
+        for i in range(len(left) - 1):
+            b.add(poly([left[i], left[i + 1], right[i + 1], right[i]]), PathOp.UNION)
+        if ri == 0 and ball0:
+            x, y = pts[0][0], pts[0][1]
+            b.add(ellipse(x, y, ball0[0] / 2, ball0[0] / 2), PathOp.UNION)
+        if ri == len(allpts) - 1 and ball1:
+            x, y = pts[-1][0], pts[-1][1]
+            b.add(ellipse(x, y, ball1[0] / 2, ball1[0] / 2), PathOp.UNION)
+        pieces.append(b.resolve())
         ends.append((left[0], right[0], left[-1], right[-1]))
     # bevel joins between runs
     for i in range(len(ends) - 1):

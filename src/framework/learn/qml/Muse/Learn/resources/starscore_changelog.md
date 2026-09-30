@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.11.2
+
+- **StarScore Deco**: ball ends now grow out of their strokes. The line swells smoothly to the full width of the ball instead of a ball being stuck on the end: the treble clef's tail, the bass and alto clef knobs, the eighth-rest family and the breath-mark comma.
+
 ## 1.11.1
 
 - **StarScore Deco**: cleaned up the joins where shapes meet, so there are no more small steps or spurs.
