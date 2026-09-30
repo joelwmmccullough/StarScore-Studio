@@ -88,31 +88,19 @@ F_BREAKS = {
 }
 
 
-def f_stencil(breaks=("top",)):
-    """Bass clef in the stencil family: the ball grows out of the stroke, solid round dots, and
-    the chosen narrow breaks. (0.6 had all three breaks; Joel: 'still looks like a cyborg'.)"""
-    # Head: a round ball. On the outside (left) the ball's outline runs on a straight tangent
-    # into the stroke's outer edge; on the inside (right) the ball meets the stroke in a
-    # generous round fillet. No neck, no notch, no lump.
+F_BALL = 0.58          # Joel picked option 17 (0.7, one top break) with the ball at 0.58 (was 0.68)
+
+
+def f_stencil(breaks=("top",), ball=None):
+    """Bass clef in the stencil family (0.7's option with one break across the top): the ball
+    grows out of the stroke, and narrow breaks as chosen. Dots are added as true circles."""
+    ball = F_BALL if ball is None else ball
     skel = [(0.42, 0.0),
             ('C', (0.42, 0.64), (0.82, 1.04), (1.28, 1.04)),
             ('C', (1.82, 1.04), (2.16, 0.64), (2.16, 0.02)),
             ('C', (2.16, -0.86), (1.44, -1.74), (0.18, -2.46))]
-
-    def taper(u):
-        if u < 0.28:
-            e = u / 0.28
-            return 0.55 + 0.45 * e * e * (3 - 2 * e)
-        return 1.0 if u < 0.52 else max(0.22, 1.0 - (u - 0.52) / 0.48 * 0.80)
-    body = _cv.to_shapely(stroke(skel, Nib(0.11, 0.42, 1.5), cap1='perp', wfun=taper))
-    cx0, R0 = 0.42, 0.34
-    ball = M.Polygon(M.arc(cx0, 0.0, R0, R0, 0, 360, 1))
-    left = M.G(ball, body.intersection(M.box(-1, 0.0, cx0, 0.95))).convex_hull.intersection(M.box(-1, -1, cx0, 1.2))
-    body = M.G(body, ball, left)
-    r = 0.16
-    closed = body.buffer(r, quad_segs=48).buffer(-r, quad_segs=48)
-    body = M.G(body, closed.intersection(M.box(cx0 - 0.02, -1, 1.0, 0.8)))
-    g = body                     # the dots are added as true circles after conversion (F_DOTS)
+    taper = lambda u: 1.0 if u < 0.52 else max(0.22, 1.0 - (u - 0.52) / 0.48 * 0.80)
+    g = _cv.to_shapely(stroke(skel, Nib(0.11, 0.42, 1.5), cap1='perp', wfun=taper, ball0=(ball, 0.62)))
     cuts = []
     for k in breaks:
         x, y, a_, L, wk = F_BREAKS[k]

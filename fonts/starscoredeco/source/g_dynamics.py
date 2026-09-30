@@ -182,7 +182,20 @@ def L_v():
                  diag(w - D, w, XH, (w - D) / 2, (w + D) / 2, 0.0)), 0.0, w
 
 
-LETTERS = {'p': L_p, 'm': L_m, 'n': L_n, 'r': L_r, 'f': L_f, 's': L_s, 'z': L_z,
+S_TILT = 4.0      # degrees clockwise: Joel — the top of the s sits right, but its bottom is too close to the f
+
+
+def L_s_dyn():
+    """The s as used in dynamics: turned a few degrees clockwise about the middle of its top,
+    so the bottom moves left away from a following f, then set back on the baseline."""
+    p, bl, w = L_s()
+    x0, y0, x1, y1 = bounds(p)
+    q = rotate(p, -S_TILT, (x0 + x1) / 2, y1)
+    q = move(q, 0, y0 - bounds(q)[1])
+    return q, bl, w
+
+
+LETTERS = {'p': L_p, 'm': L_m, 'n': L_n, 'r': L_r, 'f': L_f, 's': L_s_dyn, 'z': L_z,
            'e': L_e, 'a': L_a, 'b': L_b, 'd': L_d, 'v': L_v}
 _c = {}
 
@@ -193,12 +206,16 @@ def letter(ch):
     return _c[ch]
 
 
+KERN = {('s', 'f'): -0.12, ('s', 'p'): -0.04, ('s', 'z'): -0.04}   # Joel: the s sits too far from fz, fp
+
+
 def word(s):
     parts = []
     x = 0.0
     for i, ch in enumerate(s):
         p, bl, br = letter(ch)
         g = 0.0 if (i and s[i - 1] == 'f' and ch == 'f') else GAP     # ff: one continuous crossbar
+        g += KERN.get((s[i - 1], ch), 0.0) if i else 0.0
         dx = -bl if i == 0 else x + g - bl
         parts.append(move(p, dx, 0))
         x = dx + br

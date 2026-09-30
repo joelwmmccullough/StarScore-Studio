@@ -31,7 +31,7 @@
   "tupletBracketThickness": 0.14
  },
  "fontName": "StarScore Deco",
- "fontVersion": 0.1,
+ "fontVersion": 0.11,
  "glyphBBoxes": {
   "accidentalBracketLeft": {
    "bBoxNE": [
@@ -895,71 +895,71 @@
   },
   "dynamicSforzando": {
    "bBoxNE": [
-    0.634,
-    1.059
+    0.62,
+    1.057
    ],
    "bBoxSW": [
-    0.054,
+    -0.006,
     0.0
    ]
   },
   "dynamicSforzando1": {
    "bBoxNE": [
-    1.685,
+    1.565,
     1.484
    ],
    "bBoxSW": [
-    0.054,
+    -0.006,
     -0.424
    ]
   },
   "dynamicSforzandoPianissimo": {
    "bBoxNE": [
-    3.175,
+    3.055,
     1.484
    ],
    "bBoxSW": [
-    0.054,
+    -0.006,
     -0.424
    ]
   },
   "dynamicSforzandoPiano": {
    "bBoxNE": [
-    2.366,
+    2.246,
     1.484
    ],
    "bBoxSW": [
-    0.054,
+    -0.006,
     -0.424
    ]
   },
   "dynamicSforzato": {
    "bBoxNE": [
-    2.362,
+    2.242,
     1.484
    ],
    "bBoxSW": [
-    0.054,
+    -0.006,
     -0.424
    ]
   },
   "dynamicSforzatoFF": {
    "bBoxNE": [
-    3.204,
+    3.084,
     1.484
    ],
    "bBoxSW": [
-    0.054,
+    -0.006,
     -0.424
    ]
   },
   "dynamicSforzatoPiano": {
    "bBoxNE": [
-    3.091,
+    2.971,
     1.484
    ],
    "bBoxSW": [
-    0.054,
+    -0.006,
     -0.424
    ]
   },
@@ -975,61 +975,61 @@
   },
   "fClef": {
    "bBoxNE": [
-    2.79,
-    1.094
+    2.74,
+    1.095
    ],
    "bBoxSW": [
-    0.0,
+    0.001,
     -2.481
    ]
   },
   "fClef15ma": {
    "bBoxNE": [
-    2.79,
-    2.314
+    2.74,
+    2.316
    ],
    "bBoxSW": [
-    0.0,
+    0.001,
     -2.481
    ]
   },
   "fClef15mb": {
    "bBoxNE": [
-    2.79,
-    1.094
+    2.74,
+    1.095
    ],
    "bBoxSW": [
-    0.0,
+    0.001,
     -3.701
    ]
   },
   "fClef8va": {
    "bBoxNE": [
-    2.79,
-    2.314
+    2.74,
+    2.316
    ],
    "bBoxSW": [
-    0.0,
+    0.001,
     -2.481
    ]
   },
   "fClef8vb": {
    "bBoxNE": [
-    2.79,
-    1.094
+    2.74,
+    1.095
    ],
    "bBoxSW": [
-    0.0,
+    0.001,
     -3.701
    ]
   },
   "fClefChange": {
    "bBoxNE": [
-    2.232,
-    0.875
+    2.192,
+    0.876
    ],
    "bBoxSW": [
-    -0.003,
+    0.001,
     -1.985
    ]
   },
@@ -2639,37 +2639,37 @@
   },
   "dynamicSforzando1": {
    "opticalCenter": [
-    0.819,
+    0.759,
     0.0
    ]
   },
   "dynamicSforzandoPianissimo": {
    "opticalCenter": [
-    1.628,
+    1.568,
     0.0
    ]
   },
   "dynamicSforzandoPiano": {
    "opticalCenter": [
-    1.223,
+    1.163,
     0.0
    ]
   },
   "dynamicSforzato": {
    "opticalCenter": [
-    1.181,
+    1.121,
     0.0
    ]
   },
   "dynamicSforzatoFF": {
    "opticalCenter": [
-    1.602,
+    1.542,
     0.0
    ]
   },
   "dynamicSforzatoPiano": {
    "opticalCenter": [
-    1.586,
+    1.526,
     0.0
    ]
   },

@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.12.11
+
+- **StarScore Deco 0.11**: the bass clef is Joel's pick from every version so far (the 0.7 design with one stencil break across the top) with a smaller ball. In sf, sfz, sfp and the other s dynamics the s sits closer to the f and is turned 4° so its bottom clears the f's tail.
+
 ## 1.12.10
 
 - **StarScore Deco 0.10**: the s in dynamics and the turn follow Joel's own sketch: the 0.3 shape with a smooth concave curve inside each end instead of the small counters.
