@@ -148,13 +148,13 @@ def outline(pts, w=CS):
 tri = outline([(0.0, 0.0), (1.9, 0.0), (0.95, 1.7)])
 add("csymMajorSeventh", tri)
 add("csymAugmented", union(rect(0, 0.8 - CS / 2, 1.44, 0.8 + CS / 2), rect(0.72 - CS / 2, 0.08, 0.72 + CS / 2, 1.52)))
-add("csymMinor", rect(0, 0.8 - CS / 2, 1.1, 0.8 + CS / 2))
+MB, MY = 0.31, 1.40       # minus: a little heavier, centred at the middle of the chord digits (Jost 7 = 700/1000 em)
+add("csymMinor", rect(0, MY - MB / 2, 1.1, MY + MB / 2))
 
 # Joel's own chord marks (not in SMuFL): diminished-major seventh = a diamond, minor-major
 # seventh = the diamond with a full bar through it, running past both side corners.
 DW, DH = 1.33, 1.70
 dia = outline([(0.0, DH / 2), (DW / 2, 0.0), (DW, DH / 2), (DW / 2, DH)])
-add("csymDiminishedMajorSeventh", dia)
 EXT, BAR = 0.30, 0.22
 add("csymMinorMajorSeventh", union(move(dia, EXT, 0), rect(0.0, DH / 2 - BAR / 2, DW + 2 * EXT, DH / 2 + BAR / 2)))
 

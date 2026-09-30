@@ -147,3 +147,21 @@ def S(g, deg=0.0, dx=0.0, dy=0.0):
     if dx or dy:
         g = affinity.translate(g, dx, dy)
     return g
+
+
+def thin_points(g, tol):
+    """Drop outline points closer than tol to the last kept one. Keeps curves (points stay dense
+    enough for the curve fitter) but removes the micro-edges a buffer leaves at cap corners,
+    which otherwise survive as tiny steps."""
+    def ring(coords):
+        pts = list(coords)[:-1]
+        out = [pts[0]]
+        for p in pts[1:]:
+            if math.hypot(p[0] - out[-1][0], p[1] - out[-1][1]) >= tol:
+                out.append(p)
+        if len(out) > 3 and math.hypot(out[0][0] - out[-1][0], out[0][1] - out[-1][1]) < tol:
+            out.pop()
+        return out
+    polys = list(g.geoms) if isinstance(g, MultiPolygon) else [g]
+    res = [Polygon(ring(p.exterior.coords), [ring(h.coords) for h in p.interiors]) for p in polys]
+    return unary_union(res)

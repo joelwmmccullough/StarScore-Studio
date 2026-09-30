@@ -166,14 +166,15 @@ def to_shapely(path):
 
 
 def concepts(registry_G):
-    """name -> (label, pathops Path)."""
+    """name -> (label, pathops Path): bass clef break options for 0.7."""
     import g_clefs as gc
     out = {}
-    eng = {"gClef": gc.G_ENGRAVED, "fClef": gc.F_ENGRAVED, "cClef": gc.C_ENGRAVED}
-    tw = stencil_twin()
-    for key in ("gClef", "fClef", "cClef"):
-        out[f"concept-{key}-A"] = (f"{key} · concept A: Engraved (0.3)", eng[key])
-        out[f"concept-{key}-E"] = (f"{key} · concept E: Stencil + twin-line", M.to_path(tw[key]))
+    for key, br, label in (("F1", (), "no breaks"), ("F2", ("top",), "one break across the top (in the font now)"),
+                           ("F3", ("tail",), "one break across the tail"), ("F4", ("side",), "one break across the heavy side"),
+                           ("F5", ("top", "tail"), "breaks across the top and the tail")):
+        g = gc.f_stencil(br)
+        g = M.affinity.translate(g, -g.bounds[0], 0)
+        out[f"concept-fClef-{key}"] = (f"fClef · {label}", M.to_path(g))
     return out
 
 

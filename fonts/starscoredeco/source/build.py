@@ -11,13 +11,12 @@ SMOOTH = os.environ.get('DECO_SMOOTH', '1') == '1'
 
 FAMILY = "StarScore Deco"
 TEXT_SB = 0.08
-VERSION = "0.6"
+VERSION = "0.7"
 MODULES = ["g_noteheads", "g_clefs", "g_accidentals", "g_rests", "g_flags",
            "g_timesig", "g_dynamics", "g_artic", "g_misc", "g_lines"]
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CUSTOM = {   # Joel's own glyphs, outside SMuFL (optional-glyph range)
-    "csymDiminishedMajorSeventh": {"codepoint": "U+F4C0", "description": "Diminished-major seventh (diamond)"},
     "csymMinorMajorSeventh": {"codepoint": "U+F4C1", "description": "Minor-major seventh (diamond with a bar)"},
 }
 GLYPHNAMES = json.load(open(os.path.join(HERE, '..', '..', 'smufl', 'glyphnames.json')))

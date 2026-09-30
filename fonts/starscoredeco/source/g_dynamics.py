@@ -116,10 +116,13 @@ def L_f():
     return p, 0.0, bounds(p)[2]
 
 
-def L_s(w=None, H=XH, wh=0.175, k=1.22, a_top=32, a_bot=-148):
-    """Modernoir s: two elliptic arcs joined by a straight spine tangent to both. Drawn as one
-    even stroke of width wh on a narrower skeleton, then widened by k, so the sides come out
-    k times heavier than the tops and bottoms (the letter's vertical stress)."""
+def L_s(w=None, H=XH, wh=0.19, k=1.22, a_top=32, a_bot=-148):
+    """Modernoir s (the 0.3 design Joel chose): two elliptic arcs joined by a straight spine
+    tangent to both. Drawn as one even stroke of width wh on a narrower skeleton, then widened
+    by k, so the sides come out k times heavier than the tops and bottoms.
+    0.7 cleanup: arcs sampled finely, and the outline simplified by a hair so the buffer's
+    micro-edges at the cap corners and along the inner (concave) curves don't survive as
+    small steps."""
     import mono as Mo
     from shapely import affinity
     w = W('s') if w is None else w
@@ -137,31 +140,10 @@ def L_s(w=None, H=XH, wh=0.175, k=1.22, a_top=32, a_bot=-148):
     a2 = Mo.ell_angle(*El, p2)
     if a2 > 90:
         a2 -= 360
-    # arcs run on to the extreme right/left and are then cut vertically at the terminal angles
-    # The ends are cut square to the stroke as it looks AFTER widening: the arcs run a few
-    # degrees past each terminal and are trimmed along the widened stroke's normal.
-    ext = 8
-    sk = Mo.chain(Mo.arc(*Eu, a_top - ext, a1), Mo.line(p1, p2), Mo.arc(*El, a2, a_bot + ext))
-    g = Mo.buf(sk, wh, join='round')
-
-    def trim(g, E, a, sgn):
-        cx, cy, rx, ry = E
-        t = math.radians(a)
-        P = (cx + rx * math.cos(t), cy + ry * math.sin(t))
-        tx, ty = -rx * math.sin(t) * sgn, ry * math.cos(t) * sgn     # toward the extension (narrow space)
-        L = math.hypot(tx, ty); tx, ty = tx / L, ty / L
-        cxl, cyl = -ty / k, k * tx                                   # cut line: final-space normal, mapped back
-        L = math.hypot(cxl, cyl); cxl, cyl = cxl / L, cyl / L
-        Rn = wh * 0.5 + 0.02
-        Rd = max(rx, ry) * math.radians(ext) + 0.03
-        # extend along the narrow-space tangent; the polygon only covers the extension
-        q = [(P[0] + cxl * Rn, P[1] + cyl * Rn), (P[0] - cxl * Rn, P[1] - cyl * Rn)]
-        q += [(q[1][0] + tx * Rd, q[1][1] + ty * Rd), (q[0][0] + tx * Rd, q[0][1] + ty * Rd)]
-        return g.difference(Mo.Polygon(q))
-    g = trim(g, Eu, a_top, -1)
-    g = trim(g, El, a_bot, +1)
+    sk = Mo.chain(Mo.arc(*Eu, a_top, a1, 0.25), Mo.line(p1, p2, 60), Mo.arc(*El, a2, a_bot, 0.25))
+    g = Mo.LineString(sk).buffer(wh / 2, quad_segs=128, cap_style='flat', join_style='round')
     g = affinity.scale(g, k, 1.0, origin=(0, 0))
-    return Mo.to_path(g), 0.0, w
+    return Mo.to_path(Mo.thin_points(g, 0.012 * H / XH)), 0.0, w
 
 
 def L_z():

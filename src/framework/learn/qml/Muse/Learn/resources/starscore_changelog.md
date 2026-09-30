@@ -4,6 +4,14 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.12.7
+
+- **StarScore Deco 0.7**, from Joel's review of 0.6:
+  - The s (dynamics, turn, segno) is back to the 0.3 design Joel chose, cleaned up so its inner curves and ends have no small steps.
+  - Bass clef: one stencil break only, across the top.
+  - The diminished-major diamond is removed; the minor-major diamond stays. The minus is a little heavier and sits at the middle of the chord's digits.
+  - The 4's stem is nudged further toward the middle.
+
 ## 1.12.6
 
 - **StarScore Deco 0.6**, from Joel's review of 0.4:

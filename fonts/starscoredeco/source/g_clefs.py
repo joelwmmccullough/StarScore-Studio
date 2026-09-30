@@ -81,9 +81,16 @@ def fclef():
     return union(body, d1, d2)
 
 
-def f_stencil():
-    """Stencil bass clef: the ball grows out of the stroke (as in the treble clef's tail), solid
-    round dots, and narrow breaks across the top, the heavy side and the tail."""
+F_BREAKS = {
+    "top": (1.34, 0.95, 90, 0.5, None),          # across the hairline over the top
+    "side": (2.02, -0.25, 0, 0.9, None),         # across the heavy right side
+    "tail": (1.54, -1.40, -50, 0.8, 0.9),        # across the tail
+}
+
+
+def f_stencil(breaks=("top",)):
+    """Bass clef in the stencil family: the ball grows out of the stroke, solid round dots, and
+    the chosen narrow breaks. (0.6 had all three breaks; Joel: 'still looks like a cyborg'.)"""
     skel = [(0.42, 0.0),
             ('C', (0.42, 0.64), (0.82, 1.04), (1.28, 1.04)),
             ('C', (1.82, 1.04), (2.16, 0.64), (2.16, 0.02)),
@@ -92,10 +99,11 @@ def f_stencil():
     body = _cv.to_shapely(stroke(skel, Nib(0.11, 0.42, 1.5), cap1='perp', wfun=taper, ball0=(0.68, 0.62)))
     g = M.G(body, M.Polygon(M.arc(2.66, 0.5, 0.21, 0.21, 0, 360)),
             M.Polygon(M.arc(2.66, -0.5, 0.21, 0.21, 0, 360)))
-    g = _cv.stencil(g, [(1.34, 0.95, 90, 0.5, GAP_ST),          # across the top
-                        (2.02, -0.25, 0, 0.9, GAP_ST),          # across the heavy side
-                        (1.54, -1.40, -50, 0.8, GAP_ST * 0.9)])  # across the tail
-    return g
+    cuts = []
+    for k in breaks:
+        x, y, a_, L, wk = F_BREAKS[k]
+        cuts.append((x, y, a_, L, GAP_ST * (wk or 1.0)))
+    return _cv.stencil(g, cuts) if cuts else g
 
 
 fA = fclef()
