@@ -31,7 +31,7 @@
   "tupletBracketThickness": 0.14
  },
  "fontName": "StarScore Deco",
- "fontVersion": 0.4,
+ "fontVersion": 0.5,
  "glyphBBoxes": {
   "accidentalBracketLeft": {
    "bBoxNE": [
@@ -976,7 +976,7 @@
   "fClef15ma": {
    "bBoxNE": [
     2.819,
-    2.316
+    2.315
    ],
    "bBoxSW": [
     0.0,
@@ -996,7 +996,7 @@
   "fClef8va": {
    "bBoxNE": [
     2.819,
-    2.316
+    2.315
    ],
    "bBoxSW": [
     0.0,
@@ -1316,61 +1316,61 @@
   "gClef": {
    "bBoxNE": [
     2.82,
-    4.717
+    4.725
    ],
    "bBoxSW": [
     0.0,
-    -2.672
+    -2.678
    ]
   },
   "gClef15ma": {
    "bBoxNE": [
     2.82,
-    5.937
+    5.945
    ],
    "bBoxSW": [
     0.0,
-    -2.67
+    -2.678
    ]
   },
   "gClef15mb": {
    "bBoxNE": [
     2.82,
-    4.717
+    4.725
    ],
    "bBoxSW": [
     0.0,
-    -3.892
+    -3.898
    ]
   },
   "gClef8va": {
    "bBoxNE": [
     2.82,
-    5.937
+    5.945
    ],
    "bBoxSW": [
     0.0,
-    -2.67
+    -2.678
    ]
   },
   "gClef8vb": {
    "bBoxNE": [
     2.82,
-    4.717
+    4.725
    ],
    "bBoxSW": [
     0.0,
-    -3.892
+    -3.898
    ]
   },
   "gClefChange": {
    "bBoxNE": [
     2.259,
-    3.773
+    3.78
    ],
    "bBoxSW": [
     0.0,
-    -2.136
+    -2.142
    ]
   },
   "keyboardPedalDot": {

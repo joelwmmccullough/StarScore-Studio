@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.12.5
+
+- **StarScore Deco 0.5**: stencil clefs refined. The treble clef's stem is slightly heavier; the bass clef's stroke starts with a clean cut just above the head, with an even gap; the alto clef's arms meet the bowls without a step.
+
 ## 1.12.4
 
 - **StarScore Deco 0.4**, from Joel's review of 0.3:

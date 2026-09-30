@@ -6,7 +6,7 @@ import style
 import os
 CONTRAST = os.environ.get('DECO_CLEF', 'c') == 'c'
 BOWL = Nib(0.10, 0.37, 1.5) if CONTRAST else style.pen(0.34)
-STEM = style.pen(0.20) if CONTRAST else style.pen(0.27)
+STEM = style.pen(0.22) if CONTRAST else style.pen(0.27)
 
 
 def gclef():
@@ -84,8 +84,8 @@ def fclef():
 def f_stencil():
     """Stencil bass clef: the head is a separate disc, and breaks cross the top, the heavy side
     and the tail; each dot is split."""
-    skel = [(0.42, 0.0),
-            ('C', (0.42, 0.64), (0.82, 1.04), (1.28, 1.04)),
+    skel = [(0.42, 0.46),
+            ('C', (0.42, 0.80), (0.80, 1.04), (1.28, 1.04)),
             ('C', (1.82, 1.04), (2.16, 0.64), (2.16, 0.02)),
             ('C', (2.16, -0.86), (1.44, -1.74), (0.18, -2.46))]
     taper = lambda u: 1.0 if u < 0.52 else max(0.22, 1.0 - (u - 0.52) / 0.48 * 0.80)
@@ -125,8 +125,7 @@ def cclef():
     half = nib.wmin / 2
     if STENCIL_ARMS:          # arms stop short of the thin bar, cut vertically, pointing at it
         x0a = 1.04
-        k = (yb - 0.08) / (1.30 - x0a)
-        arm = poly([(x0a, 0.08 - half * 1.15), (1.30, yb - half), (1.30, yb + half), (x0a, 0.08 + half * 1.15)])
+        arm = poly([(x0a, 0.08 - half * 1.15), (1.26, yb - half), (1.26, yb + half), (x0a, 0.08 + half * 1.15)])
     else:
         arm = poly([(0.86, 0.0), (1.26, yb - half), (1.26, yb + half), (0.86, 0.17)])
     upper = union(bowl_, arm)
