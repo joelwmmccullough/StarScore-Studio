@@ -116,7 +116,7 @@ def L_f():
     return p, 0.0, bounds(p)[2]
 
 
-def L_s(w=None, H=XH, wh=0.19, k=1.22, a_top=32, a_bot=-148):
+def L_s(w=None, H=XH, wh=0.175, k=1.22, a_top=32, a_bot=-148):
     """Modernoir s: two elliptic arcs joined by a straight spine tangent to both. Drawn as one
     even stroke of width wh on a narrower skeleton, then widened by k, so the sides come out
     k times heavier than the tops and bottoms (the letter's vertical stress)."""
@@ -137,6 +137,7 @@ def L_s(w=None, H=XH, wh=0.19, k=1.22, a_top=32, a_bot=-148):
     a2 = Mo.ell_angle(*El, p2)
     if a2 > 90:
         a2 -= 360
+    # arcs run on to the extreme right/left and are then cut vertically at the terminal angles
     sk = Mo.chain(Mo.arc(*Eu, a_top, a1), Mo.line(p1, p2), Mo.arc(*El, a2, a_bot))
     g = affinity.scale(Mo.buf(sk, wh, join='round'), k, 1.0, origin=(0, 0))
     return Mo.to_path(g), 0.0, w
@@ -156,7 +157,10 @@ def L_e():
     b = oval_bowl(0, w)
     bar = rect(0.02, XH * 0.50, w - 0.02, XH * 0.50 + t)
     p = union(b, bar)
-    p = diff(p, rect(w / 2, 0.16, 5, XH * 0.50))                # open lower right, flat cut
+    cx, cy = w / 2, XH / 2
+    far = 5
+    wedge = poly([(cx, cy), (cx + far, cy), (cx + far * math.cos(math.radians(-32)), cy + far * math.sin(math.radians(-32)))])
+    p = diff(p, wedge)                                           # open lower right, radial cut
     return p, 0.0, w
 
 

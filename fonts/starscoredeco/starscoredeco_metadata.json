@@ -31,7 +31,7 @@
   "tupletBracketThickness": 0.14
  },
  "fontName": "StarScore Deco",
- "fontVersion": 0.3,
+ "fontVersion": 0.4,
  "glyphBBoxes": {
   "accidentalBracketLeft": {
    "bBoxNE": [
@@ -465,22 +465,22 @@
   },
   "cClef": {
    "bBoxNE": [
-    2.84,
-    2.023
+    2.833,
+    2.026
    ],
    "bBoxSW": [
     0.0,
-    -2.023
+    -2.027
    ]
   },
   "cClefChange": {
    "bBoxNE": [
-    2.272,
-    1.619
+    2.266,
+    1.62
    ],
    "bBoxSW": [
     0.0,
-    -1.619
+    -1.622
    ]
   },
   "caesura": {
@@ -515,7 +515,7 @@
   },
   "clef15": {
    "bBoxNE": [
-    1.015,
+    0.982,
     1.1
    ],
    "bBoxSW": [
@@ -530,7 +530,7 @@
    ],
    "bBoxSW": [
     0.001,
-    0.0
+    -0.0
    ]
   },
   "coda": {
@@ -885,71 +885,71 @@
   },
   "dynamicSforzando": {
    "bBoxNE": [
-    0.634,
-    1.059
+    0.662,
+    1.061
    ],
    "bBoxSW": [
-    0.054,
-    0.001
+    0.058,
+    -0.001
    ]
   },
   "dynamicSforzando1": {
    "bBoxNE": [
-    1.685,
+    1.717,
     1.484
    ],
    "bBoxSW": [
-    0.054,
+    0.058,
     -0.424
    ]
   },
   "dynamicSforzandoPianissimo": {
    "bBoxNE": [
-    3.175,
+    3.207,
     1.484
    ],
    "bBoxSW": [
-    0.054,
+    0.058,
     -0.424
    ]
   },
   "dynamicSforzandoPiano": {
    "bBoxNE": [
-    2.366,
+    2.398,
     1.484
    ],
    "bBoxSW": [
-    0.054,
+    0.058,
     -0.424
    ]
   },
   "dynamicSforzato": {
    "bBoxNE": [
-    2.362,
+    2.394,
     1.484
    ],
    "bBoxSW": [
-    0.054,
+    0.058,
     -0.424
    ]
   },
   "dynamicSforzatoFF": {
    "bBoxNE": [
-    3.204,
+    3.236,
     1.484
    ],
    "bBoxSW": [
-    0.054,
+    0.058,
     -0.424
    ]
   },
   "dynamicSforzatoPiano": {
    "bBoxNE": [
-    3.091,
+    3.122,
     1.484
    ],
    "bBoxSW": [
-    0.054,
+    0.058,
     -0.424
    ]
   },
@@ -965,62 +965,62 @@
   },
   "fClef": {
    "bBoxNE": [
-    2.809,
+    2.819,
     1.095
    ],
    "bBoxSW": [
     0.0,
-    -2.482
+    -2.481
    ]
   },
   "fClef15ma": {
    "bBoxNE": [
-    2.809,
+    2.819,
     2.316
    ],
    "bBoxSW": [
     0.0,
-    -2.482
+    -2.481
    ]
   },
   "fClef15mb": {
    "bBoxNE": [
-    2.809,
+    2.819,
     1.095
    ],
    "bBoxSW": [
     0.0,
-    -3.702
+    -3.701
    ]
   },
   "fClef8va": {
    "bBoxNE": [
-    2.809,
+    2.819,
     2.316
    ],
    "bBoxSW": [
     0.0,
-    -2.482
+    -2.481
    ]
   },
   "fClef8vb": {
    "bBoxNE": [
-    2.809,
+    2.819,
     1.095
    ],
    "bBoxSW": [
     0.0,
-    -3.702
+    -3.701
    ]
   },
   "fClefChange": {
    "bBoxNE": [
-    2.247,
+    2.255,
     0.876
    ],
    "bBoxSW": [
     0.0,
-    -1.986
+    -1.985
    ]
   },
   "fermataAbove": {
@@ -1315,62 +1315,62 @@
   },
   "gClef": {
    "bBoxNE": [
-    2.87,
-    4.733
+    2.82,
+    4.717
    ],
    "bBoxSW": [
-    -0.002,
+    0.0,
     -2.672
    ]
   },
   "gClef15ma": {
    "bBoxNE": [
-    2.87,
-    5.953
+    2.82,
+    5.937
    ],
    "bBoxSW": [
-    -0.002,
-    -2.672
+    0.0,
+    -2.67
    ]
   },
   "gClef15mb": {
    "bBoxNE": [
-    2.87,
-    4.733
+    2.82,
+    4.717
    ],
    "bBoxSW": [
-    -0.002,
+    0.0,
     -3.892
    ]
   },
   "gClef8va": {
    "bBoxNE": [
-    2.87,
-    5.953
+    2.82,
+    5.937
    ],
    "bBoxSW": [
-    -0.002,
-    -2.672
+    0.0,
+    -2.67
    ]
   },
   "gClef8vb": {
    "bBoxNE": [
-    2.87,
-    4.733
+    2.82,
+    4.717
    ],
    "bBoxSW": [
-    -0.002,
+    0.0,
     -3.892
    ]
   },
   "gClefChange": {
    "bBoxNE": [
-    2.296,
-    3.787
+    2.259,
+    3.773
    ],
    "bBoxSW": [
-    -0.002,
-    -2.138
+    0.0,
+    -2.136
    ]
   },
   "keyboardPedalDot": {
@@ -1696,110 +1696,110 @@
   "ornamentTurn": {
    "bBoxNE": [
     1.901,
-    0.851
+    0.907
    ],
    "bBoxSW": [
     -0.001,
-    -0.002
+    -0.0
    ]
   },
   "ornamentTurnInverted": {
    "bBoxNE": [
     1.901,
-    0.851
+    0.907
    ],
    "bBoxSW": [
     -0.001,
-    -0.002
+    -0.0
    ]
   },
   "ornamentTurnSlash": {
    "bBoxNE": [
-    1.9,
-    1.149
+    1.898,
+    1.206
    ],
    "bBoxSW": [
-    -0.001,
+    0.001,
     -0.3
    ]
   },
   "ottava": {
    "bBoxNE": [
-    1.16,
+    1.18,
     1.6
    ],
    "bBoxSW": [
-    0.072,
+    0.068,
     0.0
    ]
   },
   "ottavaAlta": {
    "bBoxNE": [
-    2.395,
+    2.415,
     1.6
    ],
    "bBoxSW": [
-    0.072,
+    0.068,
     0.0
    ]
   },
   "ottavaBassa": {
    "bBoxNE": [
-    2.381,
+    2.401,
     1.6
    ],
    "bBoxSW": [
-    0.072,
+    0.068,
     0.0
    ]
   },
   "ottavaBassaBa": {
    "bBoxNE": [
-    2.544,
+    2.565,
     1.6
    ],
    "bBoxSW": [
-    0.072,
+    0.068,
     0.0
    ]
   },
   "ottavaBassaVb": {
    "bBoxNE": [
-    2.381,
+    2.401,
     1.6
    ],
    "bBoxSW": [
-    0.072,
+    0.068,
     0.0
    ]
   },
   "quindicesima": {
    "bBoxNE": [
-    1.696,
+    1.648,
     1.6
    ],
    "bBoxSW": [
-    0.244,
+    0.248,
     0.0
    ]
   },
   "quindicesimaAlta": {
    "bBoxNE": [
-    3.311,
+    3.263,
     1.6
    ],
    "bBoxSW": [
-    0.244,
+    0.248,
     0.0
    ]
   },
   "quindicesimaBassa": {
    "bBoxNE": [
-    3.297,
+    3.249,
     1.6
    ],
    "bBoxSW": [
-    0.244,
+    0.248,
     0.0
    ]
   },
@@ -2015,7 +2015,7 @@
   },
   "timeSig1": {
    "bBoxNE": [
-    0.76,
+    0.7,
     1.0
    ],
    "bBoxSW": [
@@ -2040,7 +2040,7 @@
    ],
    "bBoxSW": [
     0.08,
-    -1.002
+    -1.0
    ]
   },
   "timeSig4": {
@@ -2235,7 +2235,7 @@
   },
   "tuplet1": {
    "bBoxNE": [
-    0.55,
+    0.505,
     1.5
    ],
    "bBoxSW": [
@@ -2260,7 +2260,7 @@
    ],
    "bBoxSW": [
     0.04,
-    -0.001
+    -0.003
    ]
   },
   "tuplet4": {
@@ -2309,8 +2309,8 @@
     1.5
    ],
    "bBoxSW": [
-    0.041,
-    0.0
+    0.042,
+    -0.0
    ]
   },
   "tuplet9": {
@@ -2623,43 +2623,43 @@
   },
   "dynamicSforzando": {
    "opticalCenter": [
-    0.343,
+    0.358,
     0.0
    ]
   },
   "dynamicSforzando1": {
    "opticalCenter": [
-    0.819,
+    0.835,
     0.0
    ]
   },
   "dynamicSforzandoPianissimo": {
    "opticalCenter": [
-    1.628,
+    1.644,
     0.0
    ]
   },
   "dynamicSforzandoPiano": {
    "opticalCenter": [
-    1.223,
+    1.239,
     0.0
    ]
   },
   "dynamicSforzato": {
    "opticalCenter": [
-    1.181,
+    1.197,
     0.0
    ]
   },
   "dynamicSforzatoFF": {
    "opticalCenter": [
-    1.602,
+    1.618,
     0.0
    ]
   },
   "dynamicSforzatoPiano": {
    "opticalCenter": [
-    1.586,
+    1.602,
     0.0
    ]
   },

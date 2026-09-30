@@ -4,6 +4,13 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.12.4
+
+- **StarScore Deco 0.4**, from Joel's review of 0.3:
+  - Treble, bass and alto clefs are now the stencil design: narrow breaks where strokes meet or cross. In the treble clef the stem stops short on both sides of every stroke it crosses; the thickest strokes are lighter. The bass clef's head is a separate disc, with breaks across the top, the heavy side and the tail, and split dots. The alto clef has smaller ball ends, a split thick bar, and arms that stop short of the thin bar.
+  - The 4's stem moved left (and the 1 and 3 were adjusted) so figures stacked in a time signature line up.
+  - A subtler 8, a wider and more open s (dynamics, turn, segno), and a cleaner e in Ped.
+
 ## 1.12.3
 
 - **StarScore Deco 0.3**, redrawn from Joel's glyph-by-glyph review of 0.2:

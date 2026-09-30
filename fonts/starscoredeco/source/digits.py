@@ -67,7 +67,7 @@ def _figs(H, w, W_of):
     ry = 0.29 * H - e
     cy = -h + e + ry
     ybot = cy + ry - e                        # lower edge of the bowl's top stroke
-    bowl3 = M.buf(M.arc(W / 2, cy, rx, ry, 150, -155), w)
+    bowl3 = M.buf(M.arc(W / 2, cy, rx, ry, 150, -168), w)
     xl = W / 2 - 0.02 * W                     # where the diagonal's left edge lands
     xr = xl + w
     for _ in range(30):
@@ -87,7 +87,7 @@ def _figs(H, w, W_of):
 
     # 4: closed pointed top, crossbar running past the stem
     W = W_of('4')
-    xs1 = W - 0.07 * W                        # stem right edge
+    xs1 = W - 0.20 * W                        # stem right edge (crossbar runs past it)
     xs0 = xs1 - w
     cb = -h + 0.25 * H                        # crossbar bottom
     outer = M.Polygon([(xs0, -h), (xs1, -h), (xs1, cb), (W, cb), (W, cb + w), (xs1, cb + w),
@@ -142,10 +142,10 @@ def _figs(H, w, W_of):
 
     # 8: smaller upper loop on a larger lower loop; they share one stroke at the waist
     W = W_of('8')
-    ryl = 0.27 * H - e
+    ryl = 0.262 * H - e
     ryu = (H - w) / 2 - ryl
     rxl = W / 2 - e
-    rxu = rxl * 0.86
+    rxu = rxl * 0.92
     cyl = -h + e + ryl
     cyu = cyl + ryl + ryu
     F['8'] = M.G(M.ring(W / 2, cyu, rxu, ryu, w), M.ring(W / 2, cyl, rxl, ryl, w))
