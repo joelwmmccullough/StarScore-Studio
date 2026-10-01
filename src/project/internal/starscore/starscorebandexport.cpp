@@ -58,6 +58,7 @@
 #include "starscorepdf.h"
 
 #include "io/filestream.h"
+#include "global/serialization/zipreader.h"
 #include "translation.h"
 #include "log.h"
 
@@ -892,6 +893,71 @@ static void starscoreRetitleSheet(mu::engraving::Score* score, const QString& le
     score->doLayout();
 }
 
+// ---------------------------------------------------------------------------
+//  Re-exports that change nothing
+// ---------------------------------------------------------------------------
+
+//! A PDF with the parts that differ between two exports of the same pages blanked out: the dates
+//! (/CreationDate, /ModDate and the XMP dates), the document UUID and the /ID pair.
+static QByteArray starscorePdfWithoutStamps(const QByteArray& pdf)
+{
+    QString s = QString::fromLatin1(pdf);   // one char per byte, so binary streams survive
+    static const QRegularExpression pdfDate("\\(D:[0-9+\\-Z' ]*\\)");
+    static const QRegularExpression xmpDate("(xmp:[A-Za-z]+Date)=\"[^\"]*\"");
+    static const QRegularExpression uuid("uuid:[0-9A-Fa-f\\-]+");
+    static const QRegularExpression ids("/ID\\s*\\[\\s*<[0-9A-Fa-f]*>\\s*<[0-9A-Fa-f]*>\\s*\\]");
+    s.replace(pdfDate, "(D:)");
+    s.replace(xmpDate, "\\1=\"\"");
+    s.replace(uuid, "uuid:");
+    s.replace(ids, "/ID[]");
+    return s.toLatin1();
+}
+
+//! True when a freshly exported PDF shows exactly what the existing file shows: the same bytes apart
+//! from the export date and the random document id
+static bool starscoreSamePdf(const QString& freshPath, const QString& existingPath)
+{
+    QFile a(freshPath), b(existingPath);
+    if (!a.open(QIODevice::ReadOnly) || !b.open(QIODevice::ReadOnly) || a.size() != b.size()) {
+        return false;
+    }
+    const QByteArray x = a.readAll(), y = b.readAll();
+    return x == y || starscorePdfWithoutStamps(x) == starscorePdfWithoutStamps(y);
+}
+
+//! True when two .mscz files hold the same files with the same contents (the zip's own dates are ignored)
+static bool starscoreSameMscz(const QString& freshPath, const QString& existingPath)
+{
+    if (!QFileInfo::exists(freshPath) || !QFileInfo::exists(existingPath)) {
+        return false;
+    }
+    ZipReader a(io::path_t(freshPath)), b(io::path_t(existingPath));
+    if (a.hasError() || b.hasError()) {
+        return false;
+    }
+    std::set<std::string> names;
+    for (const ZipReader::FileInfo& f : a.fileInfoList()) {
+        if (f.isFile) {
+            names.insert(f.filePath.toStdString());
+        }
+    }
+    std::set<std::string> other;
+    for (const ZipReader::FileInfo& f : b.fileInfoList()) {
+        if (f.isFile) {
+            other.insert(f.filePath.toStdString());
+        }
+    }
+    if (names != other || names.empty()) {
+        return false;
+    }
+    for (const std::string& n : names) {
+        if (a.fileData(n) != b.fileData(n)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 Ret StarScoreService::writePdf(const INotationPtr& notation, const QString& path) const
 {
     INotationWriterPtr writer = writers()->writer("pdf");
@@ -1108,6 +1174,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     };
 
     QStringList written;
+    QStringList unchanged;
     QStringList problems = plan.val.notes;
 
     for (const StarScoreBandFile& file : plan.val.files) {
@@ -1171,8 +1238,14 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
             continue;
         }
 
-        supersede(file.relativePath);
         const QString target = songDir + "/" + file.relativePath;
+        // the same pages as the file already there (a re-export with nothing changed in this sheet):
+        // the existing file stays, and nothing is archived
+        if (QFileInfo::exists(target) && starscoreSamePdf(tmpPdf, target)) {
+            unchanged << file.relativePath;
+            continue;
+        }
+        supersede(file.relativePath);
         QDir().mkpath(QFileInfo(target).absolutePath());
         QFile::remove(target);
         if (!QFile::copy(tmpPdf, target)) {
@@ -1215,7 +1288,19 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         info.archived = archivedPaths;
         QJsonObject sigs = data.exportSignatures;
         for (const StarScoreBandFile& f : plan.val.files) {
-            if (!written.contains(f.relativePath) || !f.sourceFile.isEmpty()) {
+            if (!f.sourceFile.isEmpty()) {
+                continue;
+            }
+            if (unchanged.contains(f.relativePath)) {
+                // same pages as before: no changelog entry, but the bar signatures are kept from now on
+                if (!sigs.contains(f.relativePath)) {
+                    QJsonObject stored = organizerSignature(ms, f.partIds);
+                    stored["version"] = data.version;
+                    sigs[f.relativePath] = stored;
+                }
+                continue;
+            }
+            if (!written.contains(f.relativePath)) {
                 continue;
             }
             const QJsonObject now = organizerSignature(ms, f.partIds);
@@ -1277,7 +1362,14 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         m_lastExport = info;
     }
 
-    QString summary = muse::qtrc("starscore", "Wrote %1 PDF(s) to %2.").arg(written.size()).arg(plan.val.songFolder);
+    QString summary = written.isEmpty() && !unchanged.isEmpty()
+                      ? muse::qtrc("starscore", "Nothing to write: every sheet is the same as the file already in %1.")
+                      .arg(plan.val.songFolder)
+                      : muse::qtrc("starscore", "Wrote %1 PDF(s) to %2.").arg(written.size()).arg(plan.val.songFolder);
+    if (!written.isEmpty() && !unchanged.isEmpty()) {
+        summary += " " + muse::qtrc("starscore", "%1 sheet(s) came out the same as before, so those files were left as they were.")
+                   .arg(unchanged.size());
+    }
     if (!problems.isEmpty()) {
         summary += "\n\n" + muse::qtrc("starscore", "Skipped:") + "\n• " + problems.join("\n• ");
     }
@@ -1487,9 +1579,27 @@ RetVal<QString> StarScoreService::exportArrangementsAsMscz(const QString& folder
     QStringList written;
     QStringList failed;
     QStringList superseded;
+    QStringList unchanged;
+    const QString freshDir = QDir::tempPath() + "/StarScoreMscz-" + QUuid::createUuid().toString(QUuid::Id128);
+    QDir().mkpath(freshDir);
     for (const StarScoreArrangement& a : list) {
         const QString name = prefix + " - " + starscoreSafeFileName(a.name) + ".mscz";
         const QString target = folder + "/" + name;
+
+        // Written to a temporary file first: when it holds the same as the file already there, nothing changes
+        const QString fresh = freshDir + "/" + name;
+        QFile::remove(fresh);
+        const Ret ret = exportArrangement(a.id, io::path_t(fresh));
+        if (!ret) {
+            QFile::remove(fresh);
+            failed << QString("%1 (%2)").arg(name, QString::fromStdString(ret.toString()));
+            continue;
+        }
+        if (starscoreSameMscz(fresh, target)) {
+            QFile::remove(fresh);
+            unchanged << name;
+            continue;
+        }
 
         // An older copy moves to Version History/Superseded <today>/ instead of being overwritten
         if (QFileInfo::exists(target)) {
@@ -1504,13 +1614,15 @@ RetVal<QString> StarScoreService::exportArrangementsAsMscz(const QString& folder
             }
         }
 
-        const Ret ret = exportArrangement(a.id, io::path_t(target));
-        if (ret) {
-            written << name;
-        } else {
-            failed << QString("%1 (%2)").arg(name, QString::fromStdString(ret.toString()));
+        const bool placed = !QFileInfo::exists(target) && QFile::copy(fresh, target);
+        QFile::remove(fresh);
+        if (!placed) {
+            failed << QString("%1 (%2)").arg(name, muse::qtrc("starscore", "couldn't replace the existing file"));
+            continue;
         }
+        written << name;
     }
+    QDir(freshDir).removeRecursively();
 
     QString summary = muse::qtrc("starscore", "Wrote %1 MuseScore file(s) to %2:").arg(written.size()).arg(folder);
     for (const QString& w : written) {
@@ -1519,6 +1631,10 @@ RetVal<QString> StarScoreService::exportArrangementsAsMscz(const QString& folder
     if (!superseded.isEmpty()) {
         summary += "\n\n" + muse::qtrc("starscore", "Older copies of %1 file(s) moved to Version History/Superseded %2.")
                    .arg(superseded.size()).arg(today);
+    }
+    if (!unchanged.isEmpty()) {
+        summary += "\n\n" + muse::qtrc("starscore", "Left as they were (the same as the existing files):") + "\n  • "
+                   + unchanged.join("\n  • ");
     }
     if (!failed.isEmpty()) {
         summary += "\n\n" + muse::qtrc("starscore", "Couldn't export:") + "\n  • " + failed.join("\n  • ");

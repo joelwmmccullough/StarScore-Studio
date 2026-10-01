@@ -521,8 +521,10 @@ ProjectsFilingReport fileProjects(const Paths& paths, const Progress& progress)
     // what to file: loose top-level files and everything in 9 Inbox (bundles move whole)
     QStringList targets;
     const QDir top(base);
+    // Shortcuts (symlinks, e.g. "10 Sweater Weather" pointing into another band's shared Drive) are never
+    // followed or moved: what they point to isn't part of this folder
     for (const QFileInfo& fi : top.entryInfoList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
-        if (hidden(fi.fileName()) || KEEP_TOP.contains(fi.fileName()) || (fi.isDir() && !isBundle(fi.filePath()))) {
+        if (fi.isSymLink() || hidden(fi.fileName()) || KEEP_TOP.contains(fi.fileName()) || (fi.isDir() && !isBundle(fi.filePath()))) {
             continue;
         }
         targets << fi.fileName();
@@ -531,7 +533,7 @@ ProjectsFilingReport fileProjects(const Paths& paths, const Progress& progress)
     QDir().mkpath(inbox);
     std::function<void(const QString&)> walk = [&](const QString& dirRel) {
         for (const QFileInfo& fi : QDir(base + "/" + dirRel).entryInfoList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
-            if (hidden(fi.fileName())) {
+            if (fi.isSymLink() || hidden(fi.fileName())) {
                 continue;
             }
             const QString rel = dirRel + "/" + fi.fileName();
@@ -622,12 +624,15 @@ ProjectsFilingReport fileProjects(const Paths& paths, const Progress& progress)
         }
         return true;
     };
-    for (int pass = 0; pass < 4; ++pass) {
+    for (int pass = 0; pass < 4 && !progress.stopped(); ++pass) {
         QStringList cands;
         std::function<void(const QString&)> scan = [&](const QString& dirRel) {
+            if (progress.stopped()) {
+                return;
+            }
             for (const QFileInfo& fi : QDir(base + "/" + dirRel).entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot | QDir::Hidden, QDir::Name)) {
                 const QString rel = dirRel.isEmpty() ? fi.fileName() : dirRel + "/" + fi.fileName();
-                if (fi.fileName().startsWith('.') || isBundle(fi.filePath()) || KEEP.contains(rel.section('/', 0, 0))) {
+                if (fi.isSymLink() || fi.fileName().startsWith('.') || isBundle(fi.filePath()) || KEEP.contains(rel.section('/', 0, 0))) {
                     continue;
                 }
                 scan(rel);
@@ -638,7 +643,7 @@ ProjectsFilingReport fileProjects(const Paths& paths, const Progress& progress)
             }
         };
         scan(QString());
-        if (cands.isEmpty()) {
+        if (cands.isEmpty() || progress.stopped()) {
             break;
         }
         for (const QString& c : cands) {

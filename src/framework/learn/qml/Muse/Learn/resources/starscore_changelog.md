@@ -4,6 +4,12 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.13.1
+
+- **Organizing after an export now runs.** In 1.13.0 the organizer window closed the moment it opened after an export (a window opened from the export window closed with it), so nothing was organized. It now opens once the export window has closed.
+- **Re-exports that change nothing leave the files alone.** A sheet that comes out the same as the file already in Sheets and Demos isn't rewritten or moved to Version History (the PDFs are compared without their export date and random document id). The export summary says how many were left as they were. The same applies to Export arrangements as MuseScore files.
+- **Folder shortcuts are never followed.** In Projects and Sheets, the empty-folder sweep went into "10 Sweater Weather", a shortcut to another band's shared Drive folder. It walked that whole folder (very slowly) and could have moved its empty folders. Shortcuts are now skipped everywhere the organizer files or sweeps, and Stop now also stops the sweep.
+
 ## 1.13.0
 
 - **The folder organizer is now part of StarScore.** It replaces the Python scripts and the two daily tasks (off since 21 Aug). It runs after every Export to Sheets and Demos (the new "Run organization process" box, ticked by default), and from File › Run folder organization or the Dashboard. It:

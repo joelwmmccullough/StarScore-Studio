@@ -5,7 +5,9 @@
  */
 #include "bandexportmodel.h"
 
+#include <QCoreApplication>
 #include <QSettings>
+#include <QTimer>
 
 #include "translation.h"
 
@@ -285,5 +287,10 @@ void BandExportModel::setRunOrganizer(bool on)
 
 void BandExportModel::openOrganizer()
 {
-    interactive()->open(muse::UriQuery("musescore://starscore/organizer?mode=export"));
+    // Opened once the export window has closed: a window opened from it takes it as its parent,
+    // and the framework closes a window as soon as its parent hides (which stopped every run right away)
+    std::shared_ptr<muse::IInteractive> ia = interactive();
+    QTimer::singleShot(400, qApp, [ia]() {
+        ia->open(muse::UriQuery("musescore://starscore/organizer?mode=export"));
+    });
 }
