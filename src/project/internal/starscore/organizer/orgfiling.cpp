@@ -10,6 +10,7 @@
 #include <QDateTime>
 #include <QDir>
 #include <QDirIterator>
+#include <QFile>
 #include <QFileInfo>
 #include <QRegularExpression>
 
@@ -798,6 +799,13 @@ QStringList retireOldToolkits(const Paths& paths)
         const QString dest = folder + "/Deprecated/Retired " + paths.todayIso();
         const QStringList names = QDir(folder).entryList(patterns, QDir::Files | QDir::Dirs | QDir::Hidden | QDir::NoDotAndDotDot, QDir::Name);
         for (const QString& n : names) {
+            // the RULES.md StarScore writes stays (a first run that was cut short already wrote it)
+            if (n == "RULES.md") {
+                QFile f(folder + "/" + n);
+                if (f.open(QIODevice::ReadOnly) && f.read(200).contains("StarScore Studio does all of this")) {
+                    continue;
+                }
+            }
             if (moveItem(folder + "/" + n, freeName(dest + "/" + n))) {
                 moved << n;
             }

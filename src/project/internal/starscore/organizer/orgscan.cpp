@@ -37,8 +37,20 @@ void SheetCache::load(const Paths& paths)
         return;
     }
 
-    // First run: the old toolkit's measurements (density.tsv) and fingerprints (fingerprints.json)
-    QFile density(paths.toolkit + "/density.tsv");
+    // First run: the old toolkit's measurements (density.tsv) and fingerprints (fingerprints.json), in the
+    // toolkit or, when a first run was cut short after retiring them, in the newest Deprecated/Retired folder
+    QString oldToolkit = paths.toolkit;
+    if (!QFileInfo::exists(oldToolkit + "/density.tsv")) {
+        QStringList retired = QDir(paths.toolkit + "/Deprecated").entryList({ "Retired *" }, QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
+        for (int i = int(retired.size()) - 1; i >= 0; --i) {
+            const QString dir = paths.toolkit + "/Deprecated/" + retired[i];
+            if (QFileInfo::exists(dir + "/density.tsv")) {
+                oldToolkit = dir;
+                break;
+            }
+        }
+    }
+    QFile density(oldToolkit + "/density.tsv");
     if (density.open(QIODevice::ReadOnly)) {
         for (const QByteArray& line : density.readAll().split('\n')) {
             const QList<QByteArray> f = line.split('\t');
@@ -54,7 +66,7 @@ void SheetCache::load(const Paths& paths)
             m_entries[QString::fromUtf8(f[0])] = e;
         }
     }
-    const QJsonObject fp = readJsonObject(paths.toolkit + "/fingerprints.json");
+    const QJsonObject fp = readJsonObject(oldToolkit + "/fingerprints.json");
     for (auto it = fp.begin(); it != fp.end(); ++it) {
         auto e = m_entries.find(it.key());
         if (e != m_entries.end()) {
