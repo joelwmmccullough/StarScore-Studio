@@ -11,16 +11,24 @@ jobs:
     steps:
     - uses: actions/checkout@v6
     - name: Build and run
-      timeout-minutes: 45
+      timeout-minutes: 25
       run: |
-        clang++ -fobjc-arc -O1 probe.mm -o probe -framework Cocoa -framework WebKit -framework PDFKit
-        mkdir -p out
-        ./probe "$PWD" "$PWD/out" music x || echo "music probe exited $?" >> out/report.txt
-        for f in whatshere.html recordings.html bandguide.html progress.html allrecordings.html; do
-          for v in C B A1 A0; do
-            perl -e 'alarm shift; exec @ARGV' 60 ./probe "$PWD" "$PWD/out" $f $v || echo "  $f $v exited $?" >> out/report.txt
-          done
-        done
+        mkdir -p Probe.app/Contents/MacOS out
+        cat > Probe.app/Contents/Info.plist <<'PLIST'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0"><dict>
+        <key>CFBundleIdentifier</key><string>org.starscore.probe</string>
+        <key>CFBundleExecutable</key><string>probe</string>
+        <key>CFBundleName</key><string>Probe</string>
+        <key>CFBundlePackageType</key><string>APPL</string>
+        <key>LSUIElement</key><true/>
+        <key>NSPrincipalClass</key><string>NSApplication</string>
+        </dict></plist>
+        PLIST
+        clang++ -fobjc-arc -O1 probe.mm -o Probe.app/Contents/MacOS/probe -framework Cocoa -framework WebKit -framework PDFKit
+        codesign -s - --force --deep Probe.app || true
+        perl -e 'alarm shift; exec @ARGV' 900 Probe.app/Contents/MacOS/probe "$PWD" "$PWD/out" || echo "probe exited $?" >> out/report.txt
     - name: Publish results to the ci-probe branch
       if: always()
       run: |
