@@ -95,6 +95,18 @@ void ProjectActionsController::init()
     dispatcher()->reg(this, "starscore-audit-library", [this]() {
         interactive()->open(Uri("musescore://starscore/auditlibrary"));
     });
+    dispatcher()->reg(this, "starscore-organize", [this]() {
+        interactive()->open(UriQuery("musescore://starscore/organizer?mode=organize"));
+    });
+    dispatcher()->reg(this, "starscore-rebuild-all", [this]() {
+        interactive()->open(UriQuery("musescore://starscore/organizer?mode=rebuild"));
+    });
+    dispatcher()->reg(this, "starscore-band-roster", [this]() {
+        interactive()->open(Uri("musescore://starscore/roster"));
+    });
+    dispatcher()->reg(this, "starscore-recordings", [this]() {
+        interactive()->open(Uri("musescore://starscore/recordings"));
+    });
     dispatcher()->reg(this, "starscore-compare-parts", [this]() {
         interactive()->open(Uri("musescore://starscore/compare"));
     });
@@ -211,6 +223,9 @@ bool ProjectActionsController::canReceiveAction(const ActionCode& code) const
             "starscore-toggle-panel",
             "starscore-audit-library",
             "starscore-audit-open",
+            "starscore-organize",
+            "starscore-rebuild-all",
+            "starscore-band-roster",
             "file-open",
             "file-import-pdf",
             "file-import-audio-to-score",

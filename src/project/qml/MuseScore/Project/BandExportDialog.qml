@@ -211,6 +211,13 @@ StyledDialogView {
             text: exportModel.notes
         }
 
+        CheckBox {
+            visible: root.listMode && !root.done
+            text: qsTrc("starscore", "Run organization process")
+            checked: exportModel.runOrganizer
+            onClicked: exportModel.runOrganizer = !checked
+        }
+
         ButtonBox {
             Layout.fillWidth: true
             buttons: [ ButtonBoxModel.Close ]
@@ -241,6 +248,10 @@ StyledDialogView {
                     resultLabel.text = qsTrc("starscore", "Exporting…")
                     root.done = true
                     resultLabel.text = exportModel.exportNow()
+                    if (exportModel.runOrganizer) {
+                        exportModel.openOrganizer()
+                        root.hide()
+                    }
                 }
             }
 

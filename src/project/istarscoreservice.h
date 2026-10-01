@@ -14,8 +14,13 @@
 
 #include <vector>
 
+#include <optional>
+
+#include <QJsonObject>
 #include <QString>
 #include <QStringList>
+
+#include "internal/starscore/organizer/orgchangelog.h"
 
 #include "modularity/imoduleinterface.h"
 #include "global/io/path.h"
@@ -493,6 +498,18 @@ public:
     virtual QString referencePageImage(const QString& referenceId, int page, int widthPx) const = 0;
     //! Save changed solos and the main score (used when Save is pressed while a solo is showing)
     virtual muse::Ret saveAll() = 0;
+
+    // --- the organizer (keeps Sheets and Demos and Projects and Sheets in order after exports)
+    //! What the last "Export to Sheets and Demos" did, for the organizer run that follows it (taken once)
+    virtual std::optional<starscore::org::ExportInfo> takeLastExport() = 0;
+    //! "Projects and Sheets": saved choice, or the usual Google Drive location if it exists
+    virtual QString projectsFolder() const = 0;
+    virtual void setProjectsFolder(const QString& path) = 0;
+    //! This song's code in Sheets and Demos (codes.json, else the file name's "CODE - "), "" when unknown
+    virtual QString songCode() const = 0;
+    //! This song's recordings, kept in the .starscore (a copy of its part of recordings.json)
+    virtual QJsonObject songRecordings() const = 0;
+    virtual void setSongRecordings(const QJsonObject& recordings) = 0;
 
     // --- export to the band's "Sheets and Demos" folder ---
     virtual QString bandFolder() const = 0;          // saved choice, or the usual Google Drive location if it exists

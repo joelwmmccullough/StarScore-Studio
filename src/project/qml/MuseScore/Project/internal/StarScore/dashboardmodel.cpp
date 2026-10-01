@@ -484,3 +484,8 @@ void DashboardModel::auditInOrder()
         }
     });
 }
+
+void DashboardModel::runAction(const QString& action)
+{
+    dispatcher()->dispatch(action.toStdString());
+}

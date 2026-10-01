@@ -99,6 +99,30 @@ const UiActionList ProjectUiActions::m_actions = {
              TranslatableString("action", "Export arrangements as MuseScore files…"),
              TranslatableString("action", "Export each arrangement as its own MuseScore file (.mscz)")
              ),
+    UiAction("starscore-organize",
+             mu::context::UiCtxAny,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Run folder organization…"),
+             TranslatableString("action", "Keep Sheets and Demos and Projects and Sheets in order and rebuild the PDFs that are out of date")
+             ),
+    UiAction("starscore-rebuild-all",
+             mu::context::UiCtxAny,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Rebuild every generated PDF…"),
+             TranslatableString("action", "Organize the folders and rebuild every generated PDF in Sheets and Demos and Projects and Sheets")
+             ),
+    UiAction("starscore-band-roster",
+             mu::context::UiCtxAny,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Band roster…"),
+             TranslatableString("action", "Who plays what, for the changelogs and Horn Part Guides")
+             ),
+    UiAction("starscore-recordings",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Recordings…"),
+             TranslatableString("action", "This song's recordings: shows, albums, sessions, and your star ratings")
+             ),
     UiAction("starscore-audit-library",
              mu::context::UiCtxAny,
              mu::context::CTX_ANY,

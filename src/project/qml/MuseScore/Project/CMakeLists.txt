@@ -76,6 +76,12 @@ qt_add_qml_module(project_qml
         internal/StarScore/additivetimesigmodel.h
         internal/StarScore/bandexportmodel.cpp
         internal/StarScore/bandexportmodel.h
+        internal/StarScore/organizermodel.cpp
+        internal/StarScore/organizermodel.h
+        internal/StarScore/rostermodel.cpp
+        internal/StarScore/rostermodel.h
+        internal/StarScore/recordingsmodel.cpp
+        internal/StarScore/recordingsmodel.h
         internal/StarScore/comparepartsmodel.cpp
         internal/StarScore/comparepartsmodel.h
         internal/StarScore/voiceordermodel.cpp
@@ -180,6 +186,9 @@ qt_add_qml_module(project_qml
         AddSoloDialog.qml
         AdditiveTimeSigDialog.qml
         BandExportDialog.qml
+        OrganizerDialog.qml
+        BandRosterDialog.qml
+        RecordingsDialog.qml
         ComparePartsDialog.qml
         VoiceOrderDialog.qml
         StarScoreImportDialog.qml

@@ -135,6 +135,12 @@ public:
 
     QString bandFolder() const override;
     void setBandFolder(const QString& path) override;
+    std::optional<starscore::org::ExportInfo> takeLastExport() override;
+    QString projectsFolder() const override;
+    void setProjectsFolder(const QString& path) override;
+    QString songCode() const override;
+    QJsonObject songRecordings() const override;
+    void setSongRecordings(const QJsonObject& recordings) override;
     muse::RetVal<StarScoreBandExportPlan> planBandExport() const override;
     muse::Ret registerBandSong(const QString& title, int category, const QString& code) override;
     muse::RetVal<QString> exportArrangementsAsMscz(const QString& folder) override;
@@ -204,6 +210,10 @@ public:
         // StarScore Deco switched on: score ("" = main score, else the part book's name) -> its fonts before
         // (music symbols, music text, dynamics)
         std::map<QString, QStringList> decoRestore;
+        // Organizer: each exported sheet's bar signatures at its last export ("sheet path" -> {version, bars, marks}),
+        // for bar-by-bar changelog entries; and this song's recordings (a copy of its part of recordings.json)
+        QJsonObject exportSignatures;
+        QJsonObject recordings;
 
         // Audit mode
         QString auditReferenceSectionId;          // section the others are compared with (empty = automatic)
@@ -223,6 +233,12 @@ public:
     static QString idTextOf(const mu::engraving::Part* part);
 
 private:
+    //! Organizer: per-bar signatures of a sheet ({bars: [...], marks: {bar: "A"}}), and the 1-3 horn parts analysed
+    //! for the Horn Part Guides (starscoreaudit.cpp)
+    QJsonObject organizerSignature(const mu::engraving::MasterScore* ms, const QStringList& partIds) const;
+    QJsonObject organizerHornAnalysis(const mu::engraving::MasterScore* ms, const StarScoreBandExportPlan& plan) const;
+    std::optional<starscore::org::ExportInfo> m_lastExport;
+
     mu::engraving::MasterScore* masterScore() const;
     void listenCurrentProject();
     Data load() const;

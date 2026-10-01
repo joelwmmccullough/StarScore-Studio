@@ -457,6 +457,8 @@ QVariantList StarScoreBarModel::moreMenu() const
         QVariantMap { { "id", "set-version" }, { "title", muse::qtrc("starscore", "Version number (%1)…").arg(starScore()->scoreVersion()) },
                       { "enabled", true } },
         QVariantMap { { "id", "export-band" }, { "title", muse::qtrc("starscore", "Export to Sheets and Demos…") }, { "enabled", true } },
+        QVariantMap { { "id", "recordings" }, { "title", muse::qtrc("starscore", "Recordings…") }, { "enabled", true } },
+        QVariantMap { { "id", "organize" }, { "title", muse::qtrc("starscore", "Run folder organization…") }, { "enabled", true } },
         QVariantMap { { "id", "export-arrangements" }, { "title", muse::qtrc("starscore", "Export arrangements as MuseScore files…") },
                       { "enabled", !starScore()->arrangements().empty() } },
     };
@@ -743,6 +745,10 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
         openEditDialog("version", QString());
     } else if (action == "export-arrangements") {
         dispatcher()->dispatch("starscore-export-arrangements");
+    } else if (action == "recordings") {
+        dispatcher()->dispatch("starscore-recordings");
+    } else if (action == "organize") {
+        dispatcher()->dispatch("starscore-organize");
     }
 }
 

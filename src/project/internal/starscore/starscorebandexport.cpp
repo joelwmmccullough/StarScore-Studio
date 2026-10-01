@@ -28,6 +28,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QRegularExpression>
+#include <QSettings>
 #include <QUuid>
 
 #include "engraving/dom/masterscore.h"
@@ -328,6 +329,88 @@ void StarScoreService::setBandFolder(const QString& path)
     StyleSettings settings = loadStyleSettings();
     settings.bandFolder = path;
     saveStyleSettings(settings);
+}
+
+std::optional<starscore::org::ExportInfo> StarScoreService::takeLastExport()
+{
+    std::optional<starscore::org::ExportInfo> info = m_lastExport;
+    m_lastExport.reset();
+    return info;
+}
+
+QString StarScoreService::projectsFolder() const
+{
+    const QString saved = QSettings().value("StarScore/projectsFolder").toString();
+    if (!saved.isEmpty() && QFileInfo(saved).isDir()) {
+        return saved;
+    }
+    const QString audit = QSettings().value("StarScore/auditLibraryFolder").toString();
+    if (audit.endsWith("Projects and Sheets") && QFileInfo(audit).isDir()) {
+        return audit;
+    }
+    // The usual places on Joel's Mac: …/My Drive/Music/Projects and Sheets, or next to Sheets and Demos
+    const QDir cloud(QDir::homePath() + "/Library/CloudStorage");
+    for (const QString& drive : cloud.entryList({ "GoogleDrive-*" }, QDir::Dirs)) {
+        for (const QString& rel : { QString("/My Drive/Music/Projects and Sheets"), QString("/My Drive/Projects and Sheets") }) {
+            const QString candidate = cloud.filePath(drive + rel);
+            if (QFileInfo(candidate).isDir()) {
+                return candidate;
+            }
+        }
+    }
+    const QString band = bandFolder();
+    if (!band.isEmpty()) {
+        const QString sibling = QFileInfo(band).absolutePath() + "/Projects and Sheets";
+        if (QFileInfo(sibling).isDir()) {
+            return sibling;
+        }
+    }
+    return QString();
+}
+
+void StarScoreService::setProjectsFolder(const QString& path)
+{
+    QSettings().setValue("StarScore/projectsFolder", path);
+}
+
+QString StarScoreService::songCode() const
+{
+    INotationProjectPtr project = exportSourceProject();
+    if (!project) {
+        return QString();
+    }
+    const RetVal<StarScoreBandExportPlan> plan = planBandExport();
+    if (plan.ret && !plan.val.code.isEmpty() && !plan.val.newSong) {
+        return plan.val.code;
+    }
+    const QString fileBase = QFileInfo(project->path().toQString()).completeBaseName();
+    const QRegularExpressionMatch m = QRegularExpression("^([A-Z]{4})\\s*-\\s*").match(fileBase);
+    return m.hasMatch() ? m.captured(1) : QString();
+}
+
+QJsonObject StarScoreService::songRecordings() const
+{
+    INotationProjectPtr project = exportSourceProject();
+    if (!project) {
+        return QJsonObject();
+    }
+    return loadFrom(project->masterNotation()->masterScore()).recordings;
+}
+
+void StarScoreService::setSongRecordings(const QJsonObject& recordings)
+{
+    INotationProjectPtr project = exportSourceProject();
+    if (!project) {
+        return;
+    }
+    engraving::MasterScore* ms = project->masterNotation()->masterScore();
+    Data data = loadFrom(ms);
+    if (data.recordings == recordings) {
+        return;
+    }
+    data.recordings = recordings;
+    storeTo(ms, data, project);
+    project->markAsUnsaved();
 }
 
 INotationProjectPtr StarScoreService::exportSourceProject() const
@@ -1007,6 +1090,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         return writePdf(n, pdfPath);
     };
 
+    QStringList archivedPaths;
     auto supersede = [&](const QString& rel) {
         const QString target = songDir + "/" + rel;
         if (!QFileInfo::exists(target)) {
@@ -1018,7 +1102,9 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         for (int i = 2; QFileInfo::exists(archived); ++i) {
             archived = QString("%1 (%2).pdf").arg(base).arg(i);
         }
-        QFile::rename(target, archived);
+        if (QFile::rename(target, archived)) {
+            archivedPaths << rel;
+        }
     };
 
     QStringList written;
@@ -1117,9 +1203,86 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
 
     QDir(tmpDir).removeRecursively();
 
+    // --- for the organizer: what changed in each sheet since its last export, bar by bar
+    {
+        Data data = loadFrom(ms);
+        starscore::org::ExportInfo info;
+        info.songRoot = plan.val.songFolder;
+        info.code = plan.val.code;
+        info.title = starscoreSongTitle(project);
+        info.version = data.version;
+        info.written = written;
+        info.archived = archivedPaths;
+        QJsonObject sigs = data.exportSignatures;
+        for (const StarScoreBandFile& f : plan.val.files) {
+            if (!written.contains(f.relativePath) || !f.sourceFile.isEmpty()) {
+                continue;
+            }
+            const QJsonObject now = organizerSignature(ms, f.partIds);
+            const QJsonObject before = sigs.value(f.relativePath).toObject();
+            starscore::org::SheetChange c;
+            c.relativePath = f.relativePath;
+            c.isScore = f.isScore;
+            c.arrangement = f.sheetRight;
+            QString part = f.relativePath.section('/', -1);
+            part.remove(QRegularExpression("^" + QRegularExpression::escape(plan.val.code) + " - "));
+            part.remove(QRegularExpression("\\.pdf$"));
+            c.part = part;
+            if (before.isEmpty()) {
+                // first export since bar signatures were kept: new, or replacing a sheet made before
+                c.kind = archivedPaths.contains(f.relativePath) ? starscore::org::SheetChange::Changed : starscore::org::SheetChange::Added;
+                c.barsKnown = false;
+            } else {
+                const QJsonArray a = before.value("bars").toArray(), b = now.value("bars").toArray();
+                const QJsonObject marks = now.value("marks").toObject();
+                std::vector<std::pair<int, int> > ranges;
+                const int n = std::max(a.size(), b.size());
+                for (int i = 0; i < n; ++i) {
+                    if (i < a.size() && i < b.size() && a[i] == b[i]) {
+                        continue;
+                    }
+                    if (!ranges.empty() && ranges.back().second == i) {    // i is 0-based; ranges are 1-based
+                        ranges.back().second = i + 1;
+                    } else {
+                        ranges.push_back({ i + 1, i + 1 });
+                    }
+                }
+                c.kind = ranges.empty() ? starscore::org::SheetChange::Same : starscore::org::SheetChange::Changed;
+                c.bars = ranges;
+                // the rehearsal marks those bars fall under
+                for (const auto& [from, to] : ranges) {
+                    QString current;
+                    for (int bar = 1; bar <= to; ++bar) {
+                        if (marks.contains(QString::number(bar))) {
+                            current = marks.value(QString::number(bar)).toString();
+                        }
+                        if (bar >= from && !current.isEmpty() && !c.letters.contains(current)) {
+                            c.letters << current;
+                        }
+                    }
+                }
+            }
+            info.sheets.push_back(c);
+            QJsonObject stored = now;
+            stored["version"] = data.version;
+            sigs[f.relativePath] = stored;
+        }
+        info.hornAnalysis = organizerHornAnalysis(ms, plan.val);
+        if (!info.hornAnalysis.isEmpty()) {
+            info.hornAnalysis["scoreVersion"] = data.version;
+        }
+        info.recordings = data.recordings;
+        data.exportSignatures = sigs;
+        storeTo(ms, data, project);
+        m_lastExport = info;
+    }
+
     QString summary = muse::qtrc("starscore", "Wrote %1 PDF(s) to %2.").arg(written.size()).arg(plan.val.songFolder);
     if (!problems.isEmpty()) {
         summary += "\n\n" + muse::qtrc("starscore", "Skipped:") + "\n• " + problems.join("\n• ");
+    }
+    if (m_lastExport) {
+        m_lastExport->summary = summary;
     }
     return RetVal<QString>::make_ok(summary);
 }

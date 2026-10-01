@@ -10,6 +10,7 @@
 #include <qqmlintegration.h>
 
 #include "modularity/ioc.h"
+#include "iinteractive.h"
 #include "project/istarscoreservice.h"
 
 namespace mu::project {
@@ -30,10 +31,12 @@ class BandExportModel : public QObject, public muse::Contextable
     Q_PROPERTY(bool newSong READ newSong NOTIFY loaded)                 // not in Sheets and Demos yet
     Q_PROPERTY(QString songTitle READ songTitle NOTIFY loaded)
     Q_PROPERTY(QString suggestedCode READ suggestedCode NOTIFY loaded)
+    Q_PROPERTY(bool runOrganizer READ runOrganizer WRITE setRunOrganizer NOTIFY runOrganizerChanged)
 
     QML_ELEMENT
 
     muse::ContextInject<IStarScoreService> starScore = { this };
+    muse::ContextInject<muse::IInteractive> interactive = { this };
 
 public:
     explicit BandExportModel(QObject* parent = nullptr);
@@ -50,6 +53,11 @@ public:
     bool newSong() const;
     QString songTitle() const;
     QString suggestedCode() const;
+    bool runOrganizer() const;
+    void setRunOrganizer(bool on);
+
+    //! After an export: opens the organizer window, which runs the folder organization for this export
+    Q_INVOKABLE void openOrganizer();
 
     //! Adds the song to Sheets and Demos (category 1–4) and plans the export. Returns an error, or "" when done.
     Q_INVOKABLE QString createSong(const QString& title, int category, const QString& code);
@@ -67,6 +75,7 @@ signals:
     void loaded();
     void itemsChanged();
     void bumpChanged();
+    void runOrganizerChanged();
 
 private:
     void saveTicks();

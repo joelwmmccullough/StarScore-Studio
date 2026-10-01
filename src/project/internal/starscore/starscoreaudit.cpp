@@ -54,6 +54,7 @@
 #include "engraving/dom/instrument.h"
 #include "engraving/dom/dynamic.h"
 #include "engraving/dom/rehearsalmark.h"
+#include "engraving/dom/harmony.h"
 #include "engraving/dom/spanner.h"
 #include "engraving/dom/key.h"
 #include "engraving/types/constants.h"
@@ -2183,4 +2184,161 @@ void StarScoreService::openAuditWalkSong()
             d->dispatch("toggle-starscore-audit");
         }
     });
+}
+
+// ---------------------------------------------------------------------------
+//  Organizer: what an export changed, bar by bar, and the horn parts for the Horn Part Guides
+// ---------------------------------------------------------------------------
+
+static std::vector<std::pair<int, QString> > organizerMarks(const std::vector<const Measure*>& measures)
+{
+    std::vector<std::pair<int, QString> > marks;   // bar index, text
+    for (int b = 0; b < int(measures.size()); ++b) {
+        bool found = false;
+        for (const Segment* s = measures[b]->first(); s && !found; s = s->next()) {
+            for (const EngravingItem* ann : s->annotations()) {
+                if (ann->isRehearsalMark()) {
+                    marks.push_back({ b, toRehearsalMark(ann)->plainText().toQString().trimmed() });
+                    found = true;
+                    break;
+                }
+            }
+        }
+    }
+    return marks;
+}
+
+QJsonObject StarScoreService::organizerSignature(const MasterScore* ms, const QStringList& partIds) const
+{
+    QJsonObject out;
+    if (!ms) {
+        return out;
+    }
+    std::vector<const Measure*> measures;
+    for (const Measure* m = ms->firstMeasure(); m; m = m->nextMeasure()) {
+        measures.push_back(m);
+    }
+    std::vector<QString> bars(measures.size());
+    for (const QString& pid : partIds) {
+        const Part* p = ms->partById(ID(pid));
+        if (!p) {
+            continue;
+        }
+        const AuditLine line = auditLineOf(p, measures, auditSlurTicks(ms, p), false);
+        const track_idx_t firstTrack = p->staves().front()->idx() * VOICES;
+        const track_idx_t endTrack = (p->staves().back()->idx() + 1) * VOICES;
+        for (size_t b = 0; b < measures.size() && b < line.size(); ++b) {
+            QString sig = auditBarSig(line[b]);
+            // chord symbols belong to the sheet too
+            for (const Segment* s = measures[b]->first(SegmentType::ChordRest); s; s = s->next(SegmentType::ChordRest)) {
+                for (const EngravingItem* ann : s->annotations()) {
+                    if (ann->isHarmony() && ann->track() >= firstTrack && ann->track() < endTrack) {
+                        sig += QString("H%1%2").arg(s->rtick().ticks()).arg(toHarmony(ann)->harmonyName().toQString());
+                    }
+                }
+            }
+            bars[b] += pid + sig + "/";
+        }
+    }
+    QJsonArray hashes;
+    for (const QString& b : bars) {
+        hashes.append(auditHash(b).left(8));
+    }
+    QJsonObject marks;
+    for (const auto& [b, text] : organizerMarks(measures)) {
+        marks[QString::number(b + 1)] = text;
+    }
+    out["bars"] = hashes;
+    out["marks"] = marks;
+    return out;
+}
+
+QJsonObject StarScoreService::organizerHornAnalysis(const MasterScore* ms, const StarScoreBandExportPlan& plan) const
+{
+    QJsonObject out;
+    if (!ms) {
+        return out;
+    }
+    std::vector<const Measure*> measures;
+    for (const Measure* m = ms->firstMeasure(); m; m = m->nextMeasure()) {
+        measures.push_back(m);
+    }
+    // sections of the song, rehearsal mark by rehearsal mark
+    const auto marks = organizerMarks(measures);
+    std::vector<std::tuple<int, int, QString> > ranges;
+    if (marks.empty() || marks.front().first > 0) {
+        ranges.push_back({ 0, (marks.empty() ? int(measures.size()) : marks.front().first) - 1, QString(marks.empty() ? "Whole song" : "Start") });
+    }
+    for (size_t i = 0; i < marks.size(); ++i) {
+        const int end = i + 1 < marks.size() ? marks[i + 1].first - 1 : int(measures.size()) - 1;
+        ranges.push_back({ marks[i].first, end, marks[i].second });
+    }
+    QJsonArray markList;
+    for (const auto& [a, b, name] : ranges) {
+        markList.append(QJsonObject { { "mark", name }, { "bar", a + 1 }, { "endBar", b + 1 } });
+    }
+
+    static const QRegularExpression folderRe("^([123])H(?: |$)");
+    static const QRegularExpression chairRe("Horn (\\d+)");
+    QJsonArray parts;
+    std::set<QString> chairsDone;
+    for (const StarScoreBandFile& f : plan.files) {
+        const QString folder = f.relativePath.section('/', 0, 0);
+        const QRegularExpressionMatch fm = folderRe.match(folder);
+        if (!fm.hasMatch() || f.isScore || !f.sourceFile.isEmpty() || f.partIds.size() != 1) {
+            continue;
+        }
+        const Part* p = ms->partById(ID(f.partIds.first()));
+        if (!p || auditIsDrums(p)) {
+            continue;
+        }
+        const bool generic = folder.contains("Any");
+        int chair = 0;
+        if (generic) {
+            const QRegularExpressionMatch cm = chairRe.match(f.header.isEmpty() ? f.relativePath : f.header);
+            chair = cm.hasMatch() ? cm.captured(1).toInt() : 0;
+            if (!chair || chairsDone.count(folder + QString::number(chair))) {
+                continue;     // one entry per chair: the guides transpose it for each player
+            }
+            chairsDone.insert(folder + QString::number(chair));
+        }
+        // written pitch for named horns; concert pitch for Any Horns chairs
+        const int written = generic ? 0 : -p->instrument()->transpose().chromatic;
+        const AuditLine line = auditLineOf(p, measures, {}, true);
+        QJsonArray sections;
+        int notes = 0;
+        for (const auto& [a, b, name] : ranges) {
+            QJsonArray seq;
+            int n = 0, restBars = 0;
+            for (int bar = a; bar <= b && bar < int(line.size()); ++bar) {
+                int inBar = 0;
+                for (const AuditChord& c : line[bar].chords) {
+                    if (c.pitches.empty() || c.silent) {
+                        continue;
+                    }
+                    seq.append(c.pitches.back() + written);
+                    ++inBar;
+                }
+                n += inBar;
+                restBars += inBar == 0;
+            }
+            notes += n;
+            sections.append(QJsonObject { { "mark", name }, { "n", n }, { "restBars", restBars }, { "seq", seq } });
+        }
+        QString label = f.relativePath.section('/', -1);
+        label.remove(QRegularExpression("^" + QRegularExpression::escape(plan.code) + " - "));
+        label.remove(QRegularExpression("\\.pdf$"));
+        parts.append(QJsonObject { { "n", fm.captured(1).toInt() }, { "folder", folder }, { "label", generic ? QString("Horn %1").arg(chair) : label },
+                                   { "generic", generic }, { "chair", chair }, { "notes", notes }, { "file", f.relativePath },
+                                   { "sections", sections } });
+    }
+    if (parts.isEmpty()) {
+        return out;
+    }
+    out["version"] = 1;
+    out["code"] = plan.code;
+    out["made"] = QDate::currentDate().toString(Qt::ISODate);
+    out["marks"] = markList;
+    out["parts"] = parts;
+    return out;
 }

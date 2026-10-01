@@ -4,6 +4,22 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.13.0
+
+- **The folder organizer is now part of StarScore.** It replaces the Python scripts and the two daily tasks (off since 21 Aug). It runs after every Export to Sheets and Demos (the new "Run organization process" box, ticked by default), and from File › Run folder organization or the Dashboard. It:
+  - files 6 Inbox and loose sheets, gives numbered song folders without a code their code, and keeps Update Notes dated to each song's last change;
+  - finds blank and short sheets, reading only new or changed files;
+  - writes changelog entries for the players whose parts changed. After an export they name the bars and rehearsal letters, e.g. "3-Horn Arrangement: your Alto Sax part changed in bars 33–48 (letter C)";
+  - rebuilds the PDFs that are out of date: What's Here, Recordings, changelogs, Horn Part Guides (now worked out from the score), the Band Guide, the Progress tracker and the Maintenance Report, plus All Recordings and the Projects Maintenance Report. The PDFs are made with the Mac's own WebKit and look like before;
+  - in Projects and Sheets, files 9 Inbox and loose top-level files (older MuseScore material into the tune's MuseScore Files/), moves empty folders to "Z Empty Folders (safe to delete)", and keeps codes_proj.json in step with codes.json;
+  - colours the song folders in Finder.
+  Nothing is ever deleted. The first run moves the old Python toolkit to Deprecated.
+- **New shows**: each run checks setlist.fm. A show is offered from the day after its date. Paste the YouTube link, or skip it, or mark it "not filmed". The songs and their times come from the video's description; you confirm any names StarScore can't place.
+- **Play counts** come from setlist.fm: this year plus last year.
+- **Recordings window** (File › Recordings…, or "…" › Recordings…): this song's live takes, albums and sessions. Rate live takes with 1–5 stars; best-rated come first on the Recordings pages. A copy is kept in the .starscore.
+- **Band roster** (File › Band roster…, or the Dashboard): who reads which parts, horn chairs for Any Horns charts, current or former. A new player on an instrument starts with the former player's changelog history.
+- **Rebuild everything** (File menu, Dashboard): every generated PDF in both folders.
+
 ## 1.12.14
 
 - **Reference PDF panel**: closed when a file opens, unless it was open when you last closed that file. It's now one setting per file (before, each part score had its own, so closing the panel in a part could leave it open for the main score next time). The notation page no longer brings the panel back from its saved layout; StarScore decides. Each score and part still shows the PDF last chosen for it.

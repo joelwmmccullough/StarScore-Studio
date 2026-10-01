@@ -111,6 +111,49 @@ target_sources(project PRIVATE
     internal/starscore/starscorepdf.cpp
     internal/starscore/starscorepdf.h
     internal/starscore/starscoreengraving.h
+
+    internal/starscore/organizer/orgcore.cpp
+    internal/starscore/organizer/orgcore.h
+    internal/starscore/organizer/orgonline.cpp
+    internal/starscore/organizer/orgonline.h
+    internal/starscore/organizer/orgscan.cpp
+    internal/starscore/organizer/orgscan.h
+    internal/starscore/organizer/orglibrary.cpp
+    internal/starscore/organizer/orglibrary.h
+    internal/starscore/organizer/orgstores.cpp
+    internal/starscore/organizer/orgstores.h
+    internal/starscore/organizer/orgfiling.cpp
+    internal/starscore/organizer/orgfiling.h
+    internal/starscore/organizer/orgchangelog.cpp
+    internal/starscore/organizer/orgchangelog.h
+    internal/starscore/organizer/orgrecordings.cpp
+    internal/starscore/organizer/orgrecordings.h
+    internal/starscore/organizer/orghtml.cpp
+    internal/starscore/organizer/orghtml.h
+    internal/starscore/organizer/orghtml_recordings.cpp
+    internal/starscore/organizer/orghtml_players.cpp
+    internal/starscore/organizer/orghtml_home.cpp
+    internal/starscore/organizer/organizer.cpp
+    internal/starscore/organizer/organizer.h
+    internal/starscore/organizer/orgplatform.h
+)
+
+# StarScore organizer: each file is its own translation unit (file-local helpers share names)
+set_source_files_properties(
+    internal/starscore/organizer/orgcore.cpp
+    internal/starscore/organizer/orgonline.cpp
+    internal/starscore/organizer/orgscan.cpp
+    internal/starscore/organizer/orglibrary.cpp
+    internal/starscore/organizer/orgstores.cpp
+    internal/starscore/organizer/orgfiling.cpp
+    internal/starscore/organizer/orgchangelog.cpp
+    internal/starscore/organizer/orgrecordings.cpp
+    internal/starscore/organizer/orghtml.cpp
+    internal/starscore/organizer/orghtml_recordings.cpp
+    internal/starscore/organizer/orghtml_players.cpp
+    internal/starscore/organizer/orghtml_home.cpp
+    internal/starscore/organizer/organizer.cpp
+    PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON
 )
 
 # StarScore audit: its own translation unit (file-local helper types)
@@ -121,12 +164,16 @@ if (OS_IS_MAC)
         internal/platform/macos/macosrecentfilescontroller.mm
         internal/platform/macos/macosrecentfilescontroller.h
     )
-    # StarScore: reference PDFs are drawn with CoreGraphics
-    target_link_libraries(project PRIVATE "-framework CoreGraphics" "-framework CoreFoundation" "-framework CoreText")
+    # StarScore: reference PDFs are drawn with CoreGraphics; the organizer prints its PDFs with WebKit and reads
+    # sheets with PDFKit
+    target_sources(project PRIVATE internal/starscore/organizer/orgplatform_mac.mm)
+    target_link_libraries(project PRIVATE "-framework CoreGraphics" "-framework CoreFoundation" "-framework CoreText"
+        "-framework AppKit" "-framework WebKit" "-framework PDFKit")
     # Don't mix C++ and Objective-C++ in Unity Build
     set_source_files_properties(
         internal/platform/macos/macosrecentfilescontroller.mm
         internal/starscore/starscorepdf.cpp
+        internal/starscore/organizer/orgplatform_mac.mm
         PROPERTIES
         SKIP_UNITY_BUILD_INCLUSION ON
         SKIP_PRECOMPILE_HEADERS ON
@@ -136,6 +183,9 @@ elseif (OS_IS_WIN)
         internal/platform/windows/windowsrecentfilescontroller.cpp
         internal/platform/windows/windowsrecentfilescontroller.h
     )
+endif()
+if (NOT OS_IS_MAC)
+    target_sources(project PRIVATE internal/starscore/organizer/orgplatform_other.cpp)
 endif()
 
 target_link_libraries(project PRIVATE notation)

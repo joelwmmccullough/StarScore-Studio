@@ -5,6 +5,8 @@
  */
 #include "bandexportmodel.h"
 
+#include <QSettings>
+
 #include "translation.h"
 
 using namespace mu::project;
@@ -268,4 +270,20 @@ QString BandExportModel::exportNow()
         return muse::qtrc("starscore", "Export failed: %1").arg(QString::fromStdString(summary.ret.toString()));
     }
     return summary.val + "\n\n" + muse::qtrc("starscore", "Sheets are marked Version %1. Save the .starscore to keep this version number.").arg(version);
+}
+
+bool BandExportModel::runOrganizer() const
+{
+    return QSettings().value("StarScore/runOrganizerAfterExport", true).toBool();
+}
+
+void BandExportModel::setRunOrganizer(bool on)
+{
+    QSettings().setValue("StarScore/runOrganizerAfterExport", on);
+    emit runOrganizerChanged();
+}
+
+void BandExportModel::openOrganizer()
+{
+    interactive()->open(muse::UriQuery("musescore://starscore/organizer?mode=export"));
 }

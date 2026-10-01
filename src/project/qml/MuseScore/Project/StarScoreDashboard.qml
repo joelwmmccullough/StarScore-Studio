@@ -110,6 +110,34 @@ Rectangle {
                 }
             }
 
+            // ---------------- Keeping the folders in order ----------------
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 10
+                StyledTextLabel {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignLeft
+                    wrapMode: Text.WordWrap
+                    opacity: 0.8
+                    text: qsTrc("starscore", "Sheets and Demos and Projects and Sheets are tidied after every export. "
+                                + "Run it on its own after dropping files into an Inbox.")
+                }
+                FlatButton {
+                    text: qsTrc("starscore", "Run folder organization")
+                    onClicked: dash.runAction("starscore-organize")
+                }
+                FlatButton {
+                    text: qsTrc("starscore", "Rebuild everything")
+                    toolTipTitle: qsTrc("starscore", "Rebuild everything")
+                    toolTipDescription: qsTrc("starscore", "Rebuilds every generated PDF in both folders")
+                    onClicked: dash.runAction("starscore-rebuild-all")
+                }
+                FlatButton {
+                    text: qsTrc("starscore", "Band roster…")
+                    onClicked: dash.runAction("starscore-band-roster")
+                }
+            }
+
             // ---------------- Overall ----------------
             ColumnLayout {
                 Layout.fillWidth: true
