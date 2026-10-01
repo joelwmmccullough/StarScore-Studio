@@ -64,7 +64,7 @@ static void describePdf(NSString* label, NSString* path) {
     say(@"== %@ %@", self.cur.html, self.cur.variant);
     WKWebViewConfiguration* cfg = [WKWebViewConfiguration new];
     if (@available(macOS 13.3, *)) { cfg.preferences.shouldPrintBackgrounds = YES; }
-    double w = [self.cur.variant hasPrefix:@"B"] && self.cur.variant.length > 1 ? [[self.cur.variant substringFromIndex:1] doubleValue] : 816;
+    double w = 816;
     NSRect r = NSMakeRect(0, 0, w, 1056);
     self.wv = [[WKWebView alloc] initWithFrame:r configuration:cfg];
     self.win = [[NSWindow alloc] initWithContentRect:r styleMask:NSWindowStyleMaskTitled backing:NSBackingStoreBuffered defer:NO];
@@ -80,6 +80,9 @@ static void describePdf(NSString* label, NSString* path) {
     [[NSRunLoop currentRunLoop] addTimer:self.watchdog forMode:NSModalPanelRunLoopMode];
     NSString* path = [[self.dir stringByAppendingPathComponent:@"html"] stringByAppendingPathComponent:self.cur.html];
     NSString* html = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil];
+    if ([self.cur.variant isEqualToString:@"BZ"]) {
+        html = [html stringByReplacingOccurrencesOfString:@"<head>" withString:@"<head><style>html{zoom:0.9375}</style>"];
+    }
     [self.wv loadHTMLString:html baseURL:nil];
 }
 - (void)webView:(WKWebView*)w didFailNavigation:(WKNavigation*)n withError:(NSError*)e { say(@"  load failed %@", e); [self finishJob:@"load failed"]; }
@@ -106,6 +109,7 @@ static void describePdf(NSString* label, NSString* path) {
         pi.verticalPagination = NSPrintingPaginationModeAutomatic;
         pi.horizontallyCentered = NO; pi.verticallyCentered = NO;
         [pi.dictionary setObject:@NO forKey:NSPrintHeaderAndFooter];
+        if ([self.cur.variant isEqualToString:@"BS"]) { [pi.dictionary setObject:@0.9375 forKey:NSPrintScalingFactor]; }
         NSPrintOperation* op = [self.wv printOperationWithPrintInfo:pi];
         op.showsPrintPanel = NO; op.showsProgressPanel = NO;
         op.view.frame = self.wv.bounds;
@@ -127,8 +131,8 @@ int main(int argc, const char* argv[]) {
         say(@"macOS %@", [[NSProcessInfo processInfo] operatingSystemVersionString]);
         Runner* r = [Runner new];
         r.dir = dir; r.out = out; r.jobs = [NSMutableArray new];
-        for (NSString* f in @[ @"ruler.html", @"bandguide.html" ]) {
-            for (NSString* v in @[ @"B816", @"B704", @"B612", @"B528" ]) {
+        for (NSString* f in @[ @"ruler.html", @"bandguide.html", @"progress.html", @"allrecordings.html", @"whatshere.html" ]) {
+            for (NSString* v in @[ @"BZ", @"BS" ]) {
                 Job* j = [Job new]; j.html = f; j.variant = v;
                 j.pdf = [out stringByAppendingPathComponent:[NSString stringWithFormat:@"%@-%@.pdf", [f stringByDeletingPathExtension], v]];
                 [r.jobs addObject:j];
