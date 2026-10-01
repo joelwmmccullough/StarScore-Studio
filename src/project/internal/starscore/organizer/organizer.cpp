@@ -244,14 +244,15 @@ void Organizer::online(std::shared_ptr<Run> r)
 }
 
 // ------------------------------------------------------------------ 2. the work
+//! As the old Colour Song Folders script: the lead sheet, the rhythm section and the 3-horn chart each score
+//! 1 when done, 1/2 when started, 0 when missing. 3 is green, 2 or more blue, anything above 0 yellow, 0 red.
 static QString colourFor(const SongInfo& s)
 {
-    int done = 0, started = 0;
+    int halves = 0;
     for (const QString& st : { s.status.lead, s.status.rhythm, s.status.three }) {
-        done += st == "done";
-        started += st != "none";
+        halves += st == "done" ? 2 : st == "none" ? 0 : 1;
     }
-    return done == 3 ? "Green" : done == 2 ? "Blue" : started ? "Yellow" : "Red";
+    return halves >= 6 ? "Green" : halves >= 4 ? "Blue" : halves > 0 ? "Yellow" : "Red";
 }
 
 static QString movesHtml(const std::vector<Move>& moves, int max = 8)
