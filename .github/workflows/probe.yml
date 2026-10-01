@@ -18,13 +18,13 @@ jobs:
         ./probe "$PWD" "$PWD/out" music x || echo "music probe exited $?" >> out/report.txt
         for f in whatshere.html recordings.html bandguide.html progress.html allrecordings.html; do
           for v in C B A1 A0; do
-            perl -e 'alarm shift; exec @ARGV' 120 ./probe "$PWD" "$PWD/out" $f $v || echo "  $f $v exited $?" >> out/report.txt
+            perl -e 'alarm shift; exec @ARGV' 60 ./probe "$PWD" "$PWD/out" $f $v || echo "  $f $v exited $?" >> out/report.txt
           done
         done
     - name: Publish results to the ci-probe branch
       if: always()
       run: |
-        mkdir -p /tmp/res && cp -R out/. /tmp/res/ || true
+        mkdir -p /tmp/res && cp out/report.txt /tmp/res/ && ls -la out >> /tmp/res/report.txt && find out -name '*.pdf' -size -15M -exec cp {} /tmp/res/ \; || true
         cd /tmp/res
         git init -q
         git config user.name "StarScore CI"
