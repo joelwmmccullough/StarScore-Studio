@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.16)
+project(orgmac CXX OBJCXX)
+set(CMAKE_CXX_STANDARD 17)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui)
+file(GLOB SRC *.cpp)
+add_executable(orgmac MACOSX_BUNDLE testmain.mm orgplatform_mac.mm ${SRC})
+set_source_files_properties(testmain.mm orgplatform_mac.mm PROPERTIES COMPILE_FLAGS "-fobjc-arc")
+target_link_libraries(orgmac Qt6::Core Qt6::Gui "-framework AppKit" "-framework WebKit" "-framework PDFKit")
