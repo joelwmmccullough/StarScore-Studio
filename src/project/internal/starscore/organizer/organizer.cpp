@@ -402,7 +402,9 @@ void Organizer::prepare(std::shared_ptr<Run> r)
                 }
             }
         }
-        if (r->request.exported && !changedRoots.contains(r->request.exported->songRoot)) {
+        // the exported song counts as changed only when the export wrote something (a re-export where every sheet
+        // came out the same leaves its files, and its Update Notes date, as they were)
+        if (r->request.exported && !r->request.exported->written.isEmpty() && !changedRoots.contains(r->request.exported->songRoot)) {
             changedRoots << r->request.exported->songRoot;
         }
         redateUpdateNotes(paths, r->codes, changedRoots, filing);
@@ -481,7 +483,9 @@ void Organizer::prepare(std::shared_ptr<Run> r)
             for (const Player* p : r->roster.current()) {
                 missing |= !s.updateNotes.isEmpty() && !dir.exists(s.updateNotes + "/" + s.code + " - Changelog - " + p->name + ".pdf");
             }
-            if (everything || missing || changedRoots.contains(s.root) || r->recordingsChanged.contains(s.code)) {
+            // after an export the song's pages are rebuilt even when no sheet changed: its horn guides come from that export
+            const bool exportedSong = r->request.exported && r->request.exported->songRoot == s.root;
+            if (everything || missing || exportedSong || changedRoots.contains(s.root) || r->recordingsChanged.contains(s.code)) {
                 songsToBuild.insert(s.root);
             }
         }
