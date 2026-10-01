@@ -64,7 +64,8 @@ static void describePdf(NSString* label, NSString* path) {
     say(@"== %@ %@", self.cur.html, self.cur.variant);
     WKWebViewConfiguration* cfg = [WKWebViewConfiguration new];
     if (@available(macOS 13.3, *)) { cfg.preferences.shouldPrintBackgrounds = YES; }
-    NSRect r = NSMakeRect(0, 0, 816, 1056);
+    double w = [self.cur.variant hasPrefix:@"B"] && self.cur.variant.length > 1 ? [[self.cur.variant substringFromIndex:1] doubleValue] : 816;
+    NSRect r = NSMakeRect(0, 0, w, 1056);
     self.wv = [[WKWebView alloc] initWithFrame:r configuration:cfg];
     self.win = [[NSWindow alloc] initWithContentRect:r styleMask:NSWindowStyleMaskTitled backing:NSBackingStoreBuffered defer:NO];
     self.win.releasedWhenClosed = NO;
@@ -126,8 +127,8 @@ int main(int argc, const char* argv[]) {
         say(@"macOS %@", [[NSProcessInfo processInfo] operatingSystemVersionString]);
         Runner* r = [Runner new];
         r.dir = dir; r.out = out; r.jobs = [NSMutableArray new];
-        for (NSString* f in @[ @"whatshere.html", @"recordings.html", @"bandguide.html", @"progress.html", @"allrecordings.html" ]) {
-            for (NSString* v in @[ @"B", @"C" ]) {
+        for (NSString* f in @[ @"ruler.html", @"bandguide.html" ]) {
+            for (NSString* v in @[ @"B816", @"B704", @"B612", @"B528" ]) {
                 Job* j = [Job new]; j.html = f; j.variant = v;
                 j.pdf = [out stringByAppendingPathComponent:[NSString stringWithFormat:@"%@-%@.pdf", [f stringByDeletingPathExtension], v]];
                 [r.jobs addObject:j];
