@@ -17,6 +17,7 @@
 #include <QThread>
 #include <QTime>
 
+#include "orgcolours.h"
 #include "orgfiling.h"
 #include "orghtml.h"
 #include "orglibrary.h"
@@ -66,8 +67,15 @@ Since October 2026 StarScore Studio does all of this. It runs after every "Expor
    All Recordings and the Projects Maintenance Report in Projects and Sheets.
 6. Projects and Sheets: files `9 Inbox` and loose top-level files into the right tune (older MuseScore material
    into the tune's `MuseScore Files/`), moves empty folders to `Z Empty Folders (safe to delete)`.
-7. Colours the song folders in Finder (green / blue / yellow / red by Phase 1 progress), and each tune folder in
-   Projects and Sheets the same colour as its song.
+7. Colours the song folders in Finder from the status each sheet had when it was exported from StarScore
+   (6 Inbox/.organizer/sheets/CODE.json, written at every export). Each colour needs everything below it:
+   Purple = Big Band and Marching Band charts; Blue = every sheet the songbooks and the 4- to 7-Horn charts need;
+   Green = every horn sheet of 1-Horn, 2-Horn Flexible, 2-Horn Standard, 3-Horn Flexible, 3-Horn Standard and
+   4-Horn Standard; Yellow = 3-Horn Section, drums, guitar, bass, keys and lead sheet; Orange = 3-Horn Section,
+   guitar, bass and lead sheet (all Finished); Red = those of Yellow exported at least as Sketch; Gray = less.
+   A song not exported since this started has no colour. Sheet folders: Gray when a sheet they must have is
+   missing, otherwise Green / Yellow / Orange / Red by their least finished file (Gray if a file has no status).
+   Each tune folder in Projects and Sheets gets the same colour as its song.
 
 ## Data files here
 `codes.json`, `roster.json` (edit in StarScore: Dashboard > Band roster), `changelog.json`, `maintlog.json`,
@@ -245,17 +253,6 @@ void Organizer::online(std::shared_ptr<Run> r)
 }
 
 // ------------------------------------------------------------------ 2. the work
-//! As the old Colour Song Folders script: the lead sheet, the rhythm section and the 3-horn chart each score
-//! 1 when done, 1/2 when started, 0 when missing. 3 is green, 2 or more blue, anything above 0 yellow, 0 red.
-static QString colourFor(const SongInfo& s)
-{
-    int halves = 0;
-    for (const QString& st : { s.status.lead, s.status.rhythm, s.status.three }) {
-        halves += st == "done" ? 2 : st == "none" ? 0 : 1;
-    }
-    return halves >= 6 ? "Green" : halves >= 4 ? "Blue" : halves > 0 ? "Yellow" : "Red";
-}
-
 static QString movesHtml(const std::vector<Move>& moves, int max = 8)
 {
     QStringList out;
@@ -664,13 +661,25 @@ void Organizer::prepare(std::shared_ptr<Run> r)
 
         // --- folder colours: the band's song folders, and each tune folder in Projects and Sheets in its song's colour
         //     (matched by code; tunes with no song in Sheets and Demos keep whatever colour they have)
+        //     The colours come from the sheet records StarScore writes at each export (orgcolours.h); a song with
+        //     no record yet has no colour.
         std::map<QString, QString> colourOfCode;
+        const std::map<QString, QJsonObject> records = loadSheetRecords(paths);
         for (const SongInfo& s : lib.songs) {
-            if (s.code != "????") {
-                const QString c = colourFor(s);
-                r->colours.emplace_back(paths.band + "/" + s.root, c);
-                colourOfCode[s.code] = c;
+            if (s.code == "????") {
+                continue;
             }
+            QString c;
+            auto rec = records.find(s.code);
+            if (rec != records.end()) {
+                const SongColours sc = songColours(paths, s.root, rec->second, scan.sheets);
+                c = sc.song;
+                for (const auto& [folder, colour] : sc.folders) {
+                    r->colours.emplace_back(paths.band + "/" + s.root + "/" + folder, colour);
+                }
+            }
+            r->colours.emplace_back(paths.band + "/" + s.root, c);
+            colourOfCode[s.code] = c;
         }
         if (!paths.projects.isEmpty() && QFileInfo(paths.projects).isDir()) {
             // only the Starsign groups (1 Originals, 2 Covers, 3 WIP): "4 Other Projects" can hold a tune of the same name

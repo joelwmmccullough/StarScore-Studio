@@ -4,6 +4,23 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.14.0
+
+- **Folder colours from what's finished and exported.** Every Export to Sheets and Demos now records each sheet's status as it was exported (in `6 Inbox/.organizer/sheets/CODE.json`), and the folder organization colours folders from that. A sheet counts only while the file in the folder is still the one exported.
+  - **Song folders.** Each colour also needs everything the colours below it need.
+    - Purple: the Big Band and Marching Band charts.
+    - Blue: every sheet the songbooks and the 4- to 7-Horn charts need.
+    - Green: every horn sheet of 1-Horn, 2-Horn Flexible, 2-Horn Standard, 3-Horn Flexible, 3-Horn Standard and 4-Horn Standard.
+    - Yellow: the 3-Horn Section, drums, guitar, bass, keys and the lead sheet.
+    - Orange: the 3-Horn Section, guitar, bass and the lead sheet.
+    - Red: the Yellow sheets, each exported at least as Sketch.
+    - Gray: less than that.
+    - All "Finished" except Red. Drums or keys that read the lead sheet count as the lead sheet; percussion is left out.
+  - A song not exported since this version has no colour. Export it again to colour it; sheets that come out the same aren't rewritten.
+  - **Sheet folders** (1 Lead Sheet, 1 Rhythm, each horn folder, Big Band …): Gray when a sheet the folder must have is missing, otherwise Green / Yellow / Orange / Red by the least finished file in it (Finished / Needs review / In progress / Sketch). A file with no status (not exported from StarScore, or changed since) makes it Gray. 1H must have Trumpet, Alto Sax, Tenor Sax and Trombone; a 7-horn folder must have the Bari Sax, Bass Sax and Bassoon versions of the Bass Trombone; 1 Rhythm must have guitar and bass, plus drums and keys when there's no lead sheet.
+  - Each tune folder in Projects and Sheets gets its song's colour.
+- **Bassoon version of the 7-Horn Bass Trombone.** Marking a 7-Horn Bass Trombone part Finished now offers whichever of the Baritone Sax, Bass Sax and Bassoon versions it doesn't have yet (songs that already have the two saxes are offered just the bassoon). The bassoon sheet is exported into the 7-horn folder like the saxes.
+
 ## 1.13.1
 
 - **Organizing after an export now runs.** In 1.13.0 the organizer window closed the moment it opened after an export (a window opened from the export window closed with it), so nothing was organized. It now opens once the export window has closed.

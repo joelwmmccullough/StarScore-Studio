@@ -100,6 +100,7 @@ target_sources(project PRIVATE
 
     internal/starscore/starscoreservice.cpp
     internal/starscore/starscorebandexport.cpp
+    internal/starscore/starscoresheetrecord.cpp
     internal/starscore/starscoreservice.h
     internal/starscore/starscoreengraving.cpp
     internal/starscore/starscorehouse.cpp
@@ -126,6 +127,8 @@ target_sources(project PRIVATE
     internal/starscore/organizer/orgfiling.h
     internal/starscore/organizer/orgchangelog.cpp
     internal/starscore/organizer/orgchangelog.h
+    internal/starscore/organizer/orgcolours.cpp
+    internal/starscore/organizer/orgcolours.h
     internal/starscore/organizer/orgrecordings.cpp
     internal/starscore/organizer/orgrecordings.h
     internal/starscore/organizer/orghtml.cpp
@@ -147,6 +150,7 @@ set_source_files_properties(
     internal/starscore/organizer/orgstores.cpp
     internal/starscore/organizer/orgfiling.cpp
     internal/starscore/organizer/orgchangelog.cpp
+    internal/starscore/organizer/orgcolours.cpp
     internal/starscore/organizer/orgrecordings.cpp
     internal/starscore/organizer/orghtml.cpp
     internal/starscore/organizer/orghtml_recordings.cpp
@@ -158,6 +162,7 @@ set_source_files_properties(
 
 # StarScore audit: its own translation unit (file-local helper types)
 set_source_files_properties(internal/starscore/starscoreaudit.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+set_source_files_properties(internal/starscore/starscoresheetrecord.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 
 if (OS_IS_MAC)
     target_sources(project PRIVATE

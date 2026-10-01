@@ -238,6 +238,11 @@ private:
     QJsonObject organizerSignature(const mu::engraving::MasterScore* ms, const QStringList& partIds) const;
     QJsonObject organizerHornAnalysis(const mu::engraving::MasterScore* ms, const StarScoreBandExportPlan& plan) const;
     std::optional<starscore::org::ExportInfo> m_lastExport;
+    //! Organizer: each exported sheet's status (with size and md5) and the sheets each folder colour needs, in
+    //! 6 Inbox/.organizer/sheets/CODE.json (starscoresheetrecord.cpp). onDisk: the sheets this export wrote or left
+    //! as they were because they came out the same
+    void writeSheetRecord(const mu::engraving::MasterScore* ms, const Data& data, const StarScoreBandExportPlan& full,
+                          const QStringList& onDisk) const;
 
     mu::engraving::MasterScore* masterScore() const;
     void listenCurrentProject();
@@ -268,11 +273,12 @@ private:
     void standardizeImported();
     //! A new "N-Horn Any" section starts with the music of the "N-Horn" section, chair by chair
     void fillAnyHornsFromStandard(const StarScoreSection& anySection);
-    //! A 7-Horn Bass Trombone part marked Finished: offer Baritone and Bass Saxophone versions of it
+    //! A 7-Horn Bass Trombone part marked Finished: offer the Baritone Sax, Bass Sax and Bassoon versions it lacks
     void offerLowAlternates(const QStringList& partIds);
     //! Legacy audit: marks (or unmarks) these sheets as no longer needing auditing, with a fingerprint of their music
     void markPartsAudited(Data& data, const mu::engraving::MasterScore* ms, const QStringList& partIds, bool audited) const;
-    muse::RetVal<QStringList> createLowAlternates(const QString& sectionId, const QString& mainPartId);
+    //! instrumentIds: which of "baritone-saxophone", "bass-saxophone", "bassoon" to make
+    muse::RetVal<QStringList> createLowAlternates(const QString& sectionId, const QString& mainPartId, const QStringList& instrumentIds);
     //! Name the new parts, hide default-hidden parts/staves, make part books; returns the new section
     StarScoreSection finishNewParts(const std::vector<mu::engraving::Part*>& newParts,
                                     const std::vector<StarScoreInstrument>& instruments);

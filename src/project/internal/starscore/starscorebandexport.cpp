@@ -69,7 +69,7 @@ using namespace muse;
 // Order and short codes used in horn folder names ("5H 2Tpt Alt Ten Tbn")
 static const std::vector<std::pair<QString, QString> > STARSCORE_HORN_ORDER {
     { "Trumpet", "Tpt" }, { "Flugelhorn", "Flg" }, { "Flute", "Flu" }, { "Clarinet", "Cla" }, { "Soprano Sax", "Sop" },
-    { "Alto Sax", "Alt" }, { "Tenor Sax", "Ten" }, { "Bari Sax", "Bar" }, { "Bass Sax", "Bsx" }, { "Bass Clarinet", "Bcl" },
+    { "Alto Sax", "Alt" }, { "Tenor Sax", "Ten" }, { "Bari Sax", "Bar" }, { "Bass Sax", "Bsx" }, { "Bassoon", "Bsn" }, { "Bass Clarinet", "Bcl" },
     { "Trombone", "Tbn" }, { "Bass Trombone", "Btb" },
 };
 
@@ -111,6 +111,9 @@ static QString starscoreHornName(const QString& id)
     }
     if (id.contains("bass-saxophone")) {
         return "Bass Sax";
+    }
+    if (id == "bassoon") {
+        return "Bassoon";
     }
     return QString();
 }
@@ -1361,6 +1364,10 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         data.exportSignatures = sigs;
         storeTo(ms, data, project);
         m_lastExport = info;
+
+        // --- for the folder colours: each sheet's status as exported, and what each colour needs
+        const RetVal<StarScoreBandExportPlan> full = planBandExport();
+        writeSheetRecord(ms, data, full.ret ? full.val : plan.val, written + unchanged);
     }
 
     QString summary = written.isEmpty() && !unchanged.isEmpty()

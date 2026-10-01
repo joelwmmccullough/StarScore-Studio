@@ -88,7 +88,7 @@ QString pdfFirstPageText(const QString& path, int maxLines)
 }
 
 // ------------------------------------------------------------------ Finder tags
-static const QStringList OUR_COLOURS { "Green", "Blue", "Yellow", "Red" };
+static const QStringList OUR_COLOURS { "Gray", "Green", "Purple", "Blue", "Yellow", "Red", "Orange" };
 
 bool setFinderColour(const QString& folder, const QString& colour)
 {
