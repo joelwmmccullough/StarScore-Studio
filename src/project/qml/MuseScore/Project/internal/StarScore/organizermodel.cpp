@@ -19,7 +19,7 @@ using namespace mu::project;
 namespace org = mu::project::starscore::org;
 
 OrganizerModel::OrganizerModel(QObject* parent)
-    : QObject(parent), m_alive(std::make_shared<bool>(true))
+    : QObject(parent), muse::Contextable(muse::iocCtxForQmlObject(this)), m_alive(std::make_shared<bool>(true))
 {
 }
 

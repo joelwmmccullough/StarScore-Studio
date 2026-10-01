@@ -13,7 +13,7 @@ using namespace mu::project;
 namespace org = mu::project::starscore::org;
 
 RosterModel::RosterModel(QObject* parent)
-    : QObject(parent)
+    : QObject(parent), muse::Contextable(muse::iocCtxForQmlObject(this))
 {
 }
 

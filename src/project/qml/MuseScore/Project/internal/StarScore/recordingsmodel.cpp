@@ -22,7 +22,7 @@ using namespace mu::project;
 namespace org = mu::project::starscore::org;
 
 RecordingsModel::RecordingsModel(QObject* parent)
-    : QObject(parent)
+    : QObject(parent), muse::Contextable(muse::iocCtxForQmlObject(this))
 {
 }
 
