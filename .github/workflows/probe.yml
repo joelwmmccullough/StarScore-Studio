@@ -1,0 +1,28 @@
+name: 'StarScore probe (macOS WebKit)'
+on:
+  push:
+    branches: [ probe ]
+permissions:
+  contents: write
+jobs:
+  probe:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+    - uses: actions/checkout@v6
+    - name: Build and run
+      run: |
+        clang++ -fobjc-arc -O1 probe.mm -o probe -framework Cocoa -framework WebKit -framework PDFKit
+        mkdir -p out
+        ./probe "$PWD" "$PWD/out" || echo "probe exited $?" >> out/report.txt
+    - name: Publish results to the ci-probe branch
+      if: always()
+      run: |
+        mkdir -p /tmp/res && cp -R out/. /tmp/res/ || true
+        cd /tmp/res
+        git init -q
+        git config user.name "StarScore CI"
+        git config user.email "ci@users.noreply.github.com"
+        git add -A
+        git commit -q -m "probe run ${{ github.run_number }}"
+        git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:ci-probe
