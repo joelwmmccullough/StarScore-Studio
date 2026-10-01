@@ -1,0 +1,29 @@
+[
+    {
+        "actions": [
+            {
+                "head": "Inbox",
+                "kind": "change",
+                "text": "1 file filed: <span class=\"mono\">6 Inbox/TEST - Trombone.pdf</span> &rarr; <span class=\"mono\">1 Test Song/TEST - Trombone.pdf</span>."
+            },
+            {
+                "head": "Filed",
+                "kind": "change",
+                "text": "1 file sitting loose in song folders: <span class=\"mono\">1 Test Song/TEST - Trombone.pdf</span> &rarr; <span class=\"mono\">1 Test Song/Extras/TEST - Trombone.pdf</span>."
+            },
+            {
+                "head": "Folders",
+                "kind": "",
+                "text": "Made: <span class=\"mono\">1 Test Song/Horn Part Guides, 2 Other Tune/Horn Part Guides</span>."
+            },
+            {
+                "head": "Regenerated",
+                "kind": "",
+                "text": "8 PDFs for 2 songs, plus the Band Guide, the Progress tracker and this report."
+            }
+        ],
+        "date": "2026-10-01",
+        "time": "21:15",
+        "title": "rebuilt everything"
+    }
+]

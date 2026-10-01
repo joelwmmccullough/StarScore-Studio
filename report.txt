@@ -1,0 +1,63 @@
+STEP 8 Retiring the old Python toolkit
+STEP 12 Filing Sheets and Demos
+STEP 20 Reading new and changed sheets
+STEP 44 Writing Other Tune
+STEP 60 Writing Test Song
+STEP 65 Filing Projects and Sheets
+STEP 70 Making 13 PDFs
+STEP 71 Making PDFs (1 of 13)
+STEP 73 Making PDFs (2 of 13)
+STEP 75 Making PDFs (3 of 13)
+STEP 77 Making PDFs (4 of 13)
+STEP 79 Making PDFs (5 of 13)
+STEP 81 Making PDFs (6 of 13)
+STEP 83 Making PDFs (7 of 13)
+STEP 85 Making PDFs (8 of 13)
+STEP 87 Making PDFs (9 of 13)
+STEP 89 Making PDFs (10 of 13)
+STEP 91 Making PDFs (11 of 13)
+STEP 93 Making PDFs (12 of 13)
+STEP 95 Making PDFs (13 of 13)
+STEP 96 Putting the PDFs in place
+STEP 100 Done: 13 PDFs rebuilt.
+DONE Done: 13 PDFs rebuilt. QList(Filed 1 file from 6 Inbox., Filed 1 file found loose in song folders., Measured 19 new or changed sheets., Recoloured 2 song folders in Finder.) QList() 13 0
+fx/Sheets and Demos/Starsign Band Guide.pdf
+fx/Sheets and Demos/1 Test Song/TEST - Recordings.pdf
+fx/Sheets and Demos/1 Test Song/Update Notes 26-08-19/TEST - Changelog - Player B.pdf
+fx/Sheets and Demos/1 Test Song/Update Notes 26-08-19/TEST - Changelog - Player A.pdf
+fx/Sheets and Demos/1 Test Song/1 Rhythm/TEST - Drums.pdf
+fx/Sheets and Demos/1 Test Song/1 Rhythm/TEST - Bass.pdf
+fx/Sheets and Demos/1 Test Song/1 Rhythm/TEST - Keys.pdf
+fx/Sheets and Demos/1 Test Song/1 Rhythm/TEST - Guitar.pdf
+fx/Sheets and Demos/1 Test Song/3H Tpt Alt Ten/TEST - Trumpet.pdf
+fx/Sheets and Demos/1 Test Song/3H Tpt Alt Ten/TEST - Alto Sax.pdf
+fx/Sheets and Demos/1 Test Song/3H Tpt Alt Ten/TEST - Score.pdf
+fx/Sheets and Demos/1 Test Song/3H Tpt Alt Ten/TEST - Tenor Sax.pdf
+fx/Sheets and Demos/1 Test Song/1 Lead Sheet/TEST - Lead Sheet.pdf
+fx/Sheets and Demos/1 Test Song/TEST - What's Here.pdf
+fx/Sheets and Demos/1 Test Song/Extras/TEST - Trombone.pdf
+fx/Sheets and Demos/Starsign Maintenance Report.pdf
+fx/Sheets and Demos/2 Other Tune/Update Notes 26-08-19/OTHR - Changelog - Player A.pdf
+fx/Sheets and Demos/2 Other Tune/Update Notes 26-08-19/OTHR - Changelog - Player B.pdf
+fx/Sheets and Demos/2 Other Tune/OTHR - What's Here.pdf
+fx/Sheets and Demos/2 Other Tune/1 Rhythm/OTHR - Guitar.pdf
+fx/Sheets and Demos/2 Other Tune/1 Rhythm/OTHR - Keys.pdf
+fx/Sheets and Demos/2 Other Tune/1 Rhythm/OTHR - Drums.pdf
+fx/Sheets and Demos/2 Other Tune/1 Rhythm/OTHR - Bass.pdf
+fx/Sheets and Demos/2 Other Tune/OTHR - Recordings.pdf
+fx/Sheets and Demos/2 Other Tune/3H Tpt Alt Ten/OTHR - Alto Sax.pdf
+fx/Sheets and Demos/2 Other Tune/3H Tpt Alt Ten/OTHR - Trumpet.pdf
+fx/Sheets and Demos/2 Other Tune/3H Tpt Alt Ten/OTHR - Tenor Sax.pdf
+fx/Sheets and Demos/2 Other Tune/3H Tpt Alt Ten/OTHR - Score.pdf
+fx/Sheets and Demos/2 Other Tune/1 Lead Sheet/OTHR - Lead Sheet.pdf
+fx/Sheets and Demos/Starsign Progress - Joel.pdf
+fx/Projects and Sheets/Projects Maintenance Report.pdf
+fx/Projects and Sheets/All Recordings.pdf
+total 32
+drwxr-xr-x   7 runner  staff   224 Oct  1 21:15 .
+drwxr-xr-x  11 runner  staff   352 Oct  1 21:15 ..
+-rw-r--r--   1 runner  staff  2077 Oct  1 21:15 build.txt
+-rw-r--r--   1 runner  staff  1116 Oct  1 21:14 cmake.txt
+-rw-r--r--   1 runner  staff  1109 Oct  1 21:15 maintlog.json
+drwxr-xr-x  34 runner  staff  1088 Oct  1 21:15 pdfs
+-rw-r--r--   1 runner  staff  2875 Oct  1 21:15 report.txt
