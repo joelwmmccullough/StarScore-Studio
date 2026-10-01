@@ -167,6 +167,7 @@ if (OS_IS_MAC)
     # StarScore: reference PDFs are drawn with CoreGraphics; the organizer prints its PDFs with WebKit and reads
     # sheets with PDFKit
     target_sources(project PRIVATE internal/starscore/organizer/orgplatform_mac.mm)
+    set_source_files_properties(internal/starscore/organizer/orgplatform_mac.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
     target_link_libraries(project PRIVATE "-framework CoreGraphics" "-framework CoreFoundation" "-framework CoreText"
         "-framework AppKit" "-framework WebKit" "-framework PDFKit")
     # Don't mix C++ and Objective-C++ in Unity Build

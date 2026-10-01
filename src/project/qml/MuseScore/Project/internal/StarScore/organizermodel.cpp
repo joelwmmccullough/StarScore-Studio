@@ -29,6 +29,17 @@ OrganizerModel::~OrganizerModel()
     if (m_organizer) {
         m_organizer->stop();
     }
+    // the window closed with a question open: the run finishes as if it was skipped
+    if (auto k = std::move(m_showsAnswer)) {
+        std::vector<org::ShowAnswer> later;
+        for (const org::NewShow& s : m_offered) {
+            later.push_back({ s.show.url, org::ShowAnswer::Later, QString() });
+        }
+        k(later);
+    }
+    if (auto k = std::move(m_songsAnswer)) {
+        k();
+    }
 }
 
 QString OrganizerModel::bandFolder() const

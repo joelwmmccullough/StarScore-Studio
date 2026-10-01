@@ -163,6 +163,16 @@ static std::vector<int> shape(const std::vector<int>& seq)
     return out;
 }
 
+//! "the 3-horn", or the folder when two of the player's parts are both 3-horn
+static QString partName(const std::vector<GuidePart>& parts, int i)
+{
+    int same = 0;
+    for (const GuidePart& p : parts) {
+        same += p.n == parts[i].n;
+    }
+    return same > 1 ? parts[i].folder : QString("%1-horn").arg(parts[i].n);
+}
+
 static QString verdictFor(const std::vector<Cell>& row, const std::vector<GuidePart>& parts)
 {
     int present = 0, playing = 0;
@@ -214,7 +224,7 @@ static QString describeDifference(const std::vector<Cell>& row, const std::vecto
         }
     }
     QStringList bits;
-    auto nh = [&](int i) { return QString("%1-horn").arg(parts[i].n); };
+    auto nh = [&](int i) { return partName(parts, i); };
     if (!silent.empty()) {
         QStringList sn, pn;
         for (int i : silent) {
@@ -421,8 +431,8 @@ QString hornGuideHtml(const SongInfo& song, const Player& player, const QJsonObj
     if (parts.size() > 1) {
         if (differ.isEmpty()) {
             QStringList which;
-            for (const GuidePart& p : parts) {
-                which << QString("the %1-horn").arg(p.n);
+            for (int i = 0; i < int(parts.size()); ++i) {
+                which << "the " + partName(parts, i);
             }
             b += "<div class=\"keyfact\"><b>Good news &mdash; your parts are the same all the way through.</b> Every rehearsal mark "
                  "reads identically across " + which.join(" and ") + ". Learn it once.</div>";
@@ -437,9 +447,9 @@ QString hornGuideHtml(const SongInfo& song, const Player& player, const QJsonObj
     }
 
     b += "<h2>Section by section</h2><table class=\"grid\"><tr><th class=\"l\" style=\"width:52px\">Mark</th>";
-    for (const GuidePart& p : parts) {
-        b += QString("<th>%1-horn<br><span style=\"font-weight:400;text-transform:none;letter-spacing:0;\">%2</span></th>")
-             .arg(p.n).arg(esc(p.instrument));
+    for (int i = 0; i < int(parts.size()); ++i) {
+        b += QString("<th>%1<br><span style=\"font-weight:400;text-transform:none;letter-spacing:0;\">%2</span></th>")
+             .arg(esc(partName(parts, i)), esc(parts[i].instrument));
     }
     b += "<th class=\"l\">Verdict</th></tr>";
     static const QMap<QString, QString> LABEL { { "same", "identical" }, { "transposed", "same line, transposed" },
