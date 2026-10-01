@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.12.14
+
+- **Reference PDF panel**: closed when a file opens, unless it was open when you last closed that file. It's now one setting per file (before, each part score had its own, so closing the panel in a part could leave it open for the main score next time). The notation page no longer brings the panel back from its saved layout; StarScore decides. Each score and part still shows the PDF last chosen for it.
+
 ## 1.12.13
 
 - **Export to Sheets and Demos** (and songbook sheets): the arrangement name at the top right is leveled with the instrument name when the sheet is printed. After layout, StarScore measures where both texts landed and moves the arrangement name to the instrument name's height. (The 1.11.3 and 1.12.2 fixes didn't change its position; it was still one staff height too low.)

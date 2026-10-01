@@ -293,6 +293,7 @@ private:
     QJsonObject loadReferenceView() const;
     void recordReferenceView();
     void listenReferencePanel();
+    void applyReferencePanelState();
 
     // audit
     StarScoreAuditReport auditScore(const mu::engraving::MasterScore* ms, const Data& data) const;
@@ -307,6 +308,7 @@ private:
     int m_listenStartTick = -1;
     int m_listenEndTick = -1;
     bool m_restoringReferenceView = false;
+    bool m_referencePanelTouched = false;   // you opened or closed the reference panel since the file opened
     qint64 m_projectOpenedMs = 0;   // when the current project was opened (ms since epoch): the notation page
                                     // restores its panels a moment later, which can reopen the reference panel
     bool m_switching = false;

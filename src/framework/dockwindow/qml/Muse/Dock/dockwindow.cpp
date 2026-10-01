@@ -580,6 +580,13 @@ bool DockWindow::doLoadPage(const QString& uri, const QVariantMap& params)
     restorePageState(newPage);
     initDocks(newPage);
 
+    // StarScore: the reference PDF panel is not restored with the page's layout. It starts closed, and StarScore
+    // opens it for a file that had it open when it was last closed.
+    static const QString starscoreReferencePanel("starscoreReferencePanel");
+    if (newPage->dockByName(starscoreReferencePanel) && newPage->isDockOpen(starscoreReferencePanel)) {
+        newPage->setDockOpen(starscoreReferencePanel, false);
+    }
+
     newPage->setParams(params);
 
     m_currentPage = newPage;
