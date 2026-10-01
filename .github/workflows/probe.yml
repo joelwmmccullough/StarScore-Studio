@@ -7,14 +7,20 @@ permissions:
 jobs:
   probe:
     runs-on: macos-26
-    timeout-minutes: 20
+    timeout-minutes: 60
     steps:
     - uses: actions/checkout@v6
     - name: Build and run
+      timeout-minutes: 45
       run: |
         clang++ -fobjc-arc -O1 probe.mm -o probe -framework Cocoa -framework WebKit -framework PDFKit
         mkdir -p out
-        ./probe "$PWD" "$PWD/out" || echo "probe exited $?" >> out/report.txt
+        ./probe "$PWD" "$PWD/out" music x || echo "music probe exited $?" >> out/report.txt
+        for f in whatshere.html recordings.html bandguide.html progress.html allrecordings.html; do
+          for v in C B A1 A0; do
+            timeout 120 ./probe "$PWD" "$PWD/out" $f $v || echo "  $f $v exited $?" >> out/report.txt
+          done
+        done
     - name: Publish results to the ci-probe branch
       if: always()
       run: |

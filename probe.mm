@@ -3,12 +3,12 @@
 #import <WebKit/WebKit.h>
 #import <PDFKit/PDFKit.h>
 
-static NSMutableString* gReport;
+static FILE* gReport;
 static void say(NSString* fmt, ...) {
     va_list ap; va_start(ap, fmt);
     NSString* s = [[NSString alloc] initWithFormat:fmt arguments:ap];
     va_end(ap);
-    [gReport appendFormat:@"%@\n", s];
+    fprintf(gReport, "%s\n", s.UTF8String); fflush(gReport);
     fprintf(stderr, "%s\n", s.UTF8String);
 }
 
@@ -84,82 +84,64 @@ static NSPrintInfo* printInfo(NSString* outPath, CGFloat margin) {
 
 int main(int argc, const char* argv[]) {
     @autoreleasepool {
-        gReport = [NSMutableString new];
-        [NSApplication sharedApplication];
-        [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+        // probe <dir> <out> <file.html|music> <variant A0|A1|B|C>
         NSString* dir = [NSString stringWithUTF8String:argv[1]];
         NSString* out = [NSString stringWithUTF8String:argv[2]];
+        NSString* f = [NSString stringWithUTF8String:argv[3]];
+        NSString* variant = [NSString stringWithUTF8String:argv[4]];
         [[NSFileManager defaultManager] createDirectoryAtPath:out withIntermediateDirectories:YES attributes:nil error:nil];
-        say(@"macOS %@", [[NSProcessInfo processInfo] operatingSystemVersionString]);
+        gReport = fopen([[out stringByAppendingPathComponent:@"report.txt"] fileSystemRepresentation], "a");
+        [NSApplication sharedApplication];
+        [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+        [NSApp finishLaunching];
 
-        NSArray* files = [[[NSFileManager defaultManager] contentsOfDirectoryAtPath:[dir stringByAppendingPathComponent:@"html"] error:nil]
-                          sortedArrayUsingSelector:@selector(compare:)];
-        for (NSString* f in files) {
-            if (![f hasSuffix:@".html"]) continue;
-            NSString* path = [[dir stringByAppendingPathComponent:@"html"] stringByAppendingPathComponent:f];
-            NSString* base = [f stringByDeletingPathExtension];
-            say(@"== %@", f);
-
-            // A: synchronous print operation, page margins from NSPrintInfo = 0 (CSS @page decides)
-            for (int m = 0; m < 2; ++m) {
-                Waiter* w = [Waiter new]; NSWindow* win = nil;
-                WKWebView* wv = loadHtml(path, w, &win);
-                NSString* pdf = [out stringByAppendingPathComponent:[NSString stringWithFormat:@"%@-A%d.pdf", base, m]];
-                NSPrintOperation* op = [wv printOperationWithPrintInfo:printInfo(pdf, m == 0 ? 0 : 40)];
-                op.showsPrintPanel = NO; op.showsProgressPanel = NO;
-                op.view.frame = wv.bounds;
-                NSDate* t0 = [NSDate date];
-                BOOL ok = [op runOperation];
-                say(@"  A%d runOperation -> %d in %.2fs", m, ok, -t0.timeIntervalSinceNow);
-                describePdf([NSString stringWithFormat:@"A%d", m], pdf);
-                [win close];
+        if ([f isEqualToString:@"music"]) {
+            say(@"macOS %@", [[NSProcessInfo processInfo] operatingSystemVersionString]);
+            NSString* music = [dir stringByAppendingPathComponent:@"music/demo.pdf"];
+            PDFDocument* doc = [[PDFDocument alloc] initWithURL:[NSURL fileURLWithPath:music]];
+            NSString* all = doc.string ?: @"";
+            NSUInteger pua = 0, words = 0;
+            for (NSUInteger i = 0; i < all.length; ++i) { unichar c = [all characterAtIndex:i]; if (c >= 0xE000 && c <= 0xF8FF) ++pua; }
+            for (NSString* wd in [all componentsSeparatedByCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]]) {
+                if (wd.length && [wd rangeOfCharacterFromSet:[[NSCharacterSet alphanumericCharacterSet] invertedSet]].location == NSNotFound) ++words;
             }
-
-            // B: modal-for-window print operation (asynchronous)
-            {
-                Waiter* w = [Waiter new]; NSWindow* win = nil;
-                WKWebView* wv = loadHtml(path, w, &win);
-                NSString* pdf = [out stringByAppendingPathComponent:[NSString stringWithFormat:@"%@-B.pdf", base]];
-                NSPrintOperation* op = [wv printOperationWithPrintInfo:printInfo(pdf, 0)];
-                op.showsPrintPanel = NO; op.showsProgressPanel = NO;
-                op.view.frame = wv.bounds;
-                NSDate* t0 = [NSDate date];
-                [op runOperationModalForWindow:win delegate:w didRunSelector:@selector(printOperationDidRun:success:contextInfo:) contextInfo:nil];
-                spin(^{ return w.printed; }, 60);
-                say(@"  B modal -> printed %d ok %d in %.2fs", w.printed, w.printOk, -t0.timeIntervalSinceNow);
-                describePdf(@"B", pdf);
-                [win close];
-            }
-
-            // C: createPDF (one tall page)
-            if (@available(macOS 11.0, *)) {
-                Waiter* w = [Waiter new]; NSWindow* win = nil;
-                WKWebView* wv = loadHtml(path, w, &win);
-                NSString* pdf = [out stringByAppendingPathComponent:[NSString stringWithFormat:@"%@-C.pdf", base]];
-                __block BOOL done = NO;
-                [wv createPDFWithConfiguration:[WKPDFConfiguration new] completionHandler:^(NSData* data, NSError* err) {
-                    if (data) [data writeToFile:pdf atomically:YES]; else say(@"  C error %@", err);
-                    done = YES;
-                }];
-                spin(^{ return done; }, 30);
-                describePdf(@"C", pdf);
-                [win close];
-            }
+            say(@"== music PDF via PDFKit: %ld pages, %lu music glyphs, %lu words (pdftotext: 2 pages, 440 glyphs, 127 words)",
+                (long)doc.pageCount, (unsigned long)pua, (unsigned long)words);
+            return 0;
         }
-
-        // PDFKit text from a MuseScore PDF (what the blank-sheet measure needs)
-        NSString* music = [dir stringByAppendingPathComponent:@"music/demo.pdf"];
-        PDFDocument* doc = [[PDFDocument alloc] initWithURL:[NSURL fileURLWithPath:music]];
-        NSString* all = doc.string ?: @"";
-        NSUInteger pua = 0, words = 0;
-        for (NSUInteger i = 0; i < all.length; ++i) { unichar c = [all characterAtIndex:i]; if (c >= 0xE000 && c <= 0xF8FF) ++pua; }
-        for (NSString* wd in [all componentsSeparatedByCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]]) {
-            if (wd.length && [wd rangeOfCharacterFromSet:[[NSCharacterSet alphanumericCharacterSet] invertedSet]].location == NSNotFound) ++words;
+        NSString* path = [[dir stringByAppendingPathComponent:@"html"] stringByAppendingPathComponent:f];
+        NSString* base = [f stringByDeletingPathExtension];
+        NSString* pdf = [out stringByAppendingPathComponent:[NSString stringWithFormat:@"%@-%@.pdf", base, variant]];
+        say(@"== %@ %@", f, variant);
+        Waiter* w = [Waiter new]; NSWindow* win = nil;
+        NSDate* tl = [NSDate date];
+        WKWebView* wv = loadHtml(path, w, &win);
+        say(@"  loaded %d in %.2fs", w.loaded, -tl.timeIntervalSinceNow);
+        NSDate* t0 = [NSDate date];
+        if ([variant hasPrefix:@"A"]) {
+            NSPrintOperation* op = [wv printOperationWithPrintInfo:printInfo(pdf, [variant isEqualToString:@"A0"] ? 0 : 40)];
+            op.showsPrintPanel = NO; op.showsProgressPanel = NO;
+            op.view.frame = wv.bounds;
+            BOOL ok = [op runOperation];
+            say(@"  %@ runOperation -> %d in %.2fs", variant, ok, -t0.timeIntervalSinceNow);
+        } else if ([variant isEqualToString:@"B"]) {
+            NSPrintOperation* op = [wv printOperationWithPrintInfo:printInfo(pdf, 0)];
+            op.showsPrintPanel = NO; op.showsProgressPanel = NO;
+            op.view.frame = wv.bounds;
+            [op runOperationModalForWindow:win delegate:w didRunSelector:@selector(printOperationDidRun:success:contextInfo:) contextInfo:nil];
+            spin(^{ return w.printed; }, 60);
+            say(@"  B modal -> printed %d ok %d in %.2fs", w.printed, w.printOk, -t0.timeIntervalSinceNow);
+        } else {
+            __block BOOL done = NO;
+            [wv createPDFWithConfiguration:[WKPDFConfiguration new] completionHandler:^(NSData* data, NSError* err) {
+                if (data) [data writeToFile:pdf atomically:YES]; else say(@"  C error %@", err);
+                done = YES;
+            }];
+            spin(^{ return done; }, 30);
+            say(@"  C createPDF done %d in %.2fs", done, -t0.timeIntervalSinceNow);
         }
-        say(@"== music PDF via PDFKit: %ld pages, %lu music glyphs, %lu words (pdftotext: 2 pages, 440 glyphs, 127 words)",
-            (long)doc.pageCount, (unsigned long)pua, (unsigned long)words);
-
-        [gReport writeToFile:[out stringByAppendingPathComponent:@"report.txt"] atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        describePdf(variant, pdf);
+        [win close];
     }
     return 0;
 }
