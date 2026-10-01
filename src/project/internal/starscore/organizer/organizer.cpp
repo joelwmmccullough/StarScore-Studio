@@ -673,7 +673,20 @@ void Organizer::prepare(std::shared_ptr<Run> r)
             }
         }
         if (!paths.projects.isEmpty() && QFileInfo(paths.projects).isDir()) {
-            for (const auto& [name, rel] : projectTunes(paths)) {
+            // only the Starsign groups (1 Originals, 2 Covers, 3 WIP): "4 Other Projects" can hold a tune of the same name
+            std::vector<std::pair<QString, QString> > starsignTunes;
+            const QDir base(paths.projects);
+            for (const QString& group : base.entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
+                if (!QRegularExpression("^[123] ").match(group).hasMatch()) {
+                    continue;
+                }
+                for (const QFileInfo& t : QDir(base.filePath(group)).entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
+                    if (!t.isSymLink() && !t.fileName().startsWith('.')) {
+                        starsignTunes.emplace_back(t.fileName(), group + "/" + t.fileName());
+                    }
+                }
+            }
+            for (const auto& [name, rel] : starsignTunes) {
                 QString code;
                 const auto known = r->codes.projects.find(name);
                 if (known != r->codes.projects.end()) {
