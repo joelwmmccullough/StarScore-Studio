@@ -49,11 +49,14 @@ static void describePdf(NSString* label, NSString* path) {
     [self.watchdog invalidate]; self.watchdog = nil;
     say(@"  %@ %@ in %.2fs", self.cur.variant, why, -self.t0.timeIntervalSinceNow);
     describePdf(self.cur.variant, self.cur.pdf);
-    [self.win orderOut:nil];
-    self.wv.navigationDelegate = nil;
-    self.wv = nil; self.win = nil;
     self.generation++;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ [self next]; });
+    WKWebView* oldView = self.wv; NSWindow* oldWin = self.win;
+    oldView.navigationDelegate = nil;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [oldWin orderOut:nil];
+        (void)oldView;
+        [self next];
+    });
 }
 - (void)next {
     if (self.jobs.count == 0) { say(@"done"); [NSApp terminate:nil]; return; }
@@ -64,6 +67,7 @@ static void describePdf(NSString* label, NSString* path) {
     NSRect r = NSMakeRect(0, 0, 816, 1056);
     self.wv = [[WKWebView alloc] initWithFrame:r configuration:cfg];
     self.win = [[NSWindow alloc] initWithContentRect:r styleMask:NSWindowStyleMaskTitled backing:NSBackingStoreBuffered defer:NO];
+    self.win.releasedWhenClosed = NO;
     self.win.contentView = self.wv;
     if ([self.cur.variant hasSuffix:@"v"]) { [self.win makeKeyAndOrderFront:nil]; } else { [self.win setFrameOrigin:NSMakePoint(-20000, -20000)]; [self.win orderBack:nil]; }
     self.wv.navigationDelegate = self;
@@ -123,7 +127,7 @@ int main(int argc, const char* argv[]) {
         Runner* r = [Runner new];
         r.dir = dir; r.out = out; r.jobs = [NSMutableArray new];
         for (NSString* f in @[ @"whatshere.html", @"recordings.html", @"bandguide.html", @"progress.html", @"allrecordings.html" ]) {
-            for (NSString* v in @[ @"B", @"C", @"Bv" ]) {
+            for (NSString* v in @[ @"B", @"C" ]) {
                 Job* j = [Job new]; j.html = f; j.variant = v;
                 j.pdf = [out stringByAppendingPathComponent:[NSString stringWithFormat:@"%@-%@.pdf", [f stringByDeletingPathExtension], v]];
                 [r.jobs addObject:j];
