@@ -931,7 +931,8 @@ static bool starscoreSameMscz(const QString& freshPath, const QString& existingP
     if (!QFileInfo::exists(freshPath) || !QFileInfo::exists(existingPath)) {
         return false;
     }
-    ZipReader a(io::path_t(freshPath)), b(io::path_t(existingPath));
+    ZipReader a { io::path_t(freshPath) };
+    ZipReader b { io::path_t(existingPath) };
     if (a.hasError() || b.hasError()) {
         return false;
     }
