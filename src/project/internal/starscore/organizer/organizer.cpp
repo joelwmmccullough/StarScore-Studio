@@ -66,7 +66,8 @@ Since October 2026 StarScore Studio does all of this. It runs after every "Expor
    All Recordings and the Projects Maintenance Report in Projects and Sheets.
 6. Projects and Sheets: files `9 Inbox` and loose top-level files into the right tune (older MuseScore material
    into the tune's `MuseScore Files/`), moves empty folders to `Z Empty Folders (safe to delete)`.
-7. Colours the song folders in Finder (green / blue / yellow / red by Phase 1 progress).
+7. Colours the song folders in Finder (green / blue / yellow / red by Phase 1 progress), and each tune folder in
+   Projects and Sheets the same colour as its song.
 
 ## Data files here
 `codes.json`, `roster.json` (edit in StarScore: Dashboard > Band roster), `changelog.json`, `maintlog.json`,
@@ -661,10 +662,34 @@ void Organizer::prepare(std::shared_ptr<Run> r)
             Q_UNUSED(countsMoved);
         }
 
-        // --- folder colours
+        // --- folder colours: the band's song folders, and each tune folder in Projects and Sheets in its song's colour
+        //     (matched by code; tunes with no song in Sheets and Demos keep whatever colour they have)
+        std::map<QString, QString> colourOfCode;
         for (const SongInfo& s : lib.songs) {
             if (s.code != "????") {
-                r->colours.emplace_back(paths.band + "/" + s.root, colourFor(s));
+                const QString c = colourFor(s);
+                r->colours.emplace_back(paths.band + "/" + s.root, c);
+                colourOfCode[s.code] = c;
+            }
+        }
+        if (!paths.projects.isEmpty() && QFileInfo(paths.projects).isDir()) {
+            for (const auto& [name, rel] : projectTunes(paths)) {
+                QString code;
+                const auto known = r->codes.projects.find(name);
+                if (known != r->codes.projects.end()) {
+                    code = known->second;
+                } else {
+                    for (const QString& f : QDir(paths.projects + "/" + rel).entryList({ "*.starscore" }, QDir::Files, QDir::Name)) {
+                        code = QRegularExpression("^([A-Z]{4}) - ").match(f).captured(1);
+                        if (!code.isEmpty()) {
+                            break;
+                        }
+                    }
+                }
+                const auto c = colourOfCode.find(code);
+                if (!code.isEmpty() && c != colourOfCode.end()) {
+                    r->colours.emplace_back(paths.projects + "/" + rel, c->second);
+                }
             }
         }
 
@@ -771,7 +796,7 @@ void Organizer::deploy(std::shared_ptr<Run> r)
             }
         }
         if (recoloured) {
-            r->summary.lines << QString("Recoloured %1 in Finder.").arg(plural(recoloured, "song folder"));
+            r->summary.lines << QString("Recoloured %1 in Finder.").arg(plural(recoloured, "folder"));
         }
         self->finish(r);
     });
