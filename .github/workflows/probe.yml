@@ -18,7 +18,7 @@ jobs:
         ./probe "$PWD" "$PWD/out" music x || echo "music probe exited $?" >> out/report.txt
         for f in whatshere.html recordings.html bandguide.html progress.html allrecordings.html; do
           for v in C B A1 A0; do
-            timeout 120 ./probe "$PWD" "$PWD/out" $f $v || echo "  $f $v exited $?" >> out/report.txt
+            perl -e 'alarm shift; exec @ARGV' 120 ./probe "$PWD" "$PWD/out" $f $v || echo "  $f $v exited $?" >> out/report.txt
           done
         done
     - name: Publish results to the ci-probe branch
