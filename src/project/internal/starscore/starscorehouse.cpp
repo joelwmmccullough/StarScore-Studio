@@ -255,15 +255,38 @@ void clearComposerCredit(Score* score)
         return;
     }
     const double gap = 0.5 * score->style().spatium();
-    // below the arrangement label a little more: about half a line of the credit (Joel's choice, Balkan Wedding)
-    double labelGap = 1.5 * score->style().spatium();
+    // Below the arrangement label: 0.06 of a credit line between their outlines, which prints as about 6 pt of
+    // white space between "7-Horn Arrangement" and the first composer (Joel's choice: Balkan Wedding's Bari Sax,
+    // Bass Sax and Bass Clarinet sheets in 1.15.5; 0.55 of a line printed 13.5 pt, too much)
+    double labelGap = 0.2 * score->style().spatium();
     {
         const TextBase::LayoutData* ld = comp->ldata();
         if (ld && ld->blocks.size() >= 2) {
-            labelGap = std::max(gap, 0.55 * (ld->blocks.at(1).y() - ld->blocks.at(0).y()));
+            labelGap = 0.06 * (ld->blocks.at(1).y() - ld->blocks.at(0).y());
         }
     }
-    const RectF c = comp->pageBoundingRect();
+    // A credit pushed down earlier (against a label that sat lower then, or with a different gap) stays too low
+    // unless it can come back up. Placed by the style, it starts from its home position (last line on the
+    // subtitle's baseline) and is pushed down from there, so the gap below the label is always the same. A credit
+    // placed by hand in this score keeps its place unless something collides with it.
+    double up = 0.0;
+    if (comp->propertyFlags(Pid::OFFSET) != PropertyFlags::UNSTYLED) {
+        const Text* sub = nullptr;
+        for (const Text* t : others) {
+            if (t->textStyleType() == TextStyleType::SUBTITLE) {
+                sub = t;
+                break;
+            }
+        }
+        const TextBase::LayoutData* cl = comp->ldata();
+        const TextBase::LayoutData* sl = sub ? sub->ldata() : nullptr;
+        if (cl && sl && !cl->blocks.empty() && !sl->blocks.empty()) {
+            const double compBase = comp->pagePos().y() + cl->blocks.back().y();
+            const double subBase = sub->pagePos().y() + sl->blocks.back().y();
+            up = std::max(0.0, compBase - subBase);
+        }
+    }
+    const RectF c = comp->pageBoundingRect().translated(0.0, -up);
     // Each blocker the credit overlaps pushes it below that blocker; repeat, since moving down can meet another
     double down = 0.0;
     for (int pass = 0; pass < 4; ++pass) {
@@ -288,9 +311,14 @@ void clearComposerCredit(Score* score)
             break;
         }
     }
-    if (down <= 0.0) {
+    // where the credit ends up: its home position (c) moved down by "down"; "shift" is the move from where it is now
+    // (negative: up). A tiny difference is left alone, so nothing changes once it is in place.
+    const double shift = down - up;
+    if (std::abs(shift) < 0.05 * score->style().spatium()) {
         return;
     }
+    const double bottomAfter = c.bottom() + down;
+    down = shift;
     if (comp->propertyFlags(Pid::OFFSET) == PropertyFlags::UNSTYLED) {
         // the credit was placed by hand in this score (Balkan Wedding's Bass Trombone part): the style's position
         // doesn't move it, its own does
@@ -304,7 +332,7 @@ void clearComposerCredit(Score* score)
     // the frame grows by what now hangs below it
     if (frame->isVBox()) {
         const double frameBottom = frame->pageBoundingRect().bottom();
-        const double overhang = c.bottom() + down - frameBottom;
+        const double overhang = bottomAfter - frameBottom;
         if (overhang > 0.0) {
             const double height = frame->getProperty(Pid::BOX_HEIGHT).value<Spatium>().val();
             frame->undoChangeProperty(Pid::BOX_HEIGHT, Spatium(height + overhang / score->style().spatium() + 0.5));
