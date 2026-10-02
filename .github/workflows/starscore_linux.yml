@@ -1,0 +1,115 @@
+name: 'StarScore Studio: Linux test build'
+
+# Every push to the starscore branch also builds StarScore Studio for Linux (x86_64 AppImage), so changes can be run
+# and tested headless (QT_QPA_PLATFORM=offscreen) before a Mac .dmg is made. Published as a release "linux-<run>".
+
+on:
+  push:
+    branches: [ starscore ]
+  workflow_dispatch:
+
+concurrency:
+  group: starscore-linux-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  linux_x64:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 300
+    steps:
+    - name: Clone repository
+      uses: actions/checkout@v6
+
+    - name: Configure workflow
+      run: |
+        bash ./buildscripts/ci/tools/make_build_mode_env.sh -e workflow_dispatch -m devel
+        bash ./buildscripts/ci/tools/make_build_number.sh
+        BUILD_NUMBER=$(cat ./build.artifacts/env/build_number.env)
+        echo "BUILD_NUMBER=$BUILD_NUMBER" | tee -a $GITHUB_ENV
+
+    - name: Restore ccache files
+      id: restore-ccache
+      uses: actions/cache/restore@v5
+      with:
+        path: ${{ github.workspace }}/.ccache
+        key: starscore-${{runner.os}}-${{runner.arch}}-ccache-
+        restore-keys: starscore-${{runner.os}}-${{runner.arch}}-ccache-
+
+    - name: Setup ccache
+      run: |
+        sudo apt-get update && sudo apt-get install -y ccache
+        bash ./buildscripts/ci/tools/setup_ccache_config.sh
+
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: 6.10.2
+        host: linux
+        target: 'desktop'
+        arch: linux_gcc_64
+        modules: 'qt5compat qtnetworkauth qtshadertools qtwebsockets'
+        cache: true
+
+    - name: Setup environment
+      run: |
+        bash ./buildscripts/ci/linux/setup.sh --arch x86_64 --build-pipewire
+
+    - name: Generate _en.ts files
+      env:
+        LUPDATE_ARGS: ""
+        POSTPROCESS_ARGS: "--warn-only"
+      run: |
+        bash ./tools/translations/run_lupdate.sh
+
+    - name: Build
+      run: |
+        set -o pipefail
+        bash ./buildscripts/ci/linux/build.sh -n ${{ env.BUILD_NUMBER }} --crash_log_url "''" --arch x86_64 --build-pipewire 2>&1 | tee build.log
+
+    - name: Publish build errors to the ci-logs-linux branch
+      if: failure()
+      run: |
+        mkdir -p /tmp/ci-logs
+        { echo "run ${{ github.run_number }} commit ${{ github.sha }}"; grep -n -E "error:|Error |FAILED:|undefined|cannot find|No such file" build.log | head -300; echo; echo "---- tail ----"; tail -150 build.log; } > /tmp/ci-logs/build-errors.txt || true
+        cd /tmp/ci-logs
+        git init -q
+        git config user.name "StarScore CI"
+        git config user.email "ci@users.noreply.github.com"
+        git add build-errors.txt
+        git commit -q -m "linux build errors for run ${{ github.run_number }}"
+        git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:ci-logs-linux
+
+    - name: Show ccache stats
+      if: always()
+      run: ccache -sv
+
+    - name: Package
+      run: |
+        bash ./buildscripts/ci/linux/package.sh --arch x86_64 --build-pipewire
+
+    - name: Publish a downloadable release
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        APPIMAGE=$(ls build.artifacts/*.AppImage | head -1)
+        cp "$APPIMAGE" StarScore-Studio-x86_64.AppImage
+        TAG="linux-${{ github.run_number }}"
+        gh release create "$TAG" StarScore-Studio-x86_64.AppImage --repo "${{ github.repository }}" --target "${{ github.sha }}" \
+          --title "StarScore Studio Linux test build ${{ github.run_number }}" --notes "Linux test build from ${{ github.sha }}" --prerelease
+
+    - name: Prepare ccache files for saving
+      id: prepare-save-ccache
+      if: always()
+      run: |
+        ccache --recompress 10
+        echo "CCACHE_TIMESTAMP=$(date -u +"%F-%T")" | tee -a $GITHUB_OUTPUT
+
+    - name: Save ccache files
+      if: always()
+      uses: actions/cache/save@v5
+      with:
+        key: ${{ steps.restore-ccache.outputs.cache-primary-key }}${{ steps.prepare-save-ccache.outputs.CCACHE_TIMESTAMP }}
+        path: ${{ github.workspace }}/.ccache

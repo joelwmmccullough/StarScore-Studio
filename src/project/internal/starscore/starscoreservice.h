@@ -337,6 +337,12 @@ private:
     //! Tidying on opening a file: older stand-in versions shown, horn names, part score titles
     void tidyOpenedScore();
     void clearComposerInCurrentScore();
+    // Automatic test run (starscoreautotest.cpp): STARSCORE_AUTOTEST=<output folder>
+    static bool autotestRequested();
+    void startAutotest();
+    void runAutotestSteps(QStringList steps, int reportNumber);
+    void autotestReport(const QString& base);
+    bool m_autotestStarted = false;
     QJsonObject loadReferenceView() const;
     void recordReferenceView();
     void listenReferencePanel();

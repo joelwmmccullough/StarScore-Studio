@@ -102,6 +102,7 @@ target_sources(project PRIVATE
     internal/starscore/starscorebandexport.cpp
     internal/starscore/starscoresheetrecord.cpp
     internal/starscore/starscoretodo.cpp
+    internal/starscore/starscoreautotest.cpp
     internal/starscore/starscoreservice.h
     internal/starscore/starscoreengraving.cpp
     internal/starscore/starscorehouse.cpp
@@ -165,6 +166,9 @@ set_source_files_properties(
 set_source_files_properties(internal/starscore/starscoreaudit.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 set_source_files_properties(internal/starscore/starscoresheetrecord.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 set_source_files_properties(internal/starscore/starscoretodo.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+set_source_files_properties(internal/starscore/starscoreautotest.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+# the StarScore version, for the automatic test run's log
+target_compile_definitions(project PRIVATE STARSCORE_VERSION_STR="${STARSCORE_VERSION}")
 
 if (OS_IS_MAC)
     target_sources(project PRIVATE

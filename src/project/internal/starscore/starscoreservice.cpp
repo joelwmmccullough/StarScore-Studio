@@ -2987,6 +2987,9 @@ void StarScoreService::onCurrentProjectChanged()
     ensureFileId();
     // once the score is fully set up
     QTimer::singleShot(0, [this]() { tidyOpenedScore(); });
+    if (autotestRequested()) {
+        startAutotest();
+    }
 }
 
 void StarScoreService::clearSolos()
