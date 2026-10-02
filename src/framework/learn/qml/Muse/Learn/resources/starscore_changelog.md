@@ -13,6 +13,7 @@ Version numbers: the first number changes when files stop being compatible, the 
 - **Title frames of a fixed height** in every score and part score when a song opens (a frame sized to its contents came out too tall: Balkan Wedding's Drums).
 - **Finished sheets keep their layout.** Marking a part, a section or a part score Finished locks every system that isn't locked yet and adds a page break after the last system of each page (except the last page, and where there's a break already).
 - **New sections open their part scores**, each with its sheet title (Flexible chairs show "Horn 1" and "Flexible 2-Horn Arrangement").
+- **Exported scores name their staves without the section** ("Trumpet 1", not "7H: Trumpet 1").
 - **Starsign 2.6 style:** Staff Text and Text Lines in Futura (were Jost). Applied the next time part styles are applied.
 
 ## 1.15.5

@@ -54,6 +54,7 @@
 #include "notation/inotation.h"
 
 #include "starscoreengraving.h"
+#include "engraving/editing/editpart.h"
 #include "starscorehouse.h"
 #include "starscorepdf.h"
 #include "organizer/orgplatform.h"
@@ -1433,6 +1434,18 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                 vis.emplace_back(part->id(), file.partIds.contains(idText(part)));
             }
             p->masterNotation()->parts()->setPartsVisible(vis, TranslatableString::untranslatable("Export"));
+            // The score names its staves without StarScore's section prefix: "Trumpet 1", not "7H: Trumpet 1"
+            // (this is a copy of the file, so the names change only for the printing)
+            p->masterNotation()->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Staff names"));
+            for (engraving::Part* part : cs->parts()) {
+                const QString name = part->longName().toQString();
+                const int at = name.lastIndexOf(": ");
+                if (file.partIds.contains(idText(part)) && at >= 0) {
+                    engraving::EditPart::setInstrumentName(cs, part, engraving::Fraction(0, 1),
+                                                           String::fromQString(name.mid(at + 2).trimmed()));
+                }
+            }
+            p->masterNotation()->notation()->undoStack()->commitChanges();
             // A part can also be hidden staff by staff (the eye on each staff in the Instruments panel); a part on
             // this score with every staff hidden would leave it empty (Balkan Wedding's 2- to 5-Horn scores were
             // blank pages). Its staves show; a part with some staves showing keeps its choice.
