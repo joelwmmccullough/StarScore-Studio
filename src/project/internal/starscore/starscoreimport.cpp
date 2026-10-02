@@ -728,7 +728,7 @@ void StarScoreService::fillAnyHornsFromStandard(const StarScoreSection& anySecti
 //! The 7-Horn Bass Trombone line's stand-in versions: instrument id, band name
 static const std::vector<std::pair<QString, QString> > STARSCORE_LOW_VERSIONS {
     { "baritone-saxophone", "Bari Sax" }, { "bass-saxophone", "Bass Sax" }, { "bassoon", "Bassoon" },
-    { "bass-clarinet", "Bass Clarinet" }, { "contrabass-clarinet", "Contrabass Clarinet" }, { "contrabassoon", "Contrabassoon" },
+    { "bb-bass-clarinet", "Bass Clarinet" }, { "contrabass-clarinet", "Contrabass Clarinet" }, { "contrabassoon", "Contrabassoon" },
     { "tuba", "Tuba" },
 };
 

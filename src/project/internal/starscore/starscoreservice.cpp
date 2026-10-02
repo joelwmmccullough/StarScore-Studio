@@ -37,6 +37,8 @@
 #include "engraving/dom/measure.h"
 #include "engraving/dom/segment.h"
 #include "engraving/dom/select.h"
+#include "engraving/dom/text.h"
+#include "engraving/dom/measurebase.h"
 #include "engraving/rw/xmlreader.h"
 
 #include "serialization/zipreader.h"
@@ -84,6 +86,8 @@ void StarScoreService::init()
     // Reference PDF panel: each part score shows the reference PDF last chosen for it (or stays closed)
     globalContext()->currentNotationChanged().onNotify(this, [this]() {
         pickReferenceForCurrentScore();
+        // a part score being shown is laid out: if its composer credit runs into the arrangement label, move it now
+        QTimer::singleShot(0, [this]() { clearComposerInCurrentScore(); });
     });
     globalContext()->currentProjectChanged().onNotify(this, [this]() {
         // the notation page and its panels may still be loading: restore once they are there
@@ -3882,4 +3886,37 @@ void StarScoreService::setPanelVisible(bool visible)
 muse::async::Notification StarScoreService::panelVisibleChanged() const
 {
     return m_panelVisibleChanged;
+}
+
+//! The part score on screen: its composer credit clear of the title, subtitle and arrangement label. Measured on the
+//! score as shown (laid out), so it holds however the part score was made; changes nothing when they're clear.
+void StarScoreService::clearComposerInCurrentScore()
+{
+    INotationPtr n = globalContext()->currentNotation();
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    if (!n || !master || n == master->notation() || !m_mainProject || globalContext()->currentProject() != m_mainProject) {
+        return;
+    }
+    engraving::Score* score = n->elements() ? n->elements()->msScore() : nullptr;
+    if (!score || load().sections.empty()) {
+        return;
+    }
+    // only part scores with an arrangement label (horn sheets)
+    bool hasLabel = false;
+    for (engraving::MeasureBase* mb = score->first(); mb && !mb->isMeasure(); mb = mb->next()) {
+        for (engraving::EngravingItem* e : mb->el()) {
+            if (e && e->isText() && engraving::toText(e)->textStyleType() == engraving::TextStyleType::INSTRUMENT_EXCERPT
+                && engraving::toText(e)->position() == engraving::AlignH::RIGHT) {
+                hasLabel = true;
+            }
+        }
+    }
+    if (!hasLabel) {
+        return;
+    }
+    score->doLayout();
+    n->undoStack()->prepareChanges(TranslatableString::untranslatable("Composer clear of the arrangement label"));
+    starscore::clearComposerCredit(score);
+    n->undoStack()->commitChanges();
+    n->notationChanged().notify();
 }

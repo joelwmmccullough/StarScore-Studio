@@ -1431,8 +1431,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
             if (retitle) {
                 bookNotation->undoStack()->rollbackChanges();
                 if (engraving::Score* bs = bookNotation->elements()->msScore()) {
-                    bs->setLayoutAll();
-                    bs->doLayout();
+                    bs->setLayoutAll();   // laid out again when it's next shown (a full layout per sheet slowed the export)
                 }
                 bookNotation->notationChanged().notify();
             }

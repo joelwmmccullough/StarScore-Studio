@@ -333,6 +333,7 @@ private:
     int standardizeHornNames();
     //! Tidying on opening a file: older stand-in versions shown, horn names, part score titles
     void tidyOpenedScore();
+    void clearComposerInCurrentScore();
     QJsonObject loadReferenceView() const;
     void recordReferenceView();
     void listenReferencePanel();

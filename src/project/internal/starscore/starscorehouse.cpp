@@ -267,7 +267,7 @@ void clearComposerCredit(Score* score)
     // Each blocker the credit overlaps pushes it below that blocker; repeat, since moving down can meet another
     double down = 0.0;
     for (int pass = 0; pass < 4; ++pass) {
-        bool moved = false;
+        bool pushed = false;
         for (const Text* other : others) {
             if (!other->ldata()) {
                 continue;
@@ -275,21 +275,32 @@ void clearComposerCredit(Score* score)
             const bool isLabel = other->textStyleType() == TextStyleType::INSTRUMENT_EXCERPT;
             const double g = isLabel ? labelGap : gap;
             const RectF o = other->pageBoundingRect().adjusted(-gap, -gap, gap, g);
-            if (c.translated(0.0, down).intersects(o) && o.bottom() - c.top() > down) {
+            const RectF moved = c.translated(0.0, down);
+            // the arrangement label and the credit both sit at the frame's right edge: they meet whenever their
+            // heights overlap (their widths aren't compared, so a label measured in the wrong place still counts)
+            const bool meets = isLabel ? (moved.top() < o.bottom() && moved.bottom() > o.top()) : moved.intersects(o);
+            if (meets && o.bottom() - c.top() > down) {
                 down = o.bottom() - c.top();
-                moved = true;
+                pushed = true;
             }
         }
-        if (!moved) {
+        if (!pushed) {
             break;
         }
     }
     if (down <= 0.0) {
         return;
     }
-    const bool inSpatium = score->style().styleV(Sid::composerOffsetType).toInt() == int(OffsetType::SPATIUM);
-    const PointF off = score->style().styleV(Sid::composerOffset).value<PointF>();
-    starscoreSet(score, Sid::composerOffset, PointF(off.x(), off.y() + (inSpatium ? down / score->style().spatium() : down / DPMM)));
+    if (comp->propertyFlags(Pid::OFFSET) == PropertyFlags::UNSTYLED) {
+        // the credit was placed by hand in this score (Balkan Wedding's Bass Trombone part): the style's position
+        // doesn't move it, its own does
+        Text* c2 = const_cast<Text*>(comp);
+        c2->undoChangeProperty(Pid::OFFSET, c2->offset() + PointF(0.0, down), PropertyFlags::UNSTYLED);
+    } else {
+        const bool inSpatium = score->style().styleV(Sid::composerOffsetType).toInt() == int(OffsetType::SPATIUM);
+        const PointF off = score->style().styleV(Sid::composerOffset).value<PointF>();
+        starscoreSet(score, Sid::composerOffset, PointF(off.x(), off.y() + (inSpatium ? down / score->style().spatium() : down / DPMM)));
+    }
     // the frame grows by what now hangs below it
     if (frame->isVBox()) {
         const double frameBottom = frame->pageBoundingRect().bottom();
