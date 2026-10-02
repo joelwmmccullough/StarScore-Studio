@@ -1164,7 +1164,7 @@
     <systemTextFrameFgColor r="0" g="0" b="0" a="255"/>
     <systemTextFrameBgColor r="255" g="255" b="255" a="0"/>
     <systemTextPosition>center</systemTextPosition>
-    <staffTextFontFace>Jost</staffTextFontFace>
+    <staffTextFontFace>Futura</staffTextFontFace>
     <staffTextFontSize>10</staffTextFontSize>
     <staffTextLineSpacing>1</staffTextLineSpacing>
     <staffTextFontSpatiumDependent>1</staffTextFontSpatiumDependent>
@@ -1294,7 +1294,7 @@
     <frameFrameFgColor r="0" g="0" b="0" a="255"/>
     <frameFrameBgColor r="255" g="255" b="255" a="0"/>
     <framePosition>left</framePosition>
-    <textLineFontFace>Jost</textLineFontFace>
+    <textLineFontFace>Futura</textLineFontFace>
     <textLineFontSize>10</textLineFontSize>
     <textLineLineSpacing>1</textLineLineSpacing>
     <textLineFontSpatiumDependent>1</textLineFontSpatiumDependent>

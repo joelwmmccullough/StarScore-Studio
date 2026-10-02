@@ -37,6 +37,22 @@ struct LayoutCopyResult {
 LayoutCopyResult copyLayout(const mu::engraving::Score* source, const std::vector<mu::engraving::Score*>& targets,
                             const LayoutCopyOptions& options);
 
+//! Score and every part score: tempo marks without fonts written into their text (a part could keep an old font
+//! after the metronome mark: "= 100" in Petaluma Script on Balkan Wedding's Drums), and title frames of a fixed
+//! height (a frame sized to its contents ignores the house style's height). Undoable when apply is true; returns
+//! how many things differ (apply false) or changed.
+int tidyTempoAndFrames(mu::engraving::MasterScore* master, bool apply);
+
+//! Fixes a finished sheet's layout: a system lock on every system that has none, and a page break after the last
+//! system of every page but the last (where there's no break already). Lays the score out first. Call inside a
+//! command. Returns how many locks and breaks were added.
+int lockSheetLayout(mu::engraving::Score* score);
+
+//! Copies where the texts sit (staff and system text, tempo marks, rehearsal marks, expressions) from one part score
+//! to another holding the same music: a text in the target at the same place in the song with the same words gets
+//! the source's position (offset and placement). Call inside a command. Returns how many texts moved.
+int copyTextPositions(const mu::engraving::Score* source, mu::engraving::Score* target);
+
 //! Colour notes (noteheads, accidentals, dots) by pitch class using Joel's 12 colours, or reset them
 //! to the default colour. Works on the selected notes, or the whole score when nothing is selected.
 //! Must be called inside a command (startCmd/endCmd). Returns the number of notes changed.

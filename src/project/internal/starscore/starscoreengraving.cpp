@@ -8,6 +8,7 @@
 #include <map>
 #include <set>
 
+#include <QRegularExpression>
 #include <QStringList>
 
 #include "engraving/dom/masterscore.h"
@@ -19,6 +20,11 @@
 #include "engraving/dom/part.h"
 #include "engraving/dom/staff.h"
 #include "engraving/dom/barline.h"
+#include "engraving/dom/textbase.h"
+#include "engraving/dom/tempotext.h"
+#include "engraving/dom/box.h"
+#include "engraving/dom/page.h"
+#include "engraving/dom/system.h"
 #include "engraving/dom/instrument.h"
 #include "engraving/dom/accidental.h"
 #include "engraving/dom/notedot.h"
@@ -616,5 +622,185 @@ int mu::project::starscore::syncEndBarlines(MasterScore* master, bool apply)
             }
         }
     }
+
+    // The part scores: each staff's barline like its staff in the score. A part can lose one the score has (the double
+    // barline before a repeat went missing in Balkan Wedding's Bass Sax, Bari Sax and Contrabassoon parts).
+    for (Excerpt* ex : master->excerpts()) {
+        Score* es = ex ? ex->excerptScore() : nullptr;
+        if (!es) {
+            continue;
+        }
+        for (Measure* m = es->firstMeasure(); m; m = m->nextMeasure()) {
+            Segment* seg = m->findSegment(SegmentType::EndBarLine, m->endTick());
+            Measure* mm = master->tick2measure(m->tick());
+            Segment* mseg = mm ? mm->findSegment(SegmentType::EndBarLine, mm->endTick()) : nullptr;
+            if (!seg || !mseg) {
+                continue;
+            }
+            for (size_t st = 0; st < es->nstaves(); ++st) {
+                EngravingItem* e = seg->element(st * VOICES);
+                Staff* staff = es->staff(st);
+                Staff* linked = staff ? staff->findLinkedInScore(master) : nullptr;
+                if (!e || !e->isBarLine() || !linked) {
+                    continue;
+                }
+                EngravingItem* me = mseg->element(linked->idx() * VOICES);
+                if (!me || !me->isBarLine()) {
+                    continue;
+                }
+                const BarLineType want = toBarLine(me)->barLineType();
+                BarLine* bl = toBarLine(e);
+                if (want == BarLineType::NORMAL || want == BarLineType::START_REPEAT || want == BarLineType::END_REPEAT
+                    || want == BarLineType::END_START_REPEAT || bl->barLineType() != BarLineType::NORMAL) {
+                    continue;
+                }
+                ++count;
+                if (apply) {
+                    es->undoChangeBarLineType(bl, want, false);
+                }
+            }
+        }
+    }
     return count;
+}
+
+int mu::project::starscore::copyTextPositions(const Score* source, Score* target)
+{
+    if (!source || !target) {
+        return 0;
+    }
+    auto movable = [](const EngravingItem* e) {
+        return e && (e->isStaffText() || e->isSystemText() || e->isTempoText() || e->isRehearsalMark() || e->isExpression()
+                     || e->isPlayTechAnnotation());
+    };
+    // the target's texts by place in the song and words
+    std::multimap<std::pair<int, QString>, EngravingItem*> targetTexts;
+    for (Segment* seg = target->firstSegment(SegmentType::ChordRest); seg; seg = seg->next1(SegmentType::ChordRest)) {
+        for (EngravingItem* e : seg->annotations()) {
+            if (movable(e)) {
+                targetTexts.emplace(std::make_pair(seg->tick().ticks(), toTextBase(e)->plainText().toQString()), e);
+            }
+        }
+    }
+    int moved = 0;
+    std::set<EngravingItem*> used;
+    for (const Segment* seg = source->firstSegment(SegmentType::ChordRest); seg; seg = seg->next1(SegmentType::ChordRest)) {
+        for (const EngravingItem* e : seg->annotations()) {
+            if (!movable(e)) {
+                continue;
+            }
+            const auto key = std::make_pair(seg->tick().ticks(), toTextBase(e)->plainText().toQString());
+            auto range = targetTexts.equal_range(key);
+            for (auto it = range.first; it != range.second; ++it) {
+                EngravingItem* t = it->second;
+                if (used.count(t) || t->type() != e->type()) {
+                    continue;
+                }
+                used.insert(t);
+                bool changed = false;
+                for (Pid pid : { Pid::OFFSET, Pid::PLACEMENT, Pid::AUTOPLACE }) {
+                    const PropertyValue v = e->getProperty(pid);
+                    if (t->getProperty(pid) != v) {
+                        t->undoChangeProperty(pid, v, e->propertyFlags(pid));
+                        changed = true;
+                    }
+                }
+                moved += changed ? 1 : 0;
+                break;
+            }
+        }
+    }
+    return moved;
+}
+
+int mu::project::starscore::tidyTempoAndFrames(MasterScore* master, bool apply)
+{
+    if (!master) {
+        return 0;
+    }
+    static const QRegularExpression fontFace("<font\\s+face=\"[^\"]*\"\\s*/>");
+    int count = 0;
+    for (Score* score : master->scoreList()) {
+        // title frame: fixed height
+        for (MeasureBase* mb = score->first(); mb && !mb->isMeasure(); mb = mb->next()) {
+            if (mb->isVBox()) {
+                if (mb->getProperty(Pid::BOX_AUTOSIZE).toBool()) {
+                    ++count;
+                    if (apply) {
+                        mb->undoChangeProperty(Pid::BOX_AUTOSIZE, false);
+                    }
+                }
+                break;
+            }
+        }
+        // tempo marks: the text style's font throughout
+        for (Segment* seg = score->firstSegment(SegmentType::ChordRest); seg; seg = seg->next1(SegmentType::ChordRest)) {
+            for (EngravingItem* e : seg->annotations()) {
+                if (!e || !e->isTempoText()) {
+                    continue;
+                }
+                TextBase* t = toTextBase(e);
+                const QString xml = t->xmlText().toQString();
+                QString clean = xml;
+                clean.remove(fontFace);
+                if (clean != xml) {
+                    ++count;
+                    if (apply) {
+                        t->undoChangeProperty(Pid::TEXT, String::fromQString(clean));
+                    }
+                }
+            }
+        }
+    }
+    return count;
+}
+
+int mu::project::starscore::lockSheetLayout(Score* score)
+{
+    if (!score) {
+        return 0;
+    }
+    score->doLayout();
+    int added = 0;
+    std::vector<std::pair<MeasureBase*, MeasureBase*> > locks;   // collected first: adding one changes the layout
+    std::vector<MeasureBase*> pageEnds;
+    const std::vector<Page*>& pages = score->pages();
+    for (size_t pi = 0; pi < pages.size(); ++pi) {
+        MeasureBase* lastOnPage = nullptr;
+        for (System* sys : pages[pi]->systems()) {
+            MeasureBase* first = nullptr;
+            MeasureBase* last = nullptr;
+            for (MeasureBase* mb : sys->measures()) {
+                if (mb && mb->isMeasure()) {
+                    if (!first) {
+                        first = mb;
+                    }
+                    last = mb;
+                }
+            }
+            if (!first) {
+                continue;   // a frame
+            }
+            if (!score->systemLocks()->lockContaining(first) && !score->systemLocks()->lockContaining(last)) {
+                locks.emplace_back(first, last);
+            }
+            lastOnPage = last;
+        }
+        if (lastOnPage && pi + 1 < pages.size()) {
+            MeasureBase* end = lastOnPage->isMeasure() && toMeasure(lastOnPage)->isMMRest()
+                               ? static_cast<MeasureBase*>(toMeasure(lastOnPage)->mmRestLast()) : lastOnPage;
+            if (end && !end->pageBreak() && !end->sectionBreak()) {
+                pageEnds.push_back(end);
+            }
+        }
+    }
+    for (const auto& [a, b] : locks) {
+        EditSystemLocks::undoAddSystemLock(score, new SystemLock(a, b));
+        ++added;
+    }
+    for (MeasureBase* end : pageEnds) {
+        end->undoSetPageBreak(true);
+        ++added;
+    }
+    return added;
 }

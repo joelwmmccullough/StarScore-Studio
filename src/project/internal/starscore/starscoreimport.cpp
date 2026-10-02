@@ -1044,6 +1044,10 @@ RetVal<QStringList> StarScoreService::createLowAlternates(const QString& section
         if (src && !targets.empty()) {
             master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Copy part formatting"));
             starscore::copyLayout(src, targets, starscore::LayoutCopyOptions());
+            // and where the texts sit ("Final soloist continues playing", "End solo", the tempo mark)
+            for (engraving::Score* t : targets) {
+                starscore::copyTextPositions(src, t);
+            }
             master->notation()->undoStack()->commitChanges();
         }
     }
@@ -1264,6 +1268,14 @@ void StarScoreService::tidyOpenedScore()
             d.alternateBarlinesMatched = true;
             store(d);
         }
+    }
+
+    // Tempo marks in the text style's font, title frames of a fixed height
+    if (starscore::tidyTempoAndFrames(ms, false) > 0) {
+        master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Tempo fonts and title frames"));
+        starscore::tidyTempoAndFrames(ms, true);
+        master->notation()->undoStack()->commitChanges();
+        master->notation()->notationChanged().notify();
     }
 
     // Barlines the same on every staff (a staff added later starts with plain ones)

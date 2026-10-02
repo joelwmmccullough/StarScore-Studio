@@ -4,6 +4,17 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.15.6
+
+- **Stray bars after an export.** Exporting printed each part score with its sheet title added and then undid it; undoing an edit after the part was laid out could leave bars behind in the score (Balkan Wedding gained an empty bar and a broken multimeasure-rest bar before bar 32 during the 4.0.1 export). The export no longer changes and undoes anything around the printing: a part score that doesn't show its sheet title yet gets it for good.
+- **Part scores keep the score's barlines.** The barline check (on opening and exporting) now also compares every part score with the score: a part that lost a double barline the score has (before H1's repeat in Balkan Wedding's Bass Sax, Bari Sax and Contrabassoon) gets it back.
+- **New Bass Trombone versions copy where the texts sit** from the Bass Trombone part: staff and system text ("Final soloist continues playing", "End solo"), the tempo mark, rehearsal marks and expressions.
+- **Tempo marks in the right font.** A tempo mark could keep an old font for the part after its note ("= 100" in Petaluma Script on Balkan Wedding's Drums). Fonts written into tempo marks are removed when a song opens, so they use the tempo style's font.
+- **Title frames of a fixed height** in every score and part score when a song opens (a frame sized to its contents came out too tall: Balkan Wedding's Drums).
+- **Finished sheets keep their layout.** Marking a part, a section or a part score Finished locks every system that isn't locked yet and adds a page break after the last system of each page (except the last page, and where there's a break already).
+- **New sections open their part scores**, each with its sheet title (Flexible chairs show "Horn 1" and "Flexible 2-Horn Arrangement").
+- **Starsign 2.6 style:** Staff Text and Text Lines in Futura (were Jost). Applied the next time part styles are applied.
+
 ## 1.15.5
 
 - **The arrangement label stays on the instrument name's line.** At export, the label was lined up with the instrument name directly, outside the edits that are undone after printing; now that part scores keep their label, that could leave it moved up out of the title frame (Balkan Wedding's Bari Sax). Lining it up is now undone with the rest after printing, and opening a part score puts its label back on the instrument name's line before moving the composer credit clear of it.

@@ -337,6 +337,9 @@ private:
     //! Tidying on opening a file: older stand-in versions shown, horn names, part score titles
     void tidyOpenedScore();
     void clearComposerInCurrentScore();
+    void lockFinishedScore(engraving::Score* score);
+    void lockFinishedParts(const QStringList& partIds);
+    void openPartBooks(const QStringList& partIds);
     // Automatic test run (starscoreautotest.cpp): STARSCORE_AUTOTEST=<output folder>
     static bool autotestRequested();
     void startAutotest();

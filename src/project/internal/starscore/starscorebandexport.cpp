@@ -986,7 +986,27 @@ int StarScoreService::labelPartBooks()
     int changed = 0;
     bool open = false;
     std::vector<INotationPtr> touched;
+    // Flexible sections: their chairs' part scores ("Horn 1", concert pitch) are printed as one sheet per instrument
+    // that can sit in the chair; the part score shows the chair and the arrangement
+    std::vector<StarScoreBandFile> files;
+    std::set<QString> chairsDone;
+    static const QRegularExpression chairRe("Horn\\s*(\\d+)");
     for (const StarScoreBandFile& f : plan.val.files) {
+        if (!f.isVersion) {
+            files.push_back(f);
+            continue;
+        }
+        if (f.partIds.size() != 1 || chairsDone.count(f.partIds.front())) {
+            continue;
+        }
+        chairsDone.insert(f.partIds.front());
+        StarScoreBandFile chair = f;
+        const QRegularExpressionMatch m = chairRe.match(f.header);
+        chair.sheetLeft = m.hasMatch() ? QString("Horn %1").arg(m.captured(1)) : QString();
+        chair.isVersion = false;
+        files.push_back(chair);
+    }
+    for (const StarScoreBandFile& f : files) {
         if (f.isScore || f.isVersion || !f.sourceFile.isEmpty() || f.partIds.size() != 1
             || (f.sheetLeft.isEmpty() && f.sheetRight.isEmpty())) {
             continue;
@@ -1389,20 +1409,18 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                 continue;
             }
             INotationPtr bookNotation = it->second->notation();
-            const bool retitle = bookNotation && (!file.sheetLeft.isEmpty() || !file.sheetRight.isEmpty());
-            if (retitle) {
-                // Only for printing: undone right after, so the part score itself doesn't change
+            // The part score shows its sheet title in StarScore (instrument name, arrangement label). One that doesn't
+            // yet gets it now, kept in the file. Nothing is changed and undone again around the printing: an edit
+            // undone after a layout could leave stray bars in the score (Balkan Wedding gained two empty bars).
+            engraving::Score* bs = bookNotation ? bookNotation->elements()->msScore() : nullptr;
+            if (bs && (!file.sheetLeft.isEmpty() || !file.sheetRight.isEmpty())
+                && starscoreNeedsRetitle(bs, file.sheetLeft, file.sheetRight)) {
                 bookNotation->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
-                starscoreRetitleSheet(bookNotation->elements()->msScore(), file.sheetLeft, file.sheetRight);
-            }
-            ret = writePdf(bookNotation, tmpPdf);
-            if (retitle) {
-                bookNotation->undoStack()->rollbackChanges();
-                if (engraving::Score* bs = bookNotation->elements()->msScore()) {
-                    bs->setLayoutAll();   // laid out again when it's next shown (a full layout per sheet slowed the export)
-                }
+                starscoreRetitleSheet(bs, file.sheetLeft, file.sheetRight, true);
+                bookNotation->undoStack()->commitChanges();
                 bookNotation->notationChanged().notify();
             }
+            ret = writePdf(bookNotation, tmpPdf);
         } else {
             INotationProjectPtr p = scratchProject();
             if (!p) {

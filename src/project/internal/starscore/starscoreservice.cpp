@@ -1449,6 +1449,9 @@ RetVal<QString> StarScoreService::createSection(const QString& templateKey, cons
     if (section.templateKey.endsWith("-horn-any")) {
         fillAnyHornsFromStandard(section);
     }
+    // the new part scores open, with their sheet titles (after the Flexible chairs took the Standard parts' style)
+    labelPartBooks();
+    openPartBooks(section.partIds);
 
     if (!missing.isEmpty()) {
         LOGW() << "[starscore] skipped unknown instruments: " << missing.join(", ");
@@ -1612,11 +1615,14 @@ void StarScoreService::setSectionStatus(const QString& sectionId, StarScoreStatu
             partIds = s.partIds;
         }
     }
-    // a section marked Finished: its sheets no longer need auditing
+    // a section marked Finished: its sheets no longer need auditing, and keep their layout
     if (status == StarScoreStatus::Finished) {
         markPartsAudited(data, masterScore(), partIds, true);
     }
     store(data);
+    if (status == StarScoreStatus::Finished) {
+        lockFinishedParts(partIds);
+    }
 }
 
 void StarScoreService::setSectionAutoStatus(const QString& sectionId)
@@ -1705,6 +1711,9 @@ void StarScoreService::setPartScoreStatus(const engraving::Score* score, int sta
             data.scoreStatus[family] = statusKey(static_cast<StarScoreStatus>(status));
         }
         storeTo(ms, data, m_mainProject ? m_mainProject : globalContext()->currentProject());
+        if (status == int(StarScoreStatus::Finished)) {
+            lockFinishedScore(const_cast<engraving::Score*>(score));
+        }
         return;
     }
     for (const QString& id : ids) {
@@ -1717,7 +1726,44 @@ void StarScoreService::setPartScoreStatus(const engraving::Score* score, int sta
     markPartsAudited(data, ms, ids, status == int(StarScoreStatus::Finished));
     storeTo(ms, data, m_mainProject ? m_mainProject : globalContext()->currentProject());
     if (status == int(StarScoreStatus::Finished)) {
+        lockFinishedScore(const_cast<engraving::Score*>(score));
         offerLowAlternates(ids);
+    }
+}
+
+//! A sheet marked Finished keeps its layout: every system locked, a page break after each page's last system
+void StarScoreService::lockFinishedScore(engraving::Score* score)
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    if (!score || !master || score->isMaster()) {
+        return;   // the main score is a workspace of every arrangement, not a sheet
+    }
+    master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Lock the finished sheet's layout"));
+    const int added = starscore::lockSheetLayout(score);
+    master->notation()->undoStack()->commitChanges();
+    if (added > 0) {
+        master->notation()->notationChanged().notify();
+    }
+}
+
+//! The part scores of these parts (one instrument each), their layout kept now they're Finished
+void StarScoreService::lockFinishedParts(const QStringList& partIds)
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    engraving::MasterScore* ms = masterScore();
+    if (!master || !ms) {
+        return;
+    }
+    for (engraving::Excerpt* ex : ms->excerpts()) {
+        engraving::Score* es = ex ? ex->excerptScore() : nullptr;
+        if (!es || es->parts().size() != 1) {
+            continue;
+        }
+        const engraving::Staff* st = es->parts().front()->staves().empty() ? nullptr : es->parts().front()->staves().front();
+        const engraving::Staff* linked = st ? st->findLinkedInScore(ms) : nullptr;
+        if (linked && partIds.contains(idText(linked->part()))) {
+            lockFinishedScore(es);
+        }
     }
 }
 
@@ -1732,6 +1778,7 @@ void StarScoreService::setPartStatus(const QString& partId, int status)
     markPartsAudited(data, masterScore(), { partId }, status == int(StarScoreStatus::Finished));
     store(data);
     if (status == int(StarScoreStatus::Finished)) {
+        lockFinishedParts({ partId });
         offerLowAlternates({ partId });
     }
 }
@@ -2344,7 +2391,7 @@ void StarScoreService::saveStyleSettings(const StyleSettings& settings)
 //! Done once per bundled version. A default the user chose themselves (not an older bundled one) is kept.
 void StarScoreService::installBuiltinDefaultStyle()
 {
-    static const int BUILTIN_STYLE_VERSION = 8;   // 1 = Starsign 2.0, 2 = 2.1, 3 = 2.2, 4 = 2.3, 5 = 2.4, 6 = 2.5, 7 = 2.6, 8 = 2.6 with H-bar 0.7sp
+    static const int BUILTIN_STYLE_VERSION = 9;   // 1 = Starsign 2.0, 2 = 2.1, 3 = 2.2, 4 = 2.3, 5 = 2.4, 6 = 2.5, 7 = 2.6, 8 = 2.6 with H-bar 0.7sp, 9 = Futura staff text and text lines
 
     const QString dir = globalConfiguration()->userAppDataPath().appendingComponent("StarScoreStyles").toQString();
     const QString target = dir + "/Starsign 2.6.mss";
@@ -3928,4 +3975,35 @@ void StarScoreService::clearComposerInCurrentScore()
     starscore::clearComposerCredit(score);
     n->undoStack()->commitChanges();
     n->notationChanged().notify();
+}
+
+//! Opens the part scores of these parts (one instrument each), the first one showing
+void StarScoreService::openPartBooks(const QStringList& partIds)
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    engraving::MasterScore* ms = masterScore();
+    if (!master || !ms) {
+        return;
+    }
+    std::vector<INotationPtr> books;
+    for (const QString& pid : partIds) {
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            INotationPtr n = e->notation();
+            engraving::Score* es = n && n->elements() ? n->elements()->msScore() : nullptr;
+            if (!es || es->parts().size() != 1 || es->parts().front()->staves().empty()) {
+                continue;
+            }
+            const engraving::Staff* linked = es->parts().front()->staves().front()->findLinkedInScore(ms);
+            if (linked && idText(linked->part()) == pid) {
+                books.push_back(n);
+                break;
+            }
+        }
+    }
+    for (const INotationPtr& n : books) {
+        master->setExcerptIsOpen(n, true);
+    }
+    if (!books.empty()) {
+        globalContext()->setCurrentNotation(books.front());
+    }
 }
