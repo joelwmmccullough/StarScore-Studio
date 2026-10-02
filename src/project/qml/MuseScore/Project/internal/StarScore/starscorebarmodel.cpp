@@ -327,7 +327,14 @@ QVariantList StarScoreBarModel::sectionMenu(const QString& id) const
         }
     }
 
-    return {
+    bool sevenHorn = false;
+    for (const StarScoreSection& s : starScore()->sections()) {
+        if (s.id == id && s.templateKey == "7-horn") {
+            sevenHorn = true;
+        }
+    }
+
+    QVariantList items {
         QVariantMap { { "id", "sec-solo:" + id }, { "title", muse::qtrc("starscore", "Show only this section") }, { "enabled", true } },
         QVariantMap { { "title", muse::qtrc("starscore", "Status") }, { "subitems", statusItems },
                       { "enabled", true } },
@@ -344,6 +351,13 @@ QVariantList StarScoreBarModel::sectionMenu(const QString& id) const
         QVariantMap { { "id", "sec-delete-all:" + id }, { "title", muse::qtrc("starscore", "Delete section and its instruments") },
                       { "enabled", true } },
     };
+    if (sevenHorn) {
+        // the Bass Trombone's other versions (Bari Sax, Bass Sax, Bassoon…): only the ones the section doesn't have
+        items.insert(4, QVariantMap { { "id", "sec-bass-versions:" + id },
+                                      { "title", muse::qtrc("starscore", "Make the Bass Trombone's other versions…") },
+                                      { "enabled", true } });
+    }
+    return items;
 }
 
 QVariantList StarScoreBarModel::addArrangementMenu() const
@@ -578,6 +592,8 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
         if (!ret.ret) {
             interactive()->error(muse::trc("starscore", "Couldn't create the arrangement"), ret.ret.toString());
         }
+    } else if (action == "sec-bass-versions") {
+        starScore()->makeBassHornVersions(arg);
     } else if (action == "sec-solo") {
         starScore()->soloSection(arg);
     } else if (action == "sec-status") {

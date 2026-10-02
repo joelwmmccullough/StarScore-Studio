@@ -382,7 +382,7 @@ std::vector<StarScoreVoiceSection> StarScoreService::checkVoiceOrderIn(const Mas
     };
 
     static const QRegularExpression numberRe("(\\d+)\\s*$");
-    static const QRegularExpression chairRe("^\\s*Horn\\s*(\\d+)\\s*$", QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression chairRe("^(?:.*:\\s*)?Horn\\s*(\\d+)\\s*$", QRegularExpression::CaseInsensitiveOption);   // "Horn 1", "3H Flexible: Horn 1"
 
     for (const StarScoreSection& sec : data.sections) {
         // (1-Horn: one melody sheet per instrument, not voices of one chord)

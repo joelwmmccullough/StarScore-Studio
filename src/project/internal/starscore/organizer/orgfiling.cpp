@@ -37,7 +37,7 @@ static const std::vector<std::pair<QString, QString> > CANON {
     { "^flute", "Flute" }, { "^sop.*recorder", "Recorder" }, { "^bass synth", "Bass Synth" },
     { "^(bass guitar|4-string bass|6-string bass|electric bass)", "Bass" }, { "^(electric guitar|guitar)", "Guitar" },
     { "^(hammond organ|organ|electric piano|elec piano|e\\.? ?piano|epiano|rhodes|wurlitzer|keys|piano|keyboards?|clavinet|clav)\\b", "Keys" }, { "^(drums|drumset|drum set|drummer)", "Drums" }, { "^(percussion|percussionist)", "Percussion" },
-    { "^congas", "Congas" }, { "^violin", "Violin" }, { "^viola", "Viola" }, { "^cello", "Cello" }, { "^bassoon", "Bassoon" },
+    { "^(congas|bongos|timbales|cajon)", "Percussion" }, { "^violin", "Violin" }, { "^viola", "Viola" }, { "^cello", "Cello" }, { "^bassoon", "Bassoon" },
     { "^accordion", "Accordion" }, { "^strings", "Strings" }, { "^(vocals?|voice|lead vox)", "Vocals" }, { "^ewi", "EWI" },
     { "^didgeridoo", "Didgeridoo" }, { "^synth", "Keys" },
 };
@@ -428,6 +428,20 @@ BandFilingReport fileBand(const Paths& paths, Codes& codes, const Roster& roster
                 continue;
             }
             filer.fileOne(song + "/" + f, song, code);
+        }
+        // The percussion sheet is called Percussion (it used to be named after the instrument: Congas, Bongos…)
+        {
+            const QDir rhythm(dir.filePath("1 Rhythm"));
+            const QString perc = code + " - Percussion.pdf";
+            if (rhythm.exists() && !rhythm.exists(perc)) {
+                for (const QString& old : { code + " - Congas.pdf", code + " - Bongos.pdf", code + " - Timbales.pdf",
+                                            code + " - Cajon.pdf" }) {
+                    if (rhythm.exists(old) && moveItem(rhythm.filePath(old), rhythm.filePath(perc))) {
+                        report.filed.push_back({ song + "/1 Rhythm/" + old, song + "/1 Rhythm/" + perc });
+                        break;
+                    }
+                }
+            }
         }
         for (const QString& want : QStringList { "1 Lead Sheet", "1 Rhythm", "Horn Part Guides" }) {
             if (!dir.exists(want)) {

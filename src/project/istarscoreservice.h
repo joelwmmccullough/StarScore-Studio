@@ -435,6 +435,9 @@ public:
     //! Completion tag of each part (instrument); parts without a tag are missing from the map
     virtual std::map<QString, StarScoreStatus> partStatuses() const = 0;
     virtual void setPartStatus(const QString& partId, int status) = 0;   // -1 = no tag
+    //! 7-Horn section: offers to make the Bass Trombone's stand-in versions it doesn't have yet (Bari Sax, Bass Sax,
+    //! Bassoon, Bass Clarinet, Contrabass Clarinet, Contrabassoon, Tuba)
+    virtual void makeBassHornVersions(const QString& sectionId) = 0;
     //! A part score's status (for its tab): the least-finished of its parts' tags, a part without a tag
     //! counting as Empty; -1 when none of its parts has a tag, or for the main score
     virtual int partScoreStatus(const mu::engraving::Score* score) const = 0;

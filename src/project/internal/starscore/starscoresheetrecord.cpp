@@ -202,8 +202,16 @@ void StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, const 
         }
         return nullptr;
     };
+    // the section's folder: the shallowest one its sheets are in (7-Horn bass horns sit in a subfolder)
     auto folderOf = [&](const QStringList& files) {
-        return files.isEmpty() ? QString() : files.first().section('/', 0, -2);
+        QString best;
+        for (const QString& f : files) {
+            const QString folder = f.section('/', 0, -2);
+            if (best.isEmpty() || folder.count('/') < best.count('/')) {
+                best = folder;
+            }
+        }
+        return best;
     };
 
     // --- lead sheet, the 3-Horn Section, the rhythm roles
@@ -446,10 +454,14 @@ void StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, const 
                 addUnique(req, { QString("1H/%1 - %2.pdf").arg(full.code, horn) });
             }
         } else if (key == "7-horn") {
-            // the Bass Trombone line also as Baritone Sax, Bass Sax and Bassoon
-            for (const QString& horn : { QString("Bari Sax"), QString("Bass Sax"), QString("Bassoon") }) {
-                addUnique(req, { QString("%1/%2 - %3.pdf").arg(folder, full.code, horn) });
+            // the Bass Trombone line also as Baritone Sax, Bass Sax and Bassoon, in the bass horns subfolder
+            const QString bass = folder + "/Bass Horns (Horn #7)";
+            QStringList bassReq = filesOfFolder[bass];
+            for (const QString& horn : { QString("Bass Trombone"), QString("Bari Sax"), QString("Bass Sax"), QString("Bassoon") }) {
+                addUnique(bassReq, { QString("%1/%2 - %3.pdf").arg(bass, full.code, horn) });
             }
+            addUnique(req, bassReq);
+            setFolder(bass, bassReq, {});
         }
         setFolder(folder, req, {});
     }

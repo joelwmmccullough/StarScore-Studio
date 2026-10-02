@@ -70,8 +70,12 @@ using namespace muse;
 static const std::vector<std::pair<QString, QString> > STARSCORE_HORN_ORDER {
     { "Trumpet", "Tpt" }, { "Flugelhorn", "Flg" }, { "Flute", "Flu" }, { "Clarinet", "Cla" }, { "Soprano Sax", "Sop" },
     { "Alto Sax", "Alt" }, { "Tenor Sax", "Ten" }, { "Bari Sax", "Bar" }, { "Bass Sax", "Bsx" }, { "Bassoon", "Bsn" }, { "Bass Clarinet", "Bcl" },
-    { "Trombone", "Tbn" }, { "Bass Trombone", "Btb" },
+    { "Contrabass Clarinet", "Cbcl" }, { "Contrabassoon", "Cbsn" },
+    { "Trombone", "Tbn" }, { "Bass Trombone", "Btb" }, { "Tuba", "Tba" },
 };
+
+//! 7-Horn arrangement: the subfolder for the Bass Trombone and its stand-in versions
+static const QString STARSCORE_BASS_HORNS_FOLDER = QStringLiteral("Bass Horns (Horn #7)");
 
 //! The band's name for a horn, or empty when the instrument is not a horn
 static QString starscoreHornName(const QString& id)
@@ -87,6 +91,9 @@ static QString starscoreHornName(const QString& id)
     }
     if (id.contains("trumpet") || id.contains("cornet")) {
         return "Trumpet";
+    }
+    if (id.contains("contrabass-clarinet")) {
+        return "Contrabass Clarinet";
     }
     if (id.contains("bass-clarinet")) {
         return "Bass Clarinet";
@@ -115,7 +122,19 @@ static QString starscoreHornName(const QString& id)
     if (id == "bassoon") {
         return "Bassoon";
     }
+    if (id == "contrabassoon") {
+        return "Contrabassoon";
+    }
+    if (id.contains("tuba") && !id.contains("wagner") && id != "tubaphone") {
+        return "Tuba";
+    }
     return QString();
+}
+
+//! The band's name for a horn (shared with the rest of StarScore), or empty when the instrument is not a horn
+QString mu::project::starscore::bandHornName(const QString& instrumentId)
+{
+    return starscoreHornName(instrumentId);
 }
 
 //! The horn's name printed on its sheet ("Trumpet 1" -> "Trumpet 1 in B♭", "Alto Sax" -> "Alto Saxophone")
@@ -133,7 +152,7 @@ static QString starscoreSheetHornName(const QString& bandName)
         }
     }
     if (name.startsWith("Trumpet") || name.startsWith("Flugelhorn") || name.startsWith("Clarinet")
-        || name.startsWith("Bass Clarinet")) {
+        || name.startsWith("Bass Clarinet") || name.startsWith("Contrabass Clarinet")) {
         name += QString::fromUtf8(" in B\u266D");
     }
     return name;
@@ -160,8 +179,8 @@ static QString starscoreRhythmName(const QString& id, const QString& partName)
     if (id.contains("drum")) {
         return "Drums";
     }
-    if (id == "congas") {
-        return "Congas";
+    if (id == "congas" || id.contains("conga")) {
+        return "Percussion";
     }
     if (id.contains("percussion") || id == "bongos" || id == "timbales" || id == "cajon" || id == "shaker") {
         return "Percussion";
@@ -702,13 +721,27 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
             }
             addFile(folder, "Score", scoreParts, true);
 
+            // 7-Horn: the Bass Trombone and its stand-in versions (Bari Sax, Bass Sax, Bassoon…) in a folder of their own
+            std::set<QString> bassHorns;
+            if (sec.templateKey == "7-horn" || players == 7) {
+                for (const auto& [alt, main] : sec.alternates) {
+                    bassHorns.insert(alt);
+                    bassHorns.insert(main);
+                }
+                for (const auto& [pid, horn] : horns) {
+                    if (horn == "Bass Trombone") {
+                        bassHorns.insert(pid);
+                    }
+                }
+            }
+
             std::map<QString, int> seen;
             for (const auto& [pid, horn] : horns) {
                 QString name = horn;
                 if (counts[horn] > 1) {
                     name += QString(" %1").arg(++seen[horn]);
                 }
-                addFile(folder, name, { pid }, false);
+                addFile(bassHorns.count(pid) ? folder + "/" + STARSCORE_BASS_HORNS_FOLDER : folder, name, { pid }, false);
                 plan.files.back().sheetLeft = starscoreSheetHornName(name);
                 plan.files.back().sheetRight = QString("%1-Horn Arrangement").arg(players);
             }
@@ -761,11 +794,11 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
 static std::vector<const mu::engraving::Score*> s_levelScores;
 
 //! Moves the arrangement label (right-positioned instrument-name text) to the instrument name's height
-static void starscoreLevelSheetLabels(mu::engraving::Score* score)
+static bool starscoreLevelSheetLabels(mu::engraving::Score* score)
 {
     auto it = std::find(s_levelScores.begin(), s_levelScores.end(), score);
     if (!score || it == s_levelScores.end()) {
-        return;
+        return false;
     }
     s_levelScores.erase(it);
 
@@ -780,7 +813,7 @@ static void starscoreLevelSheetLabels(mu::engraving::Score* score)
         }
     }
     if (!box) {
-        return;
+        return true;
     }
     mu::engraving::Text* ref = nullptr;
     std::vector<mu::engraving::Text*> labels;
@@ -796,7 +829,7 @@ static void starscoreLevelSheetLabels(mu::engraving::Score* score)
         }
     }
     if (!ref) {
-        return;
+        return true;
     }
     bool moved = false;
     const double refTop = ref->pagePos().y() + ref->ldata()->bbox().top();
@@ -812,10 +845,36 @@ static void starscoreLevelSheetLabels(mu::engraving::Score* score)
         score->setLayoutAll();
         score->doLayout();
     }
+    return true;
 }
 
-//! The sheet's title frame: the horn's name top left (the part name text), the arrangement top right
-static void starscoreRetitleSheet(mu::engraving::Score* score, const QString& left, const QString& right)
+//! The title frame's texts with their offsets, to tell whether anything in it changed
+static QString starscoreTitleFrameSignature(const mu::engraving::Score* score)
+{
+    QStringList out;
+    for (const mu::engraving::MeasureBase* mb = score ? score->first() : nullptr; mb && !mb->isMeasure(); mb = mb->next()) {
+        for (const mu::engraving::EngravingItem* e : mb->el()) {
+            if (e && e->isText()) {
+                const mu::engraving::Text* t = mu::engraving::toText(e);
+                out << QString("%1|%2|%3").arg(t->xmlText().toQString()).arg(t->offset().x()).arg(t->offset().y());
+            }
+        }
+        if (mb->isBox()) {
+            out << QString::number(mb->getProperty(mu::engraving::Pid::BOX_HEIGHT).value<mu::engraving::Spatium>().val());
+        }
+    }
+    if (score) {
+        const mu::engraving::PointF c = score->style().styleV(mu::engraving::Sid::composerOffset).value<mu::engraving::PointF>();
+        out << QString("%1,%2").arg(c.x()).arg(c.y());
+    }
+    return out.join('\n');
+}
+
+//! The sheet's title frame: the horn's name top left (the part name text), the arrangement top right. Running it
+//! again with the same names changes nothing: an arrangement label already there gets the new text. With
+//! `inApp`, the label is also levelled with the instrument name now (the export levels it at print time too) and the
+//! composer credit moves clear of it, so the part score in StarScore shows what the exported sheet will.
+static void starscoreRetitleSheet(mu::engraving::Score* score, const QString& left, const QString& right, bool inApp = false)
 {
     if (!score) {
         return;
@@ -839,15 +898,27 @@ static void starscoreRetitleSheet(mu::engraving::Score* score, const QString& le
     };
 
     mu::engraving::Text* partText = nullptr;
+    mu::engraving::Text* label = nullptr;
     for (mu::engraving::EngravingItem* e : box->el()) {
-        if (e && e->isText() && mu::engraving::toText(e)->textStyleType() == mu::engraving::TextStyleType::INSTRUMENT_EXCERPT) {
-            partText = mu::engraving::toText(e);
-            break;
+        if (!e || !e->isText() || mu::engraving::toText(e)->textStyleType() != mu::engraving::TextStyleType::INSTRUMENT_EXCERPT) {
+            continue;
+        }
+        mu::engraving::Text* t = mu::engraving::toText(e);
+        if (t->position() == mu::engraving::AlignH::RIGHT) {
+            if (!label) {
+                label = t;
+            }
+        } else if (!partText) {
+            partText = t;
         }
     }
+    bool changed = false;
     if (!left.isEmpty()) {
         if (partText) {
-            partText->undoChangeProperty(mu::engraving::Pid::TEXT, escape(left));
+            if (partText->xmlText() != escape(left)) {
+                partText->undoChangeProperty(mu::engraving::Pid::TEXT, escape(left));
+                changed = true;
+            }
         } else {
             mu::engraving::Text* t = mu::engraving::Factory::createText(box, mu::engraving::TextStyleType::INSTRUMENT_EXCERPT);
             t->setParent(box);
@@ -857,36 +928,118 @@ static void starscoreRetitleSheet(mu::engraving::Score* score, const QString& le
             t->setXmlText(escape(left));
             score->undoAddElement(t);
             partText = t;
+            changed = true;
         }
     }
     if (!right.isEmpty()) {
-        mu::engraving::Text* t = mu::engraving::Factory::createText(box, mu::engraving::TextStyleType::INSTRUMENT_EXCERPT);
-        t->setParent(box);
-        t->setTrack(0);
-        t->setXmlText(escape(right));
-        // placed at the frame's right edge (position), and right-justified (align); on the same line as the
-        // instrument name: its vertical alignment and its offset (often moved by hand in the part book)
-        const mu::engraving::AlignV alignV = partText ? partText->align().vertical : mu::engraving::AlignV::TOP;
-        t->setAlign(mu::engraving::Align(mu::engraving::AlignH::RIGHT, alignV));
-        t->setPropertyFlags(mu::engraving::Pid::ALIGN, mu::engraving::PropertyFlags::UNSTYLED);
-        t->setPosition(mu::engraving::AlignH::RIGHT);
-        t->setPropertyFlags(mu::engraving::Pid::POSITION, mu::engraving::PropertyFlags::UNSTYLED);
-        // placement: a text made here defaults to "below", which drops it by a staff height
-        t->setPlacement(partText ? partText->placement() : mu::engraving::PlacementV::ABOVE);
-        t->setPropertyFlags(mu::engraving::Pid::PLACEMENT, mu::engraving::PropertyFlags::UNSTYLED);
-        if (partText) {
-            t->setOffset(mu::engraving::PointF(0.0, partText->offset().y()));
-            t->setPropertyFlags(mu::engraving::Pid::OFFSET, mu::engraving::PropertyFlags::UNSTYLED);
-            t->setSize(partText->size());
-            t->setPropertyFlags(mu::engraving::Pid::FONT_SIZE, mu::engraving::PropertyFlags::UNSTYLED);
+        if (label) {
+            if (label->xmlText() != escape(right)) {
+                label->undoChangeProperty(mu::engraving::Pid::TEXT, escape(right));
+                changed = true;
+            }
+        } else {
+            mu::engraving::Text* t = mu::engraving::Factory::createText(box, mu::engraving::TextStyleType::INSTRUMENT_EXCERPT);
+            t->setParent(box);
+            t->setTrack(0);
+            t->setXmlText(escape(right));
+            // placed at the frame's right edge (position), and right-justified (align); on the same line as the
+            // instrument name: its vertical alignment and its offset (often moved by hand in the part book)
+            const mu::engraving::AlignV alignV = partText ? partText->align().vertical : mu::engraving::AlignV::TOP;
+            t->setAlign(mu::engraving::Align(mu::engraving::AlignH::RIGHT, alignV));
+            t->setPropertyFlags(mu::engraving::Pid::ALIGN, mu::engraving::PropertyFlags::UNSTYLED);
+            t->setPosition(mu::engraving::AlignH::RIGHT);
+            t->setPropertyFlags(mu::engraving::Pid::POSITION, mu::engraving::PropertyFlags::UNSTYLED);
+            // placement: a text made here defaults to "below", which drops it by a staff height
+            t->setPlacement(partText ? partText->placement() : mu::engraving::PlacementV::ABOVE);
+            t->setPropertyFlags(mu::engraving::Pid::PLACEMENT, mu::engraving::PropertyFlags::UNSTYLED);
+            if (partText) {
+                t->setOffset(mu::engraving::PointF(0.0, partText->offset().y()));
+                t->setPropertyFlags(mu::engraving::Pid::OFFSET, mu::engraving::PropertyFlags::UNSTYLED);
+                t->setSize(partText->size());
+                t->setPropertyFlags(mu::engraving::Pid::FONT_SIZE, mu::engraving::PropertyFlags::UNSTYLED);
+            }
+            score->undoAddElement(t);
+            changed = true;
         }
-        score->undoAddElement(t);
         if (std::find(s_levelScores.begin(), s_levelScores.end(), score) == s_levelScores.end()) {
             s_levelScores.push_back(score);
         }
     }
+    if (!changed) {
+        if (inApp) {
+            // already titled: nothing to lay out (the export levels the label again at print time)
+            s_levelScores.erase(std::remove(s_levelScores.begin(), s_levelScores.end(), score), s_levelScores.end());
+        }
+        return;
+    }
     score->setLayoutAll();
     score->doLayout();
+    if (inApp) {
+        starscoreLevelSheetLabels(score);   // also takes it off the print-time list
+    }
+    starscore::clearComposerCredit(score);
+}
+
+//! The horn part scores show their exported title: the instrument name the sheet prints top left ("Trumpet 1 in
+//! B♭", "Baritone Saxophone") and the arrangement top right ("7-Horn Arrangement"), with the composer credit clear of
+//! it. Changes nothing when they already do. Returns how many part scores changed.
+int StarScoreService::labelPartBooks()
+{
+    INotationProjectPtr project = exportSourceProject();
+    if (!project || project != globalContext()->currentProject() || bandFolder().isEmpty()) {
+        return 0;
+    }
+    IMasterNotationPtr master = project->masterNotation();
+    engraving::MasterScore* ms = master ? master->masterScore() : nullptr;
+    if (!ms || loadFrom(ms).sections.empty()) {
+        return 0;
+    }
+    const RetVal<StarScoreBandExportPlan> plan = planBandExport();
+    if (!plan.ret) {
+        return 0;
+    }
+
+    // part score by part: one instrument, preferably the one named like the part
+    std::map<QString, IExcerptNotationPtr> bookForPart;
+    for (const IExcerptNotationPtr& e : master->excerpts()) {
+        INotationPtr n = e->notation();
+        engraving::Score* es = n && n->elements() ? n->elements()->msScore() : nullptr;
+        if (!es || es->parts().size() != 1) {
+            continue;
+        }
+        for (const engraving::Staff* staff : es->parts().front()->staves()) {
+            if (const engraving::Staff* linked = staff->findLinkedInScore(ms)) {
+                const QString pid = idText(linked->part());
+                if (!bookForPart.count(pid) || e->name() == linked->part()->partName().toQString()) {
+                    bookForPart[pid] = e;
+                }
+                break;
+            }
+        }
+    }
+
+    int changed = 0;
+    for (const StarScoreBandFile& f : plan.val.files) {
+        if (f.isScore || f.isVersion || !f.sourceFile.isEmpty() || f.partIds.size() != 1
+            || (f.sheetLeft.isEmpty() && f.sheetRight.isEmpty())) {
+            continue;
+        }
+        auto it = bookForPart.find(f.partIds.front());
+        if (it == bookForPart.end() || !it->second->notation()) {
+            continue;
+        }
+        INotationPtr n = it->second->notation();
+        engraving::Score* es = n->elements()->msScore();
+        const QString before = starscoreTitleFrameSignature(es);
+        n->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
+        starscoreRetitleSheet(es, f.sheetLeft, f.sheetRight, true);
+        n->undoStack()->commitChanges();
+        if (starscoreTitleFrameSignature(es) != before) {
+            ++changed;
+            n->notationChanged().notify();
+        }
+    }
+    return changed;
 }
 
 // ---------------------------------------------------------------------------
@@ -971,7 +1124,10 @@ Ret StarScoreService::writePdf(const INotationPtr& notation, const QString& path
     notation->painting()->setViewMode(ViewMode::PAGE);
     if (score) {
         score->doLayout();
-        starscoreLevelSheetLabels(score);
+        if (starscoreLevelSheetLabels(score)) {
+            // the label sits where it prints now: the composer credit moves clear of it if they meet
+            starscore::clearComposerCredit(score);
+        }
     }
 
     io::FileStream out { io::path_t(path) };
@@ -1171,9 +1327,12 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         n->style()->setStyleValue(StyleId::concertPitch, false);
         n->undoStack()->commitChanges();
         if (!file.sheetLeft.isEmpty() || !file.sheetRight.isEmpty()) {
+            // open while printing: the label is levelled and the composer credit moved at print time
             n->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
             starscoreRetitleSheet(n->elements()->msScore(), file.sheetLeft, file.sheetRight);
+            const Ret written = writePdf(n, pdfPath);
             n->undoStack()->commitChanges();
+            return written;
         }
 
         return writePdf(n, pdfPath);
@@ -1253,6 +1412,21 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                 vis.emplace_back(part->id(), file.partIds.contains(idText(part)));
             }
             p->masterNotation()->parts()->setPartsVisible(vis, TranslatableString::untranslatable("Export"));
+            // A part can also be hidden staff by staff (the eye on each staff in the Instruments panel); a part on
+            // this score with every staff hidden would leave it empty (Balkan Wedding's 2- to 5-Horn scores were
+            // blank pages). Its staves show; a part with some staves showing keeps its choice.
+            for (engraving::Part* part : cs->parts()) {
+                if (!file.partIds.contains(idText(part))) {
+                    continue;
+                }
+                const bool anyShown = std::any_of(part->staves().begin(), part->staves().end(),
+                                                  [](const engraving::Staff* st) { return st->visible(); });
+                if (!anyShown) {
+                    for (engraving::Staff* st : part->staves()) {
+                        p->masterNotation()->parts()->setStaffVisible(st->id(), true);
+                    }
+                }
+            }
             ret = writePdf(p->masterNotation()->notation(), tmpPdf);
         }
 
@@ -1304,6 +1478,36 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                 }
             }
         }
+        // Percussion sheets under older names ("Congas", "Bongos"…), once a Percussion sheet is there
+        {
+            const QString prefix = "1 Rhythm/" + plan.val.code + " - Percussion";
+            const bool percThere = std::any_of(current.begin(), current.end(), [&](const QString& rel) {
+                return rel.startsWith(prefix) && QFileInfo::exists(songDir + "/" + rel);
+            });
+            if (percThere) {
+                const QDir dir(songDir + "/1 Rhythm");
+                for (const QString& fileName : dir.entryList({ plan.val.code + " - Congas*.pdf", plan.val.code + " - Bongos*.pdf",
+                                                               plan.val.code + " - Timbales*.pdf", plan.val.code + " - Cajon*.pdf" },
+                                                             QDir::Files)) {
+                    const QString rel = "1 Rhythm/" + fileName;
+                    if (!current.contains(rel)) {
+                        supersede(rel);
+                    }
+                }
+            }
+        }
+        // 7-Horn bass horns: the sheets that sat in the arrangement folder before they got their own subfolder
+        for (const QString& rel : current) {
+            const QString marker = "/" + STARSCORE_BASS_HORNS_FOLDER + "/";
+            const int at = rel.indexOf(marker);
+            if (at < 0 || !QFileInfo::exists(songDir + "/" + rel)) {
+                continue;
+            }
+            const QString old = rel.left(at) + "/" + rel.mid(at + marker.size());
+            if (!current.contains(old) && QFileInfo::exists(songDir + "/" + old)) {
+                supersede(old);
+            }
+        }
         for (const QString& folder : plan.val.anyHornFolders) {
             const QDir dir(songDir + "/" + folder);
             for (const QString& fileName : dir.entryList({ plan.val.code + " - Horn *.pdf" }, QDir::Files)) {
@@ -1345,7 +1549,13 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                 continue;
             }
             const QJsonObject now = organizerSignature(ms, f.partIds);
-            const QJsonObject before = sigs.value(f.relativePath).toObject();
+            QJsonObject before = sigs.value(f.relativePath).toObject();
+            if (before.isEmpty() && f.relativePath.contains("/" + STARSCORE_BASS_HORNS_FOLDER + "/")) {
+                // the same sheet before it moved into the bass horns subfolder
+                QString old = f.relativePath;
+                old.remove(STARSCORE_BASS_HORNS_FOLDER + "/");
+                before = sigs.value(old).toObject();
+            }
             starscore::org::SheetChange c;
             c.relativePath = f.relativePath;
             c.isScore = f.isScore;
@@ -1831,10 +2041,10 @@ void StarScoreService::songbookRenderSheets(const QString& songPath, std::vector
         n->undoStack()->prepareChanges(TranslatableString::untranslatable("Songbook sheet"));
         n->style()->setStyleValue(StyleId::showPageNumber, false);   // the book numbers its pages
         starscoreRetitleSheet(score, sheet.left, sheet.right);
-        n->undoStack()->commitChanges();
         QDir().mkpath(QFileInfo(sheet.pdfPath).absolutePath());
         QFile::remove(sheet.pdfPath);
-        const Ret ret = writePdf(n, sheet.pdfPath);
+        const Ret ret = writePdf(n, sheet.pdfPath);   // inside the edit: printing may move the composer credit
+        n->undoStack()->commitChanges();
         if (!ret) {
             sheet.error = QString::fromStdString(ret.toString());
         } else {

@@ -104,10 +104,25 @@ StyledDialogView {
             radius: 3
 
             StyledListView {
+                id: targetList
                 anchors.fill: parent
                 anchors.margins: 6
                 spacing: 2
                 model: layoutModel.targets
+
+                // Ticking a part rebuilds the list, which would scroll it back to the top: keep the scroll position
+                property real keptY: -1
+                Connections {
+                    target: layoutModel
+                    function onTargetsChanged() {
+                        if (targetList.keptY < 0) {
+                            return
+                        }
+                        const y = targetList.keptY
+                        targetList.keptY = -1
+                        Qt.callLater(function() { targetList.contentY = y })
+                    }
+                }
 
                 delegate: CheckBox {
                     required property var modelData
@@ -119,6 +134,7 @@ StyledDialogView {
                     enabled: modelData.enabled
 
                     onClicked: {
+                        targetList.keptY = targetList.contentY
                         layoutModel.setTargetChecked(index, !checked)
                     }
                 }

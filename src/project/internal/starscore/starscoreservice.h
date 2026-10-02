@@ -143,6 +143,7 @@ public:
     QJsonObject songRecordings() const override;
     void setSongRecordings(const QJsonObject& recordings) override;
     muse::RetVal<StarScoreBandExportPlan> planBandExport() const override;
+    void makeBassHornVersions(const QString& sectionId) override;
     muse::Ret registerBandSong(const QString& title, int category, const QString& code) override;
     muse::RetVal<QString> exportArrangementsAsMscz(const QString& folder) override;
     muse::RetVal<QString> exportToBandFolder(const QStringList& onlyPaths) override;
@@ -285,7 +286,7 @@ private:
     //! A new "N-Horn Any" section starts with the music of the "N-Horn" section, chair by chair
     void fillAnyHornsFromStandard(const StarScoreSection& anySection);
     //! A 7-Horn Bass Trombone part marked Finished: offer the Baritone Sax, Bass Sax and Bassoon versions it lacks
-    void offerLowAlternates(const QStringList& partIds);
+    void offerLowAlternates(const QStringList& partIds, bool asked = false);
     //! Legacy audit: marks (or unmarks) these sheets as no longer needing auditing, with a fingerprint of their music
     void markPartsAudited(Data& data, const mu::engraving::MasterScore* ms, const QStringList& partIds, bool audited) const;
     //! instrumentIds: which of "baritone-saxophone", "bass-saxophone", "bassoon" to make
@@ -324,6 +325,12 @@ private:
     QStringList referenceViewSettingsKeys() const;
     void ensureFileId();
     void showOldAlternates();
+    //! The horn part scores show their exported title (instrument name, arrangement label); see starscorebandexport.cpp
+    int labelPartBooks();
+    //! Horn parts are named "7H: Bari Sax", "3H Flexible: Horn 1"…; returns how many were renamed
+    int standardizeHornNames();
+    //! Tidying on opening a file: older stand-in versions shown, horn names, part score titles
+    void tidyOpenedScore();
     QJsonObject loadReferenceView() const;
     void recordReferenceView();
     void listenReferencePanel();

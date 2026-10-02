@@ -71,6 +71,16 @@ int syncBarNumbering(mu::engraving::MasterScore* master, BarNumberingSync how);
 //! system" off. Returns how many settings it changed (0 = already so).
 int applyKeysStaffRules(mu::engraving::MasterScore* master);
 
+//! The band's name for a horn ("Trumpet", "Tenor Sax", "Bari Sax", "Bass Trombone"…), or empty when the instrument
+//! is not a horn
+QString bandHornName(const QString& instrumentId);
+
+//! Gives the first staff of each of `to` the end barlines (double, final…) of the first staff of `from`, bar by bar,
+//! in the score and every part book (undoable). Pasted music doesn't bring its barlines: a new stand-in version of
+//! the Bass Trombone lost the double barline before each repeat. Returns how many barlines changed.
+int copyEndBarlines(mu::engraving::MasterScore* master, const mu::engraving::Part* from,
+                    const std::vector<mu::engraving::Part*>& to);
+
 QString applyAdditiveTimeSig(mu::engraving::MasterScore* score, mu::engraving::Measure* start, mu::engraving::Measure* last,
                              const std::vector<int>& numerators, int denominator);
 }

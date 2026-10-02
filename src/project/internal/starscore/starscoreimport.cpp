@@ -724,11 +724,40 @@ void StarScoreService::fillAnyHornsFromStandard(const StarScoreSection& anySecti
 // ---------------------------------------------------------------------------
 
 //! The stand-in versions of the 7-Horn Bass Trombone line, in the order they're made
+//! The 7-Horn Bass Trombone line's stand-in versions: instrument id, band name
 static const std::vector<std::pair<QString, QString> > STARSCORE_LOW_VERSIONS {
-    { "baritone-saxophone", "Baritone Saxophone" }, { "bass-saxophone", "Bass Saxophone" }, { "bassoon", "Bassoon" },
+    { "baritone-saxophone", "Bari Sax" }, { "bass-saxophone", "Bass Sax" }, { "bassoon", "Bassoon" },
+    { "bass-clarinet", "Bass Clarinet" }, { "contrabass-clarinet", "Contrabass Clarinet" }, { "contrabassoon", "Contrabassoon" },
+    { "tuba", "Tuba" },
 };
 
-void StarScoreService::offerLowAlternates(const QStringList& partIds)
+void StarScoreService::makeBassHornVersions(const QString& sectionId)
+{
+    engraving::MasterScore* ms = masterScore();
+    if (!ms) {
+        return;
+    }
+    QStringList bassTrombones;
+    for (const StarScoreSection& s : load().sections) {
+        if (s.id != sectionId) {
+            continue;
+        }
+        for (const QString& pid : s.partIds) {
+            const engraving::Part* p = ms->partById(ID(pid));
+            if (p && p->instrumentId().toQString().contains("bass-trombone") && !s.alternates.count(pid)) {
+                bassTrombones << pid;
+            }
+        }
+    }
+    if (bassTrombones.isEmpty()) {
+        interactive()->info(muse::trc("starscore", "No Bass Trombone"),
+                            muse::trc("starscore", "This section has no Bass Trombone part to make the other versions from."));
+        return;
+    }
+    offerLowAlternates(bassTrombones, true);
+}
+
+void StarScoreService::offerLowAlternates(const QStringList& partIds, bool asked)
 {
     engraving::MasterScore* ms = masterScore();
     if (!ms) {
@@ -747,10 +776,19 @@ void StarScoreService::offerLowAlternates(const QStringList& partIds)
             if (!p || !s.partIds.contains(pid) || !p->instrumentId().toQString().contains("bass-trombone")) {
                 continue;
             }
+            // The versions there now: stand-ins of this line, and any other instrument of that kind in the section
+            // (a deleted part is gone from both, so it's made again)
             QStringList have;
             for (const auto& [alt, main] : s.alternates) {
                 if (main == pid) {
                     if (const engraving::Part* a = ms->partById(ID(alt))) {
+                        have << a->instrumentId().toQString();
+                    }
+                }
+            }
+            for (const QString& other : s.partIds) {
+                if (other != pid) {
+                    if (const engraving::Part* a = ms->partById(ID(other))) {
                         have << a->instrumentId().toQString();
                     }
                 }
@@ -769,6 +807,12 @@ void StarScoreService::offerLowAlternates(const QStringList& partIds)
         }
     }
     if (mainId.isEmpty()) {
+        if (asked) {
+            QTimer::singleShot(0, [this]() {
+                interactive()->info(muse::trc("starscore", "Nothing to make"),
+                                    muse::trc("starscore", "The Bass Trombone already has every other version."));
+            });
+        }
         return;
     }
 
@@ -803,7 +847,8 @@ void StarScoreService::offerLowAlternates(const QStringList& partIds)
         interactive()->info(muse::trc("starscore", "Parts created"),
                             muse::qtrc("starscore", "%1 now have the Bass Trombone's music, below it in the 7-Horn section, and their status "
                                                     "is Needs review. They show and hide with the 7-Horn section and are in the "
-                                                    "7-Horn arrangement's score; each also has its own part score. Notes too low "
+                                                    "7-Horn arrangement's score. Their part scores are open, with the Bass "
+                                                    "Trombone part's page breaks, system breaks and system locks. Notes too low "
                                                     "for an instrument are colored as out of range.").arg(list).toStdString());
     });
 }
@@ -919,6 +964,8 @@ RetVal<QStringList> StarScoreService::createLowAlternates(const QString& section
             engraving::XmlReader reader(mime);
             ms->pasteStaff(reader, start, to->staves().front()->idx());
         }
+        // pasting brings the notes, not the barlines: the double barlines (before each repeat) too
+        starscore::copyEndBarlines(ms, mainPart, newParts);
         master->notation()->undoStack()->commitChanges();
     }
 
@@ -952,9 +999,60 @@ RetVal<QStringList> StarScoreService::createLowAlternates(const QString& section
     }
     d.alternatesInSection = true;
     store(d);
+    // named like the rest of the section ("7H: Bari Sax")
+    standardizeHornNames();
     // the 7-Horn arrangement's own score gets them too
     syncArrangementScores();
     applyStyles(made.partIds);
+
+    // Their part scores: the Bass Trombone part's layout (page and system breaks, system locks), the exported title,
+    // and open, the first one showing
+    auto bookOf = [&](const engraving::Part* part) -> IExcerptNotationPtr {
+        IExcerptNotationPtr found;
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            engraving::Excerpt* ex = importExcerptOf(e);
+            if (!ex) {
+                continue;
+            }
+            const std::vector<engraving::Part*> ps = masterPartsOf(ex);
+            if (ps.size() == 1 && ps.front() == part && (!found || e->name() == part->partName().toQString())) {
+                found = e;
+            }
+        }
+        return found;
+    };
+    mainPart = ms->partById(ID(mainPartId));
+    const IExcerptNotationPtr mainBook = mainPart ? bookOf(mainPart) : nullptr;
+    std::vector<INotationPtr> newBooks;
+    for (const QString& pid : made.partIds) {
+        const engraving::Part* p = ms->partById(ID(pid));
+        const IExcerptNotationPtr book = p ? bookOf(p) : nullptr;
+        if (book && book->notation()) {
+            newBooks.push_back(book->notation());
+        }
+    }
+    if (mainBook && mainBook->notation()) {
+        const engraving::Score* src = mainBook->notation()->elements()->msScore();
+        std::vector<engraving::Score*> targets;
+        for (const INotationPtr& n : newBooks) {
+            if (engraving::Score* es = n->elements()->msScore()) {
+                targets.push_back(es);
+            }
+        }
+        if (src && !targets.empty()) {
+            master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Copy part formatting"));
+            starscore::copyLayout(src, targets, starscore::LayoutCopyOptions());
+            master->notation()->undoStack()->commitChanges();
+        }
+    }
+    labelPartBooks();
+    for (const INotationPtr& n : newBooks) {
+        master->setExcerptIsOpen(n, true);
+    }
+    if (!newBooks.empty()) {
+        globalContext()->setCurrentNotation(newBooks.front());
+    }
+
     const QStringList newIds = made.partIds;
     QTimer::singleShot(1500, [this, newIds]() { applyMixerDefaults(newIds); });
     QTimer::singleShot(4000, [this, newIds]() { applyMixerDefaults(newIds); });
@@ -1015,4 +1113,142 @@ void StarScoreService::showOldAlternates()
         }
     }
     syncArrangementScores();
+}
+
+//! Horn parts are named by their section and the band's name for the horn: "7H: Trumpet 1", "7H: Bari Sax",
+//! "3H: Tenor Sax", "1H: Alto Sax", "3H Flexible: Horn 1". The part's name in the score and its part score's name
+//! follow. (The exported sheets have names of their own: "BALK - Trumpet 1.pdf", printed "Trumpet 1 in B♭".)
+int StarScoreService::standardizeHornNames()
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    engraving::MasterScore* ms = masterScore();
+    if (!master || !ms) {
+        return 0;
+    }
+    const Data d = load();
+    static const QRegularExpression keyRe("^(\\d)-horn(-any)?$");
+    auto bare = [](const QString& name) {
+        const int at = name.lastIndexOf(": ");
+        return (at >= 0 ? name.mid(at + 2) : name).trimmed();
+    };
+
+    std::vector<std::pair<engraving::Part*, QString> > renames;
+    for (const StarScoreSection& s : d.sections) {
+        const QRegularExpressionMatch m = keyRe.match(s.templateKey);
+        if (!m.hasMatch()) {
+            continue;
+        }
+        const bool flexible = !m.captured(2).isEmpty();
+        const QString prefix = m.captured(1) + "H" + (flexible ? QString(" Flexible") : QString());
+
+        std::vector<engraving::Part*> parts;   // in score order
+        for (engraving::Part* p : ms->parts()) {
+            if (s.partIds.contains(idText(p))) {
+                parts.push_back(p);
+            }
+        }
+        std::vector<QString> bases;
+        std::vector<bool> numbered;
+        std::map<QString, int> counts;
+        for (engraving::Part* p : parts) {
+            QString base = flexible ? QString() : starscore::bandHornName(p->instrumentId().toQString());
+            const bool byHorn = !base.isEmpty();
+            if (!byHorn) {
+                base = bare(p->partName().toQString());   // "Horn 1", "Horn 1 (Flute)", or a name set by hand
+            }
+            bases.push_back(base);
+            numbered.push_back(byHorn);
+            if (byHorn) {
+                counts[base]++;
+            }
+        }
+        std::map<QString, int> seen;
+        for (size_t i = 0; i < parts.size(); ++i) {
+            QString name = bases[i];
+            if (name.isEmpty()) {
+                continue;
+            }
+            if (numbered[i] && counts[name] > 1) {
+                name += QString(" %1").arg(++seen[bases[i]]);
+            }
+            const QString full = prefix + ": " + name;
+            if (parts[i]->partName().toQString() != full) {
+                renames.emplace_back(parts[i], full);
+            }
+        }
+    }
+
+    for (const auto& [p, name] : renames) {
+        const QString old = p->partName().toQString();
+        master->parts()->setInstrumentName(InstrumentKey { p->instrumentId(), p->id(), engraving::Fraction(0, 1) }, name);
+        p->setPartName(String::fromQString(name));
+        // its part score follows: the one named like the part, or its only one
+        IExcerptNotationPtr book;
+        int books = 0;
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            engraving::Excerpt* ex = importExcerptOf(e);
+            if (!ex) {
+                continue;
+            }
+            const std::vector<engraving::Part*> ps = masterPartsOf(ex);
+            if (ps.size() == 1 && ps.front() == p) {
+                ++books;
+                if (!book || e->name() == old) {
+                    book = e;
+                }
+            }
+        }
+        if (book && (books == 1 || book->name() == old) && book->name() != name) {
+            book->setName(name);
+        }
+    }
+    if (!renames.empty()) {
+        if (INotationProjectPtr project = globalContext()->currentProject()) {
+            project->markAsUnsaved();
+        }
+        master->notation()->notationChanged().notify();
+        m_changed.notify();
+    }
+    return int(renames.size());
+}
+
+//! On opening a file: stand-in versions from older files shown with their section, their barlines like the Bass
+//! Trombone's, horn parts named by the scheme, and the horn part scores showing their exported title
+void StarScoreService::tidyOpenedScore()
+{
+    if (!m_mainProject || globalContext()->currentProject() != m_mainProject) {
+        return;
+    }
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    engraving::MasterScore* ms = masterScore();
+    if (!master || !ms || load().sections.empty()) {
+        return;
+    }
+    showOldAlternates();
+
+    // Stand-in versions made before 1.15.3 lost the double barlines of the line they stand in for
+    {
+        std::map<QString, std::vector<engraving::Part*> > altsOf;   // main part id -> its stand-ins
+        for (const StarScoreSection& s : load().sections) {
+            for (const auto& [alt, main] : s.alternates) {
+                if (engraving::Part* a = ms->partById(ID(alt))) {
+                    altsOf[main].push_back(a);
+                }
+            }
+        }
+        if (!altsOf.empty()) {
+            master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Barlines like the Bass Trombone"));
+            int changed = 0;
+            for (const auto& [main, alts] : altsOf) {
+                changed += starscore::copyEndBarlines(ms, ms->partById(ID(main)), alts);
+            }
+            master->notation()->undoStack()->commitChanges();
+            if (changed) {
+                master->notation()->notationChanged().notify();
+            }
+        }
+    }
+
+    standardizeHornNames();
+    labelPartBooks();
 }

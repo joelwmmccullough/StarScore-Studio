@@ -511,8 +511,8 @@ static std::vector<std::vector<const Part*> > auditChairGroups(const AuditContex
     const int hornCount = auditHornCount(section);
     std::map<int, std::vector<const Part*> > byChair;
     std::set<const Part*> placed;
-    static const QRegularExpression bookRe("(\\d+)\\s*-?\\s*Horn.*\\bHorn\\s*(\\d+)", QRegularExpression::CaseInsensitiveOption);
-    static const QRegularExpression chairRe("^\\s*Horn\\s*(\\d+)\\s*$", QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression bookRe("(\\d+)\\s*(?:-?\\s*Horn|H\\b).*\\bHorn\\s*(\\d+)", QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression chairRe("^(?:.*:\\s*)?Horn\\s*(\\d+)\\s*$", QRegularExpression::CaseInsensitiveOption);   // "Horn 1", "3H Flexible: Horn 1"
     for (const Excerpt* ex : ctx.ms->excerpts()) {
         const QRegularExpressionMatch m = bookRe.match(ex->name().toQString());
         if (!m.hasMatch() || (hornCount > 0 && m.captured(1).toInt() != hornCount)) {

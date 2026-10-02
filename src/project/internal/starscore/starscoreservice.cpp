@@ -912,6 +912,7 @@ void StarScoreService::applyOnSections(const QStringList& onIds, const QString& 
     m_auditRevealed.clear();
 
     std::vector<std::pair<muse::ID, bool> > changes;
+    std::vector<muse::ID> unhideStaves;   // shown parts whose every staff was hidden staff by staff
     for (const engraving::Part* p : ms->parts()) {
         const QString id = idText(p);
         if (!managed.count(id)) {
@@ -921,9 +922,21 @@ void StarScoreService::applyOnSections(const QStringList& onIds, const QString& 
         if (p->show() != visible) {
             changes.emplace_back(p->id(), visible);
         }
+        if (visible && !p->staves().empty()
+            && std::none_of(p->staves().begin(), p->staves().end(), [](const engraving::Staff* st) { return st->visible(); })) {
+            for (const engraving::Staff* st : p->staves()) {
+                unhideStaves.push_back(st->id());
+            }
+        }
     }
 
+    for (const muse::ID& sid : unhideStaves) {
+        master->parts()->setStaffVisible(sid, true);
+    }
     if (changes.empty()) {
+        if (!unhideStaves.empty()) {
+            m_changed.notify();
+        }
         return;
     }
 
@@ -1406,6 +1419,7 @@ RetVal<QString> StarScoreService::createSection(const QString& templateKey, cons
     section.status = StarScoreStatus::Empty;
     data.sections.push_back(section);
     store(data);
+    standardizeHornNames();   // "4H: Trumpet", "3H Flexible: Horn 1"
 
     applyStyles(section.partIds);
     // The mixer's tracks for new instruments appear a moment after they're added: apply the defaults again then
@@ -2368,6 +2382,8 @@ int StarScoreService::applyStyles(const QStringList& partIds)
 {
     const int restyled = applyStylesOnly(partIds);
     applyMixerDefaults(partIds);
+    // horn part scores show their exported title (after the style: the composer credit moves clear of the label)
+    labelPartBooks();
 
     // Default layout: the lead sheet's bass staff shows only where it has music
     if (partIds.isEmpty()) {
@@ -2462,8 +2478,11 @@ int StarScoreService::applyStylesOnly(const QStringList& partIds)
             const QString partName = part->partName().toQString().trimmed();
             for (const StarScoreStyleRule& r : settings.rules) {
                 const bool sectionOk = r.sectionKey.isEmpty() || sectionKeys.contains(r.sectionKey);
+                // a rule may name the part with or without its section ("7H: Bari Sax" or "Bari Sax")
+                const QString bare = partName.contains(": ") ? partName.mid(partName.lastIndexOf(": ") + 2).trimmed() : partName;
                 const bool partOk = r.partName.trimmed().isEmpty()
                                     || r.partName.trimmed().compare(partName, Qt::CaseInsensitive) == 0
+                                    || r.partName.trimmed().compare(bare, Qt::CaseInsensitive) == 0
                                     || r.partName.trimmed().compare(e->name().trimmed(), Qt::CaseInsensitive) == 0;
                 if (sectionOk && partOk && usable(r.stylePath)) {
                     chosen = r.stylePath;   // later rules win
@@ -2948,7 +2967,7 @@ void StarScoreService::onCurrentProjectChanged()
     extractSolos();
     ensureFileId();
     // once the score is fully set up
-    QTimer::singleShot(0, [this]() { showOldAlternates(); });
+    QTimer::singleShot(0, [this]() { tidyOpenedScore(); });
 }
 
 void StarScoreService::clearSolos()

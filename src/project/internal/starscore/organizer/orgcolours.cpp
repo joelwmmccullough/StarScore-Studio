@@ -8,6 +8,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QJsonArray>
+#include <QRegularExpression>
 
 namespace mu::project::starscore::org {
 namespace {
@@ -148,14 +149,26 @@ SongColours songColours(const Paths& paths, const QString& songRoot, const QJson
         for (const QString& rel : strings(o.value("required"))) {
             gray |= !check.exists(rel);
         }
+        // Percussion sheets (Congas, Bongos…) never count toward a colour
+        static const QRegularExpression percussion(" - (Percussion|Congas|Bongos|Timbales|Cajon|Shakers?)( \\(.*\\))?( \\d+)?\\.pdf$",
+                                                   QRegularExpression::CaseInsensitiveOption);
         int least = 4;
+        int counted = 0;
         const QStringList files = QDir(abs).entryList({ "*.pdf", "*.PDF" }, QDir::Files, QDir::Name);
         for (const QString& f : files) {
-            if (!f.startsWith('.')) {
+            if (!f.startsWith('.') && !percussion.match(f).hasMatch()) {
                 least = std::min(least, check.status(folder + "/" + f));
+                ++counted;
             }
         }
-        if (files.isEmpty()) {
+        // sheets it needs in a subfolder (the 7-Horn bass horns) count too
+        for (const QString& rel : strings(o.value("required"))) {
+            if (rel.section('/', 0, -2) != folder && check.exists(rel)) {
+                least = std::min(least, check.status(rel));
+                ++counted;
+            }
+        }
+        if (counted == 0) {
             gray = true;
         }
         const QString colour = gray || least < 1 ? QString("Gray")

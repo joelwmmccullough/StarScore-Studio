@@ -18,6 +18,7 @@
 #include "engraving/dom/note.h"
 #include "engraving/dom/part.h"
 #include "engraving/dom/staff.h"
+#include "engraving/dom/barline.h"
 #include "engraving/dom/instrument.h"
 #include "engraving/dom/accidental.h"
 #include "engraving/dom/notedot.h"
@@ -530,6 +531,40 @@ int mu::project::starscore::applyKeysStaffRules(MasterScore* master)
     if (changed) {
         for (Score* score : master->scoreList()) {
             score->setLayoutAll();
+        }
+    }
+    return changed;
+}
+
+int mu::project::starscore::copyEndBarlines(MasterScore* master, const Part* from, const std::vector<Part*>& to)
+{
+    if (!master || !from || from->staves().empty()) {
+        return 0;
+    }
+    const track_idx_t srcTrack = from->staves().front()->idx() * VOICES;
+    int changed = 0;
+    for (Measure* m = master->firstMeasure(); m; m = m->nextMeasure()) {
+        Segment* seg = m->findSegment(SegmentType::EndBarLine, m->endTick());
+        if (!seg) {
+            continue;
+        }
+        EngravingItem* se = seg->element(srcTrack);
+        if (!se || !se->isBarLine()) {
+            continue;
+        }
+        const BarLineType type = toBarLine(se)->barLineType();
+        if (type == BarLineType::START_REPEAT || type == BarLineType::END_REPEAT || type == BarLineType::END_START_REPEAT) {
+            continue;   // repeats belong to the bar, so every staff has them already
+        }
+        for (Part* p : to) {
+            if (!p || p->staves().empty()) {
+                continue;
+            }
+            EngravingItem* de = seg->element(p->staves().front()->idx() * VOICES);
+            if (de && de->isBarLine() && toBarLine(de)->barLineType() != type) {
+                master->undoChangeBarLineType(toBarLine(de), type, false);
+                ++changed;
+            }
         }
     }
     return changed;

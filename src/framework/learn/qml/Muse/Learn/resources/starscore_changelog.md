@@ -4,6 +4,25 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.15.3
+
+- **Horn part names** in StarScore are "section: horn": "7H: Trumpet 1", "7H: Bari Sax", "3H: Tenor Sax", "1H: Alto Sax", "3H Flexible: Horn 1". The part's name in the score and its part score's name follow. Existing files are renamed when opened (save afterwards). The exported sheets keep their own names ("BALK - Trumpet 1.pdf", printed "Trumpet 1 in B♭"). Part-style rules that name a part work with or without the section.
+- **Part scores show their exported title.** A horn part score now shows, in StarScore, the instrument name its sheet prints top left ("Trumpet 1 in B♭", "Baritone Saxophone") and the arrangement top right ("7-Horn Arrangement"), as the exported sheet will. Done when a file opens, when part styles are applied and when parts are made.
+- **The composer credit clears the arrangement label.** A long credit (Balkan Wedding) moved clear of the title and subtitle but ran into "N-Horn Arrangement" at the top right. It now moves below that too, in StarScore and on the exported sheet.
+- **The Bass Trombone's other versions:**
+  - Also Bass Clarinet, Contrabass Clarinet, Contrabassoon and Tuba, besides Bari Sax, Bass Sax and Bassoon.
+  - Only the versions the 7-Horn section doesn't have are made; a deleted one is made again.
+  - Right-click the 7-Horn section › "Make the Bass Trombone's other versions…" makes them any time (not only when the Bass Trombone is marked Finished).
+  - New ones get the Bass Trombone part score's page breaks, system breaks and system locks, its double barlines (before repeats, etc.), and their part scores open.
+  - Stand-in versions made before keep in step: their barlines are matched to the Bass Trombone's when the file opens.
+- **Title frame size.** Applying the house style now makes the title frame a fixed 15 sp. Part scores StarScore made had frames sized to their contents, which ignored the height and came out far too tall.
+- **Blank arrangement scores fixed.** An exported score showed only the title when its instruments were hidden staff by staff (the eye on each staff in the Instruments panel): Balkan Wedding's 2- to 5-Horn scores. The export now shows those staves, and showing a section or arrangement on the StarScore bar does too.
+- **Export to Sheets and Demos:**
+  - The percussion sheet is "Percussion" (it was named after the instrument, "Congas"). The organizer renames old "Congas", "Bongos", "Timbales" and "Cajon" sheets to Percussion, and the export moves them to Version History once a Percussion sheet is written.
+  - The 7-Horn arrangement's Bass Trombone and its versions go in a subfolder, "Bass Horns (Horn #7)". The sheets in the old place move to Version History; changelogs carry on from them.
+  - Percussion sheets no longer count toward the 1 Rhythm folder's colour (an old Congas sheet turned it gray). The 7-Horn folder's colour also counts the sheets in its Bass Horns subfolder, and the subfolder gets its own colour.
+- **Copy part formatting:** ticking a part no longer scrolls the list back to the top.
+
 ## 1.15.2
 
 - **Keys sheet staff settings.** Every keyboard part's bass-clef staff is set to "Hide empty staves: Always hide" (in the score, the arrangement scores and the Keys part score), and the Keys part score's style has "Automatically hide all empty staves" on and "Don't hide empty staves in first system" off. This is applied when you apply part styles and on every export to Sheets and Demos, so existing songs get it on their next export.

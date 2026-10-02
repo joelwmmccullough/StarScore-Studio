@@ -129,6 +129,11 @@ void applyHouseStyle(Score* score, bool partBook, const QString& version)
     // Title frame on page 1: 15 sp tall
     MeasureBase* first = score->first();
     if (first && first->isVBox()) {
+        // a fixed height: a frame sized to its contents (MuseScore's default for frames it makes, as in new part
+        // books) ignores the height and came out far too tall
+        if (first->getProperty(Pid::BOX_AUTOSIZE).toBool()) {
+            first->undoChangeProperty(Pid::BOX_AUTOSIZE, false);
+        }
         first->undoChangeProperty(Pid::BOX_HEIGHT, Spatium(15.0));
     }
 
@@ -206,52 +211,86 @@ void applyHouseStyle(Score* score, bool partBook, const QString& version)
         }
     }
 
-    // A long composer credit (Balkan Wedding lists many) reaches up into the title or the subtitle once its last
-    // line sits on the subtitle's baseline: then it moves down until it clears them, and the title frame grows if
-    // the credit would otherwise run into the music.
-    if (comp && comp->ldata()) {
-        const Text* title = nullptr;
-        const MeasureBase* frame = comp->parent() && comp->parent()->isMeasureBase() ? toMeasureBase(comp->parent()) : nullptr;
-        if (frame) {
-            for (EngravingItem* e : frame->el()) {
-                if (e && e->isText() && toText(e)->textStyleType() == TextStyleType::TITLE && !toText(e)->empty()) {
-                    title = toText(e);
-                    break;
-                }
-            }
+    // A long composer credit must not run into the title, the subtitle or the arrangement label
+    clearComposerCredit(score);
+}
+
+//! A long composer credit (Balkan Wedding lists many) can reach up into the title or the subtitle once its last line
+//! sits on the subtitle's baseline, or into the arrangement label at the top right of a horn sheet ("7-Horn
+//! Arrangement", level with the instrument name). It moves down until it clears them by half a staff space, and
+//! the title frame grows if the credit would otherwise run into the music.
+void clearComposerCredit(Score* score)
+{
+    if (!score) {
+        return;
+    }
+    MeasureBase* frame = nullptr;
+    for (MeasureBase* mb = score->first(); mb && !mb->isMeasure(); mb = mb->next()) {
+        if (mb->isVBox()) {
+            frame = mb;
+            break;
         }
-        const double gap = 0.5 * score->style().spatium();
-        const RectF c = comp->pageBoundingRect();
-        double down = 0.0;
-        for (const Text* other : { title, sub }) {
-            if (!other || !other->ldata()) {
+    }
+    if (!frame) {
+        return;
+    }
+    const Text* comp = nullptr;
+    std::vector<const Text*> others;   // title, subtitle, arrangement label(s)
+    for (EngravingItem* e : frame->el()) {
+        if (!e || !e->isText() || toText(e)->empty()) {
+            continue;
+        }
+        const Text* t = toText(e);
+        const TextStyleType type = t->textStyleType();
+        if (type == TextStyleType::COMPOSER) {
+            if (!comp) {
+                comp = t;
+            }
+        } else if (type == TextStyleType::TITLE || type == TextStyleType::SUBTITLE
+                   || (type == TextStyleType::INSTRUMENT_EXCERPT && t->position() == AlignH::RIGHT)) {
+            others.push_back(t);
+        }
+    }
+    if (!comp || !comp->ldata()) {
+        return;
+    }
+    const double gap = 0.5 * score->style().spatium();
+    const RectF c = comp->pageBoundingRect();
+    // Each blocker the credit overlaps pushes it below that blocker; repeat, since moving down can meet another
+    double down = 0.0;
+    for (int pass = 0; pass < 4; ++pass) {
+        bool moved = false;
+        for (const Text* other : others) {
+            if (!other->ldata()) {
                 continue;
             }
             const RectF o = other->pageBoundingRect().adjusted(-gap, -gap, gap, gap);
-            const RectF moved = c.translated(0.0, down);
-            if (moved.intersects(o)) {
-                down = std::max(down, o.bottom() - c.top());
+            if (c.translated(0.0, down).intersects(o) && o.bottom() - c.top() > down) {
+                down = o.bottom() - c.top();
+                moved = true;
             }
         }
-        if (down > 0.0) {
-            const bool inSpatium = score->style().styleV(Sid::composerOffsetType).toInt() == int(OffsetType::SPATIUM);
-            const PointF off = score->style().styleV(Sid::composerOffset).value<PointF>();
-            starscoreSet(score, Sid::composerOffset,
-                         PointF(off.x(), off.y() + (inSpatium ? down / score->style().spatium() : down / DPMM)));
-            // the frame grows by what now hangs below it
-            if (frame && frame->isVBox()) {
-                const double frameBottom = frame->pageBoundingRect().bottom();
-                const double overhang = c.bottom() + down - frameBottom;
-                if (overhang > 0.0) {
-                    const double height = frame->getProperty(Pid::BOX_HEIGHT).value<Spatium>().val();
-                    const_cast<MeasureBase*>(frame)->undoChangeProperty(
-                        Pid::BOX_HEIGHT, Spatium(height + overhang / score->style().spatium() + 0.5));
-                }
-            }
-            score->setLayoutAll();
-            score->doLayout();
+        if (!moved) {
+            break;
         }
     }
+    if (down <= 0.0) {
+        return;
+    }
+    const bool inSpatium = score->style().styleV(Sid::composerOffsetType).toInt() == int(OffsetType::SPATIUM);
+    const PointF off = score->style().styleV(Sid::composerOffset).value<PointF>();
+    starscoreSet(score, Sid::composerOffset, PointF(off.x(), off.y() + (inSpatium ? down / score->style().spatium() : down / DPMM)));
+    // the frame grows by what now hangs below it
+    if (frame->isVBox()) {
+        const double frameBottom = frame->pageBoundingRect().bottom();
+        const double overhang = c.bottom() + down - frameBottom;
+        if (overhang > 0.0) {
+            const double height = frame->getProperty(Pid::BOX_HEIGHT).value<Spatium>().val();
+            frame->undoChangeProperty(Pid::BOX_HEIGHT, Spatium(height + overhang / score->style().spatium() + 0.5));
+        }
+    }
+    score->setLayoutAll();
+    score->doLayout();
 }
 
 QString versionFromCopyright(const QString& copyright)
