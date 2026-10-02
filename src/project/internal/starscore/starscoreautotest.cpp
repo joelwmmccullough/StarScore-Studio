@@ -15,6 +15,7 @@
  *                 and parts-N/<part score>.pdf, each part score as StarScore shows it
  *   view          shows every part score in turn (what opening a part score does)
  *   bassversions  makes the 7-Horn Bass Trombone's missing stand-in versions (no questions asked)
+ *   section:KEY   adds a section from a template (section:2-horn-any is a 2-Horn Flexible section)
  *   styles        applies the part styles to everything
  *   export        Export to Sheets and Demos into STARSCORE_AUTOTEST_BAND (a copy, never the real folder)
  *   save          saves a copy of the song as saved.starscore
@@ -162,6 +163,11 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
                 }
             }
         }
+    } else if (step.startsWith("section:")) {
+        // section:<template key>, e.g. section:2-horn-any (a 2-Horn Flexible section), as from the Add section menu
+        const QString key = step.mid(QString("section:").size());
+        const RetVal<QString> made = createSectionFromTemplate(key);
+        autotestLog(QString("  %1: %2").arg(key, made.ret ? made.val : QString::fromStdString(made.ret.toString())));
     } else if (step == "styles") {
         autotestLog(QString("  restyled %1").arg(applyStyles()));
     } else if (step == "export") {
