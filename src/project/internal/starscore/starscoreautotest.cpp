@@ -171,7 +171,9 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         } else {
             setBandFolder(band);
             const RetVal<QString> r = exportToBandFolder({});
-            autotestLog("  " + (r.ret ? r.val : QString::fromStdString(r.ret.toString())).replace("\n", "\n  "));
+            QString text = r.ret ? r.val : QString::fromStdString(r.ret.toString());
+            text.replace("\n", "\n  ");
+            autotestLog("  " + text);
         }
     } else if (step == "save") {
         INotationProjectPtr project = globalContext()->currentProject();
