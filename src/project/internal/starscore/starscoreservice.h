@@ -327,6 +327,8 @@ private:
     void showOldAlternates();
     //! The horn part scores show their exported title (instrument name, arrangement label); see starscorebandexport.cpp
     int labelPartBooks();
+    //! The to-do list as a printable page (HTML for the organizer's PDF printer)
+    QString todoPdfHtml(const QString& title, const QString& code, const QString& version) const;
     //! Horn parts are named "7H: Bari Sax", "3H Flexible: Horn 1"…; returns how many were renamed
     int standardizeHornNames();
     //! Tidying on opening a file: older stand-in versions shown, horn names, part score titles

@@ -145,6 +145,24 @@ SongColours songColours(const Paths& paths, const QString& songRoot, const QJson
             continue;
         }
         const QJsonObject o = it.value().toObject();
+        // A folder with its own colour ladder (the 7-Horn Bass Horns subfolder): up the ladder while every sheet
+        // a colour needs was exported as Finished and is still that file
+        if (o.contains("ladder")) {
+            QString colour = o.value("base").toString("Red");
+            for (const QJsonValue& step : o.value("ladder").toArray()) {
+                const QJsonObject t = step.toObject();
+                bool all = true;
+                for (const QString& rel : strings(t.value("paths"))) {
+                    all &= check.status(rel) == 4;
+                }
+                if (!all) {
+                    break;
+                }
+                colour = t.value("colour").toString();
+            }
+            out.folders.emplace_back(folder, colour);
+            continue;
+        }
         bool gray = !strings(o.value("missing")).isEmpty();
         for (const QString& rel : strings(o.value("required"))) {
             gray |= !check.exists(rel);

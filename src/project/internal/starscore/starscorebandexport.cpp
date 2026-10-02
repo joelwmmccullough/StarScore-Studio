@@ -56,6 +56,7 @@
 #include "starscoreengraving.h"
 #include "starscorehouse.h"
 #include "starscorepdf.h"
+#include "organizer/orgplatform.h"
 
 #include "io/filestream.h"
 #include "global/serialization/zipreader.h"
@@ -1617,6 +1618,26 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         writeSheetRecord(ms, data, full.ret ? full.val : plan.val, written + unchanged);
     }
 
+    // --- the song's to-do list as a PDF, next to the .starscore in Projects and Sheets ("BALK - To-Do.pdf"); it's about
+    // the work on the song, so it stays out of Sheets and Demos. Made fresh each export.
+    QString todoNote;
+    {
+        const QString projects = projectsFolder();
+        const QString source = project->path().toQString();
+        const QString dir = source.isEmpty() ? QString() : QFileInfo(source).absolutePath();
+        if (!projects.isEmpty() && !dir.isEmpty() && QDir::cleanPath(dir).startsWith(QDir::cleanPath(projects) + "/")
+            && !plan.val.code.isEmpty() && starscore::org::canRenderPdf()) {
+            starscore::org::RenderJob job;
+            job.html = todoPdfHtml(starscoreSongTitle(project), plan.val.code, loadFrom(ms).version);
+            job.pdfPath = dir + "/" + plan.val.code + " - To-Do.pdf";
+            if (!job.html.isEmpty()) {
+                starscore::org::renderPdfs({ job }, [](int, bool) {}, []() {});
+                todoNote = muse::qtrc("starscore", "The to-do list is in %1.").arg(QFileInfo(job.pdfPath).fileName()
+                                                                                    + " (" + QDir(projects).relativeFilePath(dir) + ")");
+            }
+        }
+    }
+
     QString renumberNote;
     if (renumbered > 0) {
         renumberNote = muse::qtrc("starscore", "%1 part book(s) numbered their bars differently from the score (a bar excluded from "
@@ -1633,6 +1654,9 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     }
     if (!renumberNote.isEmpty()) {
         summary += "\n\n" + renumberNote;
+    }
+    if (!todoNote.isEmpty()) {
+        summary += "\n\n" + todoNote;
     }
     if (!problems.isEmpty()) {
         summary += "\n\n" + muse::qtrc("starscore", "Skipped:") + "\n• " + problems.join("\n• ");

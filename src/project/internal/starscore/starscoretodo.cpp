@@ -12,6 +12,7 @@
 #include "starscoreservice.h"
 
 #include <algorithm>
+#include <cmath>
 #include <map>
 #include <set>
 #include <vector>
@@ -19,6 +20,10 @@
 #include "engraving/dom/masterscore.h"
 #include "engraving/dom/part.h"
 
+#include <QDate>
+#include <QLocale>
+
+#include "organizer/orghtml.h"
 #include "translation.h"
 
 using namespace mu::project;
@@ -277,4 +282,222 @@ std::vector<StarScoreTodoItem> StarScoreService::todoList() const
     out.push_back(familyItem("big-band", muse::qtrc("starscore", "Big Band arrangement"), "bigband-", "big-band"));
     out.push_back(familyItem("marching-band", muse::qtrc("starscore", "Marching Band arrangement"), "marching-", "marching-band"));
     return out;
+}
+
+// ---------------------------------------------------------------------------
+//  The to-do list as a PDF page ("BALK - To-Do.pdf", next to the .starscore in Projects and Sheets)
+// ---------------------------------------------------------------------------
+
+namespace {
+struct TodoLook {
+    QString colour;   // fill
+    QString ink;      // text on a light pill
+    QString name;
+};
+TodoLook todoLook(int status)
+{
+    switch (status) {
+    case 0: return { "#8A8A8A", "#4d4f57", "No status" };
+    case 1: return { "#E0463A", "#a3271d", "Sketch" };
+    case 2: return { "#F29B30", "#9a5a07", "In progress" };
+    case 3: return { "#3C8CE7", "#1d5ba3", "Needs review" };
+    case 4: return { "#3FB05A", "#1d6b33", "Finished" };
+    }
+    return { "transparent", "#8b90a0", "Not in the score yet" };
+}
+QString todoPill(int status)
+{
+    const TodoLook l = todoLook(status);
+    if (status < 0) {
+        return QString("<span class=\"pill none\">%1</span>").arg(l.name);
+    }
+    return QString("<span class=\"pill\" style=\"background:%1;\">%2</span>").arg(l.colour, l.name);
+}
+}
+
+QString StarScoreService::todoPdfHtml(const QString& title, const QString& code, const QString& version) const
+{
+    using namespace mu::project::starscore::org;
+    const engraving::MasterScore* ms = masterScore();
+    if (!ms) {
+        return QString();
+    }
+    const Data data = load();
+    const std::vector<StarScoreTodoItem> steps = todoList();
+
+    // --- the steps
+    int done = 0;
+    QString nextUp;
+    for (const StarScoreTodoItem& s : steps) {
+        if (s.status == int(StarScoreStatus::Finished)) {
+            ++done;
+        } else if (nextUp.isEmpty()) {
+            nextUp = s.title;
+        }
+    }
+
+    // --- every part, by section
+    auto partStatus = [&](const QString& pid) {
+        auto it = data.partStatus.find(pid);
+        if (it != data.partStatus.end()) {
+            return int(statusFromKey(it->second));
+        }
+        int s = -1;
+        for (const StarScoreSection& sec : data.sections) {
+            if (!sec.autoStatus && sec.partIds.contains(pid)) {
+                s = s < 0 ? int(sec.status) : std::min(s, int(sec.status));
+            }
+        }
+        return s < 0 ? 0 : s;
+    };
+    auto bare = [](const QString& name) {
+        const int at = name.lastIndexOf(": ");
+        return at >= 0 ? name.mid(at + 2) : name;
+    };
+    int parts = 0, partsDone = 0;
+    std::map<int, int> byStatus;
+    QString sectionsHtml;
+    for (const StarScoreSection& sec : data.sections) {
+        QString rows;
+        int secDone = 0, secParts = 0;
+        for (const engraving::Part* p : ms->parts()) {
+            const QString pid = idText(p);
+            if (!sec.partIds.contains(pid)) {
+                continue;
+            }
+            const int st = partStatus(pid);
+            ++secParts;
+            ++parts;
+            ++byStatus[st];
+            if (st == int(StarScoreStatus::Finished)) {
+                ++secDone;
+                ++partsDone;
+            }
+            const bool standIn = sec.alternates.count(pid) > 0;
+            rows += QString("<tr><td>%1%2</td><td class=\"r\">%3</td></tr>")
+                    .arg(esc(bare(p->partName().toQString())),
+                         standIn ? QString(" <span class=\"dim\">&middot; Bass Trombone version</span>") : QString(),
+                         todoPill(st));
+        }
+        if (secParts == 0) {
+            continue;
+        }
+        sectionsHtml += QString("<div class=\"sec\"><div class=\"sech\"><span>%1</span><span class=\"dim\">%2 of %3 finished</span></div>"
+                                "<table>%4</table></div>")
+                        .arg(esc(sec.name)).arg(secDone).arg(secParts).arg(rows);
+    }
+    // full scores with a status of their own
+    QString scoresHtml;
+    for (const StarScoreArrangement& a : data.arrangements) {
+        if (hasOwnScoreStatus(a.templateKey)) {
+            scoresHtml += QString("<tr><td>%1 full score</td><td class=\"r\">%2</td></tr>")
+                          .arg(esc(a.name), todoPill(int(ownScoreStatus(data, a))));
+        }
+    }
+    if (!scoresHtml.isEmpty()) {
+        sectionsHtml += QString("<div class=\"sec\"><div class=\"sech\"><span>Full scores</span></div><table>%1</table></div>")
+                        .arg(scoresHtml);
+    }
+
+    // --- the page
+    QString b;
+    b += QString("<div class=\"hdr\"><div><h1>%1</h1><div class=\"sub\">To-do list &middot; version %2 &middot; %3</div></div>"
+                 "<div class=\"code\">%4</div></div>")
+         .arg(esc(title), esc(version.isEmpty() ? QString("–") : version),
+              esc(QLocale(QLocale::English).toString(QDate::currentDate(), "d MMMM yyyy")), esc(code));
+
+    // tiles
+    const int pct = steps.empty() ? 0 : int(std::round(100.0 * done / double(steps.size())));
+    b += "<div class=\"grid2 tiles\">";
+    b += QString("<div class=\"tile\"><div class=\"big\">%1<span class=\"of\">/%2</span></div><div class=\"lab\">steps finished</div>"
+                 "<div class=\"bar\"><i class=\"s-done\" style=\"width:%3%;\"></i></div></div>")
+         .arg(done).arg(steps.size()).arg(pct);
+    b += QString("<div class=\"tile\"><div class=\"big\">%1<span class=\"of\">/%2</span></div><div class=\"lab\">parts finished</div>"
+                 "<div class=\"bar\">").arg(partsDone).arg(parts);
+    for (int st = 4; st >= 0; --st) {
+        if (byStatus[st] > 0 && parts > 0) {
+            b += QString("<i style=\"width:%1%;background:%2;\"></i>").arg(100.0 * byStatus[st] / parts, 0, 'f', 2).arg(todoLook(st).colour);
+        }
+    }
+    b += "</div></div>";
+    b += QString("<div class=\"tile next\"><div class=\"lab top\">%1</div><div class=\"nx\">%2</div></div>")
+         .arg(nextUp.isEmpty() ? QString("All done") : QString("Next up"),
+              nextUp.isEmpty() ? QString("Every step is finished") : esc(nextUp));
+    b += "</div>";
+
+    // the steps in order
+    b += "<h2>In priority order</h2><table class=\"steps\">";
+    int rank = 0;
+    for (const StarScoreTodoItem& s : steps) {
+        ++rank;
+        const bool finished = s.status == int(StarScoreStatus::Finished);
+        const bool next = s.title == nextUp;
+        QString left;
+        if (!finished) {
+            QStringList items;
+            for (const QString& d : s.details) {
+                items << "<li>" + esc(d) + "</li>";
+            }
+            if (!items.isEmpty()) {
+                left = "<ul>" + items.join("") + "</ul>";
+            }
+        }
+        if (!s.note.isEmpty()) {
+            left += "<div class=\"dim it\">" + esc(s.note) + "</div>";
+        }
+        b += QString("<tr class=\"%1\"><td class=\"n\">%2</td><td><span class=\"dot\" style=\"background:%3;%4\"></span></td>"
+                     "<td class=\"t\">%5%6%7</td><td class=\"r\">%8</td></tr>")
+             .arg(finished ? QString("fin") : next ? QString("nextrow") : QString())
+             .arg(rank)
+             .arg(s.status < 0 ? QString("transparent") : todoLook(s.status).colour,
+                  s.status < 0 ? QString("border:1.5px solid #b9bdc9;") : QString())
+             .arg(esc(s.title) + (finished ? " <span class=\"ck\">&#10003;</span>" : QString()),
+                  next ? " <span class=\"tag\">next up</span>" : QString(), left)
+             .arg(todoPill(s.status));
+    }
+    b += "</table>";
+
+    // every part
+    b += "<div class=\"pagebreak\"></div><h2>Every part</h2><div class=\"cols\">" + sectionsHtml + "</div>";
+
+    // legend
+    b += "<div class=\"legend\">";
+    for (int st = 0; st <= 4; ++st) {
+        b += QString("<span><span class=\"dot\" style=\"background:%1;\"></span> %2</span>").arg(todoLook(st).colour, todoLook(st).name);
+    }
+    b += "<span><span class=\"dot\" style=\"border:1.5px solid #b9bdc9;\"></span> Not in the score yet</span></div>";
+    b += QString("<div class=\"foot\"><span>Made by StarScore Studio when %1 was exported</span><span>%2 - To-Do.pdf</span></div>")
+         .arg(esc(title), esc(code));
+
+    static const QString CSS = R"CSS(
+.tiles{margin:14px 0 4px;gap:12px;}
+.tile .big .of{font-size:15pt;color:#8b90a0;font-weight:600;margin-left:2px;}
+.tile.next{background:#16213e;border-color:#16213e;color:#fff;display:flex;flex-direction:column;justify-content:center;}
+.tile.next .lab{color:#b9c3dd;margin:0 0 4px;}
+.tile.next .nx{font-size:15.5pt;font-weight:700;line-height:1.15;}
+.pill{display:inline-block;color:#fff;border-radius:10px;padding:1.5px 9px;font-size:8.4pt;font-weight:700;white-space:nowrap;}
+.pill.none{color:#8b90a0;border:1px solid #cfd3de;background:#fff;font-weight:600;}
+td.r{text-align:right;white-space:nowrap;padding-right:0;}
+table.steps td{padding:6px 8px 6px 0;font-size:10pt;}
+table.steps td.n{width:22px;text-align:right;color:#8b90a0;font-weight:700;}
+table.steps td.t{font-weight:700;color:#16213e;}
+table.steps td.t ul{font-weight:400;color:#3d4356;font-size:9.1pt;margin-top:3px;}
+table.steps td.t .it{font-weight:400;font-style:italic;font-size:9pt;margin-top:2px;}
+table.steps tr.fin td{color:#8b90a0;}
+table.steps tr.fin td.t{color:#5d7a68;font-weight:600;}
+table.steps tr.nextrow td{background:#f3f6fc;}
+table.steps tr.nextrow td.n{border-radius:5px 0 0 5px;}
+.ck{color:#2f7d5c;font-weight:700;}
+.tag{display:inline-block;background:#16213e;color:#fff;border-radius:3px;font-size:7.6pt;padding:1px 6px;margin-left:6px;
+     text-transform:uppercase;letter-spacing:.6px;vertical-align:1px;}
+.dot{width:11px;height:11px;border-radius:50%;}
+.cols{column-count:2;column-gap:22px;}
+.sec{break-inside:avoid;margin:0 0 12px;background:#f7f8fb;border:1px solid #e3e7f0;border-radius:6px;padding:8px 11px 4px;}
+.sech{display:flex;justify-content:space-between;font-weight:700;color:#16213e;font-size:10.2pt;margin-bottom:2px;}
+.sech .dim{font-weight:400;font-size:8.6pt;}
+.sec td{font-size:9.4pt;padding:3.5px 6px 3.5px 0;border-bottom:1px solid #e9ecf3;}
+.legend{margin-top:14px;}
+.legend .dot{margin-right:3px;}
+)CSS";
+    return htmlPage(title + " - To-Do", b, CSS);
 }

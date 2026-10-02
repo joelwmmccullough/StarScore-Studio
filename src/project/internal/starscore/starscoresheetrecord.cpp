@@ -454,14 +454,29 @@ void StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, const 
                 addUnique(req, { QString("1H/%1 - %2.pdf").arg(full.code, horn) });
             }
         } else if (key == "7-horn") {
-            // the Bass Trombone line also as Baritone Sax, Bass Sax and Bassoon, in the bass horns subfolder
+            // the Bass Trombone line in every version StarScore makes, in the bass horns subfolder
             const QString bass = folder + "/Bass Horns (Horn #7)";
             QStringList bassReq = filesOfFolder[bass];
-            for (const QString& horn : { QString("Bass Trombone"), QString("Bari Sax"), QString("Bass Sax"), QString("Bassoon") }) {
+            for (const QString& horn : { QString("Bass Trombone"), QString("Bari Sax"), QString("Bass Sax"), QString("Bassoon"),
+                                         QString("Bass Clarinet"), QString("Contrabass Clarinet"), QString("Contrabassoon"),
+                                         QString("Tuba") }) {
                 addUnique(bassReq, { QString("%1/%2 - %3.pdf").arg(bass, full.code, horn) });
             }
             addUnique(req, bassReq);
             setFolder(bass, bassReq, {});
+            // The subfolder's own colours, each needing its sheets exported as Finished: Red with none of these,
+            // Orange with the Bass Trombone, Yellow with Bass Trombone, Bari Sax and Bass Sax, Green with all eight
+            auto sheet = [&](const QString& horn) { return QString("%1/%2 - %3.pdf").arg(bass, full.code, horn); };
+            const QStringList orangeNeeds { sheet("Bass Trombone") };
+            const QStringList yellowNeeds { sheet("Bass Trombone"), sheet("Bari Sax"), sheet("Bass Sax") };
+            QJsonObject o = folders.value(bass).toObject();
+            o["base"] = "Red";
+            o["ladder"] = QJsonArray {
+                QJsonObject { { "colour", "Orange" }, { "paths", toArray(orangeNeeds) } },
+                QJsonObject { { "colour", "Yellow" }, { "paths", toArray(yellowNeeds) } },
+                QJsonObject { { "colour", "Green" }, { "paths", toArray(bassReq) } },
+            };
+            folders[bass] = o;
         }
         setFolder(folder, req, {});
     }

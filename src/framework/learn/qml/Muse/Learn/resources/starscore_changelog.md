@@ -4,6 +4,12 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.15.4
+
+- **To-do list PDF.** Every Export to Sheets and Demos also makes "CODE - To-Do.pdf" (e.g. "BALK - To-Do.pdf") next to the song's .starscore in Projects and Sheets: the To-do tab as a printed page. Page 1 has how many steps and parts are finished, what's next, and the steps in priority order with what each still needs; page 2 lists every part by section with its status, and the Big Band, Orchestra and Marching Band full scores. It's made fresh each export (it doesn't go in Sheets and Demos, since it's about the work on the song).
+- **7-Horn folder colour** needs every bass horn sheet: Bass Trombone, Bari Sax, Bass Sax, Bassoon, Bass Clarinet, Contrabass Clarinet, Contrabassoon and Tuba (in the Bass Horns subfolder). Until all are there, the 7-Horn folder is gray. Takes effect on each song's next export.
+- **Bass Horns (Horn #7) subfolder colours** of its own, each counting only sheets exported as Finished: Red with none of these, Orange with the Bass Trombone, Yellow with the Bass Trombone, Bari Sax and Bass Sax, Green with all eight.
+
 ## 1.15.3
 
 - **Horn part names** in StarScore are "section: horn": "7H: Trumpet 1", "7H: Bari Sax", "3H: Tenor Sax", "1H: Alto Sax", "3H Flexible: Horn 1". The part's name in the score and its part score's name follow. Existing files are renamed when opened (save afterwards). The exported sheets keep their own names ("BALK - Trumpet 1.pdf", printed "Trumpet 1 in B♭"). Part-style rules that name a part work with or without the section.
