@@ -124,6 +124,24 @@ void StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, const 
         for (const QString& pid : f.partIds) {
             s = std::min(s, partStatus(pid));
         }
+        // the Big Band / Marching Band / Orchestra full score: also its own status
+        if (f.isScore) {
+            const QString folder = f.relativePath.section('/', 0, -2);
+            const QString tpl = folder == "Big Band" ? "big-band" : folder == "Marching Band" ? "marching-band"
+                                : folder == "Full Orchestra" ? "orchestra" : QString();
+            if (!tpl.isEmpty()) {
+                bool found = false;
+                for (const StarScoreArrangement& a : data.arrangements) {
+                    if (a.templateKey == tpl) {
+                        s = std::min(s, ownScoreStatus(data, a));
+                        found = true;
+                    }
+                }
+                if (!found) {
+                    s = StarScoreStatus::Empty;
+                }
+            }
+        }
         return f.partIds.isEmpty() ? StarScoreStatus::Empty : s;
     };
 

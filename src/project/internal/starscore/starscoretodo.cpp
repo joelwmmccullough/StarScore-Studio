@@ -5,7 +5,7 @@
  *
  * The work on a song in priority order: 3-Horn Section, bass + guitar, lead sheet, drums, 2-Horn Section,
  * 2-Horn Flexible, 3-Horn Flexible, keys, 4-Horn Section, the 1-Horn sheets, 5-, 6- and 7-Horn Sections,
- * percussion, Big Band, Marching Band. Each step is as far along as its least finished part (the part's own
+ * percussion, Big Band, Marching Band (each with its full score marked Finished). Each step is as far along as its least finished part (the part's own
  * status; untagged, the status of a section set by hand that holds it). Drums, keys and percussion that read
  * the lead sheet are as far along as the lead sheet.
  */
@@ -254,16 +254,27 @@ std::vector<StarScoreTodoItem> StarScoreService::todoList() const
     // 14. Percussion
     out.push_back(roleItem("percussion", muse::qtrc("starscore", "Percussion"), "percussion"));
 
-    // 15–16. Big Band and Marching Band arrangements
-    {
-        StarScoreTodoItem i = item("big-band", muse::qtrc("starscore", "Big Band arrangement"));
-        addParts(i, sectionParts("bigband-", true));
-        out.push_back(i);
-    }
-    {
-        StarScoreTodoItem i = item("marching-band", muse::qtrc("starscore", "Marching Band arrangement"));
-        addParts(i, sectionParts("marching-", true));
-        out.push_back(i);
-    }
+    // 15–16. Big Band and Marching Band arrangements: every part, and the full score marked Finished
+    auto familyItem = [&](const QString& key, const QString& title, const QString& sectionPrefix, const QString& templateKey) {
+        StarScoreTodoItem i = item(key, title);
+        addParts(i, sectionParts(sectionPrefix, true));
+        if (i.status >= 0) {
+            const StarScoreArrangement* arr = nullptr;
+            for (const StarScoreArrangement& a : data.arrangements) {
+                if (a.templateKey == templateKey) {
+                    arr = &a;
+                }
+            }
+            const StarScoreStatus scoreStatus = arr ? ownScoreStatus(data, *arr) : StarScoreStatus::Empty;
+            i.status = std::min(i.status, int(scoreStatus));
+            if (scoreStatus != StarScoreStatus::Finished) {
+                i.details << (arr ? muse::qtrc("starscore", "Full score: %1").arg(statusText(scoreStatus))
+                              : muse::qtrc("starscore", "no %1 arrangement for the full score").arg(title));
+            }
+        }
+        return i;
+    };
+    out.push_back(familyItem("big-band", muse::qtrc("starscore", "Big Band arrangement"), "bigband-", "big-band"));
+    out.push_back(familyItem("marching-band", muse::qtrc("starscore", "Marching Band arrangement"), "marching-", "marching-band"));
     return out;
 }

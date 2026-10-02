@@ -207,6 +207,9 @@ public:
         std::map<QString, QString> referenceForScore;   // part score name ("" = main score) -> reference shown with it
         QString version;   // "4.0.1"; printed in the footer
         std::map<QString, QString> partStatus;   // part id -> status key
+        // Big Band, Orchestra and Marching Band: their full score has a status of its own (arrangement id ->
+        // status key); the arrangement is finished only when its full score is marked Finished too
+        std::map<QString, QString> scoreStatus;
         QString fileId;    // permanent id of this .starscore (kept when the file is moved or renamed)
         // StarScore Deco switched on: score ("" = main score, else the part book's name) -> its fonts before
         // (music symbols, music text, dynamics)
@@ -232,6 +235,10 @@ public:
     static QString statusKey(StarScoreStatus status);
     static StarScoreStatus statusFromKey(const QString& key);
     static QString idTextOf(const mu::engraving::Part* part);
+    //! Big Band, Orchestra and Marching Band are the arrangements whose full score has its own status
+    static bool hasOwnScoreStatus(const QString& arrangementTemplateKey);
+    //! The full score's own status of such an arrangement (Empty when it has none yet)
+    static StarScoreStatus ownScoreStatus(const Data& data, const StarScoreArrangement& arrangement);
 
 private:
     //! Organizer: per-bar signatures of a sheet ({bars: [...], marks: {bar: "A"}}), and the 1-3 horn parts analysed

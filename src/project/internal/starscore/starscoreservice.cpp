@@ -283,6 +283,10 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
     for (auto it = partStatus.begin(); it != partStatus.end(); ++it) {
         data.partStatus[it.key()] = it.value().toString();
     }
+    const QJsonObject scoreStatus = root.value("scoreStatus").toObject();
+    for (auto it = scoreStatus.begin(); it != scoreStatus.end(); ++it) {
+        data.scoreStatus[it.key()] = it.value().toString();
+    }
 
     const QJsonObject audit = root.value("audit").toObject();
     data.auditReferenceSectionId = audit.value("reference").toString();
@@ -429,6 +433,13 @@ QString StarScoreService::toJson(const Data& data)
     }
     if (!partStatus.isEmpty()) {
         root["partStatus"] = partStatus;
+    }
+    QJsonObject scoreStatus;
+    for (const auto& [aid, key] : data.scoreStatus) {
+        scoreStatus[aid] = key;
+    }
+    if (!scoreStatus.isEmpty()) {
+        root["scoreStatus"] = scoreStatus;
     }
     QJsonObject audit;
     if (!data.auditReferenceSectionId.isEmpty()) {
@@ -744,9 +755,49 @@ StarScoreStatus StarScoreService::arrangementStatus(const QString& arrangementId
                 result = std::min(result, s.status);
             }
         }
+        // Big Band, Orchestra, Marching Band: the full score must be marked Finished too
+        if (hasOwnScoreStatus(a.templateKey)) {
+            result = std::min(result, ownScoreStatus(data, a));
+        }
     }
 
     return any ? result : StarScoreStatus::Empty;
+}
+
+bool StarScoreService::hasOwnScoreStatus(const QString& arrangementTemplateKey)
+{
+    return arrangementTemplateKey == "big-band" || arrangementTemplateKey == "orchestra" || arrangementTemplateKey == "marching-band";
+}
+
+StarScoreStatus StarScoreService::ownScoreStatus(const Data& data, const StarScoreArrangement& arrangement)
+{
+    auto it = data.scoreStatus.find(arrangement.id);
+    return it == data.scoreStatus.end() ? StarScoreStatus::Empty : statusFromKey(it->second);
+}
+
+//! The Big Band / Orchestra / Marching Band arrangement whose full score this part score is ("" for any other)
+static QString starscoreFamilyArrangementOfScore(const mu::engraving::Score* score, const mu::engraving::MasterScore* ms,
+                                                 const std::vector<StarScoreArrangement>& arrangements)
+{
+    if (!score || !ms || score == ms) {
+        return QString();
+    }
+    QString name;
+    for (const mu::engraving::Excerpt* ex : ms->excerpts()) {
+        if (ex && ex->excerptScore() == score) {
+            name = ex->name().toQString();
+            break;
+        }
+    }
+    if (name.isEmpty()) {
+        return QString();
+    }
+    for (const StarScoreArrangement& a : arrangements) {
+        if (!a.scoreName.isEmpty() && a.scoreName == name && StarScoreService::hasOwnScoreStatus(a.templateKey)) {
+            return a.id;
+        }
+    }
+    return QString();
 }
 
 std::vector<StarScorePartInfo> StarScoreService::parts() const
@@ -1580,6 +1631,12 @@ int StarScoreService::partScoreStatus(const engraving::Score* score) const
         return -1;
     }
     const Data data = loadFrom(ms);
+    // a Big Band / Orchestra / Marching Band full score: its own status
+    const QString family = starscoreFamilyArrangementOfScore(score, ms, data.arrangements);
+    if (!family.isEmpty()) {
+        auto it = data.scoreStatus.find(family);
+        return it == data.scoreStatus.end() ? -1 : int(statusFromKey(it->second));
+    }
     bool anyTag = false;
     StarScoreStatus result = StarScoreStatus::Finished;
     for (const QString& id : ids) {
@@ -1602,6 +1659,17 @@ void StarScoreService::setPartScoreStatus(const engraving::Score* score, int sta
         return;
     }
     Data data = loadFrom(ms);
+    // a Big Band / Orchestra / Marching Band full score: its own status, the parts keep theirs
+    const QString family = starscoreFamilyArrangementOfScore(score, ms, data.arrangements);
+    if (!family.isEmpty()) {
+        if (status < 0) {
+            data.scoreStatus.erase(family);
+        } else {
+            data.scoreStatus[family] = statusKey(static_cast<StarScoreStatus>(status));
+        }
+        storeTo(ms, data, m_mainProject ? m_mainProject : globalContext()->currentProject());
+        return;
+    }
     for (const QString& id : ids) {
         if (status < 0) {
             data.partStatus.erase(id);

@@ -1904,6 +1904,14 @@ std::vector<StarScoreFileArrangement> StarScoreService::summarizeArrangements(co
                 }
             }
         }
+        // Big Band, Orchestra, Marching Band: the full score has its own status and must be Finished too
+        if (StarScoreService::hasOwnScoreStatus(a.templateKey) && !a.sectionIds.isEmpty()) {
+            const int st = int(StarScoreService::ownScoreStatus(data, a));
+            least = std::min(least, st);
+            if (st < int(StarScoreStatus::Finished)) {
+                fa.unfinished << QString("Full score: %1").arg(auditStatusName(st));
+            }
+        }
         fa.status = a.sectionIds.isEmpty() ? 0 : least;
         for (const StarScoreAuditArrangementState& st : report.arrangements) {
             if (st.id == a.id) {
