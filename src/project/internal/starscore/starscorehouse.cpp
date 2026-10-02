@@ -255,14 +255,15 @@ void clearComposerCredit(Score* score)
         return;
     }
     const double gap = 0.5 * score->style().spatium();
-    // Below the arrangement label: 0.06 of a credit line between their outlines, which prints as about 6 pt of
-    // white space between "7-Horn Arrangement" and the first composer (Joel's choice: Balkan Wedding's Bari Sax,
-    // Bass Sax and Bass Clarinet sheets in 1.15.5; 0.55 of a line printed 13.5 pt, too much)
-    double labelGap = 0.2 * score->style().spatium();
+    // Below the arrangement label: 0.64 of a credit line between their outlines. The outlines include space above
+    // and below the letters, so this prints as about 6 pt of white space between "7-Horn Arrangement" and the first
+    // composer (Joel's choice: Balkan Wedding's Bari Sax, Bass Sax and Bass Clarinet sheets in 1.15.5). Measured
+    // on the Linux test build with TT Modernoir: 0.06 of a line printed the two 3 pt into each other.
+    double labelGap = 1.85 * score->style().spatium();
     {
         const TextBase::LayoutData* ld = comp->ldata();
         if (ld && ld->blocks.size() >= 2) {
-            labelGap = 0.06 * (ld->blocks.at(1).y() - ld->blocks.at(0).y());
+            labelGap = 0.64 * (ld->blocks.at(1).y() - ld->blocks.at(0).y());
         }
     }
     // A credit pushed down earlier (against a label that sat lower then, or with a different gap) stays too low
