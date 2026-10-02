@@ -92,6 +92,8 @@ qt_add_qml_module(project_qml
         internal/StarScore/referencepanelmodel.h
         internal/StarScore/auditpanelmodel.cpp
         internal/StarScore/auditpanelmodel.h
+        internal/StarScore/todopanelmodel.cpp
+        internal/StarScore/todopanelmodel.h
         internal/StarScore/auditlibrarymodel.cpp
         internal/StarScore/auditlibrarymodel.h
         internal/StarScore/dashboardmodel.cpp
@@ -176,6 +178,7 @@ qt_add_qml_module(project_qml
         StarScoreBar.qml
         StarScoreReferencePanel.qml
         StarScoreAuditPanel.qml
+        StarScoreTodoPanel.qml
         AuditLibraryDialog.qml
         StarScoreDashboard.qml
         StarScoreSongbooks.qml

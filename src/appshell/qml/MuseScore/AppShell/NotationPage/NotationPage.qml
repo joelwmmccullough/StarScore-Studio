@@ -333,6 +333,31 @@ DockPage {
         },
 
         DockPanel {
+            id: starscoreTodoPanel
+
+            objectName: root.pageModel.starscoreTodoPanelName()
+            title: qsTrc("starscore", "To-do")
+
+            navigationSection: root.navigationPanelSec(starscoreTodoPanel.location)
+
+            width: root.verticalPanelDefaultWidth
+            minimumWidth: root.verticalPanelDefaultWidth
+            maximumWidth: root.verticalPanelDefaultWidth
+
+            minimumHeight: root.panelMinDimension
+            maximumHeight: root.panelMaxDimension
+
+            groupName: root.verticalPanelsGroup
+
+            dropDestinations: root.verticalPanelDropDestinations
+
+            StarScoreTodoPanel {
+                navigationSection: starscoreTodoPanel.navigationSection
+                navigationOrderStart: starscoreTodoPanel.contentNavigationPanelOrderStart
+            }
+        },
+
+        DockPanel {
             id: selectionFilterPanel
 
             objectName: root.pageModel.selectionFiltersPanelName()

@@ -309,6 +309,7 @@ MenuItem* AppMenuModel::makeViewMenu()
         makeMenuItem("starscore-toggle-panel"),
         makeMenuItem("toggle-starscore-reference"),
         makeMenuItem("toggle-starscore-audit"),
+        makeMenuItem("toggle-starscore-todo"),
         makeMenuItem("toggle-palettes"),
         makeMenuItem("masterpalette"),
         makeMenuItem("toggle-instruments"),

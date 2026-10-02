@@ -58,6 +58,7 @@ public:
     QString activeArrangementId() const override;
     StarScoreStatus arrangementStatus(const QString& arrangementId) const override;
     muse::async::Notification changed() const override;
+    std::vector<StarScoreTodoItem> todoList() const override;   // starscoretodo.cpp
 
     std::vector<StarScorePartInfo> parts() const override;
 

@@ -202,6 +202,16 @@ struct StarScoreVoiceRule
     bool strict = true;
     std::vector<int> bars;
 };
+//! One step of the open song's to-do list, in priority order (StarScoreService::todoList)
+struct StarScoreTodoItem
+{
+    QString key;            // "3-horn", "bass-guitar", "lead", "drums", … "marching-band"
+    QString title;          // "3-Horn Section"
+    int status = -1;        // StarScoreStatus of the least finished part in it; -1 = not in the score yet
+    QStringList details;    // what isn't finished yet: "Trumpet: In progress", "no Trombone sheet", …
+    QString note;           // e.g. "Keys read the lead sheet"
+};
+
 struct StarScoreVoiceSection
 {
     QString section;
@@ -389,6 +399,8 @@ public:
     virtual QString activeArrangementId() const = 0;     // empty when the sections showing match no arrangement
     virtual StarScoreStatus arrangementStatus(const QString& arrangementId) const = 0;  // least-finished section
     virtual muse::async::Notification changed() const = 0;
+    //! The open song's to-do list: each part of the work in priority order, with how far along it is
+    virtual std::vector<StarScoreTodoItem> todoList() const = 0;
 
     virtual std::vector<StarScorePartInfo> parts() const = 0;
 

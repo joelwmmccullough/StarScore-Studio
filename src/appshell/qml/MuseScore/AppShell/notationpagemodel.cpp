@@ -156,6 +156,11 @@ QString NotationPageModel::starscoreAuditPanelName() const
     return STARSCORE_AUDIT_PANEL_NAME;
 }
 
+QString NotationPageModel::starscoreTodoPanelName() const
+{
+    return STARSCORE_TODO_PANEL_NAME;
+}
+
 QString NotationPageModel::mixerPanelName() const
 {
     return MIXER_PANEL_NAME;
