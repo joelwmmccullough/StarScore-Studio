@@ -7,6 +7,7 @@
 #include "starscoreservice.h"
 #include "starscorehouse.h"
 #include "starscorepdf.h"
+#include "starscoreengraving.h"
 
 #include <algorithm>
 #include <map>
@@ -2124,6 +2125,8 @@ Ret StarScoreService::exportArrangement(const QString& arrangementId, const io::
 
     IMasterNotationPtr master = copy->masterNotation();
     engraving::MasterScore* ms = master->masterScore();
+    // part books number their bars like the main score
+    starscore::syncBarNumbering(ms, starscore::BarNumberingSync::Direct);
 
     // Part books: keep those whose instruments all belong to the arrangement
     ExcerptNotationList keptExcerpts;

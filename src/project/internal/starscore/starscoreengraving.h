@@ -53,6 +53,19 @@ bool partLooksUnfinished(const mu::engraving::Score* score, const mu::engraving:
 //! amateur range (concert pitch, as MuseScore's own range colouring). Returns a readable report.
 QString checkRanges(const mu::engraving::Score* score);
 
+//! How syncBarNumbering changes the part books
+enum class BarNumberingSync {
+    Check,      // only count the part books that differ
+    Undoable,   // through the undo stack (call inside a command)
+    Direct      // set directly (a throwaway copy of the file)
+};
+
+//! Makes every part book number its bars like the main score: each bar's "exclude from measure count" and
+//! "add to measure number" are copied from the main score. MuseScore keeps these per score, so a pickup bar
+//! excluded in the main score after the part books were made stays counted in them, and those sheets'
+//! bar numbers run one ahead. Returns the number of part books that differ(ed).
+int syncBarNumbering(mu::engraving::MasterScore* master, BarNumberingSync how);
+
 QString applyAdditiveTimeSig(mu::engraving::MasterScore* score, mu::engraving::Measure* start, mu::engraving::Measure* last,
                              const std::vector<int>& numerators, int denominator);
 }

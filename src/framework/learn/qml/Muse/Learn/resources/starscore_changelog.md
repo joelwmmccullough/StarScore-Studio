@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.14.2
+
+- **Bar numbers match on every sheet.** In Bet and Two the pickup bar is excluded from the measure count in the main score and the horn parts, but the lead sheet and rhythm part books still counted it, so their bar numbers ran one ahead of the horn sheets (MuseScore keeps "exclude from measure count" and "add to measure number" separately in each part book). Export to Sheets and Demos now copies both settings from the main score to every part book before printing, and says so in its summary. The fix is one undo step; save the file to keep it. Songbooks and Export arrangements as MuseScore files do the same on their copies.
+
 ## 1.14.1
 
 - **Keyboard sheets are always "Keys".** Export to Sheets and Demos names the piano, electric piano, organ, clavinet or synth sheet `CODE - Keys.pdf` (two keyboard parts: `Keys (Piano)`, `Keys (Organ)` …). Once the Keys sheet is in 1 Rhythm, an older keyboard sheet there under its old name (`Elec Piano`, `Organ`, `Clavinet`, `Piano`) moves to Version History. The folder organization files loose keyboard sheets from 6 Inbox as Keys too.

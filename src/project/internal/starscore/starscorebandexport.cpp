@@ -1025,6 +1025,23 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     IMasterNotationPtr master = project->masterNotation();
     engraving::MasterScore* ms = master->masterScore();
 
+    // Every part book numbers its bars like the main score. MuseScore keeps "exclude from measure count" per score,
+    // so a pickup bar excluded in the main score after the part books were made stayed counted in them, and those
+    // sheets' bar numbers ran one ahead of the others (Bet, Two). The fix is kept in the file (one undo step).
+    int renumbered = 0;
+    if (starscore::syncBarNumbering(ms, starscore::BarNumberingSync::Check) > 0) {
+        master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Bar numbers in the parts like the score"));
+        renumbered = starscore::syncBarNumbering(ms, starscore::BarNumberingSync::Undoable);
+        master->notation()->undoStack()->commitChanges();
+        for (engraving::Excerpt* ex : ms->excerpts()) {
+            if (engraving::Score* es = ex ? ex->excerptScore() : nullptr) {
+                es->setLayoutAll();
+                es->doLayout();
+            }
+        }
+        master->notation()->notationChanged().notify();
+    }
+
     const QString songDir = plan.val.bandFolder + "/" + plan.val.songFolder;
     const QString today = QDate::currentDate().toString(Qt::ISODate);
     const QString tmpDir = QDir::tempPath() + "/StarScoreExport-" + QUuid::createUuid().toString(QUuid::Id128);
@@ -1381,6 +1398,12 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         writeSheetRecord(ms, data, full.ret ? full.val : plan.val, written + unchanged);
     }
 
+    QString renumberNote;
+    if (renumbered > 0) {
+        renumberNote = muse::qtrc("starscore", "%1 part book(s) numbered their bars differently from the score (a bar excluded from "
+                                               "the measure count in the score but counted in the part); they now match the score. "
+                                               "Save the file to keep this.").arg(renumbered);
+    }
     QString summary = written.isEmpty() && !unchanged.isEmpty()
                       ? muse::qtrc("starscore", "Nothing to write: every sheet is the same as the file already in %1.")
                       .arg(plan.val.songFolder)
@@ -1388,6 +1411,9 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     if (!written.isEmpty() && !unchanged.isEmpty()) {
         summary += " " + muse::qtrc("starscore", "%1 sheet(s) came out the same as before, so those files were left as they were.")
                    .arg(unchanged.size());
+    }
+    if (!renumberNote.isEmpty()) {
+        summary += "\n\n" + renumberNote;
     }
     if (!problems.isEmpty()) {
         summary += "\n\n" + muse::qtrc("starscore", "Skipped:") + "\n• " + problems.join("\n• ");
@@ -1703,6 +1729,10 @@ void StarScoreService::songbookRenderSheets(const QString& songPath, std::vector
         INotationProjectPtr p = projectCreator()->newProject(iocContext());
         if (!p->load(io::path_t(copyPath))) {
             return nullptr;
+        }
+        // part books number their bars like the main score (see exportToBandFolder)
+        if (p->masterNotation() && p->masterNotation()->masterScore()) {
+            starscore::syncBarNumbering(p->masterNotation()->masterScore(), starscore::BarNumberingSync::Direct);
         }
         return p;
     };

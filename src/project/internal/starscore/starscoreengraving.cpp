@@ -11,6 +11,7 @@
 #include <QStringList>
 
 #include "engraving/dom/masterscore.h"
+#include "engraving/dom/excerpt.h"
 #include "engraving/dom/measure.h"
 #include "engraving/dom/segment.h"
 #include "engraving/dom/chord.h"
@@ -432,4 +433,48 @@ bool mu::project::starscore::partLooksUnfinished(const mu::engraving::Score* sco
         withNotes += found ? 1 : 0;
     }
     return bars > 0 && withNotes * 5 < bars;
+
+int syncBarNumbering(MasterScore* master, BarNumberingSync how)
+{
+    if (!master) {
+        return 0;
+    }
+    int differing = 0;
+    for (Excerpt* ex : master->excerpts()) {
+        Score* es = ex ? ex->excerptScore() : nullptr;
+        if (!es) {
+            continue;
+        }
+        bool differs = false;
+        for (Measure* m = master->firstMeasure(); m; m = m->nextMeasure()) {
+            Measure* em = es->tick2measure(m->tick());
+            if (!em || em->tick() != m->tick()) {
+                continue;
+            }
+            if (em->irregular() != m->irregular()) {
+                differs = true;
+                if (how == BarNumberingSync::Undoable) {
+                    em->undoChangeProperty(Pid::IRREGULAR, m->irregular());
+                } else if (how == BarNumberingSync::Direct) {
+                    em->setIrregular(m->irregular());
+                }
+            }
+            if (em->noOffset() != m->noOffset()) {
+                differs = true;
+                if (how == BarNumberingSync::Undoable) {
+                    em->undoChangeProperty(Pid::NO_OFFSET, m->noOffset());
+                } else if (how == BarNumberingSync::Direct) {
+                    em->setNoOffset(m->noOffset());
+                }
+            }
+        }
+        if (differs) {
+            ++differing;
+            if (how != BarNumberingSync::Check) {
+                es->setLayoutAll();
+            }
+        }
+    }
+    return differing;
+}
 }
