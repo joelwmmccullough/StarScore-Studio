@@ -66,6 +66,11 @@ enum class BarNumberingSync {
 //! bar numbers run one ahead. Returns the number of part books that differ(ed).
 int syncBarNumbering(mu::engraving::MasterScore* master, BarNumberingSync how);
 
+//! The Keys sheet: every keyboard part's lower staves (bass clef) "Hide when empty: Always" in every score, and the
+//! keyboard's own part book with "Automatically hide all empty staves" on and "Don't hide empty staves in first
+//! system" off. Returns how many settings it changed (0 = already so).
+int applyKeysStaffRules(mu::engraving::MasterScore* master);
+
 QString applyAdditiveTimeSig(mu::engraving::MasterScore* score, mu::engraving::Measure* start, mu::engraving::Measure* last,
                              const std::vector<int>& numerators, int denominator);
 }

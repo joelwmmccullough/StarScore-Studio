@@ -1042,6 +1042,15 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         master->notation()->notationChanged().notify();
     }
 
+    // The Keys sheet: bass staff "Always hide", empty staves hidden from the first system on
+    if (starscore::applyKeysStaffRules(ms) > 0) {
+        for (engraving::Score* sc : ms->scoreList()) {
+            sc->doLayout();
+        }
+        project->markAsUnsaved();
+        master->notation()->notationChanged().notify();
+    }
+
     const QString songDir = plan.val.bandFolder + "/" + plan.val.songFolder;
     const QString today = QDate::currentDate().toString(Qt::ISODate);
     const QString tmpDir = QDir::tempPath() + "/StarScoreExport-" + QUuid::createUuid().toString(QUuid::Id128);

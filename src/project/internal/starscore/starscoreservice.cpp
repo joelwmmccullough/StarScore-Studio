@@ -2474,6 +2474,15 @@ int StarScoreService::applyStylesOnly(const QStringList& partIds)
         if (restyle(e->notation(), chosen, partBook)) {
             ++restyled;
         }
+
+    }
+
+    // The Keys sheet: empty staves hide (first system included) and the bass staff is set to "Always hide"
+    if (starscore::applyKeysStaffRules(ms) > 0) {
+        if (INotationProjectPtr project = globalContext()->currentProject()) {
+            project->markAsUnsaved();
+        }
+        master->notation()->notationChanged().notify();
     }
 
     return restyled;

@@ -478,3 +478,59 @@ int mu::project::starscore::syncBarNumbering(MasterScore* master, BarNumberingSy
     }
     return differing;
 }
+
+namespace {
+bool starscoreIsKeyboardPart(const Part* p)
+{
+    if (!p || p->nstaves() < 2) {
+        return false;
+    }
+    const QString id = p->instrumentId().toQString();
+    return id == "electric-piano" || id.contains("organ") || id == "clavinet" || id.contains("piano")
+           || id.contains("keyboard") || id.contains("synth") || id == "harpsichord" || id == "celesta";
+}
+}
+
+int mu::project::starscore::applyKeysStaffRules(MasterScore* master)
+{
+    if (!master) {
+        return 0;
+    }
+    int changed = 0;
+    for (Part* p : master->parts()) {
+        if (!starscoreIsKeyboardPart(p)) {
+            continue;
+        }
+        for (size_t i = 1; i < p->nstaves(); ++i) {
+            Staff* lower = p->staves().at(i);
+            std::vector<Staff*> all = lower->staffList();
+            all.push_back(lower);
+            for (Staff* st : all) {
+                if (st->hideWhenEmpty() != AutoOnOff::ON) {
+                    st->setHideWhenEmpty(AutoOnOff::ON);
+                    ++changed;
+                }
+            }
+        }
+    }
+    for (Excerpt* ex : master->excerpts()) {
+        Score* es = ex ? ex->excerptScore() : nullptr;
+        if (!es || es->parts().size() != 1 || !starscoreIsKeyboardPart(es->parts().front())) {
+            continue;
+        }
+        if (!es->style().styleB(Sid::hideEmptyStaves)) {
+            es->style().set(Sid::hideEmptyStaves, true);
+            ++changed;
+        }
+        if (es->style().styleB(Sid::dontHideStavesInFirstSystem)) {
+            es->style().set(Sid::dontHideStavesInFirstSystem, false);
+            ++changed;
+        }
+    }
+    if (changed) {
+        for (Score* score : master->scoreList()) {
+            score->setLayoutAll();
+        }
+    }
+    return changed;
+}

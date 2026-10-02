@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.15.2
+
+- **Keys sheet staff settings.** Every keyboard part's bass-clef staff is set to "Hide empty staves: Always hide" (in the score, the arrangement scores and the Keys part score), and the Keys part score's style has "Automatically hide all empty staves" on and "Don't hide empty staves in first system" off. This is applied when you apply part styles and on every export to Sheets and Demos, so existing songs get it on their next export.
+
 ## 1.15.1
 
 - **Bari Sax, Bass Sax and Bassoon versions are part of the 7-Horn section.** "Create Bari Sax, Bass Sax, Bassoon versions" now makes them visible below the Bass Trombone (hidden only while the 7-Horn section is off), adds them to the section so they show and hide with it, puts them in the 7-Horn arrangement's score, and marks them Needs review. Before, they were made hidden and were easy to miss. Files where they were made hidden (Balkan Wedding) are fixed once when opened; save the file afterwards.
