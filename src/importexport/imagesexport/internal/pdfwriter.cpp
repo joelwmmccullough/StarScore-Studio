@@ -150,7 +150,13 @@ Ret PdfWriter::writeList(const INotationPtrList& notations, io::IODevice& destin
 void PdfWriter::preparePdfWriter(QPdfWriter& pdfWriter, const QString& title, const QSizeF& size) const
 {
     pdfWriter.setResolution(configuration()->exportPdfDpiResolution());
+    // StarScore: which StarScore and which MuseScore made the PDF (Finder shows it as the PDF's author and creator)
+#ifdef STARSCORE_VERSION_STR
+    pdfWriter.setCreator(QString("StarScore Studio Version: " STARSCORE_VERSION_STR " (MuseScore Studio Version: ")
+                         + application()->version().toString().toQString() + ")");
+#else
     pdfWriter.setCreator(QString("MuseScore Studio Version: ") + application()->version().toString().toQString());
+#endif
     pdfWriter.setTitle(title);
     pdfWriter.setPageMargins(QMarginsF());
     pdfWriter.setPageLayout(QPageLayout(QPageSize(size, QPageSize::Inch), QPageLayout::Orientation::Portrait, QMarginsF()));

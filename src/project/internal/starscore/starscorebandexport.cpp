@@ -1072,6 +1072,21 @@ static QByteArray starscorePdfWithoutStamps(const QByteArray& pdf)
     static const QRegularExpression xmpDate("(xmp:[A-Za-z]+Date)=\"[^\"]*\"");
     static const QRegularExpression uuid("uuid:[0-9A-Fa-f\\-]+");
     static const QRegularExpression ids("/ID\\s*\\[\\s*<[0-9A-Fa-f]*>\\s*<[0-9A-Fa-f]*>\\s*\\]");
+    // the app that made it (StarScore and MuseScore versions): a new version alone doesn't make a sheet different
+    static const QRegularExpression creator("/Creator\\s*(\\((?:\\\\.|[^\\\\)])*\\)|<[0-9A-Fa-f]*>)");
+    static const QRegularExpression xmpCreator("(xmp:CreatorTool)(=\"[^\"]*\"|>[^<]*<)");
+    s.replace(creator, "/Creator ()");
+    s.replace(xmpCreator, "\\1");
+    // a creator of another length moves every object after it: the byte offsets (xref table, startxref) and the
+    // metadata stream's length change with it. The streams themselves are still compared.
+    static const QRegularExpression xref("\\nxref\\s[\\s\\S]*?\\ntrailer\\b");
+    static const QRegularExpression startxref("\\nstartxref\\s+\\d+");
+    static const QRegularExpression length("/Length\\s+\\d+(?!\\s+\\d+\\s+R)");
+    static const QRegularExpression numberObject("(\\b\\d+\\s+0\\s+obj\\s*)\\d+(\\s*endobj)");
+    s.replace(xref, "\nxref trailer");
+    s.replace(startxref, "\nstartxref");
+    s.replace(length, "/Length");
+    s.replace(numberObject, "\\1\\2");
     s.replace(pdfDate, "(D:)");
     s.replace(xmpDate, "\\1=\"\"");
     s.replace(uuid, "uuid:");
@@ -1084,7 +1099,11 @@ static QByteArray starscorePdfWithoutStamps(const QByteArray& pdf)
 static bool starscoreSamePdf(const QString& freshPath, const QString& existingPath)
 {
     QFile a(freshPath), b(existingPath);
-    if (!a.open(QIODevice::ReadOnly) || !b.open(QIODevice::ReadOnly) || a.size() != b.size()) {
+    if (!a.open(QIODevice::ReadOnly) || !b.open(QIODevice::ReadOnly)) {
+        return false;
+    }
+    // (sizes can differ by the creator text alone: a sheet made by a newer StarScore)
+    if (qAbs(a.size() - b.size()) > 512) {
         return false;
     }
     const QByteArray x = a.readAll(), y = b.readAll();

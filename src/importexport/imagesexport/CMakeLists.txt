@@ -40,3 +40,5 @@ target_sources(iex_imagesexport PRIVATE
 )
 
 target_link_libraries(iex_imagesexport PRIVATE engraving)
+# StarScore: the StarScore version goes in every exported PDF's Creator field
+target_compile_definitions(iex_imagesexport PRIVATE STARSCORE_VERSION_STR="${STARSCORE_VERSION}")

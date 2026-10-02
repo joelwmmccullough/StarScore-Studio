@@ -33,6 +33,7 @@
 #include "engraving/dom/part.h"
 #include "engraving/dom/instrument.h"
 #include "engraving/dom/staff.h"
+#include "engraving/editing/editpart.h"
 #include "engraving/dom/measure.h"
 #include "engraving/dom/segment.h"
 #include "engraving/dom/select.h"
@@ -1277,6 +1278,11 @@ StarScoreSection StarScoreService::finishNewParts(const std::vector<engraving::P
     StarScoreSection section;
     std::vector<std::pair<muse::ID, bool> > hide;
 
+    std::vector<muse::ID> hiddenStaves;
+    // Names, short names and ranges in one edit: each through the Instruments panel's route lays out the score and
+    // every part score again (making a few parts in a song with dozens of part scores took about a minute)
+    engraving::MasterScore* ms = master->masterScore();
+    master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Name instruments"));
     for (size_t i = 0; i < newParts.size(); ++i) {
         engraving::Part* p = newParts[i];
         const QString id = idText(p);
@@ -1289,7 +1295,7 @@ StarScoreSection StarScoreService::finishNewParts(const std::vector<engraving::P
         const StarScoreInstrument& inst = instruments[i];
 
         if (!inst.partName.isEmpty()) {
-            master->parts()->setInstrumentName(InstrumentKey { p->instrumentId(), p->id(), engraving::Fraction(0, 1) }, inst.partName);
+            engraving::EditPart::setInstrumentName(ms, p, engraving::Fraction(0, 1), String::fromQString(inst.partName));
             p->setPartName(String::fromQString(inst.partName));
 
             // Short name: MuseScore numbers instruments of the same kind ("Pno. 2" when the lead sheet is also a
@@ -1307,8 +1313,7 @@ StarScoreSection StarScoreService::finishNewParts(const std::vector<engraving::P
                 }
             }
             if (!shortName.isEmpty()) {
-                master->parts()->setInstrumentAbbreviature(InstrumentKey { p->instrumentId(), p->id(), engraving::Fraction(0, 1) },
-                                                           shortName);
+                engraving::EditPart::setInstrumentAbbreviature(ms, p, engraving::Fraction(0, 1), String::fromQString(shortName));
             }
         }
 
@@ -1329,7 +1334,7 @@ StarScoreSection StarScoreService::finishNewParts(const std::vector<engraving::P
 
         for (int staffIdx : inst.hiddenStaves) {
             if (staffIdx >= 0 && staffIdx < int(p->staves().size())) {
-                master->parts()->setStaffVisible(p->staves().at(staffIdx)->id(), false);
+                hiddenStaves.push_back(p->staves().at(staffIdx)->id());
             }
         }
 
@@ -1338,6 +1343,12 @@ StarScoreSection StarScoreService::finishNewParts(const std::vector<engraving::P
         } else {
             section.shownPartIds << id;
         }
+    }
+
+    master->notation()->undoStack()->commitChanges();
+    master->parts()->partsChanged().notify();
+    for (const muse::ID& sid : hiddenStaves) {
+        master->parts()->setStaffVisible(sid, false);
     }
 
     addPartBooksFor(section.partIds);
