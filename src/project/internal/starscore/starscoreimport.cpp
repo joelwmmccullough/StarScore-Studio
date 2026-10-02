@@ -801,9 +801,10 @@ void StarScoreService::offerLowAlternates(const QStringList& partIds)
             return;
         }
         interactive()->info(muse::trc("starscore", "Parts created"),
-                            muse::qtrc("starscore", "%1 now have the Bass Trombone's music, and their status is Needs review. "
-                                                    "They're hidden in the score: open their part scores (Parts) to check them. "
-                                                    "Notes too low for an instrument are colored as out of range.").arg(list).toStdString());
+                            muse::qtrc("starscore", "%1 now have the Bass Trombone's music, below it in the 7-Horn section, and their status "
+                                                    "is Needs review. They show and hide with the 7-Horn section and are in the "
+                                                    "7-Horn arrangement's score; each also has its own part score. Notes too low "
+                                                    "for an instrument are colored as out of range.").arg(list).toStdString());
     });
 }
 
@@ -826,12 +827,28 @@ RetVal<QStringList> StarScoreService::createLowAlternates(const QString& section
             StarScoreInstrument inst;
             inst.instrumentId = id;
             inst.partName = name;
-            inst.hidden = true;
+            inst.hidden = false;   // shown like the rest of the 7-Horn section (set below)
             wanted.push_back(inst);
         }
     }
     if (wanted.empty()) {
         return RetVal<QStringList>::make_ret(Ret::Code::UnknownError);
+    }
+
+    // Whether the 7-Horn section is showing now (any of its instruments visible): the new versions match it
+    bool sectionOn = false;
+    {
+        const Data d0 = load();
+        for (const StarScoreSection& s0 : d0.sections) {
+            if (s0.id != sectionId) {
+                continue;
+            }
+            for (const QString& pid : s0.partIds) {
+                if (const engraving::Part* p = ms->partById(ID(pid))) {
+                    sectionOn |= p->show();
+                }
+            }
+        }
     }
 
     // Right after the Bass Trombone
@@ -907,6 +924,15 @@ RetVal<QStringList> StarScoreService::createLowAlternates(const QString& section
 
     const StarScoreSection made = finishNewParts(newParts, added);
 
+    // Hidden only while the 7-Horn section is off
+    if (!sectionOn) {
+        std::vector<std::pair<muse::ID, bool> > hide;
+        for (const QString& pid : made.partIds) {
+            hide.emplace_back(muse::ID(pid), false);
+        }
+        master->parts()->setPartsVisible(hide, TranslatableString::untranslatable("Hide instruments"));
+    }
+
     Data d = load();
     for (StarScoreSection& s : d.sections) {
         if (s.id != sectionId) {
@@ -916,11 +942,18 @@ RetVal<QStringList> StarScoreService::createLowAlternates(const QString& section
             if (!s.partIds.contains(pid)) {
                 s.partIds << pid;
             }
+            // turned on and off with the section, like its other instruments
+            if (!s.shownPartIds.isEmpty() && !s.shownPartIds.contains(pid)) {
+                s.shownPartIds << pid;
+            }
             s.alternates[pid] = mainPartId;
             d.partStatus[pid] = statusKey(StarScoreStatus::NeedsReview);
         }
     }
+    d.alternatesInSection = true;
     store(d);
+    // the 7-Horn arrangement's own score gets them too
+    syncArrangementScores();
     applyStyles(made.partIds);
     const QStringList newIds = made.partIds;
     QTimer::singleShot(1500, [this, newIds]() { applyMixerDefaults(newIds); });
@@ -929,4 +962,57 @@ RetVal<QStringList> StarScoreService::createLowAlternates(const QString& section
     master->notation()->notationChanged().notify();
     m_changed.notify();
     return RetVal<QStringList>::make_ok(made.partIds);
+}
+
+//! Files from before 1.15.1 made the stand-in versions (Bari Sax, Bass Sax, Bassoon) hidden and left them out of
+//! the section's shown instruments. Once per file: they join their section — shown when it's on, turned on and
+//! off with it, and in its arrangement scores.
+void StarScoreService::showOldAlternates()
+{
+    if (!m_mainProject || globalContext()->currentProject() != m_mainProject) {
+        return;
+    }
+    engraving::MasterScore* ms = masterScore();
+    if (!ms) {
+        return;
+    }
+    Data d = load();
+    if (d.alternatesInSection) {
+        return;
+    }
+    bool any = false;
+    std::vector<std::pair<muse::ID, bool> > show;
+    for (StarScoreSection& s : d.sections) {
+        if (s.alternates.empty()) {
+            continue;
+        }
+        any = true;
+        bool sectionOn = false;
+        for (const QString& pid : s.partIds) {
+            const engraving::Part* p = ms->partById(ID(pid));
+            if (p && !s.alternates.count(pid)) {
+                sectionOn |= p->show();
+            }
+        }
+        for (const auto& [alt, main] : s.alternates) {
+            if (!s.shownPartIds.isEmpty() && !s.shownPartIds.contains(alt)) {
+                s.shownPartIds << alt;
+            }
+            const engraving::Part* p = ms->partById(ID(alt));
+            if (p && sectionOn && !p->show()) {
+                show.emplace_back(ID(alt), true);
+            }
+        }
+    }
+    if (!any) {
+        return;   // nothing to fix, and the file stays unchanged
+    }
+    d.alternatesInSection = true;
+    store(d);
+    if (!show.empty()) {
+        if (IMasterNotationPtr master = globalContext()->currentMasterNotation()) {
+            master->parts()->setPartsVisible(show, TranslatableString::untranslatable("Show instruments"));
+        }
+    }
+    syncArrangementScores();
 }

@@ -201,19 +201,6 @@ Rectangle {
 
             FlatButton {
                 Layout.alignment: Qt.AlignTop
-                text: qsTrc("starscore", "Deco")
-                accentButton: barModel.decoOn
-                toolTipTitle: barModel.decoOn ? qsTrc("starscore", "Switch StarScore Deco off")
-                                              : qsTrc("starscore", "Switch StarScore Deco on")
-                toolTipDescription: qsTrc("starscore", "Puts the main score and every part book in the StarScore Deco music font. Switching it off brings back the fonts each one had.")
-
-                onClicked: {
-                    barModel.toggleDeco()
-                }
-            }
-
-            FlatButton {
-                Layout.alignment: Qt.AlignTop
                 icon: IconCode.MENU_THREE_DOTS
                 transparent: true
                 toolTipTitle: qsTrc("starscore", "More StarScore options")

@@ -68,8 +68,9 @@ struct StarScoreSection
     bool leadSheetFinish = false;
     QStringList autoSkipSheets;
     //! Stand-in versions of a part, e.g. the 7-Horn section's Baritone and Bass Saxophone versions of the Bass
-    //! Trombone line: alternate part id -> the part it stands in for. Hidden in the score; they get their own
-    //! part scores and sheets, and aren't counted as extra lines by the audit or the listen-through.
+    //! Trombone line: alternate part id -> the part it stands in for. Shown and hidden with their section and
+    //! in its arrangement's score; they get their own part scores and sheets, and aren't counted as extra
+    //! lines by the audit or the listen-through.
     std::map<QString, QString> alternates;
 };
 

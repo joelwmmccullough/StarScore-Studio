@@ -287,6 +287,7 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
     for (auto it = scoreStatus.begin(); it != scoreStatus.end(); ++it) {
         data.scoreStatus[it.key()] = it.value().toString();
     }
+    data.alternatesInSection = root.value("alternatesInSection").toBool();
 
     const QJsonObject audit = root.value("audit").toObject();
     data.auditReferenceSectionId = audit.value("reference").toString();
@@ -441,6 +442,9 @@ QString StarScoreService::toJson(const Data& data)
     if (!scoreStatus.isEmpty()) {
         root["scoreStatus"] = scoreStatus;
     }
+    if (data.alternatesInSection) {
+        root["alternatesInSection"] = true;
+    }
     QJsonObject audit;
     if (!data.auditReferenceSectionId.isEmpty()) {
         audit["reference"] = data.auditReferenceSectionId;
@@ -560,7 +564,7 @@ StarScoreService::Data StarScoreService::loadFrom(const engraving::MasterScore* 
         }
         const bool rhythm = s.templateKey == "rhythm" || s.templateKey == "bigband-rhythm";
         QStringList counted = s.shownPartIds.isEmpty() ? s.partIds : s.shownPartIds;
-        for (const auto& [alt, main] : s.alternates) {   // stand-in versions are hidden but still need finishing
+        for (const auto& [alt, main] : s.alternates) {   // stand-in versions count even when left out of the shown list
             if (!counted.contains(alt)) {
                 counted << alt;
             }
@@ -2934,6 +2938,8 @@ void StarScoreService::onCurrentProjectChanged()
 
     extractSolos();
     ensureFileId();
+    // once the score is fully set up
+    QTimer::singleShot(0, [this]() { showOldAlternates(); });
 }
 
 void StarScoreService::clearSolos()

@@ -4,6 +4,11 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.15.1
+
+- **Bari Sax, Bass Sax and Bassoon versions are part of the 7-Horn section.** "Create Bari Sax, Bass Sax, Bassoon versions" now makes them visible below the Bass Trombone (hidden only while the 7-Horn section is off), adds them to the section so they show and hide with it, puts them in the 7-Horn arrangement's score, and marks them Needs review. Before, they were made hidden and were easy to miss. Files where they were made hidden (Balkan Wedding) are fixed once when opened; save the file afterwards.
+- **The Deco button is gone from the StarScore bar.** Switch StarScore Deco on and off in the bar's "…" menu (StarScore Deco font, ticked when on).
+
 ## 1.15.0
 
 - **To-do panel** (a tab beside Palettes, Layout and Properties; View › To-do). The open song's work in priority order: 3-Horn Section, bass + guitar, lead sheet, drums, 2-Horn Section, 2-Horn Flexible, 3-Horn Flexible, keys, 4-Horn Section, the 1-Horn sheets, 5-, 6- and 7-Horn Sections, percussion, Big Band, Marching Band. Each step shows how far along it is (its least finished part, with the status colours of the StarScore bar), what still needs work, or "Not in the score yet". "Next up" at the top is the first step that isn't Finished. Drums, keys or percussion that read the lead sheet count as the lead sheet. The 1-Horn step needs Trumpet, Alto Sax, Tenor Sax and Trombone; the 7-Horn step needs the Bari Sax, Bass Sax and Bassoon versions of the Bass Trombone. The list updates as you change statuses.

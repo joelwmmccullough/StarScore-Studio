@@ -210,6 +210,9 @@ public:
         // Big Band, Orchestra and Marching Band: their full score has a status of its own (arrangement id ->
         // status key); the arrangement is finished only when its full score is marked Finished too
         std::map<QString, QString> scoreStatus;
+        // Stand-in versions (alternates) live in their section like its other instruments: shown with it and in its
+        // arrangement scores. False in files from before 1.15.1, where they were made hidden; fixed on opening.
+        bool alternatesInSection = false;
         QString fileId;    // permanent id of this .starscore (kept when the file is moved or renamed)
         // StarScore Deco switched on: score ("" = main score, else the part book's name) -> its fonts before
         // (music symbols, music text, dynamics)
@@ -320,6 +323,7 @@ private:
     void pickReferenceForCurrentScore();
     QStringList referenceViewSettingsKeys() const;
     void ensureFileId();
+    void showOldAlternates();
     QJsonObject loadReferenceView() const;
     void recordReferenceView();
     void listenReferencePanel();
