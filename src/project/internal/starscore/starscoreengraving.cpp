@@ -433,8 +433,9 @@ bool mu::project::starscore::partLooksUnfinished(const mu::engraving::Score* sco
         withNotes += found ? 1 : 0;
     }
     return bars > 0 && withNotes * 5 < bars;
+}
 
-int syncBarNumbering(MasterScore* master, BarNumberingSync how)
+int mu::project::starscore::syncBarNumbering(MasterScore* master, BarNumberingSync how)
 {
     if (!master) {
         return 0;
@@ -476,5 +477,4 @@ int syncBarNumbering(MasterScore* master, BarNumberingSync how)
         }
     }
     return differing;
-}
 }
