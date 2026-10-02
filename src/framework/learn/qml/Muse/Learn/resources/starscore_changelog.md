@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.14.3
+
+- **Title-frame text follows the style.** Applying the house style now also clears a size, font or font style set on the title, subtitle, composer or lyricist text itself, including size and font tags written into the text. These came in with imported files and overrode the style: Bet's and Two's subtitles stayed at 15 pt instead of the style's 21 pt. Other files with such settings: Big Milk (title 28 pt), G.I. Jorge (title font), Another One (subtitle and composer font), Playground (composer font).
+
 ## 1.14.2
 
 - **Bar numbers match on every sheet.** In Bet and Two the pickup bar is excluded from the measure count in the main score and the horn parts, but the lead sheet and rhythm part books still counted it, so their bar numbers ran one ahead of the horn sheets (MuseScore keeps "exclude from measure count" and "add to measure number" separately in each part book). Export to Sheets and Demos now copies both settings from the main score to every part book before printing, and says so in its summary. The fix is one undo step; save the file to keep it. Songbooks and Export arrangements as MuseScore files do the same on their copies.

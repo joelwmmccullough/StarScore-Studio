@@ -11,6 +11,7 @@
 #include "engraving/dom/part.h"
 #include "engraving/dom/staff.h"
 #include "engraving/dom/box.h"
+#include "engraving/dom/text.h"
 #include "engraving/dom/measurebase.h"
 #include "engraving/dom/mscore.h"
 #include "engraving/style/style.h"
@@ -126,6 +127,37 @@ void applyHouseStyle(Score* score, bool partBook, const QString& version)
     MeasureBase* first = score->first();
     if (first && first->isVBox()) {
         first->undoChangeProperty(Pid::BOX_HEIGHT, Spatium(15.0));
+    }
+
+    // Title, subtitle, composer and lyricist follow the style. A size, font or font style set on the text itself
+    // (usually from an imported file; Bet's subtitle was 15 pt, also written into the text as <font size="15"/>)
+    // overrides the style, so the style's sizes never showed.
+    static const QRegularExpression inlineFont("<font\\s+(size|face)=\"[^\"]*\"\\s*/>");
+    for (MeasureBase* mb = score->first(); mb && !mb->isMeasure(); mb = mb->next()) {
+        if (!mb->isVBox()) {
+            continue;
+        }
+        for (EngravingItem* e : mb->el()) {
+            if (!e || !e->isText()) {
+                continue;
+            }
+            Text* t = toText(e);
+            const TextStyleType type = t->textStyleType();
+            if (type != TextStyleType::TITLE && type != TextStyleType::SUBTITLE && type != TextStyleType::COMPOSER
+                && type != TextStyleType::LYRICIST) {
+                continue;
+            }
+            for (Pid p : { Pid::FONT_FACE, Pid::FONT_SIZE, Pid::FONT_STYLE }) {
+                if (t->propertyFlags(p) == PropertyFlags::UNSTYLED) {
+                    t->undoResetProperty(p);
+                }
+            }
+            QString xml = t->xmlText().toQString();
+            const QString clean = QString(xml).remove(inlineFont);
+            if (clean != xml) {
+                t->undoChangeProperty(Pid::TEXT, String::fromQString(clean));
+            }
+        }
     }
 }
 
