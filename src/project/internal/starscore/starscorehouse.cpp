@@ -5,6 +5,8 @@
  */
 #include "starscorehouse.h"
 
+#include <cmath>
+
 #include <QRegularExpression>
 
 #include "engraving/dom/score.h"
@@ -147,6 +149,11 @@ void applyHouseStyle(Score* score, bool partBook, const QString& version)
                 && type != TextStyleType::LYRICIST) {
                 continue;
             }
+            // their place comes from the style too (the subtitle's 16.5 mm, the composer's alignment below)
+            if ((type == TextStyleType::SUBTITLE || type == TextStyleType::COMPOSER)
+                && t->propertyFlags(Pid::OFFSET) == PropertyFlags::UNSTYLED) {
+                t->undoResetProperty(Pid::OFFSET);
+            }
             for (Pid p : { Pid::FONT_FACE, Pid::FONT_SIZE, Pid::FONT_STYLE }) {
                 if (t->propertyFlags(p) == PropertyFlags::UNSTYLED) {
                     t->undoResetProperty(p);
@@ -157,6 +164,44 @@ void applyHouseStyle(Score* score, bool partBook, const QString& version)
             if (clean != xml) {
                 t->undoChangeProperty(Pid::TEXT, String::fromQString(clean));
             }
+        }
+    }
+
+    // The composer text's last line sits on the subtitle's baseline (it hung a little below it). Measured after
+    // layout and corrected through the style's composer offset, so it fits this score's frame and staff size;
+    // applying the style again changes nothing once they line up.
+    score->setLayoutAll();
+    score->doLayout();
+    const Text* sub = nullptr;
+    const Text* comp = nullptr;
+    for (MeasureBase* mb = score->first(); mb && !mb->isMeasure() && !(sub && comp); mb = mb->next()) {
+        if (!mb->isVBox()) {
+            continue;
+        }
+        for (EngravingItem* e : mb->el()) {
+            if (e && e->isText()) {
+                const Text* t = toText(e);
+                if (!sub && t->textStyleType() == TextStyleType::SUBTITLE && !t->empty()) {
+                    sub = t;
+                } else if (!comp && t->textStyleType() == TextStyleType::COMPOSER && !t->empty()) {
+                    comp = t;
+                }
+            }
+        }
+    }
+    auto baseline = [](const Text* t) {
+        const TextBase::LayoutData* ld = t->ldata();
+        return ld && !ld->blocks.empty() ? t->pagePos().y() + ld->blocks.back().y() : 0.0;
+    };
+    if (sub && comp && sub->ldata() && comp->ldata() && !sub->ldata()->blocks.empty() && !comp->ldata()->blocks.empty()) {
+        const double delta = baseline(sub) - baseline(comp);   // > 0: the composer goes down
+        if (std::abs(delta) > 0.05 * score->style().spatium()) {
+            const bool inSpatium = score->style().styleV(Sid::composerOffsetType).toInt() == int(OffsetType::SPATIUM);
+            const PointF off = score->style().styleV(Sid::composerOffset).value<PointF>();
+            const double step = inSpatium ? delta / score->style().spatium() : delta / DPMM;
+            starscoreSet(score, Sid::composerOffset, PointF(off.x(), off.y() + step));
+            score->setLayoutAll();
+            score->doLayout();
         }
     }
 }

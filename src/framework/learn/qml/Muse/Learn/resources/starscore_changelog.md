@@ -7,6 +7,7 @@ Version numbers: the first number changes when files stop being compatible, the 
 ## 1.14.3
 
 - **Title-frame text follows the style.** Applying the house style now also clears a size, font or font style set on the title, subtitle, composer or lyricist text itself, including size and font tags written into the text. These came in with imported files and overrode the style: Bet's and Two's subtitles stayed at 15 pt instead of the style's 21 pt. Other files with such settings: Big Milk (title 28 pt), G.I. Jorge (title font), Another One (subtitle and composer font), Playground (composer font).
+- **Composer lines up with the subtitle.** Applying the house style now puts the last line of the composer text on the subtitle's baseline (it hung a little below it). StarScore measures both after layout and adjusts the composer position in each score's and part book's style; a position set on the subtitle or composer text itself is cleared.
 
 ## 1.14.2
 
