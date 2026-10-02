@@ -5,6 +5,7 @@
  */
 #include "starscorehouse.h"
 
+#include <algorithm>
 #include <cmath>
 
 #include <QRegularExpression>
@@ -200,6 +201,53 @@ void applyHouseStyle(Score* score, bool partBook, const QString& version)
             const PointF off = score->style().styleV(Sid::composerOffset).value<PointF>();
             const double step = inSpatium ? delta / score->style().spatium() : delta / DPMM;
             starscoreSet(score, Sid::composerOffset, PointF(off.x(), off.y() + step));
+            score->setLayoutAll();
+            score->doLayout();
+        }
+    }
+
+    // A long composer credit (Balkan Wedding lists many) reaches up into the title or the subtitle once its last
+    // line sits on the subtitle's baseline: then it moves down until it clears them, and the title frame grows if
+    // the credit would otherwise run into the music.
+    if (comp && comp->ldata()) {
+        const Text* title = nullptr;
+        const MeasureBase* frame = comp->parent() && comp->parent()->isMeasureBase() ? toMeasureBase(comp->parent()) : nullptr;
+        if (frame) {
+            for (EngravingItem* e : frame->el()) {
+                if (e && e->isText() && toText(e)->textStyleType() == TextStyleType::TITLE && !toText(e)->empty()) {
+                    title = toText(e);
+                    break;
+                }
+            }
+        }
+        const double gap = 0.5 * score->style().spatium();
+        const RectF c = comp->pageBoundingRect();
+        double down = 0.0;
+        for (const Text* other : { title, sub }) {
+            if (!other || !other->ldata()) {
+                continue;
+            }
+            const RectF o = other->pageBoundingRect().adjusted(-gap, -gap, gap, gap);
+            const RectF moved = c.translated(0.0, down);
+            if (moved.intersects(o)) {
+                down = std::max(down, o.bottom() - c.top());
+            }
+        }
+        if (down > 0.0) {
+            const bool inSpatium = score->style().styleV(Sid::composerOffsetType).toInt() == int(OffsetType::SPATIUM);
+            const PointF off = score->style().styleV(Sid::composerOffset).value<PointF>();
+            starscoreSet(score, Sid::composerOffset,
+                         PointF(off.x(), off.y() + (inSpatium ? down / score->style().spatium() : down / DPMM)));
+            // the frame grows by what now hangs below it
+            if (frame && frame->isVBox()) {
+                const double frameBottom = frame->pageBoundingRect().bottom();
+                const double overhang = c.bottom() + down - frameBottom;
+                if (overhang > 0.0) {
+                    const double height = frame->getProperty(Pid::BOX_HEIGHT).value<Spatium>().val();
+                    const_cast<MeasureBase*>(frame)->undoChangeProperty(
+                        Pid::BOX_HEIGHT, Spatium(height + overhang / score->style().spatium() + 0.5));
+                }
+            }
             score->setLayoutAll();
             score->doLayout();
         }

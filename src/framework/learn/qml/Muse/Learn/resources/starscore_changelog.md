@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.14.4
+
+- **Long composer credits don't run into the title.** After the composer text is lined up with the subtitle, StarScore checks whether it now reaches up into the title or the subtitle (Balkan Wedding lists many composers). If so it moves down until it clears them by half a staff space, and the title frame grows if the credit would otherwise hang into the music.
+
 ## 1.14.3
 
 - **Title-frame text follows the style.** Applying the house style now also clears a size, font or font style set on the title, subtitle, composer or lyricist text itself, including size and font tags written into the text. These came in with imported files and overrode the style: Bet's and Two's subtitles stayed at 15 pt instead of the style's 21 pt. Other files with such settings: Big Milk (title 28 pt), G.I. Jorge (title font), Another One (subtitle and composer font), Playground (composer font).
