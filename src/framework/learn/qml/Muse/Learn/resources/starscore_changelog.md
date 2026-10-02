@@ -6,6 +6,7 @@ Version numbers: the first number changes when files stop being compatible, the 
 
 ## 1.15.4
 
+- **Faster first opening in 1.15.3+.** The first time a song opens, its horn parts are renamed ("7H: Bari Sax") and its horn part scores get their sheet titles. That was done one part at a time, each laying out the score and every part score again (Balkan Wedding took minutes); it's now one step. Once the file is saved, opening it does nothing extra.
 - **To-do list PDF.** Every Export to Sheets and Demos also makes "CODE - To-Do.pdf" (e.g. "BALK - To-Do.pdf") next to the song's .starscore in Projects and Sheets: the To-do tab as a printed page. Page 1 has how many steps and parts are finished, what's next, and the steps in priority order with what each still needs; page 2 lists every part by section with its status, and the Big Band, Orchestra and Marching Band full scores. It's made fresh each export (it doesn't go in Sheets and Demos, since it's about the work on the song).
 - **7-Horn folder colour** needs every bass horn sheet: Bass Trombone, Bari Sax, Bass Sax, Bassoon, Bass Clarinet, Contrabass Clarinet, Contrabassoon and Tuba (in the Bass Horns subfolder). Until all are there, the 7-Horn folder is gray. Takes effect on each song's next export.
 - **Bass Horns (Horn #7) subfolder colours** of its own, each counting only sheets exported as Finished: Red with none of these, Orange with the Bass Trombone, Yellow with the Bass Trombone, Bari Sax and Bass Sax, Green with all eight.

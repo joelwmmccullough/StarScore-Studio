@@ -29,6 +29,7 @@
 #include "engraving/dom/select.h"
 #include "engraving/dom/box.h"
 #include "engraving/dom/text.h"
+#include "engraving/editing/editpart.h"
 
 #include "notation/inotationparts.h"
 #include "notation/iexcerptnotation.h"
@@ -1178,10 +1179,22 @@ int StarScoreService::standardizeHornNames()
         }
     }
 
+    if (renames.empty()) {
+        return 0;
+    }
+    // One edit for all of them: renaming through the Instruments panel's route lays out the score and every part
+    // score after each name (Balkan Wedding: 35 names x 48 scores, which kept StarScore busy for minutes on opening)
+    std::map<const engraving::Part*, QString> olds;
+    master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Horn part names"));
     for (const auto& [p, name] : renames) {
-        const QString old = p->partName().toQString();
-        master->parts()->setInstrumentName(InstrumentKey { p->instrumentId(), p->id(), engraving::Fraction(0, 1) }, name);
+        olds[p] = p->partName().toQString();
+        engraving::EditPart::setInstrumentName(ms, p, engraving::Fraction(0, 1), String::fromQString(name));
         p->setPartName(String::fromQString(name));
+    }
+    master->notation()->undoStack()->commitChanges();
+
+    for (const auto& [p, name] : renames) {
+        const QString old = olds[p];
         // its part score follows: the one named like the part, or its only one
         IExcerptNotationPtr book;
         int books = 0;
@@ -1202,13 +1215,12 @@ int StarScoreService::standardizeHornNames()
             book->setName(name);
         }
     }
-    if (!renames.empty()) {
-        if (INotationProjectPtr project = globalContext()->currentProject()) {
-            project->markAsUnsaved();
-        }
-        master->notation()->notationChanged().notify();
-        m_changed.notify();
+    if (INotationProjectPtr project = globalContext()->currentProject()) {
+        project->markAsUnsaved();
     }
+    master->parts()->partsChanged().notify();
+    master->notation()->notationChanged().notify();
+    m_changed.notify();
     return int(renames.size());
 }
 

@@ -849,26 +849,31 @@ static bool starscoreLevelSheetLabels(mu::engraving::Score* score)
     return true;
 }
 
-//! The title frame's texts with their offsets, to tell whether anything in it changed
-static QString starscoreTitleFrameSignature(const mu::engraving::Score* score)
+//! Whether the title frame doesn't show these names yet (told without laying anything out)
+static bool starscoreNeedsRetitle(const mu::engraving::Score* score, const QString& left, const QString& right)
 {
-    QStringList out;
-    for (const mu::engraving::MeasureBase* mb = score ? score->first() : nullptr; mb && !mb->isMeasure(); mb = mb->next()) {
-        for (const mu::engraving::EngravingItem* e : mb->el()) {
-            if (e && e->isText()) {
-                const mu::engraving::Text* t = mu::engraving::toText(e);
-                out << QString("%1|%2|%3").arg(t->xmlText().toQString()).arg(t->offset().x()).arg(t->offset().y());
-            }
+    const mu::engraving::MeasureBase* mb = score ? score->first() : nullptr;
+    while (mb && !mb->isVBox() && !mb->isMeasure()) {
+        mb = mb->next();
+    }
+    if (!mb || !mb->isVBox()) {
+        return false;   // no title frame to show them in
+    }
+    const muse::String l = muse::String::fromQString(left.toHtmlEscaped());
+    const muse::String r = muse::String::fromQString(right.toHtmlEscaped());
+    bool leftOk = left.isEmpty(), rightOk = right.isEmpty();
+    for (const mu::engraving::EngravingItem* e : mb->el()) {
+        if (!e || !e->isText() || mu::engraving::toText(e)->textStyleType() != mu::engraving::TextStyleType::INSTRUMENT_EXCERPT) {
+            continue;
         }
-        if (mb->isBox()) {
-            out << QString::number(mb->getProperty(mu::engraving::Pid::BOX_HEIGHT).value<mu::engraving::Spatium>().val());
+        const mu::engraving::Text* t = mu::engraving::toText(e);
+        if (t->position() == mu::engraving::AlignH::RIGHT) {
+            rightOk |= t->xmlText() == r;
+        } else {
+            leftOk |= t->xmlText() == l;
         }
     }
-    if (score) {
-        const mu::engraving::PointF c = score->style().styleV(mu::engraving::Sid::composerOffset).value<mu::engraving::PointF>();
-        out << QString("%1,%2").arg(c.x()).arg(c.y());
-    }
-    return out.join('\n');
+    return !(leftOk && rightOk);
 }
 
 //! The sheet's title frame: the horn's name top left (the part name text), the arrangement top right. Running it
@@ -1019,7 +1024,10 @@ int StarScoreService::labelPartBooks()
         }
     }
 
+    // Only part scores whose title isn't what the sheet prints yet are touched (and laid out), all in one edit
     int changed = 0;
+    bool open = false;
+    std::vector<INotationPtr> touched;
     for (const StarScoreBandFile& f : plan.val.files) {
         if (f.isScore || f.isVersion || !f.sourceFile.isEmpty() || f.partIds.size() != 1
             || (f.sheetLeft.isEmpty() && f.sheetRight.isEmpty())) {
@@ -1031,12 +1039,20 @@ int StarScoreService::labelPartBooks()
         }
         INotationPtr n = it->second->notation();
         engraving::Score* es = n->elements()->msScore();
-        const QString before = starscoreTitleFrameSignature(es);
-        n->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
+        if (!starscoreNeedsRetitle(es, f.sheetLeft, f.sheetRight)) {
+            continue;
+        }
+        if (!open) {
+            master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet titles"));
+            open = true;
+        }
         starscoreRetitleSheet(es, f.sheetLeft, f.sheetRight, true);
-        n->undoStack()->commitChanges();
-        if (starscoreTitleFrameSignature(es) != before) {
-            ++changed;
+        touched.push_back(n);
+        ++changed;
+    }
+    if (open) {
+        master->notation()->undoStack()->commitChanges();
+        for (const INotationPtr& n : touched) {
             n->notationChanged().notify();
         }
     }
