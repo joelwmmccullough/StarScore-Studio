@@ -214,6 +214,9 @@ public:
         // Stand-in versions (alternates) live in their section like its other instruments: shown with it and in its
         // arrangement scores. False in files from before 1.15.1, where they were made hidden; fixed on opening.
         bool alternatesInSection = false;
+        // Stand-in versions made before 1.15.3 got their barlines matched to the line they stand in for once; after
+        // that their formatting is left to Joel
+        bool alternateBarlinesMatched = false;
         QString fileId;    // permanent id of this .starscore (kept when the file is moved or renamed)
         // StarScore Deco switched on: score ("" = main score, else the part book's name) -> its fonts before
         // (music symbols, music text, dynamics)

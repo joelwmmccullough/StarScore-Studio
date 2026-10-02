@@ -293,6 +293,7 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
         data.scoreStatus[it.key()] = it.value().toString();
     }
     data.alternatesInSection = root.value("alternatesInSection").toBool();
+    data.alternateBarlinesMatched = root.value("alternateBarlinesMatched").toBool();
 
     const QJsonObject audit = root.value("audit").toObject();
     data.auditReferenceSectionId = audit.value("reference").toString();
@@ -449,6 +450,9 @@ QString StarScoreService::toJson(const Data& data)
     }
     if (data.alternatesInSection) {
         root["alternatesInSection"] = true;
+    }
+    if (data.alternateBarlinesMatched) {
+        root["alternateBarlinesMatched"] = true;
     }
     QJsonObject audit;
     if (!data.auditReferenceSectionId.isEmpty()) {

@@ -999,6 +999,7 @@ RetVal<QStringList> StarScoreService::createLowAlternates(const QString& section
         }
     }
     d.alternatesInSection = true;
+    d.alternateBarlinesMatched = true;
     store(d);
     // named like the rest of the section ("7H: Bari Sax")
     standardizeHornNames();
@@ -1238,8 +1239,9 @@ void StarScoreService::tidyOpenedScore()
     }
     showOldAlternates();
 
-    // Stand-in versions made before 1.15.3 lost the double barlines of the line they stand in for
-    {
+    // Stand-in versions made before 1.15.3 lost the double barlines of the line they stand in for: matched once per
+    // file, then left alone (Joel adjusts stand-in parts by hand after they're made)
+    if (!load().alternateBarlinesMatched) {
         std::map<QString, std::vector<engraving::Part*> > altsOf;   // main part id -> its stand-ins
         for (const StarScoreSection& s : load().sections) {
             for (const auto& [alt, main] : s.alternates) {
@@ -1258,6 +1260,9 @@ void StarScoreService::tidyOpenedScore()
             if (changed) {
                 master->notation()->notationChanged().notify();
             }
+            Data d = load();
+            d.alternateBarlinesMatched = true;
+            store(d);
         }
     }
 
