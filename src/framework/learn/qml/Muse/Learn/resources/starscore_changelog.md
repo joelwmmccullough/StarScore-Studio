@@ -6,6 +6,7 @@ Version numbers: the first number changes when files stop being compatible, the 
 
 ## 1.15.5
 
+- **The arrangement label stays on the instrument name's line.** At export, the label was lined up with the instrument name directly, outside the edits that are undone after printing; now that part scores keep their label, that could leave it moved up out of the title frame (Balkan Wedding's Bari Sax). Lining it up is now undone with the rest after printing, and opening a part score puts its label back on the instrument name's line before moving the composer credit clear of it.
 - **Barlines match on every staff.** MuseScore keeps a barline per staff, so an instrument added later starts with plain barlines where the others have double or final ones (the new Bass Trombone versions lost the double barline before each repeat). When a song opens and when it's exported, any bar where some staves have a double, final or other special barline and the rest a plain one gets it on every staff, in the score and every part. Bars with repeat signs, or with two different special barlines, are left alone. The check is quick: about a hundred bars across a few dozen staves.
 
 ## 1.15.4

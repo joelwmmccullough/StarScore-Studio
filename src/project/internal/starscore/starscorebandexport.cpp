@@ -803,49 +803,7 @@ static bool starscoreLevelSheetLabels(mu::engraving::Score* score)
     }
     s_levelScores.erase(it);
 
-    mu::engraving::Box* box = nullptr;
-    for (mu::engraving::MeasureBase* mb = score->first(); mb; mb = mb->next()) {
-        if (mb->isVBox()) {
-            box = mu::engraving::toBox(mb);
-            break;
-        }
-        if (mb->isMeasure()) {
-            break;
-        }
-    }
-    if (!box) {
-        return true;
-    }
-    mu::engraving::Text* ref = nullptr;
-    std::vector<mu::engraving::Text*> labels;
-    for (mu::engraving::EngravingItem* e : box->el()) {
-        if (!e || !e->isText() || mu::engraving::toText(e)->textStyleType() != mu::engraving::TextStyleType::INSTRUMENT_EXCERPT) {
-            continue;
-        }
-        mu::engraving::Text* t = mu::engraving::toText(e);
-        if (t->position() == mu::engraving::AlignH::RIGHT) {
-            labels.push_back(t);
-        } else if (!ref) {
-            ref = t;
-        }
-    }
-    if (!ref) {
-        return true;
-    }
-    bool moved = false;
-    const double refTop = ref->pagePos().y() + ref->ldata()->bbox().top();
-    for (mu::engraving::Text* label : labels) {
-        const double dy = refTop - (label->pagePos().y() + label->ldata()->bbox().top());
-        if (std::abs(dy) > 0.01) {
-            label->setOffset(label->offset() + mu::engraving::PointF(0.0, dy));
-            label->setPropertyFlags(mu::engraving::Pid::OFFSET, mu::engraving::PropertyFlags::UNSTYLED);
-            moved = true;
-        }
-    }
-    if (moved) {
-        score->setLayoutAll();
-        score->doLayout();
-    }
+    starscore::levelArrangementLabel(score);
     return true;
 }
 

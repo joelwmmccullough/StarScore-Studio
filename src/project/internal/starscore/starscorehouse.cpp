@@ -314,6 +314,55 @@ void clearComposerCredit(Score* score)
     score->doLayout();
 }
 
+//! The arrangement label (right-positioned instrument-name text) on the instrument name's line: its top level with the
+//! instrument name's top. Undoable, so a print-time levelling goes back with the rest of the print-time edits.
+bool levelArrangementLabel(Score* score)
+{
+    MeasureBase* frame = nullptr;
+    for (MeasureBase* mb = score ? score->first() : nullptr; mb && !mb->isMeasure(); mb = mb->next()) {
+        if (mb->isVBox()) {
+            frame = mb;
+            break;
+        }
+    }
+    if (!frame) {
+        return false;
+    }
+    Text* ref = nullptr;
+    std::vector<Text*> labels;
+    for (EngravingItem* e : frame->el()) {
+        if (!e || !e->isText() || toText(e)->textStyleType() != TextStyleType::INSTRUMENT_EXCERPT) {
+            continue;
+        }
+        Text* t = toText(e);
+        if (t->position() == AlignH::RIGHT) {
+            labels.push_back(t);
+        } else if (!ref) {
+            ref = t;
+        }
+    }
+    if (!ref || labels.empty() || !ref->ldata()) {
+        return false;
+    }
+    bool moved = false;
+    const double refTop = ref->pagePos().y() + ref->ldata()->bbox().top();
+    for (Text* label : labels) {
+        if (!label->ldata()) {
+            continue;
+        }
+        const double dy = refTop - (label->pagePos().y() + label->ldata()->bbox().top());
+        if (std::abs(dy) > 0.01) {
+            label->undoChangeProperty(Pid::OFFSET, label->offset() + PointF(0.0, dy), PropertyFlags::UNSTYLED);
+            moved = true;
+        }
+    }
+    if (moved) {
+        score->setLayoutAll();
+        score->doLayout();
+    }
+    return moved;
+}
+
 QString versionFromCopyright(const QString& copyright)
 {
     static const QRegularExpression re("Version\\s+(\\d+)\\.(\\d+)\\.(\\d+)", QRegularExpression::CaseInsensitiveOption);

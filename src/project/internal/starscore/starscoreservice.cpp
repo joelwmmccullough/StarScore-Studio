@@ -3920,6 +3920,8 @@ void StarScoreService::clearComposerInCurrentScore()
     }
     score->doLayout();
     n->undoStack()->prepareChanges(TranslatableString::untranslatable("Composer clear of the arrangement label"));
+    // the label on the instrument name's line (an export could leave it moved), then the credit clear of it
+    starscore::levelArrangementLabel(score);
     starscore::clearComposerCredit(score);
     n->undoStack()->commitChanges();
     n->notationChanged().notify();

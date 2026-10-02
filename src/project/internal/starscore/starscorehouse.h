@@ -25,6 +25,9 @@ void applyHouseStyle(mu::engraving::Score* score, bool partBook, const QString& 
 //! Moves a long composer credit down, clear of the title, the subtitle and the arrangement label (laid out first)
 void clearComposerCredit(mu::engraving::Score* score);
 
+//! Levels the arrangement label with the instrument name (laid out first; undoable). Returns whether it moved.
+bool levelArrangementLabel(mu::engraving::Score* score);
+
 //! Writes "Version x.y.z" into the footer text (Starsign 2.3 has "Version 1.0.0" in the right-hand box),
 //! replacing the version already there, or adding it to the right-hand box. Must be called inside a command.
 void applyVersionFooter(mu::engraving::Score* score, const QString& version);
