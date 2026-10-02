@@ -36,11 +36,10 @@ static const std::vector<std::pair<QString, QString> > CANON {
     { "^(bari sax|baritone sax|baritone saxophone)", "Bari Sax" }, { "^flugel", "Flugelhorn" }, { "^(trumpet|tpt)", "Trumpet" },
     { "^flute", "Flute" }, { "^sop.*recorder", "Recorder" }, { "^bass synth", "Bass Synth" },
     { "^(bass guitar|4-string bass|6-string bass|electric bass)", "Bass" }, { "^(electric guitar|guitar)", "Guitar" },
-    { "^(hammond organ|organ)", "Organ" }, { "^(electric piano|elec piano)", "Elec Piano" }, { "^(keys|piano|keyboard)", "Keys" },
-    { "^clavinet", "Clavinet" }, { "^(drums|drumset|drum set|drummer)", "Drums" }, { "^(percussion|percussionist)", "Percussion" },
+    { "^(hammond organ|organ|electric piano|elec piano|e\\.? ?piano|epiano|rhodes|wurlitzer|keys|piano|keyboards?|clavinet|clav)\\b", "Keys" }, { "^(drums|drumset|drum set|drummer)", "Drums" }, { "^(percussion|percussionist)", "Percussion" },
     { "^congas", "Congas" }, { "^violin", "Violin" }, { "^viola", "Viola" }, { "^cello", "Cello" }, { "^bassoon", "Bassoon" },
     { "^accordion", "Accordion" }, { "^strings", "Strings" }, { "^(vocals?|voice|lead vox)", "Vocals" }, { "^ewi", "EWI" },
-    { "^didgeridoo", "Didgeridoo" }, { "^synth", "Synth" },
+    { "^didgeridoo", "Didgeridoo" }, { "^synth", "Keys" },
 };
 
 QString canonInstrument(const QString& raw)

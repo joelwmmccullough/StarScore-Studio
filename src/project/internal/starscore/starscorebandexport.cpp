@@ -152,16 +152,9 @@ static QString starscoreRhythmName(const QString& id, const QString& partName)
     if (id.contains("guitar")) {
         return "Guitar";
     }
-    if (id == "electric-piano") {
-        return "Elec Piano";
-    }
-    if (id.contains("organ")) {
-        return "Organ";
-    }
-    if (id == "clavinet") {
-        return "Clavinet";
-    }
-    if (id.contains("piano") || id.contains("keyboard") || id.contains("synth")) {
+    // Every keyboard (piano, electric piano, organ, clavinet, synth) is "Keys"
+    if (id == "electric-piano" || id.contains("organ") || id == "clavinet" || id.contains("piano") || id.contains("keyboard")
+        || id.contains("synth") || id == "harpsichord" || id == "celesta") {
         return "Keys";
     }
     if (id.contains("drum")) {
@@ -1266,6 +1259,24 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         const RetVal<StarScoreBandExportPlan> full = planBandExport();
         for (const StarScoreBandFile& f : (full.ret ? full.val.files : plan.val.files)) {
             current << f.relativePath;
+        }
+        // Keyboard sheets under their older names ("Elec Piano", "Organ", "Clavinet", "Piano"), once a Keys sheet is there
+        {
+            const QString prefix = "1 Rhythm/" + plan.val.code + " - Keys";
+            const bool keysThere = std::any_of(current.begin(), current.end(), [&](const QString& rel) {
+                return rel.startsWith(prefix) && QFileInfo::exists(songDir + "/" + rel);
+            });
+            if (keysThere) {
+                const QDir dir(songDir + "/1 Rhythm");
+                for (const QString& fileName : dir.entryList({ plan.val.code + " - Elec Piano*.pdf", plan.val.code + " - Organ*.pdf",
+                                                               plan.val.code + " - Clavinet*.pdf", plan.val.code + " - Piano*.pdf" },
+                                                             QDir::Files)) {
+                    const QString rel = "1 Rhythm/" + fileName;
+                    if (!current.contains(rel)) {
+                        supersede(rel);
+                    }
+                }
+            }
         }
         for (const QString& folder : plan.val.anyHornFolders) {
             const QDir dir(songDir + "/" + folder);

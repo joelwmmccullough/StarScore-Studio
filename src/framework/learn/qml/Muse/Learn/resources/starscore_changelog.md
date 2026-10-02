@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.14.1
+
+- **Keyboard sheets are always "Keys".** Export to Sheets and Demos names the piano, electric piano, organ, clavinet or synth sheet `CODE - Keys.pdf` (two keyboard parts: `Keys (Piano)`, `Keys (Organ)` …). Once the Keys sheet is in 1 Rhythm, an older keyboard sheet there under its old name (`Elec Piano`, `Organ`, `Clavinet`, `Piano`) moves to Version History. The folder organization files loose keyboard sheets from 6 Inbox as Keys too.
+
 ## 1.14.0
 
 - **Folder colours from what's finished and exported.** Every Export to Sheets and Demos now records each sheet's status as it was exported (in `6 Inbox/.organizer/sheets/CODE.json`), and the folder organization colours folders from that. A sheet counts only while the file in the folder is still the one exported.
