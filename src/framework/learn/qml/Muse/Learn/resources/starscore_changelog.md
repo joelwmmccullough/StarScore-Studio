@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.15.5
+
+- **Barlines match on every staff.** MuseScore keeps a barline per staff, so an instrument added later starts with plain barlines where the others have double or final ones (the new Bass Trombone versions lost the double barline before each repeat). When a song opens and when it's exported, any bar where some staves have a double, final or other special barline and the rest a plain one gets it on every staff, in the score and every part. Bars with repeat signs, or with two different special barlines, are left alone. The check is quick: about a hundred bars across a few dozen staves.
+
 ## 1.15.4
 
 - **Faster first opening in 1.15.3+.** The first time a song opens, its horn parts are renamed ("7H: Bari Sax") and its horn part scores get their sheet titles. That was done one part at a time, each laying out the score and every part score again (Balkan Wedding took minutes); it's now one step. Once the file is saved, opening it does nothing extra.

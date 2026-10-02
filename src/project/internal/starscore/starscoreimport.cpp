@@ -1266,6 +1266,14 @@ void StarScoreService::tidyOpenedScore()
         }
     }
 
+    // Barlines the same on every staff (a staff added later starts with plain ones)
+    if (starscore::syncEndBarlines(ms, false) > 0) {
+        master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Barlines the same on every staff"));
+        starscore::syncEndBarlines(ms, true);
+        master->notation()->undoStack()->commitChanges();
+        master->notation()->notationChanged().notify();
+    }
+
     standardizeHornNames();
     labelPartBooks();
 }

@@ -78,6 +78,12 @@ QString bandHornName(const QString& instrumentId);
 //! Gives the first staff of each of `to` the end barlines (double, final…) of the first staff of `from`, bar by bar,
 //! in the score and every part book (undoable). Pasted music doesn't bring its barlines: a new stand-in version of
 //! the Bass Trombone lost the double barline before each repeat. Returns how many barlines changed.
+//! Every staff gets the same end barline in each bar: where some staves have a double, final or other special
+//! barline and the rest have a plain one, the plain ones get it too (in the score and every part book). Bars whose
+//! staves disagree between two special barlines are left alone. Undoable when apply is true; returns how many
+//! barlines differ (Check) or changed.
+int syncEndBarlines(mu::engraving::MasterScore* master, bool apply);
+
 int copyEndBarlines(mu::engraving::MasterScore* master, const mu::engraving::Part* from,
                     const std::vector<mu::engraving::Part*>& to);
 

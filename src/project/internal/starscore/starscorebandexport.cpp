@@ -1234,6 +1234,16 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         master->notation()->notationChanged().notify();
     }
 
+    // Every staff with the same barlines (double barlines missing from staves added later, e.g. the Bass Trombone's
+    // stand-in versions); kept in the file
+    int barlinesSynced = 0;
+    if (starscore::syncEndBarlines(ms, false) > 0) {
+        master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Barlines the same on every staff"));
+        barlinesSynced = starscore::syncEndBarlines(ms, true);
+        master->notation()->undoStack()->commitChanges();
+        project->markAsUnsaved();
+    }
+
     // The Keys sheet: bass staff "Always hide", empty staves hidden from the first system on
     if (starscore::applyKeysStaffRules(ms) > 0) {
         for (engraving::Score* sc : ms->scoreList()) {
@@ -1688,6 +1698,10 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     }
     if (!renumberNote.isEmpty()) {
         summary += "\n\n" + renumberNote;
+    }
+    if (barlinesSynced > 0) {
+        summary += "\n\n" + muse::qtrc("starscore", "%1 barline(s) were plain on some staves and double (or final) on others; "
+                                                   "they now match on every staff. Save the file to keep this.").arg(barlinesSynced);
     }
     if (!todoNote.isEmpty()) {
         summary += "\n\n" + todoNote;

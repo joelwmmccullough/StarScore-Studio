@@ -569,3 +569,52 @@ int mu::project::starscore::copyEndBarlines(MasterScore* master, const Part* fro
     }
     return changed;
 }
+
+int mu::project::starscore::syncEndBarlines(MasterScore* master, bool apply)
+{
+    if (!master) {
+        return 0;
+    }
+    int count = 0;
+    const size_t nstaves = master->nstaves();
+    for (Measure* m = master->firstMeasure(); m; m = m->nextMeasure()) {
+        Segment* seg = m->findSegment(SegmentType::EndBarLine, m->endTick());
+        if (!seg) {
+            continue;
+        }
+        // the special barline the bar has, if its staves agree on one
+        bool found = false, conflict = false;
+        BarLineType special = BarLineType::NORMAL;
+        std::vector<BarLine*> plain;
+        for (size_t st = 0; st < nstaves; ++st) {
+            EngravingItem* e = seg->element(st * VOICES);
+            if (!e || !e->isBarLine()) {
+                continue;
+            }
+            BarLine* bl = toBarLine(e);
+            const BarLineType t = bl->barLineType();
+            if (t == BarLineType::START_REPEAT || t == BarLineType::END_REPEAT || t == BarLineType::END_START_REPEAT) {
+                conflict = true;   // repeats belong to the bar; leave such bars as they are
+                break;
+            }
+            if (t == BarLineType::NORMAL) {
+                plain.push_back(bl);
+            } else if (!found) {
+                special = t;
+                found = true;
+            } else if (t != special) {
+                conflict = true;
+            }
+        }
+        if (!found || conflict || plain.empty()) {
+            continue;
+        }
+        for (BarLine* bl : plain) {
+            ++count;
+            if (apply) {
+                master->undoChangeBarLineType(bl, special, false);
+            }
+        }
+    }
+    return count;
+}
