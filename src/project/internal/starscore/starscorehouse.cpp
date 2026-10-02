@@ -267,11 +267,15 @@ void clearComposerCredit(Score* score)
         }
     }
     // A credit pushed down earlier (against a label that sat lower then, or with a different gap) stays too low
-    // unless it can come back up. Placed by the style, it starts from its home position (last line on the
-    // subtitle's baseline) and is pushed down from there, so the gap below the label is always the same. A credit
-    // placed by hand in this score keeps its place unless something collides with it.
+    // unless it can come back up. It starts from its home position (last line on the subtitle's baseline) and is
+    // pushed down from there, so the gap below the label is the same on every horn sheet. On a sheet without an
+    // arrangement label, a credit placed in the score itself (not by the style) keeps its place unless something
+    // collides with it.
+    const bool hasLabel = std::any_of(others.begin(), others.end(), [](const Text* t) {
+        return t->textStyleType() == TextStyleType::INSTRUMENT_EXCERPT;
+    });
     double up = 0.0;
-    if (comp->propertyFlags(Pid::OFFSET) != PropertyFlags::UNSTYLED) {
+    if (hasLabel || comp->propertyFlags(Pid::OFFSET) != PropertyFlags::UNSTYLED) {
         const Text* sub = nullptr;
         for (const Text* t : others) {
             if (t->textStyleType() == TextStyleType::SUBTITLE) {
