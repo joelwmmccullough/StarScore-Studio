@@ -255,6 +255,14 @@ void clearComposerCredit(Score* score)
         return;
     }
     const double gap = 0.5 * score->style().spatium();
+    // below the arrangement label a little more: about half a line of the credit (Joel's choice, Balkan Wedding)
+    double labelGap = 1.5 * score->style().spatium();
+    {
+        const TextBase::LayoutData* ld = comp->ldata();
+        if (ld && ld->blocks.size() >= 2) {
+            labelGap = std::max(gap, 0.55 * (ld->blocks.at(1).y() - ld->blocks.at(0).y()));
+        }
+    }
     const RectF c = comp->pageBoundingRect();
     // Each blocker the credit overlaps pushes it below that blocker; repeat, since moving down can meet another
     double down = 0.0;
@@ -264,7 +272,9 @@ void clearComposerCredit(Score* score)
             if (!other->ldata()) {
                 continue;
             }
-            const RectF o = other->pageBoundingRect().adjusted(-gap, -gap, gap, gap);
+            const bool isLabel = other->textStyleType() == TextStyleType::INSTRUMENT_EXCERPT;
+            const double g = isLabel ? labelGap : gap;
+            const RectF o = other->pageBoundingRect().adjusted(-gap, -gap, gap, g);
             if (c.translated(0.0, down).intersects(o) && o.bottom() - c.top() > down) {
                 down = o.bottom() - c.top();
                 moved = true;
