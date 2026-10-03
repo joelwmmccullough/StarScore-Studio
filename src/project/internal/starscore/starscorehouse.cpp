@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
 
 #include <QRegularExpression>
 
@@ -285,11 +286,29 @@ void clearComposerCredit(Score* score)
         return t->textStyleType() == TextStyleType::INSTRUMENT_EXCERPT;
     });
     double up = 0.0;
+    // how far the credit is above its house position: its last line on the subtitle's baseline
+    auto aboveSubtitle = [&]() -> std::optional<double> {
+        const Text* sub = nullptr;
+        for (const Text* t : others) {
+            if (t->textStyleType() == TextStyleType::SUBTITLE) {
+                sub = t;
+                break;
+            }
+        }
+        const TextBase::LayoutData* cl = comp->ldata();
+        const TextBase::LayoutData* sl = sub ? sub->ldata() : nullptr;
+        if (!cl || !sl || cl->blocks.empty() || sl->blocks.empty()) {
+            return std::nullopt;
+        }
+        return (comp->pagePos().y() + cl->blocks.back().y()) - (sub->pagePos().y() + sl->blocks.back().y());
+    };
     if (partName && partName->ldata()) {
-        // A part score: the credit's first line starts level with the instrument name on the left (never higher),
-        // then moves down below whatever it would run into. Placed the same way every time, whether the credit
-        // is placed by the style or in the part score itself, so every sheet comes out alike.
-        up = comp->pageBoundingRect().top() - partName->pageBoundingRect().top();
+        // A part score: the credit's last line on the subtitle's baseline, but its first line never higher than
+        // the instrument name on the left (a long credit moves down); then below whatever it would run into.
+        // Placed the same way every time, whether by the style or in the part score itself.
+        const double belowName = comp->pageBoundingRect().top() - partName->pageBoundingRect().top();
+        const std::optional<double> sub = aboveSubtitle();
+        up = sub ? std::min(*sub, belowName) : belowName;
     } else if (hasLabel || comp->propertyFlags(Pid::OFFSET) != PropertyFlags::UNSTYLED) {
         const Text* sub = nullptr;
         for (const Text* t : others) {
