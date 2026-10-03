@@ -72,6 +72,36 @@ static void starscoreSet(Score* score, Sid id, const PropertyValue& value)
     }
 }
 
+//! The title frame is measured in page view, as it prints. The main score is shown in continuous view, where the
+//! frame's texts aren't where they print: Apply Styles measured Bumper Cars' credit 17 mm off and moved it into the
+//! music of every Score PDF. Lays the score out in page view for as long as this lives, then goes back.
+class PageViewLayout
+{
+public:
+    explicit PageViewLayout(Score* score)
+        : m_score(score), m_mode(score ? score->layoutMode() : LayoutMode::PAGE)
+    {
+        if (m_score && m_mode != LayoutMode::PAGE) {
+            m_score->setLayoutMode(LayoutMode::PAGE);
+            m_score->setLayoutAll();
+            m_score->doLayout();
+        }
+    }
+
+    ~PageViewLayout()
+    {
+        if (m_score && m_mode != LayoutMode::PAGE) {
+            m_score->setLayoutMode(m_mode);
+            m_score->setLayoutAll();
+            m_score->doLayout();
+        }
+    }
+
+private:
+    Score* m_score = nullptr;
+    LayoutMode m_mode = LayoutMode::PAGE;
+};
+
 void applyVersionFooter(Score* score, const QString& version)
 {
     if (!score || version.isEmpty()) {
@@ -177,6 +207,7 @@ void applyHouseStyle(Score* score, bool partBook, const QString& version)
     // The composer text's last line sits on the subtitle's baseline (it hung a little below it). Measured after
     // layout and corrected through the style's composer offset, so it fits this score's frame and staff size;
     // applying the style again changes nothing once they line up.
+    const PageViewLayout pageView(score);
     score->setLayoutAll();
     score->doLayout();
     const Text* sub = nullptr;
@@ -225,6 +256,7 @@ void clearComposerCredit(Score* score)
     if (!score) {
         return;
     }
+    const PageViewLayout pageView(score);
     MeasureBase* frame = nullptr;
     for (MeasureBase* mb = score->first(); mb && !mb->isMeasure(); mb = mb->next()) {
         if (mb->isVBox()) {
@@ -309,20 +341,15 @@ void clearComposerCredit(Score* score)
         const double belowName = comp->pageBoundingRect().top() - partName->pageBoundingRect().top();
         const std::optional<double> sub = aboveSubtitle();
         up = sub ? std::min(*sub, belowName) : belowName;
-    } else if (hasLabel || comp->propertyFlags(Pid::OFFSET) != PropertyFlags::UNSTYLED) {
-        const Text* sub = nullptr;
-        for (const Text* t : others) {
-            if (t->textStyleType() == TextStyleType::SUBTITLE) {
-                sub = t;
-                break;
-            }
-        }
-        const TextBase::LayoutData* cl = comp->ldata();
-        const TextBase::LayoutData* sl = sub ? sub->ldata() : nullptr;
-        if (cl && sl && !cl->blocks.empty() && !sl->blocks.empty()) {
-            const double compBase = comp->pagePos().y() + cl->blocks.back().y();
-            const double subBase = sub->pagePos().y() + sl->blocks.back().y();
-            up = std::max(0.0, compBase - subBase);
+    } else if (const std::optional<double> sub = aboveSubtitle()) {
+        if (comp->propertyFlags(Pid::OFFSET) != PropertyFlags::UNSTYLED) {
+            // Placed by the style (a Score): back to its house position, up or down (a credit moved too far down
+            // by an earlier version comes back up), but its first line no higher than the top of the frame
+            const double belowTop = comp->pageBoundingRect().top() - frame->pageBoundingRect().top();
+            up = std::min(*sub, std::max(0.0, belowTop));
+        } else if (hasLabel) {
+            // placed by hand on a sheet with a label: only ever up to its house position
+            up = std::max(0.0, *sub);
         }
     }
     const RectF c = comp->pageBoundingRect().translated(0.0, -up);

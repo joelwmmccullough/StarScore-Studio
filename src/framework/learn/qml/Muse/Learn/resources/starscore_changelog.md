@@ -4,6 +4,13 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.15.8
+
+- **Score PDFs: composer credit back in the title frame.** Every Score.pdf printed the credit about 17 mm too low, beside the first system (Bumper Cars, Bet, Another One, Top Hat, Always There). Apply Styles measured the main score in continuous view, where the title frame's texts aren't where they print, and moved its credit down; Score PDFs are printed from the main score. The credit is now measured in page view, and each Score PDF puts it back at its usual place (last line on the subtitle's baseline) when it is printed. The next Apply Styles also fixes the main score itself.
+- **The part score a song reopens on** gets its composer credit placed too (until now only part scores you switched to were checked).
+- **Song folder colour:** an empty chair in a Flexible folder (the 3-Horn Flexible's optional flute) no longer holds the song's colour back either, as it already didn't for the folder's own colour.
+- **The old "NH Any Horns" folder is removed once it is empty** (its sheets are archived to Version History, as in 1.15.7). A folder with anything else left in it stays as it is.
+
 ## 1.15.7
 
 - **Composer credit placed the same way on every sheet.** Its last line sits on the subtitle's baseline, but its first line is never higher than the instrument name on the left (a long credit moves down), and it moves below the arrangement label if there is one. Balkan Wedding's Bass Sax (credit over the label) and Bass Clarinet (too low) come out like the other horn sheets, and the Lead Sheet and rhythm sheets no longer have the credit above the instrument name. Fixed when a part score is opened or exported. An arrangement label moved to the right by hand is recognised too.

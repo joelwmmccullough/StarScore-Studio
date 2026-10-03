@@ -123,6 +123,12 @@ SongColours songColours(const Paths& paths, const QString& songRoot, const QJson
         QStringList why = strings(t.value("missing"));
         for (const QString& p : strings(t.value("paths"))) {
             const int s = check.status(p);
+            // as for the folder colour: an empty chair in a Flexible folder (the 3-Horn's optional flute) doesn't
+            // hold the song back
+            const QString folderOfSheet = p.section('/', 0, -2);
+            if (s == 0 && (folderOfSheet.contains("Flexible") || folderOfSheet.contains("Any Horns"))) {
+                continue;
+            }
             if (s < need) {
                 why << (s < 0 ? (check.exists(p) ? QString("%1: not exported from StarScore as it is now").arg(p)
                                  : QString("%1: missing").arg(p))

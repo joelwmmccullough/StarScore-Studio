@@ -131,6 +131,19 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         }
         globalContext()->setCurrentNotation(master->notation());
         autotestLog(QString("  viewed %1 part scores").arg(master->excerpts().size()));
+    } else if (step == "viewtabs") {
+        // as the app does it: only switching tabs, the service's own reaction places the credit
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            if (INotationPtr n = e->notation()) {
+                master->setExcerptIsOpen(n, true);
+                globalContext()->setCurrentNotation(n);
+                for (int i = 0; i < 5; ++i) {
+                    QCoreApplication::processEvents();
+                }
+            }
+        }
+        globalContext()->setCurrentNotation(master->notation());
+        autotestLog(QString("  switched to %1 part scores").arg(master->excerpts().size()));
     } else if (step == "bassversions") {
         static const QStringList VERSIONS { "baritone-saxophone", "bass-saxophone", "bassoon", "bb-bass-clarinet",
                                             "contrabass-clarinet", "contrabassoon", "tuba" };

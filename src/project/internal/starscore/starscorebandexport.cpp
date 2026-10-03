@@ -1491,6 +1491,14 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                     }
                 }
             }
+            // The composer credit at its house position (last line on the subtitle's baseline), measured in page
+            // view: the main score's style can carry a credit moved too far (1.15.7's Apply Styles measured it in
+            // continuous view and printed Bumper Cars' credit in the music)
+            p->masterNotation()->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Composer credit"));
+            cs->setLayoutAll();
+            cs->doLayout();
+            starscore::clearComposerCredit(cs);
+            p->masterNotation()->notation()->undoStack()->commitChanges();
             ret = writePdf(p->masterNotation()->notation(), tmpPdf);
         }
 
@@ -1580,6 +1588,8 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                 for (const QString& fileName : oldDir.entryList({ "*.pdf", "*.PDF" }, QDir::Files)) {
                     supersede(oldFolder + "/" + fileName);
                 }
+                // the old folder goes once nothing is left in it (anything else in it keeps it, untouched)
+                QDir(songDir).rmdir(oldFolder);
             }
             const QDir dir(songDir + "/" + folder);
             for (const QString& fileName : dir.entryList({ plan.val.code + " - Horn *.pdf" }, QDir::Files)) {

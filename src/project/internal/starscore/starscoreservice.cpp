@@ -98,6 +98,8 @@ void StarScoreService::init()
         QTimer::singleShot(1000, [this]() { pickReferenceForCurrentScore(); });
         QTimer::singleShot(2500, [this]() { pickReferenceForCurrentScore(); });
         QTimer::singleShot(5000, [this]() { pickReferenceForCurrentScore(); });
+        // the part score the file reopens on: its composer credit placed once everything has loaded
+        QTimer::singleShot(1500, [this]() { clearComposerInCurrentScore(); });
     });
     dockWindowProvider()->windowChanged().onNotify(this, [this]() {
         listenReferencePanel();
