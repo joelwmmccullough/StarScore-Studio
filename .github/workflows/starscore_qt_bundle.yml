@@ -1,9 +1,11 @@
 name: 'StarScore Studio: Qt bundle for local Linux builds'
 
-# Run by hand. Packs the Linux Qt that the StarScore builds use and publishes it as a release asset, so StarScore can be
+# Runs when a tag starting with qt-bundle is pushed. Packs the Linux Qt that the StarScore builds use and publishes it as a release asset, so StarScore can be
 # built in a workspace that can't reach Qt's own download site.
 
 on:
+  push:
+    tags: [ 'qt-bundle*' ]
   workflow_dispatch:
 
 permissions:
