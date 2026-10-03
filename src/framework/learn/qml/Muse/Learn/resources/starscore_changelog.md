@@ -7,6 +7,7 @@ Version numbers: the first number changes when files stop being compatible, the 
 ## 1.15.8
 
 - **Score PDFs: composer credit back in the title frame.** Every Score.pdf printed the credit about 17 mm too low, beside the first system (Bumper Cars, Bet, Another One, Top Hat, Always There). Apply Styles measured the main score in continuous view, where the title frame's texts aren't where they print, and moved its credit down; Score PDFs are printed from the main score. The credit is now measured in page view, and each Score PDF puts it back at its usual place (last line on the subtitle's baseline) when it is printed. The next Apply Styles also fixes the main score itself.
+- **Lead Sheet and rhythm sheets: credit placed at export too.** Only horn sheets had their composer credit placed when exported; the Lead Sheet and rhythm sheets kept whatever position they had unless you had opened that part score in 1.15.7, so a long credit (Balkan Wedding) still printed above the instrument name. Every part score is now placed at export.
 - **The part score a song reopens on** gets its composer credit placed too (until now only part scores you switched to were checked).
 - **Song folder colour:** an empty chair in a Flexible folder (the 3-Horn Flexible's optional flute) no longer holds the song's colour back either, as it already didn't for the folder's own colour.
 - **The old "NH Any Horns" folder is removed once it is empty** (its sheets are archived to Version History, as in 1.15.7). A folder with anything else left in it stays as it is.

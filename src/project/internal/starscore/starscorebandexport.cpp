@@ -1436,9 +1436,12 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
             // yet gets it now, kept in the file. Nothing is changed and undone again around the printing: an edit
             // undone after a layout could leave stray bars in the score (Balkan Wedding gained two empty bars).
             engraving::Score* bs = bookNotation ? bookNotation->elements()->msScore() : nullptr;
-            if (bs && (!file.sheetLeft.isEmpty() || !file.sheetRight.isEmpty())) {
+            // Lead and rhythm sheets have no sheet title to add, but their credit is placed the same way (Balkan
+            // Wedding's long credit printed above the instrument name on the Lead Sheet and every rhythm sheet)
+            if (bs) {
+                const bool titled = !file.sheetLeft.isEmpty() || !file.sheetRight.isEmpty();
                 bookNotation->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
-                if (starscoreNeedsRetitle(bs, file.sheetLeft, file.sheetRight)) {
+                if (titled && starscoreNeedsRetitle(bs, file.sheetLeft, file.sheetRight)) {
                     starscoreRetitleSheet(bs, file.sheetLeft, file.sheetRight, true);
                 } else {
                     // titled already, but not necessarily laid out since (a new Bass Trombone version printed with
