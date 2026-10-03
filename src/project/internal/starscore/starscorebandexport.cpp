@@ -60,6 +60,7 @@
 #include "organizer/orgplatform.h"
 
 #include "io/filestream.h"
+#include "notation/internal/excerptnotation.h"
 #include "global/serialization/zipreader.h"
 #include "translation.h"
 #include "log.h"
@@ -1123,6 +1124,35 @@ static bool starscoreSameMscz(const QString& freshPath, const QString& existingP
     return true;
 }
 
+//! The part score MuseScore would make for one part (not made yet). Found by its part, not its name: the list is
+//! kept from before a part is renamed, so a part renamed for printing keeps its old name there (the "Any Horns"
+//! sheets, "Horn 1 - Trumpet in Bb", were never found and only Score.pdf was written).
+static mu::notation::IExcerptNotationPtr starscorePotentialBook(const mu::notation::IMasterNotationPtr& master,
+                                                                const mu::engraving::Part* part)
+{
+    if (!master || !part) {
+        return nullptr;
+    }
+    for (const mu::notation::IExcerptNotationPtr& e : master->potentialExcerpts()) {
+        auto impl = std::dynamic_pointer_cast<mu::notation::ExcerptNotation>(e);
+        const mu::engraving::Excerpt* ex = impl ? impl->excerpt() : nullptr;
+        if (!ex) {
+            continue;
+        }
+        for (const mu::engraving::Part* p : ex->parts()) {
+            if (p == part || p->id() == part->id()) {
+                return e;
+            }
+        }
+    }
+    for (const mu::notation::IExcerptNotationPtr& e : master->potentialExcerpts()) {
+        if (e->name() == part->partName().toQString()) {
+            return e;
+        }
+    }
+    return nullptr;
+}
+
 Ret StarScoreService::writePdf(const INotationPtr& notation, const QString& path) const
 {
     INotationWriterPtr writer = writers()->writer("pdf");
@@ -1310,16 +1340,11 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         vm->parts()->setInstrumentName(InstrumentKey { part->instrumentId(), part->id(), engraving::Fraction(0, 1) }, file.header);
         part->setPartName(String::fromQString(file.header));
 
-        IExcerptNotationPtr book;
-        for (const IExcerptNotationPtr& e : vm->potentialExcerpts()) {
-            if (e->name() == file.header) {
-                book = e;
-                break;
-            }
-        }
+        IExcerptNotationPtr book = starscorePotentialBook(vm, part);
         if (!book) {
             return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "couldn't make the part"));
         }
+        book->setName(file.header);
         vm->initExcerpts({ book });
         INotationPtr n = book->notation();
         if (!n) {
@@ -2267,17 +2292,12 @@ void StarScoreService::songbookRenderSheets(const QString& songPath, std::vector
         const QString bookName = "StarScore songbook " + QUuid::createUuid().toString(QUuid::Id128);
         vm->parts()->setInstrumentName(InstrumentKey { part->instrumentId(), part->id(), engraving::Fraction(0, 1) }, bookName);
         part->setPartName(String::fromQString(bookName));
-        IExcerptNotationPtr book;
-        for (const IExcerptNotationPtr& e : vm->potentialExcerpts()) {
-            if (e->name() == bookName) {
-                book = e;
-                break;
-            }
-        }
+        IExcerptNotationPtr book = starscorePotentialBook(vm, part);
         if (!book) {
             sheet.error = muse::qtrc("starscore", "couldn't make the part");
             continue;
         }
+        book->setName(bookName);
         vm->initExcerpts({ book });
         INotationPtr n = book->notation();
         if (!n) {
