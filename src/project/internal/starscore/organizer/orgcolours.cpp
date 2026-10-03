@@ -173,9 +173,16 @@ SongColours songColours(const Paths& paths, const QString& songRoot, const QJson
         int least = 4;
         int counted = 0;
         const QStringList files = QDir(abs).entryList({ "*.pdf", "*.PDF" }, QDir::Files, QDir::Name);
+        // In a Flexible ("Any Horns") folder, a chair's sheet with nothing in it (the 3-Horn's optional flute) doesn't
+        // hold the folder back
+        const bool flexible = folder.contains("Flexible") || folder.contains("Any Horns");
         for (const QString& f : files) {
             if (!f.startsWith('.') && !percussion.match(f).hasMatch()) {
-                least = std::min(least, check.status(folder + "/" + f));
+                const int st = check.status(folder + "/" + f);
+                if (flexible && st == 0) {
+                    continue;
+                }
+                least = std::min(least, st);
                 ++counted;
             }
         }

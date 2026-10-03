@@ -235,7 +235,9 @@ void clearComposerCredit(Score* score)
         return;
     }
     const Text* comp = nullptr;
+    const Text* partName = nullptr;    // the instrument name top left ("Bass Saxophone", "Lead Sheet")
     std::vector<const Text*> others;   // title, subtitle, arrangement label(s)
+    const double frameMid = frame->pageBoundingRect().center().x();
     for (EngravingItem* e : frame->el()) {
         if (!e || !e->isText() || toText(e)->empty()) {
             continue;
@@ -246,9 +248,17 @@ void clearComposerCredit(Score* score)
             if (!comp) {
                 comp = t;
             }
-        } else if (type == TextStyleType::TITLE || type == TextStyleType::SUBTITLE
-                   || (type == TextStyleType::INSTRUMENT_EXCERPT && t->position() == AlignH::RIGHT)) {
+        } else if (type == TextStyleType::TITLE || type == TextStyleType::SUBTITLE) {
             others.push_back(t);
+        } else if (type == TextStyleType::INSTRUMENT_EXCERPT) {
+            // the arrangement label is the one on the right, whether aligned right or moved there by hand
+            const bool right = t->position() == AlignH::RIGHT
+                               || (t->ldata() && t->pageBoundingRect().center().x() > frameMid);
+            if (right) {
+                others.push_back(t);
+            } else if (!partName) {
+                partName = t;
+            }
         }
     }
     if (!comp || !comp->ldata()) {
@@ -275,7 +285,12 @@ void clearComposerCredit(Score* score)
         return t->textStyleType() == TextStyleType::INSTRUMENT_EXCERPT;
     });
     double up = 0.0;
-    if (hasLabel || comp->propertyFlags(Pid::OFFSET) != PropertyFlags::UNSTYLED) {
+    if (partName && partName->ldata()) {
+        // A part score: the credit's first line starts level with the instrument name on the left (never higher),
+        // then moves down below whatever it would run into. Placed the same way every time, whether the credit
+        // is placed by the style or in the part score itself, so every sheet comes out alike.
+        up = comp->pageBoundingRect().top() - partName->pageBoundingRect().top();
+    } else if (hasLabel || comp->propertyFlags(Pid::OFFSET) != PropertyFlags::UNSTYLED) {
         const Text* sub = nullptr;
         for (const Text* t : others) {
             if (t->textStyleType() == TextStyleType::SUBTITLE) {

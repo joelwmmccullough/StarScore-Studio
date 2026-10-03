@@ -49,7 +49,7 @@ bool expandHornFolder(const QString& folder, int& n, QStringList& instruments, b
     }
     n = m.captured(1).toInt();
     const QString rest = m.captured(2);
-    if (rest.startsWith("Any")) {
+    if (rest.startsWith("Any") || rest.startsWith("Flexible")) {
         generic = true;
         return true;
     }

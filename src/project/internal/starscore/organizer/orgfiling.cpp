@@ -199,7 +199,7 @@ struct BandFiler {
             tail.remove(QRegularExpression("^[\\s_\\-:]+"));
             if (tail.isEmpty() || QStringList { "horns", "score", "full score" }.contains(tail.trimmed().toLower())) {
                 const QString f = existingHornFolder(song, n, QString());
-                return place(rel, song, f.isEmpty() ? QString("%1H Any Horns").arg(n) : f, code + " - Score.pdf");
+                return place(rel, song, f.isEmpty() ? QString("%1H Flexible").arg(n) : f, code + " - Score.pdf");
             }
             static const QRegularExpression chair("Horn[_ ](\\d)[_ ](?:in|for)[_ ](.+)$", QRegularExpression::CaseInsensitiveOption);
             const QRegularExpressionMatch g = chair.match(tail);
@@ -208,7 +208,7 @@ struct BandFiler {
                 const QString lab = key.toLower().endsWith("clef") ? QString("Horn %1 (%2)").arg(g.captured(1), key)
                                     : QString("Horn %1 in %2").arg(g.captured(1), key);
                 const QString f = existingHornFolder(song, n, QString());
-                return place(rel, song, f.isEmpty() ? QString("%1H Any Horns").arg(n) : f, code + " - " + lab + ".pdf");
+                return place(rel, song, f.isEmpty() ? QString("%1H Flexible").arg(n) : f, code + " - " + lab + ".pdf");
             }
             QString inst = canonInstrument(tail);
             if (inst.isEmpty()) {
@@ -254,7 +254,7 @@ struct BandFiler {
             const bool numbered = inst != instrumentBase(inst);
             QStringList fits;
             for (const QString& d : QDir(abs(song)).entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
-                if (!QRegularExpression("^\\dH ").match(d).hasMatch() || d.contains("Any")) {
+                if (!QRegularExpression("^\\dH ").match(d).hasMatch() || d.contains("Any") || d.contains("Flexible")) {
                     continue;
                 }
                 const QStringList toks = d.split(' ').mid(1);

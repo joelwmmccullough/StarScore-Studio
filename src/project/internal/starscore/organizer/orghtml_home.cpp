@@ -196,7 +196,7 @@ QString bandGuideHtml(const Library& lib, const QDate& today)
               : QString("None are written yet."));
     foot("Reading the horn folder names");
 
-    b += "<h1>&ldquo;Any Horns&rdquo; arrangements</h1><p style=\"margin-top:10px;\">Folders like <b>3H Any Horns</b> are not written "
+    b += "<h1>Flexible arrangements</h1><p style=\"margin-top:10px;\">Folders like <b>3H Flexible</b> are not written "
          "for named instruments &mdash; they are written for <b>chairs</b>. Find the chair your instrument covers below, then open that "
          "horn number for your instrument (<span class=\"mono\">Horn 2 - Alto Sax</span>) or, on older tunes, in your transposition "
          "(<b>in B&#9837;</b>, <b>in E&#9837;</b>, <b>in C</b>, <b>bass clef</b> or <b>alto clef</b>).</p>";
@@ -221,7 +221,7 @@ QString bandGuideHtml(const Library& lib, const QDate& today)
     b += "<div class=\"note\">Horn 1 is the top line. The two ranges cover the same music: the wider <b>pro range</b> is what the part "
          "actually asks for, the <b>amateur range</b> is the narrower span you can get away with when the extremes are out of reach. "
          "Pick the chair that suits the player, not just the instrument &mdash; an alto can sit in chair 1 or chair 2 of the 3-horn.</div>";
-    foot("&ldquo;Any Horns&rdquo; arrangements");
+    foot("Flexible arrangements");
 
     b += "<h1>Song index</h1><div class=\"sub\">Every file inside a song folder starts with that song&rsquo;s four-letter code, so "
          "<span class=\"mono\">AMPL - Trumpet.pdf</span> is the trumpet part for Amplitudes.</div>"
@@ -824,7 +824,7 @@ QString progressHtml(const Library& lib, const PlayCounts& plays, const QDate& t
     b += QString("<h1>The checklist</h1><div class=\"sub\">Every outstanding task, highest priority first. Within each band, tunes are "
                  "ordered by how often Starsign plays them &mdash; plays in %1 plus %2, from setlist.fm. The figures on the right are "
                  "<b>%1 / %2</b>.</div>").arg(y - 1).arg(y);
-    b += "<div class=\"note\">Tunes with a <b>3H Any Horns</b> chart rather than a dedicated Tpt/Alt/Ten one count as done here &mdash; "
+    b += "<div class=\"note\">Tunes with a <b>3H Flexible</b> chart rather than a dedicated Tpt/Alt/Ten one count as done here &mdash; "
          "those cover the same three chairs, so rewriting them for named horns is optional polish, not a gap.</div>";
     for (const auto& tier : TIERS) {
         std::vector<const Task*> items;

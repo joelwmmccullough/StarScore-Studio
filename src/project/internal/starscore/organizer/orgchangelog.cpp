@@ -117,7 +117,7 @@ int addChangelogEntries(QJsonObject& changelog, const SongInfo& song, const Rost
             const bool lead = c.relativePath.startsWith("1 Lead Sheet/");
             // Any Horns: every version of a chair says the same thing; one line per chair
             const QRegularExpressionMatch chair = QRegularExpression("^Horn (\\d+)").match(c.part);
-            if (c.relativePath.section('/', 0, 0).contains("Any Horns") && chair.hasMatch()) {
+            if ((c.relativePath.section('/', 0, 0).contains("Any Horns") || c.relativePath.section('/', 0, 0).contains("Flexible")) && chair.hasMatch()) {
                 const QString key = c.relativePath.section('/', 0, 0) + "|" + chair.captured(1);
                 for (const QString& p : who) {
                     auto& g = chairGroups[{ p, key }];

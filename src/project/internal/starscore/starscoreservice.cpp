@@ -3955,17 +3955,16 @@ void StarScoreService::clearComposerInCurrentScore()
     if (!score || load().sections.empty()) {
         return;
     }
-    // only part scores with an arrangement label (horn sheets)
-    bool hasLabel = false;
+    // part scores with a sheet title (instrument name top left; horn sheets also an arrangement label)
+    bool hasTitle = false;
     for (engraving::MeasureBase* mb = score->first(); mb && !mb->isMeasure(); mb = mb->next()) {
         for (engraving::EngravingItem* e : mb->el()) {
-            if (e && e->isText() && engraving::toText(e)->textStyleType() == engraving::TextStyleType::INSTRUMENT_EXCERPT
-                && engraving::toText(e)->position() == engraving::AlignH::RIGHT) {
-                hasLabel = true;
+            if (e && e->isText() && engraving::toText(e)->textStyleType() == engraving::TextStyleType::INSTRUMENT_EXCERPT) {
+                hasTitle = true;
             }
         }
     }
-    if (!hasLabel) {
+    if (!hasTitle) {
         return;
     }
     score->doLayout();

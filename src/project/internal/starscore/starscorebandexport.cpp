@@ -7,7 +7,7 @@
  *   <N> <Song>/1 Lead Sheet/CODE - Lead Sheet.pdf
  *   <N> <Song>/1 Rhythm/CODE - Bass.pdf, Drums, Guitar, Keys, Congas, ...
  *   <N> <Song>/3H Tpt Alt Ten/CODE - Score.pdf, CODE - Trumpet.pdf, CODE - Alto Sax.pdf, ...
- *   <N> <Song>/3H Any Horns/CODE - Score.pdf, CODE - Horn 1 in C.pdf, ...
+ *   <N> <Song>/3H Flexible/CODE - Score.pdf, CODE - Horn 1 - Trumpet in Bb.pdf, ... (were "3H Any Horns")
  *   <N> <Song>/Big Band, Full Orchestra, Marching Band, Extras
  *
  * A file that would be replaced is first moved to "<Song>/Version History/Superseded <date>/".
@@ -605,7 +605,7 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
                 continue;
             }
             const int horns = int(chairs.size());
-            const QString folder = QString("%1H Any Horns").arg(horns);
+            const QString folder = QString("%1H Flexible").arg(horns);
             const QString arr = QString("%1-Horn Arr: ").arg(horns);
 
             QStringList scoreParts;
@@ -1440,10 +1440,10 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                 bookNotation->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
                 if (starscoreNeedsRetitle(bs, file.sheetLeft, file.sheetRight)) {
                     starscoreRetitleSheet(bs, file.sheetLeft, file.sheetRight, true);
-                } else if (!file.sheetRight.isEmpty()) {
+                } else {
                     // titled already, but not necessarily laid out since (a new Bass Trombone version printed with
                     // the composer credit over its label): the label on the instrument name's line, the credit
-                    // below it. Both change nothing when they are already in place.
+                    // level with the instrument name or below the label. Both change nothing when already in place.
                     bs->doLayout();
                     starscore::levelArrangementLabel(bs);
                     starscore::clearComposerCredit(bs);
@@ -1573,6 +1573,14 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
             }
         }
         for (const QString& folder : plan.val.anyHornFolders) {
+            // the folder's old name ("3H Any Horns", before 1.15.7): its sheets are archived once the new one is there
+            const QString oldFolder = QString(folder).replace("Flexible", "Any Horns");
+            const QDir oldDir(songDir + "/" + oldFolder);
+            if (oldFolder != folder && oldDir.exists()) {
+                for (const QString& fileName : oldDir.entryList({ "*.pdf", "*.PDF" }, QDir::Files)) {
+                    supersede(oldFolder + "/" + fileName);
+                }
+            }
             const QDir dir(songDir + "/" + folder);
             for (const QString& fileName : dir.entryList({ plan.val.code + " - Horn *.pdf" }, QDir::Files)) {
                 const QString rel = folder + "/" + fileName;
