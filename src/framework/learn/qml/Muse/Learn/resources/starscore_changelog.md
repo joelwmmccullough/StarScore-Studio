@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.15.7
+
+- **"Visible on chord chart"** for staff and system text: a tick box in the text's properties, ticked by default. Untick it to leave that text off the song's chord charts (made from the lead sheet), such as a note to yourself about notation. Saved with the song; undoable.
+
 ## 1.15.6
 
 - **Stray bars after an export.** Exporting printed each part score with its sheet title added and then undid it; undoing an edit after the part was laid out could leave bars behind in the score (Balkan Wedding gained an empty bar and a broken multimeasure-rest bar before bar 32 during the 4.0.1 export). The export no longer changes and undoes anything around the printing: a part score that doesn't show its sheet title yet gets it for good.

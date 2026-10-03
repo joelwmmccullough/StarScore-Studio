@@ -66,6 +66,9 @@ class TextSettingsModel : public AbstractInspectorModel
     Q_PROPERTY(
         bool isSpecialCharactersInsertionAvailable READ isSpecialCharactersInsertionAvailable NOTIFY isSpecialCharactersInsertionAvailableChanged)
     Q_PROPERTY(bool isDynamicSpecificSettings READ isDynamicSpecificSettings NOTIFY isDynamicSpecificSettingsChanged)
+    // StarScore: staff and system text can be left off the song's chord chart
+    Q_PROPERTY(bool isChordChartToggleAvailable READ isChordChartToggleAvailable NOTIFY chordChartChanged)
+    Q_PROPERTY(bool chordChartVisible READ chordChartVisible NOTIFY chordChartChanged)
     Q_PROPERTY(bool isHorizontalAlignmentAvailable READ isHorizontalAlignmentAvailable NOTIFY isHorizontalAlignmentAvailableChanged)
     Q_PROPERTY(bool isSymbolSizeAvailable READ isSymbolSizeAvailable NOTIFY isSymbolSizeAvailableChanged)
     Q_PROPERTY(bool isScriptSizeAvailable READ isScriptSizeAvailable NOTIFY isScriptSizeAvailableChanged)
@@ -87,6 +90,10 @@ public:
 
     void createProperties() override;
     void requestElements() override;
+
+    bool isChordChartToggleAvailable() const;
+    bool chordChartVisible() const;
+    Q_INVOKABLE void setChordChartVisible(bool visible);
     void loadProperties() override;
     void resetProperties() override;
 
@@ -148,6 +155,7 @@ public slots:
     void setRightPositionText(QString rightPositionText);
 
 signals:
+    void chordChartChanged();
     void textStylesChanged();
 
     void areTextPropertiesAvailableChanged(bool areTextPropertiesAvailable);
@@ -224,5 +232,9 @@ private:
     QString m_leftPositionText;
     QString m_centerPositionText;
     QString m_rightPositionText;
+
+    void updateChordChart();
+    bool m_chordChartAvailable = false;
+    bool m_chordChartVisible = true;
 };
 }

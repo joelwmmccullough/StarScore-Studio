@@ -239,4 +239,23 @@ Column {
             root.model.showStaffTextProperties()
         }
     }
+
+    // StarScore: whether this text appears on the song's chord charts (made from the lead sheet)
+    CheckBox {
+        id: chordChartCheckBox
+
+        width: parent.width
+        text: qsTrc("inspector", "Visible on chord chart")
+
+        visible: root.model ? root.model.isChordChartToggleAvailable : false
+        checked: root.model ? root.model.chordChartVisible : true
+
+        navigation.name: "VisibleOnChordChart"
+        navigation.panel: root.navigationPanel
+        navigation.row: textPlacementSection.navigationRowEnd + 2
+
+        onClicked: {
+            root.model.setChordChartVisible(!checked)
+        }
+    }
 }

@@ -29,6 +29,11 @@
 #include "engraving/dom/dynamic.h"
 #include "engraving/dom/textbase.h"
 #include "engraving/types/typesconv.h"
+#include "engraving/dom/masterscore.h"
+#include "engraving/editing/editscoreproperties.h"
+
+#include <QJsonArray>
+#include <QJsonDocument>
 
 #include "translation.h"
 #include "log.h"
@@ -149,6 +154,109 @@ void TextSettingsModel::loadProperties()
     };
 
     loadProperties(textPropertyIdSet);
+    updateChordChart();
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+//  StarScore: "Visible on chord chart". The chord charts made from a song's lead sheet show its staff and system
+//  text; unticking leaves a text off. Kept in the score's "starscoreChordChartHidden" meta tag as a list of the texts'
+//  element ids (the score's own, not a part score's), so it saves with the song and can be undone.
+// ---------------------------------------------------------------------------------------------------------------
+
+static const String CHORD_CHART_HIDDEN_TAG(u"starscoreChordChartHidden");
+
+static QStringList chordChartHidden(const MasterScore* ms)
+{
+    QStringList ids;
+    if (!ms) {
+        return ids;
+    }
+    const QJsonArray arr = QJsonDocument::fromJson(ms->metaTag(CHORD_CHART_HIDDEN_TAG).toQString().toUtf8()).array();
+    for (const QJsonValue& v : arr) {
+        ids << v.toString();
+    }
+    return ids;
+}
+
+static QString chordChartId(EngravingItem* item)
+{
+    MasterScore* ms = item ? item->masterScore() : nullptr;
+    if (!ms) {
+        return QString();
+    }
+    EngravingItem* main = item->score() == ms ? item : item->findLinkedInScore(ms);
+    if (!main) {
+        main = item;
+    }
+    EID id = main->eid();
+    if (!id.isValid()) {
+        id = main->assignNewEID();
+    }
+    return QString::fromStdString(id.toStdString());
+}
+
+void TextSettingsModel::updateChordChart()
+{
+    bool available = !m_elementList.isEmpty();
+    bool visible = true;
+    QStringList hidden;
+    for (EngravingItem* item : m_elementList) {
+        if (!item || !(item->isStaffText() || item->isSystemText())) {
+            available = false;
+            break;
+        }
+    }
+    if (available) {
+        hidden = chordChartHidden(m_elementList.first()->masterScore());
+        visible = false;
+        for (EngravingItem* item : m_elementList) {
+            if (!hidden.contains(chordChartId(item))) {
+                visible = true;
+                break;
+            }
+        }
+    }
+    if (available != m_chordChartAvailable || visible != m_chordChartVisible) {
+        m_chordChartAvailable = available;
+        m_chordChartVisible = visible;
+        emit chordChartChanged();
+    }
+}
+
+bool TextSettingsModel::isChordChartToggleAvailable() const
+{
+    return m_chordChartAvailable;
+}
+
+bool TextSettingsModel::chordChartVisible() const
+{
+    return m_chordChartVisible;
+}
+
+void TextSettingsModel::setChordChartVisible(bool visible)
+{
+    if (!m_chordChartAvailable || m_elementList.isEmpty()) {
+        return;
+    }
+    MasterScore* ms = m_elementList.first()->masterScore();
+    QStringList hidden = chordChartHidden(ms);
+    for (EngravingItem* item : m_elementList) {
+        const QString id = chordChartId(item);
+        if (id.isEmpty()) {
+            continue;
+        }
+        if (visible) {
+            hidden.removeAll(id);
+        } else if (!hidden.contains(id)) {
+            hidden << id;
+        }
+    }
+    const QString json = QString::fromUtf8(QJsonDocument(QJsonArray::fromStringList(hidden)).toJson(QJsonDocument::Compact));
+    beginCommand(muse::TranslatableString("inspector", "Chord chart visibility"));
+    ms->undo(new ChangeMetaText(ms, CHORD_CHART_HIDDEN_TAG, String::fromQString(json)));
+    endCommand();
+    updateNotation();
+    updateChordChart();
 }
 
 void TextSettingsModel::loadProperties(const PropertyIdSet& propertyIdSet)
