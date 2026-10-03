@@ -1,0 +1,155 @@
+run 9 commit e769b2cd6cc0ad81f8e465dd2230610609d07a8f
+2339:FAILED: [code=1] src/project/CMakeFiles/project.dir/Unity/unity_2_cxx.cxx.o 
+2343:/home/runner/work/StarScore-Studio/StarScore-Studio/src/notation/internal/excerptnotation.h:25:10: fatal error: iexcerptnotation.h: No such file or directory
+
+---- tail ----
+[1283/2942] Running rcc pass 2 for resource fonts_FinaleMaestro
+[1284/2942] Running rcc pass 2 for resource fonts_FinaleBroadway
+[1285/2942] Building CXX object src/framework/ui/qml/Muse/Ui/CMakeFiles/muse_ui_qml.dir/.qt/rcc/qrc_qmake_Muse_Ui.cpp.o
+[1286/2942] Building CXX object src/framework/ui/qml/Muse/Ui/CMakeFiles/muse_ui_qml.dir/Unity/unity_0_cxx.cxx.o
+[1287/2942] Building CXX object src/framework/ui/qml/Muse/Ui/CMakeFiles/muse_ui_qml.dir/.qt/rcc/qrc_muse_ui_qml_raw_qml_0.cpp.o
+[1288/2942] Running rcc pass 2 for resource fonts_Tabulature
+[1289/2942] Running moc --collect-json for target engraving
+[1290/2942] Automatic MOC and UIC for target muse_audio_common
+[1291/2942] Building CXX object src/framework/ui/qml/Muse/Ui/CMakeFiles/muse_ui_qml.dir/Unity/unity_1_cxx.cxx.o
+[1292/2942] Linking CXX static library src/framework/diagnostics/libmuse_diagnostics.a
+[1293/2942] Linking CXX static library src/framework/cloud/libmuse_cloud.a
+[1294/2942] Linking CXX static library src/framework/ui/qml/Muse/Ui/libmuse_ui_qml.a
+[1295/2942] Linking CXX static library src/framework/mpe/libmuse_mpe.a
+[1296/2942] Linking CXX static library src/framework/shortcuts/libmuse_shortcuts.a
+[1297/2942] Linking CXX static library src/framework/tours/libmuse_tours.a
+[1298/2942] Linking CXX static library src/framework/learn/libmuse_learn.a
+[1299/2942] Linking CXX static library src/inspector/libinspector.a
+[1300/2942] Linking CXX static library src/framework/extensions/libmuse_extensions.a
+[1301/2942] Linking CXX static library src/musesounds/libmusesounds.a
+[1302/2942] Running rcc pass 2 for resource fonts_FreeSerif
+[1303/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/Unity/unity_29_cxx.cxx.o
+[1304/2942] Linking CXX static library src/playback/libplayback.a
+[1305/2942] Linking CXX static library src/preferences/libpreferences.a
+[1306/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/Unity/unity_26_cxx.cxx.o
+[1307/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/Unity/unity_27_cxx.cxx.o
+[1308/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/Unity/unity_25_cxx.cxx.o
+[1309/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/Unity/unity_28_cxx.cxx.o
+[1310/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/Unity/unity_23_cxx.cxx.o
+In file included from src/engraving/CMakeFiles/engraving.dir/Unity/unity_23_cxx.cxx:10:
+/home/runner/work/StarScore-Studio/StarScore-Studio/src/engraving/rendering/score/harmonylayout.cpp: In static member function ‘static void mu::engraving::rendering::score::HarmonyLayout::renderActionSet(mu::engraving::Harmony*, mu::engraving::Harmony::LayoutData*, const RenderActionSetPtr&, mu::engraving::rendering::score::HarmonyLayout::HarmonyRenderCtx&, const mu::engraving::rendering::score::LayoutContext&)’:
+/home/runner/work/StarScore-Studio/StarScore-Studio/src/engraving/rendering/score/harmonylayout.cpp:953:58: warning: unused parameter ‘ctx’ [-Wunused-parameter]
+  953 |                                     const LayoutContext& ctx)
+      |                                     ~~~~~~~~~~~~~~~~~~~~~^~~
+[1311/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/Unity/unity_24_cxx.cxx.o
+[1312/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/Unity/unity_22_cxx.cxx.o
+[1313/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/Unity/unity_21_cxx.cxx.o
+[1314/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/Unity/unity_19_cxx.cxx.o
+[1315/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/Unity/unity_20_cxx.cxx.o
+[1316/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/Unity/unity_18_cxx.cxx.o
+[1317/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/Unity/unity_17_cxx.cxx.o
+[1318/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/Unity/unity_15_cxx.cxx.o
+In file included from src/engraving/CMakeFiles/engraving.dir/Unity/unity_15_cxx.cxx:19:
+/home/runner/work/StarScore-Studio/StarScore-Studio/src/engraving/editing/edit.cpp: In member function ‘void mu::engraving::Score::deleteItem(mu::engraving::EngravingItem*)’:
+/home/runner/work/StarScore-Studio/StarScore-Studio/src/engraving/editing/edit.cpp:3354:9: warning: this statement may fall through [-Wimplicit-fallthrough=]
+ 3354 |         }
+      |         ^
+/home/runner/work/StarScore-Studio/StarScore-Studio/src/engraving/editing/edit.cpp:3357:5: note: here
+ 3357 |     default:
+      |     ^~~~~~~
+[1319/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/Unity/unity_16_cxx.cxx.o
+[1320/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/Unity/unity_14_cxx.cxx.o
+[1321/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/Unity/unity_13_cxx.cxx.o
+[1322/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/Unity/unity_12_cxx.cxx.o
+[1323/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/Unity/unity_11_cxx.cxx.o
+[1324/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/Unity/unity_10_cxx.cxx.o
+[1325/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/Unity/unity_8_cxx.cxx.o
+[1326/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/Unity/unity_9_cxx.cxx.o
+[1327/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/Unity/unity_7_cxx.cxx.o
+[1328/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/Unity/unity_6_cxx.cxx.o
+[1329/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/Unity/unity_5_cxx.cxx.o
+[1330/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/Unity/unity_3_cxx.cxx.o
+[1331/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/Unity/unity_4_cxx.cxx.o
+[1332/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/Unity/unity_1_cxx.cxx.o
+[1333/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/Unity/unity_2_cxx.cxx.o
+[1334/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/qrc_fonts_Smufl.cpp.o
+[1335/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/qrc_engraving.cpp.o
+[1336/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/infrastructure/mscwriter.cpp.o
+[1337/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/infrastructure/mscreader.cpp.o
+[1338/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/dom/excerpt.cpp.o
+[1339/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/dom/instrument.cpp.o
+[1340/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/dom/score.cpp.o
+[1341/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/dom/part.cpp.o
+[1342/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/rw/read206/read206.cpp.o
+[1343/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/editing/transpose.cpp.o
+[1344/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/Unity/unity_0_cxx.cxx.o
+[1345/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/rw/read400/tread.cpp.o
+[1346/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/rw/read400/readcontext.cpp.o
+[1347/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/rw/read400/connectorinforeader.cpp.o
+[1348/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/rw/read410/staffread.cpp.o
+[1349/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/rw/read410/readcontext.cpp.o
+[1350/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/rw/read410/measureread.cpp.o
+[1351/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/rw/read410/tread.cpp.o
+[1352/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/rw/read460/staffread.cpp.o
+[1353/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/rw/read410/connectorinforeader.cpp.o
+[1354/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/rw/read460/measureread.cpp.o
+[1355/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/rw/read460/readcontext.cpp.o
+[1356/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/rw/read460/connectorinforeader.cpp.o
+[1357/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/style/style.cpp.o
+[1358/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/rw/read460/tread.cpp.o
+[1359/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/api/v1/qmlpluginapi.cpp.o
+[1360/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/api/v1/engravingapiv1.cpp.o
+[1361/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/api/v1/enums.cpp.o
+[1362/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/api/v1/scoreelement.cpp.o
+[1363/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/api/v1/elements.cpp.o
+[1364/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/api/v1/apistructs.cpp.o
+[1365/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/api/v1/style.cpp.o
+[1366/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/api/v1/score.cpp.o
+[1367/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/api/v1/excerpt.cpp.o
+[1368/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/api/v1/cursor.cpp.o
+[1369/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/api/v1/instrument.cpp.o
+[1370/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/api/v1/playevent.cpp.o
+[1371/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/api/v1/part.cpp.o
+[1372/2942] Running AUTOMOC file extraction for target muse_audio_common
+[1373/2942] Running moc --collect-json for target muse_audio_common
+[1374/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/api/v1/selection.cpp.o
+[1375/2942] Building CXX object src/engraving/CMakeFiles/engraving.dir/api/v1/util.cpp.o
+[1376/2942] Building CXX object src/framework/audio/common/CMakeFiles/muse_audio_common.dir/Unity/unity_0_cxx.cxx.o
+[1377/2942] Automatic MOC and UIC for target muse_midiremote
+[1378/2942] Automatic MOC and UIC for target muse_multiwindows
+[1379/2942] Automatic MOC and UIC for target muse_workspace
+[1380/2942] Linking CXX static library src/engraving/libengraving.a
+[1381/2942] Automatic MOC and UIC for target braille
+[1382/2942] Running AUTOMOC file extraction for target braille
+[1383/2942] Running moc --collect-json for target braille
+[1384/2942] Automatic MOC and UIC for target notation
+[1385/2942] Automatic MOC and UIC for target muse_vst
+[1386/2942] Running AUTOMOC file extraction for target notation
+[1387/2942] Automatic MOC and UIC for target muse_autobot
+[1388/2942] Running moc --collect-json for target notation
+[1389/2942] Automatic MOC and UIC for target instrumentsscene
+[1390/2942] Building CXX object src/braille/CMakeFiles/braille.dir/Unity/unity_0_cxx.cxx.o
+[1391/2942] Building CXX object src/notation/CMakeFiles/notation.dir/Unity/unity_2_cxx.cxx.o
+[1392/2942] Building CXX object src/notation/CMakeFiles/notation.dir/Unity/unity_1_cxx.cxx.o
+[1393/2942] Linking CXX static library src/braille/libbraille.a
+[1394/2942] Running AUTOMOC file extraction for target instrumentsscene
+[1395/2942] Running moc --collect-json for target instrumentsscene
+[1396/2942] Building CXX object src/instrumentsscene/CMakeFiles/instrumentsscene.dir/Unity/unity_0_cxx.cxx.o
+[1397/2942] Building CXX object src/notation/CMakeFiles/notation.dir/Unity/unity_0_cxx.cxx.o
+[1398/2942] Linking CXX static library src/instrumentsscene/libinstrumentsscene.a
+[1399/2942] Linking CXX static library src/notation/libnotation.a
+[1400/2942] Automatic MOC and UIC for target appshell
+[1401/2942] Automatic MOC and UIC for target project
+[1402/2942] Running AUTOMOC file extraction for target project
+[1403/2942] Running rcc for resource project_starscore_resources
+[1404/2942] Running moc --collect-json for target project
+[1405/2942] Building CXX object src/project/CMakeFiles/project.dir/Unity/unity_2_cxx.cxx.o
+FAILED: [code=1] src/project/CMakeFiles/project.dir/Unity/unity_2_cxx.cxx.o 
+/usr/bin/ccache /usr/bin/g++-10 -DKORS_LOGGER_QT_SUPPORT -DKORS_PROFILER_ENABLED -DNDEBUG -DQT_CONCURRENT_LIB -DQT_CORE_LIB -DQT_GUI_LIB -DQT_NETWORK_LIB -DQT_NO_DEBUG -DQT_OPENGL_LIB -DQT_QMLINTEGRATION_LIB -DQT_QML_LIB -DQT_QUICK_LIB -DQT_WIDGETS_LIB -DSTARSCORE_VERSION_STR=\"1.15.6\" -I/home/runner/work/StarScore-Studio/StarScore-Studio/build.release/src/project -I/home/runner/work/StarScore-Studio/StarScore-Studio/src/project -I/home/runner/work/StarScore-Studio/StarScore-Studio/build.release -I/home/runner/work/StarScore-Studio/StarScore-Studio/src -I/home/runner/work/StarScore-Studio/StarScore-Studio -I/home/runner/work/StarScore-Studio/StarScore-Studio/framework -I/home/runner/work/StarScore-Studio/StarScore-Studio/framework/global -I/home/runner/work/StarScore-Studio/StarScore-Studio/framework/testing/thirdparty/googletest/googletest/include -I/home/runner/work/StarScore-Studio/StarScore-Studio/src/framework -I/home/runner/work/StarScore-Studio/StarScore-Studio/src/framework/global -I/home/runner/work/StarScore-Studio/StarScore-Studio/src/framework/testing/thirdparty/googletest/googletest/include -isystem /home/runner/work/StarScore-Studio/StarScore-Studio/build.release/src/project/project_autogen/include -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtCore -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/mkspecs/linux-g++ -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtGui -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtQuick -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtQml -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtQmlIntegration -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtNetwork -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtOpenGL -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtWidgets -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtConcurrent -O3 -DNDEBUG -std=gnu++17 -Wall -Wextra -fPIC -Winvalid-pch -include /home/runner/work/StarScore-Studio/StarScore-Studio/build.release/src/framework/pch/CMakeFiles/muse_pch.dir/cmake_pch.hxx -MD -MT src/project/CMakeFiles/project.dir/Unity/unity_2_cxx.cxx.o -MF src/project/CMakeFiles/project.dir/Unity/unity_2_cxx.cxx.o.d -o src/project/CMakeFiles/project.dir/Unity/unity_2_cxx.cxx.o -c /home/runner/work/StarScore-Studio/StarScore-Studio/build.release/src/project/CMakeFiles/project.dir/Unity/unity_2_cxx.cxx
+In file included from /home/runner/work/StarScore-Studio/StarScore-Studio/src/project/internal/starscore/starscorebandexport.cpp:63,
+                 from /home/runner/work/StarScore-Studio/StarScore-Studio/build.release/src/project/CMakeFiles/project.dir/Unity/unity_2_cxx.cxx:7:
+/home/runner/work/StarScore-Studio/StarScore-Studio/src/notation/internal/excerptnotation.h:25:10: fatal error: iexcerptnotation.h: No such file or directory
+   25 | #include "iexcerptnotation.h"
+      |          ^~~~~~~~~~~~~~~~~~~~
+compilation terminated.
+[1406/2942] Automatic MOC and UIC for target muse_uicomponents_qml
+[1407/2942] Automatic MOC and UIC for target palette
+[1408/2942] Automatic MOC and UIC for target notationscene
+ninja: build stopped: subcommand failed.
+Build failed
+Build failed
