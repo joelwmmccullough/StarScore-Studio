@@ -1369,7 +1369,14 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         if (!file.sheetLeft.isEmpty() || !file.sheetRight.isEmpty()) {
             // open while printing: the label is levelled and the composer credit moved at print time
             n->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
-            starscoreRetitleSheet(n->elements()->msScore(), file.sheetLeft, file.sheetRight);
+            // laid out, label levelled and composer credit placed below it now (a copy of the song, so nothing is kept)
+            engraving::Score* vsScore = n->elements()->msScore();
+            starscoreRetitleSheet(vsScore, file.sheetLeft, file.sheetRight, true);
+            // as for the horn part scores: laid out, label on the instrument name's line, credit below the label
+            vsScore->setLayoutAll();
+            vsScore->doLayout();
+            starscore::levelArrangementLabel(vsScore);
+            starscore::clearComposerCredit(vsScore);
             const Ret written = writePdf(n, pdfPath);
             n->undoStack()->commitChanges();
             return written;
