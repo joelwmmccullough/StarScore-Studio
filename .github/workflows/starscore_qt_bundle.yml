@@ -1,0 +1,37 @@
+name: 'StarScore Studio: Qt bundle for local Linux builds'
+
+# Run by hand. Packs the Linux Qt that the StarScore builds use and publishes it as a release asset, so StarScore can be
+# built in a workspace that can't reach Qt's own download site.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  qt_bundle:
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: 6.10.2
+        host: linux
+        target: 'desktop'
+        arch: linux_gcc_64
+        modules: 'qt5compat qtnetworkauth qtshadertools qtwebsockets'
+        cache: true
+
+    - name: Pack and publish
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        QTROOT=$(dirname "$QT_ROOT_DIR")
+        echo "Qt at $QT_ROOT_DIR"
+        tar -C "$(dirname "$QTROOT")" -cf - "$(basename "$QTROOT")" | zstd -19 -T0 -o qt-6.10.2-linux.tar.zst
+        ls -la qt-6.10.2-linux.tar.zst
+        echo "$QT_ROOT_DIR" > qt-root.txt
+        gh release delete qt-6.10.2-linux --repo "${{ github.repository }}" --yes || true
+        gh release create qt-6.10.2-linux qt-6.10.2-linux.tar.zst qt-root.txt --repo "${{ github.repository }}" \
+          --title "Qt 6.10.2 for local Linux builds" --notes "Qt used by the StarScore Linux build, packed for local builds" --prerelease
