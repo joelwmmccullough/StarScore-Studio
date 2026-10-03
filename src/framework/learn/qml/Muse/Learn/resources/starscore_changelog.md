@@ -4,6 +4,11 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.15.9
+
+- **Re-exports no longer archive sheets that didn't change.** A sheet whose pages look exactly the same is left alone, as intended. Since 1.15.6 nearly every re-export archived and rewrote every sheet: two exports of the same pages store their fonts in a different order, and a position can differ by a ten-thousandth of a unit, so the files never matched byte for byte. The pages are now compared by what they draw. (Balkan Wedding's Version History gained 120 copies on 3 Oct this way; they are kept.)
+- **Balkan Wedding's Bass Sax credit 2.5 pt lower than the other horn sheets.** When the title frame had to grow to fit the credit, the credit (aligned to the bottom of the frame) moved down with it. It is now placed again once the frame has grown.
+
 ## 1.15.8
 
 - **Score PDFs: composer credit back in the title frame.** Every Score.pdf printed the credit about 17 mm too low, beside the first system (Bumper Cars, Bet, Another One, Top Hat, Always There). Apply Styles measured the main score in continuous view, where the title frame's texts aren't where they print, and moved its credit down; Score PDFs are printed from the main score. The credit is now measured in page view, and each Score PDF puts it back at its usual place (last line on the subtitle's baseline) when it is printed. The next Apply Styles also fixes the main score itself.

@@ -251,7 +251,14 @@ void applyHouseStyle(Score* score, bool partBook, const QString& version)
 //! sits on the subtitle's baseline, or into the arrangement label at the top right of a horn sheet ("7-Horn
 //! Arrangement", level with the instrument name). It moves down until it clears them by half a staff space, and
 //! the title frame grows if the credit would otherwise run into the music.
+static void placeComposerCredit(Score* score, bool again);
+
 void clearComposerCredit(Score* score)
+{
+    placeComposerCredit(score, false);
+}
+
+static void placeComposerCredit(Score* score, bool again)
 {
     if (!score) {
         return;
@@ -396,16 +403,23 @@ void clearComposerCredit(Score* score)
         starscoreSet(score, Sid::composerOffset, PointF(off.x(), off.y() + (inSpatium ? down / score->style().spatium() : down / DPMM)));
     }
     // the frame grows by what now hangs below it
+    bool grew = false;
     if (frame->isVBox()) {
         const double frameBottom = frame->pageBoundingRect().bottom();
         const double overhang = bottomAfter - frameBottom;
         if (overhang > 0.0) {
             const double height = frame->getProperty(Pid::BOX_HEIGHT).value<Spatium>().val();
             frame->undoChangeProperty(Pid::BOX_HEIGHT, Spatium(height + overhang / score->style().spatium() + 0.5));
+            grew = true;
         }
     }
     score->setLayoutAll();
     score->doLayout();
+    // A credit aligned to the bottom of the frame moves down with it when the frame grows (Balkan Wedding's Bass Sax
+    // printed 2.5 pt lower than the other horn sheets): placed once more in the grown frame
+    if (grew && !again) {
+        placeComposerCredit(score, true);
+    }
 }
 
 //! The arrangement label (right-positioned instrument-name text) on the instrument name's line: its top level with the

@@ -1073,8 +1073,132 @@ static QByteArray starscorePdfWithoutStamps(const QByteArray& pdf)
     return s.toLatin1();
 }
 
+//! What a PDF draws, page by page, for comparing two exports of the same sheet: each page's drawing instructions
+//! (unpacked), with the font's name in place of Qt's numbered font resource ("/F11"), and every number rounded to
+//! a hundredth of a unit. Two exports of an unchanged sheet differ in ways that don't show: the fonts are stored
+//! in another order with other subset prefixes, and a position can come out a ten-thousandth of a unit off
+//! (Bumper Cars' sheets in 1.15.8). Empty when the file can't be read this way.
+static QStringList starscorePdfDrawing(const QByteArray& pdf)
+{
+    const QString s = QString::fromLatin1(pdf);
+    // every object: its number, its dictionary, and where its stream starts
+    static const QRegularExpression object("(\\d+)\\s+0\\s+obj\\b");
+    std::map<int, qsizetype> objectAt;
+    for (auto it = object.globalMatch(s); it.hasNext();) {
+        const QRegularExpressionMatch m = it.next();
+        objectAt[m.captured(1).toInt()] = m.capturedEnd();
+    }
+    auto dictOf = [&](int number) -> QString {
+        auto at = objectAt.find(number);
+        if (at == objectAt.end()) {
+            return QString();
+        }
+        const qsizetype end = s.indexOf("endobj", at->second);
+        const qsizetype streamAt = s.indexOf("stream", at->second);
+        const qsizetype stop = streamAt >= 0 && (end < 0 || streamAt < end) ? streamAt : end;
+        return stop < 0 ? QString() : s.mid(at->second, stop - at->second);
+    };
+    auto streamOf = [&](int number) -> QByteArray {
+        auto at = objectAt.find(number);
+        if (at == objectAt.end()) {
+            return QByteArray();
+        }
+        const qsizetype end = s.indexOf("endobj", at->second);
+        qsizetype from = s.indexOf("stream", at->second);
+        if (from < 0 || (end >= 0 && from > end)) {
+            return QByteArray();
+        }
+        from += 6;
+        if (s.mid(from, 2) == "\r\n") {
+            from += 2;
+        } else if (s.mid(from, 1) == "\n") {
+            from += 1;
+        }
+        const qsizetype to = s.indexOf("endstream", from);
+        if (to < 0) {
+            return QByteArray();
+        }
+        QByteArray data = pdf.mid(from, to - from);
+        while (data.endsWith('\n') || data.endsWith('\r')) {
+            data.chop(1);
+        }
+        if (dictOf(number).contains("/FlateDecode")) {
+            // qUncompress wants the unpacked size up front; a generous guess is enough
+            QByteArray sized(4, '\0');
+            const quint32 guess = quint32(std::min<qint64>(qint64(data.size()) * 40 + 4096, 64 * 1024 * 1024));
+            sized[0] = char((guess >> 24) & 0xff);
+            sized[1] = char((guess >> 16) & 0xff);
+            sized[2] = char((guess >> 8) & 0xff);
+            sized[3] = char(guess & 0xff);
+            data = qUncompress(sized + data);
+        }
+        return data;
+    };
+
+    // the fonts: resource name -> font name without its subset prefix ("QBBAAA+PetalumaText" -> "PetalumaText")
+    std::map<QString, QString> fontName;
+    static const QRegularExpression fontRef("/(F\\d+)\\s+(\\d+)\\s+0\\s+R");
+    static const QRegularExpression baseFont("/BaseFont\\s*/(?:[A-Z]{6}\\+)?([^\\s/<>\\[\\]()]+)");
+    for (auto it = fontRef.globalMatch(s); it.hasNext();) {
+        const QRegularExpressionMatch m = it.next();
+        const QRegularExpressionMatch b = baseFont.match(dictOf(m.captured(2).toInt()));
+        if (b.hasMatch()) {
+            fontName[m.captured(1)] = b.captured(1);
+        }
+    }
+
+    // the pages in the order they are stored, each with its drawing instructions
+    static const QRegularExpression page("/Type\\s*/Page\\b(?!s)");
+    static const QRegularExpression contents("/Contents\\s*(\\[[^\\]]*\\]|\\d+\\s+0\\s+R)");
+    static const QRegularExpression ref("(\\d+)\\s+0\\s+R");
+    static const QRegularExpression fontUse("/(F\\d+)(?=[\\s/\\[<(])");
+    static const QRegularExpression number("-?\\d*\\.\\d+|-?\\d+(?=[\\s\\]\\[/<>()]|$)");
+    QStringList pages;
+    for (const auto& [n, at] : objectAt) {
+        Q_UNUSED(at);
+        const QString dict = dictOf(n);
+        if (!page.match(dict).hasMatch()) {
+            continue;
+        }
+        const QRegularExpressionMatch c = contents.match(dict);
+        if (!c.hasMatch()) {
+            return QStringList();
+        }
+        QString drawing;
+        for (auto it = ref.globalMatch(c.captured(1)); it.hasNext();) {
+            const QByteArray data = streamOf(it.next().captured(1).toInt());
+            if (data.isEmpty()) {
+                return QStringList();
+            }
+            drawing += QString::fromLatin1(data);
+        }
+        QString out;
+        qsizetype last = 0;
+        // fonts by name, numbers rounded
+        QString named;
+        for (auto it = fontUse.globalMatch(drawing); it.hasNext();) {
+            const QRegularExpressionMatch m = it.next();
+            named += drawing.mid(last, m.capturedStart() - last);
+            auto f = fontName.find(m.captured(1));
+            named += "/" + (f != fontName.end() ? f->second : m.captured(1));
+            last = m.capturedEnd();
+        }
+        named += drawing.mid(last);
+        last = 0;
+        for (auto it = number.globalMatch(named); it.hasNext();) {
+            const QRegularExpressionMatch m = it.next();
+            out += named.mid(last, m.capturedStart() - last);
+            out += QString::number(std::round(m.captured(0).toDouble() * 100.0) / 100.0, 'f', 2);
+            last = m.capturedEnd();
+        }
+        out += named.mid(last);
+        pages << out;
+    }
+    return pages;
+}
+
 //! True when a freshly exported PDF shows exactly what the existing file shows: the same bytes apart
-//! from the export date and the random document id
+//! from the export date and the random document id, or else the same drawing on every page
 static bool starscoreSamePdf(const QString& freshPath, const QString& existingPath)
 {
     QFile a(freshPath), b(existingPath);
@@ -1082,11 +1206,15 @@ static bool starscoreSamePdf(const QString& freshPath, const QString& existingPa
         return false;
     }
     // (sizes can differ by the creator text alone: a sheet made by a newer StarScore)
-    if (qAbs(a.size() - b.size()) > 512) {
+    if (qAbs(a.size() - b.size()) > std::max<qint64>(4096, std::max(a.size(), b.size()) / 50)) {
         return false;
     }
     const QByteArray x = a.readAll(), y = b.readAll();
-    return x == y || starscorePdfWithoutStamps(x) == starscorePdfWithoutStamps(y);
+    if (x == y || starscorePdfWithoutStamps(x) == starscorePdfWithoutStamps(y)) {
+        return true;
+    }
+    const QStringList drawn = starscorePdfDrawing(x);
+    return !drawn.isEmpty() && drawn == starscorePdfDrawing(y);
 }
 
 //! True when two .mscz files hold the same files with the same contents (the zip's own dates are ignored)
