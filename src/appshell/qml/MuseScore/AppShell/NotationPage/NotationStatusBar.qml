@@ -56,11 +56,11 @@ Item {
     RowLayout {
         id: statusBarRow
 
-        //! TODO: hiding of controls is disabled because there is a bug
-        // Determination of the size of the window content works incorrectly
+        //! StarScore: measured from the status bar's own width (the window's width was unreliable), so a narrow
+        //! window moves the workspace and concert pitch controls into the menu at the right
         readonly property int eps: 100
-        //property int remainingSpace: Window.window ? Window.window.width - (viewModeControl.width + zoomControl.width + eps) : 0
-        property int remainingSpace: 999999
+        property int remainingSpace: root.width - (viewModeControl.width + zoomControl.width + onlineSoundsStatusView.width + eps
+                                                   + (playbackLoadingInfo.visible ? playbackLoadingInfo.width : 0))
 
         anchors.left: parent.left
         anchors.leftMargin: 12

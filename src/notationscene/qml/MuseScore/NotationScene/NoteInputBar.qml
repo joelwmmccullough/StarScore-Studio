@@ -38,8 +38,14 @@ Item {
     property int maximumWidth: 0
     property int maximumHeight: 0
 
-    width: gridView.isHorizontal ? childrenRect.width : 76
-    height: !gridView.isHorizontal ? childrenRect.height : 40
+    //! StarScore: in a window too narrow for the whole bar, the buttons wrap onto more lines instead of being cut off.
+    //! The bar then asks for little width, so the window can keep getting narrower.
+    readonly property int gripAllowance: 28
+    readonly property bool wrapping: gridView.isHorizontal && !root.floating && root.maximumWidth > 0
+                                     && root.maximumWidth < root.gripAllowance + gridView.singleLineWidth + gridView.cellWidth + 12
+
+    width: gridView.isHorizontal ? (root.wrapping ? gridView.cellWidth * 4 + 12 : childrenRect.width) : 76
+    height: !gridView.isHorizontal ? childrenRect.height : (root.wrapping ? Math.max(40, gridView.contentHeight + 4) : 40)
 
     property NavigationPanel navigationPanel: NavigationPanel {
         name: "NoteInputBar"
@@ -57,6 +63,10 @@ Item {
         function resolveHorizontalGridViewWidth() {
             if (root.floating) {
                 return gridView.contentWidth
+            }
+
+            if (root.wrapping) {
+                return gridView.wrapWidth
             }
 
             var requiredFreeSpace = gridView.cellWidth * 3 + gridView.rowSpacing * 4
@@ -87,6 +97,8 @@ Item {
         id: gridView
 
         sectionRole: "section"
+
+        wrapWidth: root.wrapping ? Math.max(gridView.cellWidth * 3, root.maximumWidth - root.gripAllowance - gridView.cellWidth - 12) : 0
 
         rowSpacing: 4
         columnSpacing: 4
@@ -216,9 +228,9 @@ Item {
             PropertyChanges {
                 target: gridView
                 width: prv.resolveHorizontalGridViewWidth()
-                height: root.height
+                height: root.wrapping ? gridView.contentHeight : root.height
                 sectionWidth: 1
-                sectionHeight: root.height
+                sectionHeight: root.wrapping ? gridView.cellHeight : root.height
                 rows: 1
                 columns: gridView.noLimit
             }

@@ -41,8 +41,10 @@ ApplicationWindow {
     width: 1150
     height: 800
 
-    minimumWidth: 1050
-    minimumHeight: 500
+    // StarScore: small enough to share the screen side by side (half a laptop screen); the score page closes its
+    // side panels and condenses its toolbars to fit
+    minimumWidth: 500
+    minimumHeight: 420
 
     visible: false
 

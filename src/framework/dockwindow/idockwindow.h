@@ -27,6 +27,11 @@
 
 #include "async/channel.h"
 
+#include <QList>
+#include <QPair>
+#include <QRect>
+#include <QString>
+
 class QPoint;
 
 namespace muse::dock {
@@ -49,6 +54,11 @@ public:
     virtual QQuickItem& asItem() const = 0;
 
     virtual void restoreDefaultLayout() = 0;
+
+    //! StarScore: the open panels docked at the left or right of the current page, each with its frame's geometry
+    //! (panels shown as tabs together share one frame)
+    virtual QList<QPair<QString, QRect> > openSidePanels() const = 0;
+    virtual QString currentPageUri() const = 0;
 };
 }
 

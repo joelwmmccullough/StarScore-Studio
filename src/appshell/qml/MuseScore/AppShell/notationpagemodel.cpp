@@ -24,6 +24,13 @@
 #include "internal/applicationuiactions.h"
 #include "dockwindow/idockwindow.h"
 
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QQuickItem>
+#include <QSettings>
+#include <QTimer>
+
 #include "async/async.h"
 
 #include "log.h"
@@ -93,7 +100,117 @@ void NotationPageModel::init()
         scheduleUpdatePercussionPanelVisibility();
     });
 
+    // StarScore: a narrow window keeps the score, closing side panels (and reopening them when it widens again)
+    if (muse::dock::IDockWindow* window = dockWindowProvider()->window()) {
+        QObject::connect(&window->asItem(), &QQuickItem::widthChanged, this, [this]() {
+            scheduleFitPanelsToWidth();
+        });
+    }
+    scheduleFitPanelsToWidth();
+
     m_inited = true;
+}
+
+namespace {
+//! The score keeps at least this much width before a side panel column closes
+constexpr int STARSCORE_MIN_SCORE_WIDTH = 480;
+//! and a closed column comes back only with this much more room, so it doesn't flicker at the boundary
+constexpr int STARSCORE_PANEL_SLACK = 40;
+const char* STARSCORE_AUTO_CLOSED_KEY = "starscore/autoClosedPanels";
+
+//! The columns closed for lack of room, last closed last: [{ "names": [...], "width": n }]
+QJsonArray starscoreAutoClosed()
+{
+    return QJsonDocument::fromJson(QSettings().value(STARSCORE_AUTO_CLOSED_KEY).toByteArray()).array();
+}
+
+void starscoreSetAutoClosed(const QJsonArray& columns)
+{
+    QSettings().setValue(STARSCORE_AUTO_CLOSED_KEY, QJsonDocument(columns).toJson(QJsonDocument::Compact));
+}
+}
+
+void NotationPageModel::scheduleFitPanelsToWidth()
+{
+    if (m_fitPanelsScheduled) {
+        return;
+    }
+    m_fitPanelsScheduled = true;
+    QTimer::singleShot(0, this, [this]() {
+        m_fitPanelsScheduled = false;
+        fitPanelsToWidth();
+    });
+}
+
+void NotationPageModel::fitPanelsToWidth()
+{
+    muse::dock::IDockWindow* window = dockWindowProvider()->window();
+    if (!window) {
+        return;
+    }
+    const QList<QPair<QString, QRect> > open = window->openSidePanels();
+    // only on the score page
+    if (window->currentPageUri() != "musescore://notation") {
+        return;
+    }
+    const int windowWidth = int(window->asItem().width());
+    if (windowWidth <= 0) {
+        return;
+    }
+
+    // the side panel columns now open: panels shown as tabs together share one column (one frame)
+    struct Column {
+        QRect frame;
+        QStringList names;
+    };
+    std::vector<Column> columns;
+    int sideWidth = 0;
+    for (const auto& [name, frame] : open) {
+        auto it = std::find_if(columns.begin(), columns.end(), [&](const Column& c) { return c.frame == frame; });
+        if (it == columns.end()) {
+            columns.push_back({ frame, { name } });
+            sideWidth += frame.width();
+        } else {
+            it->names << name;
+        }
+    }
+
+    QJsonArray closed = starscoreAutoClosed();
+
+    if (!columns.empty() && windowWidth - sideWidth < STARSCORE_MIN_SCORE_WIDTH) {
+        // the right-most column closes first
+        const Column& col = *std::max_element(columns.begin(), columns.end(), [](const Column& a, const Column& b) {
+            return a.frame.x() < b.frame.x();
+        });
+        QJsonArray names;
+        for (const QString& name : col.names) {
+            names.append(name);
+        }
+        closed.append(QJsonObject { { "names", names }, { "width", col.frame.width() } });
+        starscoreSetAutoClosed(closed);
+        for (const QString& name : col.names) {
+            dispatcher()->dispatch("dock-set-open", muse::actions::ActionData::make_arg2<QString, bool>(name, false));
+        }
+        scheduleFitPanelsToWidth();   // still too narrow? the next one goes too
+        return;
+    }
+
+    if (!closed.isEmpty()) {
+        const QJsonObject last = closed.last().toObject();
+        if (windowWidth - sideWidth - last.value("width").toInt() >= STARSCORE_MIN_SCORE_WIDTH + STARSCORE_PANEL_SLACK) {
+            closed.removeLast();
+            starscoreSetAutoClosed(closed);
+            // in their order: each panel reopened as a tab goes after the ones already back
+            const QJsonArray names = last.value("names").toArray();
+            for (qsizetype i = 0; i < names.size(); ++i) {
+                const QString name = names.at(i).toString();
+                if (!window->isDockOpen(name)) {
+                    dispatcher()->dispatch("dock-set-open", muse::actions::ActionData::make_arg2<QString, bool>(name, true));
+                }
+            }
+            scheduleFitPanelsToWidth();   // room for another one?
+        }
+    }
 }
 
 QString NotationPageModel::notationToolBarName() const

@@ -4,6 +4,15 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.15.10
+
+- **The window can be much narrower** (down to 500 px wide, about half a laptop screen), for working next to another window such as YouTube. As the window gets narrower, the score page makes room in steps:
+  - The top toolbars condense: first the extensions and the Parts/Mixer buttons go, then the playback controls keep only their buttons (no time, bar/beat or tempo), and last the page tabs keep only Home and the current page.
+  - The note input buttons wrap onto a second and third line instead of being cut off.
+  - Side panels (Palettes, Layout, Properties, To-do and anything else docked at the side) close once the score would have less than 480 px, right-hand side first. They reopen, in the same order, when the window is wide enough again.
+  - The Arrangements and Sections chips wrap, so the bar's buttons stay in reach, and the status bar moves the workspace and concert pitch controls into its "···" menu.
+  Widening the window brings everything back.
+
 ## 1.15.9
 
 - **Re-exports no longer archive sheets that didn't change.** A sheet whose pages look exactly the same is left alone, as intended. Since 1.15.6 nearly every re-export archived and rewrote every sheet: two exports of the same pages store their fonts in a different order, and a position can differ by a ten-thousandth of a unit, so the files never matched byte for byte. The pages are now compared by what they draw. (Balkan Wedding's Version History gained 120 copies on 3 Oct this way; they are kept.)

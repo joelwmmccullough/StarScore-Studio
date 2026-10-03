@@ -129,9 +129,15 @@ DockPage {
             alignment: DockToolBarAlignment.Center
             contentBottomPadding: 2
 
+            // StarScore: hidden in a narrow window (second to go)
+            compactPriorityOrder: 1
+
             navigationSection: root.topToolbarKeyNavSec
 
             NotationToolBar {
+                visible: !notationToolBar.isCompact
+                maximumWidth: notationToolBar.isCompact ? 0 : -1
+
                 navigationPanel.section: notationToolBar.navigationSection
                 navigationPanel.order: 2
             }
@@ -156,11 +162,15 @@ DockPage {
 
             navigationSection: root.topToolbarKeyNavSec
 
+            // StarScore: in a narrow window only the play buttons stay (third to go)
+            compactPriorityOrder: 2
+
             PlaybackToolBar {
                 navigationPanelSection: playbackToolBar.navigationSection
                 navigationPanelOrder: 3
 
                 floating: playbackToolBar.floating
+                compact: playbackToolBar.isCompact
             }
         },
 
@@ -184,8 +194,14 @@ DockPage {
 
             navigationSection: root.topToolbarKeyNavSec
 
+            // StarScore: hidden in a narrow window (first to go)
+            compactPriorityOrder: 0
+
             ExtensionsToolBar {
                 id: extToolBar
+
+                visible: !extDockToolBar.isCompact
+                maximumWidth: extDockToolBar.isCompact ? 0 : -1
 
                 navigationPanel.section: extDockToolBar.navigationSection
                 navigationPanel.order: 4
@@ -229,16 +245,23 @@ DockPage {
                 root.toolBarRightDropDestination
             ]
 
-            thickness: orientation === Qt.Horizontal ? 40 : 76
+            // StarScore: taller when its buttons wrap onto more lines in a narrow window
+            property int contentLinesHeight: 40
+            thickness: orientation === Qt.Horizontal ? Math.max(40, contentLinesHeight) : 76
             resizable: !floating
 
             navigationSection: root.noteInputKeyNavSec
 
             NoteInputBar {
+                id: noteInputContent
+
                 orientation: noteInputBar.orientation
                 floating: noteInputBar.floating
 
-                maximumWidth: noteInputBar.width
+                // the window's width, not only the bar's: the bar can't get narrower than its buttons until they wrap
+                maximumWidth: Window.width > 0 ? Math.min(noteInputBar.width, Window.width) : noteInputBar.width
+                onHeightChanged: noteInputBar.contentLinesHeight = height
+                Component.onCompleted: noteInputBar.contentLinesHeight = height
                 maximumHeight: noteInputBar.height
 
                 navigationPanel.section: noteInputBar.navigationSection

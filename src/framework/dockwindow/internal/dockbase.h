@@ -107,6 +107,7 @@ public:
     bool isCompact() const;
     int compactPriorityOrder() const;
     int nonCompactWidth() const;
+    void setNonCompactWidth(int width);
 
     bool floating() const;
 

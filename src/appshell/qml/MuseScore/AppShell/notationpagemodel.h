@@ -105,6 +105,11 @@ private:
     void scheduleUpdateExtensionsToolBarVisibility();
     void doUpdateExtensionsToolBarVisibility();
 
+    // StarScore: side panels close as the window gets too narrow for them and the score, and reopen as it widens
+    void scheduleFitPanelsToWidth();
+    void fitPanelsToWidth();
+    bool m_fitPanelsScheduled = false;
+
     bool m_inited = false;
     bool m_updateDrumsetPanelVisibilityScheduled = false;
     bool m_updatePercussionPanelVisibilityScheduled = false;

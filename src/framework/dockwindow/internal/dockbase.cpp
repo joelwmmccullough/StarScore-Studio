@@ -216,6 +216,11 @@ int DockBase::nonCompactWidth() const
     return m_nonCompactWidth;
 }
 
+void DockBase::setNonCompactWidth(int width)
+{
+    m_nonCompactWidth = width;
+}
+
 bool DockBase::floatable() const
 {
     return m_properties.floatable;
@@ -377,7 +382,7 @@ void DockBase::setIsCompact(bool compact)
         return;
     }
 
-    if (compact) {
+    if (compact && m_nonCompactWidth <= 0) {
         m_nonCompactWidth = width();
     }
 

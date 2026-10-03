@@ -41,7 +41,9 @@ DockToolBarView {
 
     readonly property bool isVertical: root.orientation === Qt.Vertical
 
-    minimumWidth: root.inited ? Math.min(root.contentWidth, root.maximumWidth) : prv.minimumLength
+    // (at least 1: a minimum of 0 counts as "not set" and kept the toolbar's previous minimum, so a toolbar emptied in a
+    // narrow window still held the window as wide as before)
+    minimumWidth: root.inited ? Math.max(1, Math.min(root.contentWidth, root.maximumWidth)) : prv.minimumLength
     minimumHeight: root.inited ? Math.min(root.contentHeight, root.maximumHeight) : prv.minimumLength
 
     onFloatingChanged: {

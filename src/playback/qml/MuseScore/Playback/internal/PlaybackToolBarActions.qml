@@ -39,12 +39,14 @@ Item {
     readonly property int navigationOrderEnd: tempoLoader.navigationOrderEnd
 
     property bool floating: false
+    property bool compact: false
 
     // Not `+ endSeparator.width`: this way, the separator itself is outside the view,
     // which means that it will be exactly at the position of the KDDockWidgets separator
     // between this toolbar and the undo/redo toolbar.
-    width: endSeparator.visible ? endSeparator.x
-                                : tempoLoader.x + tempoLoader.width
+    width: root.compact ? buttonsListView.width
+                        : endSeparator.visible ? endSeparator.x
+                                               : tempoLoader.x + tempoLoader.width
     height: 30
 
     ListView {
@@ -119,11 +121,13 @@ Item {
         anchors.bottomMargin: 2
 
         orientation: Qt.Vertical
-        visible: !root.floating
+        visible: !root.floating && !root.compact
     }
 
     TimeInputField {
         id: timeField
+
+        visible: !root.compact
 
         anchors.left: buttonsSeparator.right
         anchors.leftMargin: 12
@@ -149,6 +153,8 @@ Item {
 
     MeasureAndBeatFields {
         id: measureAndBeatFields
+
+        visible: !root.compact
 
         anchors.left: timeField.right
         anchors.leftMargin: 6
@@ -176,6 +182,8 @@ Item {
 
     Loader {
         id: tempoLoader
+
+        visible: !root.compact
 
         anchors.left: measureAndBeatFields.right
         anchors.leftMargin: 6
@@ -257,6 +265,6 @@ Item {
         anchors.bottomMargin: 2
 
         orientation: Qt.Vertical
-        visible: !root.floating
+        visible: !root.floating && !root.compact
     }
 }

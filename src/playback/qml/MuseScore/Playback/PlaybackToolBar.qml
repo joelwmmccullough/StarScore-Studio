@@ -33,6 +33,9 @@ Item {
 
     property alias floating: thePlaybackModel.isToolbarFloating
 
+    //! StarScore: a narrow window shows only the play buttons (no time, bar/beat or tempo)
+    property bool compact: false
+
     property NavigationPanel navigationPanel: NavigationPanel {
         id: navPanel
         name: "PlaybackToolBar"
@@ -68,6 +71,7 @@ Item {
 
             playbackModel: thePlaybackModel
             floating: root.floating
+            compact: root.compact && !root.floating
 
             navPanel: root.navigationPanel
         }

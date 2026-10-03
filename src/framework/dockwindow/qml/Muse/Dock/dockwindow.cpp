@@ -25,6 +25,8 @@
 #include "thirdparty/KDDockWidgets/src/DockWidgetQuick.h"
 #include "thirdparty/KDDockWidgets/src/LayoutSaver.h"
 #include "thirdparty/KDDockWidgets/src/private/quick/MainWindowQuick_p.h"
+#include "thirdparty/KDDockWidgets/src/private/LayoutWidget_p.h"
+#include "thirdparty/KDDockWidgets/src/private/multisplitter/Item_p.h"
 #include "thirdparty/KDDockWidgets/src/private/DockRegistry_p.h"
 #include "thirdparty/KDDockWidgets/src/Config.h"
 
@@ -105,8 +107,24 @@ public:
         static_cast<DockWindow*>(parent())->alignTopLevelToolBars(m_page);
     }
 
+    //! StarScore: a toolbar's content changed width (it went compact or back): check the row again once it is laid out
+    void adjustForSpace()
+    {
+        if (m_adjustQueued) {
+            return;
+        }
+        m_adjustQueued = true;
+        QMetaObject::invokeMethod(this, [this]() {
+            m_adjustQueued = false;
+            auto* window = static_cast<DockWindow*>(parent());
+            window->adjustContentForAvailableSpace(m_page);
+            window->scheduleFitLayoutToWindow();
+        }, Qt::QueuedConnection);
+    }
+
 private:
     DockPageView* m_page = nullptr;
+    bool m_adjustQueued = false;
 };
 
 DockWindow::DockWindow(QQuickItem* parent)
@@ -149,6 +167,7 @@ void DockWindow::componentComplete()
 
     connect(this, &QQuickItem::widthChanged, this, [this]() {
         adjustContentForAvailableSpace(m_currentPage);
+        scheduleFitLayoutToWindow();
     });
 }
 
@@ -164,7 +183,7 @@ void DockWindow::geometryChange(const QRectF& newGeometry, const QRectF& oldGeom
     //! due to lack of free space
     const QList<DockToolBarView*> topToolBars = topLevelToolBars(m_currentPage);
     for (DockToolBarView* toolBar : topToolBars) {
-        toolBar->setMinimumWidth(toolBar->contentWidth());
+        toolBar->setMinimumWidth(std::max(1, toolBar->contentWidth()));
     }
 
     QQuickItem::geometryChange(newGeometry, oldGeometry);
@@ -302,6 +321,57 @@ void DockWindow::setDockOpen(const QString& dockName, bool open)
     if (m_currentPage) {
         m_currentPage->setDockOpen(dockName, open);
         m_docksOpenStatusChanged.send({ dockName });
+        scheduleFitLayoutToWindow();
+    }
+}
+
+//! StarScore: the docks' layout keeps a size larger than the window once the window got narrower than the layout's
+//! minimum; when the minimum drops again (toolbars gone compact, buttons wrapped, a side panel closed) it fits the
+//! window again (a narrow window otherwise kept the score as wide as the window had been, cut off at the right)
+void DockWindow::scheduleFitLayoutToWindow()
+{
+    if (m_fitLayoutScheduled) {
+        return;
+    }
+    m_fitLayoutScheduled = true;
+    QMetaObject::invokeMethod(this, [this]() {
+        m_fitLayoutScheduled = false;
+        fitLayoutToWindow();
+    }, Qt::QueuedConnection);
+}
+
+void DockWindow::fitLayoutToWindow()
+{
+    KDDockWidgets::LayoutWidget* layout = m_mainWindow ? m_mainWindow->layoutWidget() : nullptr;
+    if (!layout || KDDockWidgets::LayoutSaver::restoreInProgress()) {
+        return;
+    }
+    const QSize window(int(m_mainWindow->width()), int(m_mainWindow->height()));
+    if (window.width() <= 0 || window.height() <= 0) {
+        return;
+    }
+    const QSize wanted = window.expandedTo(layout->layoutMinimumSize());
+    if (layout->size() != wanted) {
+        layout->setLayoutSize(wanted);
+    }
+
+    // A toolbar that got lower (the note input bar back on one line) leaves a gap above the status bar that nothing
+    // takes: the docks cover less than the layout. Squeezing the layout and letting it grow back hands that height
+    // to the score.
+    qint64 covered = 0;
+    for (Layouting::Item* item : layout->items()) {
+        if (item->isVisible()) {
+            covered += qint64(item->geometry().width()) * item->geometry().height();
+        }
+    }
+    const qint64 area = qint64(wanted.width()) * wanted.height();
+    if (covered > 0 && covered < area - qint64(wanted.width()) * 12) {
+        const int gap = int((area - covered) / std::max(1, wanted.width()));
+        const int squeeze = std::min(wanted.height() - layout->layoutMinimumSize().height(), gap + 8);
+        if (squeeze > 0) {
+            layout->setLayoutSize(QSize(wanted.width(), wanted.height() - squeeze));
+            layout->setLayoutSize(wanted);
+        }
     }
 }
 
@@ -330,6 +400,28 @@ DockPageView* DockWindow::currentPage() const
 QQuickItem& DockWindow::asItem() const
 {
     return *m_mainWindow;
+}
+
+QList<QPair<QString, QRect> > DockWindow::openSidePanels() const
+{
+    QList<QPair<QString, QRect> > result;
+    if (!m_currentPage) {
+        return result;
+    }
+    for (const DockPanelView* panel : m_currentPage->panels()) {
+        const QString name = panel->objectName();
+        if (name.isEmpty() || panel->floating() || !m_currentPage->isDockOpen(name)) {
+            continue;
+        }
+        if (panel->location() != Location::Left && panel->location() != Location::Right) {
+            continue;
+        }
+        const QRect frame = panel->frameGeometry();
+        if (frame.width() > 0) {
+            result << qMakePair(name, frame);
+        }
+    }
+    return result;
 }
 
 void DockWindow::restoreDefaultLayout()
@@ -477,8 +569,8 @@ void DockWindow::alignTopLevelToolBars(const DockPageView* page)
         deltaForLastCentralToolBar = 0;
     }
 
-    lastLeftToolBar->setMinimumWidth(lastLeftToolBar->contentWidth() + deltaForLastLeftToolbar);
-    lastCentralToolBar->setMinimumWidth(lastCentralToolBar->contentWidth() + deltaForLastCentralToolBar);
+    lastLeftToolBar->setMinimumWidth(std::max(1, lastLeftToolBar->contentWidth() + deltaForLastLeftToolbar));
+    lastCentralToolBar->setMinimumWidth(std::max(1, lastCentralToolBar->contentWidth() + deltaForLastCentralToolBar));
 }
 
 void DockWindow::addDock(DockBase* dock, Location location, const DockBase* relativeTo)
@@ -763,8 +855,19 @@ void DockWindow::initDocks(DockPageView* page)
         connect(toolbar, &DockToolBarView::contentSizeChanged,
                 holder, &UniqueConnectionHolder::alignTopLevelToolBars, Qt::UniqueConnection);
 
+        connect(toolbar, &DockToolBarView::contentSizeChanged,
+                holder, &UniqueConnectionHolder::adjustForSpace, Qt::UniqueConnection);
+
         connect(toolbar, &DockToolBarView::visibleChanged,
                 holder, &UniqueConnectionHolder::alignTopLevelToolBars, Qt::UniqueConnection);
+    }
+
+    // StarScore: a page toolbar changing size (the note input bar wrapping its buttons) can let the layout fit again
+    if (page) {
+        for (DockToolBarView* toolbar : page->toolBars()) {
+            connect(toolbar, &DockToolBarView::contentSizeChanged,
+                    holder, &UniqueConnectionHolder::adjustForSpace, Qt::UniqueConnection);
+        }
     }
 }
 
@@ -774,62 +877,63 @@ void DockWindow::adjustContentForAvailableSpace(DockPageView* page)
         return;
     }
 
-    int spaceWidth = width();
+    //! StarScore: the top row of toolbars fits the window. When it is wider than the window, the toolbar first in
+    //! line (lowest compactPriorityOrder) goes compact; when there is room for the last compact toolbar's full width
+    //! again, it comes back. One step at a time: the toolbar's new width is known only once its content has been
+    //! laid out, and that change runs this again (see UniqueConnectionHolder::adjustForSpace).
+    const int separatorThickness = KDDockWidgets::Config::self().separatorThickness();
+    const int spaceWidth = int(width());
+    if (spaceWidth <= 0) {
+        return;
+    }
 
-    auto adjustDocks = [&spaceWidth](QList<DockBase*> docks) {
-        int width = 0;
-        for (DockBase* dock : docks) {
-            width += dock->contentWidth();
-        }
-
-        docks.erase(std::remove_if(docks.begin(), docks.end(), [](const DockBase* dock){
-            return dock->compactPriorityOrder() == -1;
-        }), docks.end());
-
-        if (docks.empty()) {
-            return;
-        }
-
-        std::sort(docks.begin(), docks.end(), [](const DockBase* dock1, DockBase* dock2) {
-            return dock1->compactPriorityOrder() < dock2->compactPriorityOrder();
-        });
-
-        if (width >= spaceWidth) {
-            for (DockBase* dock : docks) {
-                if (!dock->isCompact()) {
-                    dock->setIsCompact(true);
-
-                    width -= dock->nonCompactWidth();
-                    width += dock->width();
-                }
-            }
-        } else {
-            for (int i = docks.size() - 1; i >= 0; i--) {
-                DockBase* dock = docks.at(i);
-                if (!dock->isCompact()) {
-                    continue;
-                }
-
-                int actualWidth = dock->contentWidth();
-                int nonCompactWidth = dock->nonCompactWidth();
-                if (width - actualWidth + nonCompactWidth < spaceWidth) {
-                    dock->setIsCompact(false);
-                }
-
-                break;
-            }
-        }
-    };
-
-    QList<DockBase*> topLevelToolBarsDocks;
-
+    QList<DockBase*> docks;
+    int used = 0;
     for (DockToolBarView* toolBar : topLevelToolBars(page)) {
-        if (!toolBar->dockWidget()->isFloating() && toolBar->isVisible()) {
-            topLevelToolBarsDocks << toolBar;
+        if (toolBar->dockWidget() && toolBar->dockWidget()->isFloating()) {
+            continue;
+        }
+        if (!toolBar->isVisible() && !toolBar->isCompact()) {
+            continue;
+        }
+        used += toolBar->contentWidth() + separatorThickness;
+        if (toolBar->compactPriorityOrder() >= 0) {
+            docks << toolBar;
         }
     }
 
-    adjustDocks(topLevelToolBarsDocks);
+    if (docks.empty()) {
+        return;
+    }
+
+    std::sort(docks.begin(), docks.end(), [](const DockBase* dock1, const DockBase* dock2) {
+        return dock1->compactPriorityOrder() < dock2->compactPriorityOrder();
+    });
+
+    // The window can't be made narrower than the row (the row's width is its minimum), so a toolbar goes compact
+    // as soon as the row fills the window; it comes back only with some room to spare, so it doesn't flicker
+    static constexpr int SLACK = 24;
+    if (used >= spaceWidth) {
+        for (DockBase* dock : docks) {
+            if (!dock->isCompact()) {
+                dock->setNonCompactWidth(dock->contentWidth());
+                dock->setIsCompact(true);
+                return;
+            }
+        }
+        return;
+    }
+
+    for (int i = int(docks.size()) - 1; i >= 0; --i) {
+        DockBase* dock = docks.at(i);
+        if (!dock->isCompact()) {
+            continue;
+        }
+        if (used - dock->contentWidth() + dock->nonCompactWidth() + SLACK <= spaceWidth) {
+            dock->setIsCompact(false);
+        }
+        return;
+    }
 }
 
 void DockWindow::notifyAboutDocksOpenStatus()

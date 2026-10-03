@@ -71,7 +71,7 @@ public:
     explicit DockWindow(QQuickItem* parent = nullptr);
     ~DockWindow() override;
 
-    QString currentPageUri() const;
+    QString currentPageUri() const override;
 
     QQmlListProperty<muse::dock::DockToolBarView> toolBarsProperty();
     QQmlListProperty<muse::dock::DockPageView> pagesProperty();
@@ -95,6 +95,7 @@ public:
     QQuickItem& asItem() const override;
 
     void restoreDefaultLayout() override;
+    QList<QPair<QString, QRect> > openSidePanels() const override;
 
 signals:
     void pageLoaded();
@@ -139,6 +140,9 @@ private:
     void initDocks(DockPageView* page);
 
     void adjustContentForAvailableSpace(DockPageView* page);
+    void fitLayoutToWindow();
+    void scheduleFitLayoutToWindow();
+    bool m_fitLayoutScheduled = false;
 
     void notifyAboutDocksOpenStatus();
 

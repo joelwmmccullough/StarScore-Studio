@@ -39,6 +39,9 @@ Item {
 
     property string currentUri: "musescore://home"
 
+    //! StarScore: a narrow window shows only the Home tab and the current page's tab
+    property bool compact: false
+
     signal selected(string uri)
 
     function select(uri) {
@@ -83,6 +86,10 @@ Item {
             required property int index
 
             ButtonGroup.group: radioButtonList.radioButtonGroup
+
+            readonly property bool shown: !root.compact || uri === root.currentUri || uri === "musescore://home"
+            visible: shown
+            width: shown ? implicitWidth : 0
 
             spacing: 0
             leftPadding: 12

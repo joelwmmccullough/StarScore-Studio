@@ -25,6 +25,9 @@
 #include "starscoreengraving.h"
 
 #include <QCoreApplication>
+#include <QGuiApplication>
+#include <QImage>
+#include <QQuickWindow>
 #include <QDir>
 #include <QFile>
 #include <QJsonArray>
@@ -131,6 +134,47 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         }
         globalContext()->setCurrentNotation(master->notation());
         autotestLog(QString("  viewed %1 part scores").arg(master->excerpts().size()));
+    } else if (step.startsWith("window:") || step.startsWith("shot:")) {
+        // the app window: "window:W:H" resizes it, "shot:NAME" saves a picture of it as NAME.png
+        QQuickWindow* win = nullptr;
+        for (QWindow* w : QGuiApplication::topLevelWindows()) {
+            auto* q = qobject_cast<QQuickWindow*>(w);
+            if (q && q->objectName() == "ApplicationWindow") {
+                win = q;
+                break;
+            }
+            if (q && q->isVisible() && (!win || q->width() * q->height() > win->width() * win->height())) {
+                win = q;
+            }
+        }
+        if (!win) {
+            autotestLog("  no window");
+        } else if (step.startsWith("window:")) {
+            // "window:W:H" or "window:W:H:STEP" (from the current width to W in steps, like dragging the edge)
+            const QStringList wh = step.mid(7).split(':');
+            const int target = wh.value(0).toInt();
+            const int stride = std::max(1, wh.value(2).toInt());
+            if (wh.size() > 2) {
+                int w = win->width();
+                while (w != target) {
+                    w = w > target ? std::max(target, w - stride) : std::min(target, w + stride);
+                    win->resize(w, wh.value(1).toInt());
+                    for (int i = 0; i < 6; ++i) {
+                        QCoreApplication::processEvents();
+                    }
+                }
+            }
+            win->resize(target, wh.value(1).toInt());
+            for (int i = 0; i < 20; ++i) {
+                QCoreApplication::processEvents();
+            }
+            autotestLog(QString("  window %1 x %2 (minimum %3 x %4)").arg(win->width()).arg(win->height())
+                        .arg(win->minimumWidth()).arg(win->minimumHeight()));
+        } else {
+            const QImage img = win->grabWindow();
+            const bool ok = img.save(autotestDir() + "/" + step.mid(5) + ".png");
+            autotestLog(QString("  shot %1 x %2 %3").arg(img.width()).arg(img.height()).arg(ok ? "saved" : "not saved"));
+        }
     } else if (step == "viewtabs") {
         // as the app does it: only switching tabs, the service's own reaction places the credit
         for (const IExcerptNotationPtr& e : master->excerpts()) {

@@ -50,6 +50,39 @@ Item {
     property int columns: noLimit
     property int columnSpacing: 2
 
+    //! StarScore: when set (horizontal only), the sections wrap onto further lines within this width
+    property int wrapWidth: 0
+    readonly property bool wrapping: root.isHorizontal && root.wrapWidth > 0
+
+    //! The width the sections take on a single line (horizontal, one row per section); kept up to date
+    readonly property int singleLineWidth: {
+        var n = root.model ? root.model.length : 0 // updates when the items change
+        return n >= 0 ? root.unwrappedWidth() : 0
+    }
+
+    function unwrappedWidth() {
+        if (!root.model) {
+            return 0
+        }
+        var counts = {}
+        var order = []
+        for (var i = 0; i < root.model.length; i++) {
+            var section = root.model.get(i)[root.sectionRole]
+            if (counts[section] === undefined) {
+                counts[section] = 0
+                order.push(section)
+            }
+            counts[section]++
+        }
+        var result = 0
+        for (var j = 0; j < order.length; j++) {
+            var n = counts[order[j]]
+            result += root.sectionWidth + privateProperties.spacingAfterSection
+                    + n * root.cellWidth + Math.max(0, n - 1) * root.columnSpacing
+        }
+        return result + Math.max(0, order.length - 1) * privateProperties.spacingBeforeSection
+    }
+
     QtObject {
         id: privateProperties
 
@@ -75,7 +108,59 @@ Item {
     Loader {
         id: loader
 
-        sourceComponent: root.isHorizontal ? horizontalView : verticalView
+        sourceComponent: root.wrapping ? wrappedView : root.isHorizontal ? horizontalView : verticalView
+    }
+
+    Component {
+        id: wrappedView
+
+        Flow {
+            width: root.wrapWidth
+
+            spacing: privateProperties.spacingBeforeSection
+
+            Repeater {
+                model: Boolean(root.model) ? privateProperties.modelSections() : []
+
+                Row {
+                    id: wrappedRow
+
+                    required property var modelData
+                    required property int index
+
+                    spacing: privateProperties.spacingAfterSection
+
+                    height: root.sectionHeight
+
+                    GridViewSection {
+                        width: root.sectionWidth
+                        height: root.sectionHeight
+
+                        sectionDelegate: root.sectionDelegate
+                        itemModel: wrappedRow.modelData
+                        index: wrappedRow.index
+                    }
+
+                    GridViewDelegate {
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        model: root.model
+
+                        itemDelegate: root.itemDelegate
+                        sectionRole: root.sectionRole
+                        sectionValue: wrappedRow.modelData
+
+                        cellWidth: root.cellWidth
+                        cellHeight: root.cellHeight
+
+                        rows: 1
+                        rowSpacing: root.rowSpacing
+                        columns: root.noLimit
+                        columnSpacing: root.columnSpacing
+                    }
+                }
+            }
+        }
     }
 
     Component {

@@ -160,6 +160,9 @@ Rectangle {
 
             Flow {
                 Layout.fillWidth: true
+                // takes the room left beside the label and buttons and wraps within it (a narrow window kept the
+                // chips on one line and pushed the buttons out of sight)
+                Layout.preferredWidth: 1
                 spacing: 6
 
                 Repeater {
@@ -259,6 +262,9 @@ Rectangle {
 
             Flow {
                 Layout.fillWidth: true
+                // takes the room left beside the label and buttons and wraps within it (a narrow window kept the
+                // chips on one line and pushed the buttons out of sight)
+                Layout.preferredWidth: 1
                 spacing: 6
 
                 Repeater {
@@ -326,6 +332,9 @@ Rectangle {
 
             Flow {
                 Layout.fillWidth: true
+                // takes the room left beside the label and buttons and wraps within it (a narrow window kept the
+                // chips on one line and pushed the buttons out of sight)
+                Layout.preferredWidth: 1
                 spacing: 6
 
                 StarScoreChip {

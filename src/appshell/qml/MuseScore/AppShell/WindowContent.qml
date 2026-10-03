@@ -69,10 +69,14 @@ DockWindow {
             floatable: false
             closable: false
 
+            // StarScore: in a narrow window only the Home and current page tabs stay (last to go compact)
+            compactPriorityOrder: 3
+
             navigationSection: topToolbarKeyNavSec
 
             MainToolBar {
                 id: toolBar
+                compact: mainToolBar.isCompact
                 navigation.section: mainToolBar.navigationSection
                 navigation.order: 1
 
