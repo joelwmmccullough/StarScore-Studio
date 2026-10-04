@@ -22,7 +22,7 @@
 namespace mu::project::starscore::org {
 struct FileEntry {
     QString rel;           // relative to Sheets and Demos
-    qint64 size = 0;
+    qint64 size = 0;       // 0 for a bundle (a .logicx or other folder that is really one file; listed as one entry)
     qint64 mtime = 0;      // ms since epoch
 };
 
@@ -37,7 +37,7 @@ struct SheetEntry {
 };
 
 struct ScanResult {
-    std::vector<FileEntry> tree;               // every file (not .organizer, not .DS_Store)
+    std::vector<FileEntry> tree;               // every file (not .organizer, not .DS_Store; a bundle counts as one file)
     std::map<QString, SheetEntry> sheets;      // current sheets by relative path
     QStringList added, changed, removed;       // compared with the previous run
     int measuredNow = 0;                       // files read this run
@@ -46,15 +46,25 @@ struct ScanResult {
 class SheetCache
 {
 public:
-    void load(const Paths& paths);
+    //! Returns unreadableMessage() for a sheetcache.json that is there but can't be read, else "". Without the
+    //! cache every sheet would be read again (a long run), so the run stops instead.
+    QString load(const Paths& paths);
+    //! Writes only when the entries changed since load()
     bool save(const Paths& paths) const;
     bool isEmpty() const { return m_entries.empty(); }
     const std::map<QString, SheetEntry>& entries() const { return m_entries; }
-    void replace(std::map<QString, SheetEntry> entries) { m_entries = std::move(entries); }
+    void replace(std::map<QString, SheetEntry> entries);
 
 private:
     std::map<QString, SheetEntry> m_entries;
+    bool m_dirty = false;
 };
+
+inline bool operator==(const SheetEntry& a, const SheetEntry& b)
+{
+    return a.size == b.size && a.mtime == b.mtime && a.md5 == b.md5 && a.pages == b.pages && a.glyphs == b.glyphs
+           && a.words == b.words && a.measured == b.measured;
+}
 
 //! A current sheet: a PDF in a song folder, outside the archive and the generated folders
 bool isSheetPath(const QString& rel);

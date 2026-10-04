@@ -39,10 +39,12 @@ using namespace mu::notation;
 using namespace muse;
 
 //! What a part plays in one bar, as text: rhythm, pitches (concert), ties, articulations and dynamics.
-//! Empty when the bar is only rests.
-static std::string starscoreBarSignature(const Part* part, const Measure* m, bool ignoreOctave = false)
+//! Empty when the bar is only rests. Two variants from the one walk of the bar: .first with the exact pitches,
+//! .second with pitch classes only (to spot octave-only differences); they used to be two separate walks.
+static std::pair<std::string, std::string> starscoreBarSignatures(const Part* part, const Measure* m)
 {
-    std::string sig;
+    std::string sig;        // exact pitches
+    std::string classSig;   // pitch classes
     bool hasNotes = false;
     for (const Staff* staff : part->staves()) {
         const track_idx_t startTrack = staff->idx() * VOICES;
@@ -52,44 +54,62 @@ static std::string starscoreBarSignature(const Part* part, const Measure* m, boo
                 if (!e) {
                     continue;
                 }
-                sig += "|" + std::to_string(track - startTrack) + "@" + std::to_string(s->rtick().ticks());
+                std::string common = "|" + std::to_string(track - startTrack) + "@" + std::to_string(s->rtick().ticks());
                 const ChordRest* cr = toChordRest(e);
-                sig += "d" + std::to_string(cr->actualTicks().ticks());
+                common += "d" + std::to_string(cr->actualTicks().ticks());
+                sig += common;
+                classSig += common;
                 if (e->isChord()) {
                     hasNotes = true;
                     const Chord* c = toChord(e);
                     std::vector<int> pitches;
+                    std::vector<int> classes;
                     for (const Note* n : c->notes()) {
-                        const int pitch = ignoreOctave ? n->pitch() % 12 : n->pitch();
-                        pitches.push_back(pitch * 2 + (n->tieFor() ? 1 : 0));
+                        const int tie = n->tieFor() ? 1 : 0;
+                        pitches.push_back(n->pitch() * 2 + tie);
+                        classes.push_back((n->pitch() % 12) * 2 + tie);
                     }
                     std::sort(pitches.begin(), pitches.end());
+                    std::sort(classes.begin(), classes.end());
                     for (int p : pitches) {
                         sig += "n" + std::to_string(p);
                     }
-                    for (const Articulation* a : c->articulations()) {
-                        sig += "a" + std::to_string(int(a->symId()));
+                    for (int p : classes) {
+                        classSig += "n" + std::to_string(p);
                     }
-                    sig += "g" + std::to_string(c->graceNotes().size());
+                    std::string tail;
+                    for (const Articulation* a : c->articulations()) {
+                        tail += "a" + std::to_string(int(a->symId()));
+                    }
+                    tail += "g" + std::to_string(c->graceNotes().size());
+                    sig += tail;
+                    classSig += tail;
                 } else {
                     sig += "r";
+                    classSig += "r";
                 }
                 for (const EngravingItem* ann : s->annotations()) {
                     if (ann->track() == track && ann->isDynamic()) {
-                        sig += "D" + toDynamic(ann)->plainText().toStdString();
+                        const std::string d = "D" + toDynamic(ann)->plainText().toStdString();
+                        sig += d;
+                        classSig += d;
                     }
                 }
             }
         }
     }
-    return hasNotes ? sig : std::string();
+    if (!hasNotes) {
+        return {};
+    }
+    return { sig, classSig };
 }
 
 //! Instruments count as the same whatever their key: bb-trumpet and c-trumpet are both "trumpet"
 static QString starscoreInstrumentFamily(const Part* part)
 {
+    static const QRegularExpression keyPrefixRe("^(bb|eb|ab|db|gb|c|f|a|d|g|e|b)-");
     QString id = part->instrumentId().toQString();
-    id.remove(QRegularExpression("^(bb|eb|ab|db|gb|c|f|a|d|g|e|b)-"));
+    id.remove(keyPrefixRe);
     return id;
 }
 
@@ -161,9 +181,11 @@ std::vector<StarScoreComparison> StarScoreService::compareParts(const std::map<Q
             std::vector<std::string> row;
             std::vector<std::string> classRow;
             row.reserve(measures.size());
+            classRow.reserve(measures.size());
             for (const Measure* m : measures) {
-                row.push_back(starscoreBarSignature(p, m));
-                classRow.push_back(starscoreBarSignature(p, m, true));
+                auto both = starscoreBarSignatures(p, m);
+                row.push_back(std::move(both.first));
+                classRow.push_back(std::move(both.second));
             }
             sigs.push_back(std::move(row));
             classSigs.push_back(std::move(classRow));

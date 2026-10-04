@@ -130,8 +130,11 @@ Item {
                 Layout.fillWidth: true
                 model: auditModel.arrangementChoices
                 currentIndex: {
-                    for (var i = 0; i < auditModel.arrangementChoices.length; ++i) {
-                        if (auditModel.arrangementChoices[i].value === auditModel.arrangementId) {
+                    // the property builds a fresh list on every read, so read it once
+                    var choices = auditModel.arrangementChoices
+                    var id = auditModel.arrangementId
+                    for (var i = 0; i < choices.length; ++i) {
+                        if (choices[i].value === id) {
                             return i
                         }
                     }
@@ -152,8 +155,10 @@ Item {
                     Layout.fillWidth: true
                     model: auditModel.referenceChoices
                     currentIndex: {
-                        for (var i = 0; i < auditModel.referenceChoices.length; ++i) {
-                            if (auditModel.referenceChoices[i].value === auditModel.referenceId) {
+                        var choices = auditModel.referenceChoices
+                        var id = auditModel.referenceId
+                        for (var i = 0; i < choices.length; ++i) {
+                            if (choices[i].value === id) {
                                 return i
                             }
                         }

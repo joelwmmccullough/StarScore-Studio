@@ -198,23 +198,32 @@ void readVideos(const std::vector<std::pair<NewShow, QString> >& shows, const QJ
         std::vector<std::pair<NewShow, QString> > shows;
         std::vector<ShowVideo> out;
         size_t next = 0;
-        QMap<QString, QString> aliases;
-        QStringList skip;
+        std::unique_ptr<NameMatcher> matcher;
+        std::function<void()> step;
     };
     auto st = std::make_shared<State>();
     st->shows = shows;
+    QMap<QString, QString> aliases;
     const QJsonObject al = recordings.value("aliases").toObject();
     for (auto it = al.begin(); it != al.end(); ++it) {
-        st->aliases[it.key()] = it.value().toString();
+        aliases[it.key()] = it.value().toString();
     }
+    QStringList skip;
     for (const QJsonValue& v : recordings.value("skipNames").toArray()) {
-        st->skip << v.toString();
+        skip << v.toString();
     }
-    auto step = std::make_shared<std::function<void()> >();
-    *step = [st, step, fetch, done]() {
+    st->matcher = std::make_unique<NameMatcher>(aliases, skip);
+    // The step function lives in the State and holds only a weak reference to it, so there is no cycle to break
+    // (an earlier version cleared the std::function from inside its own body, which destroys the running closure).
+    // Whoever calls st->step() holds the State: readVideos below, and each fetch callback through `finish`.
+    std::weak_ptr<State> weak = st;
+    st->step = [weak, fetch, done]() {
+        std::shared_ptr<State> st = weak.lock();
+        if (!st) {
+            return;
+        }
         if (st->next >= st->shows.size()) {
             done(st->out);
-            *step = nullptr;    // break the cycle
             return;
         }
         const auto [show, link] = st->shows[st->next++];
@@ -223,21 +232,21 @@ void readVideos(const std::vector<std::pair<NewShow, QString> >& shows, const QJ
             ShowVideo v;
             v.show = show;
             st->out.push_back(v);
-            (*step)();
+            st->step();
             return;
         }
         const QString url = "https://www.youtube.com/watch?v=" + id;
-        auto finish = [st, step, show](const QString& html) {
+        auto finish = [st, show](const QString& html) {
             ShowVideo v;
             v.show = show;
             v.ok = parseYouTubeWatchPage(html, v.video);
             if (v.ok) {
                 for (const Timestamp& t : parseTimestamps(v.video.description)) {
-                    v.songs.push_back(matchTimestamp(t, st->aliases, st->skip));
+                    v.songs.push_back(st->matcher->match(t));
                 }
             }
             st->out.push_back(v);
-            (*step)();
+            st->step();
         };
         fetch(url, false, [fetch, url, finish](const QString& html, int) {
             YouTubeVideo probe;
@@ -248,27 +257,57 @@ void readVideos(const std::vector<std::pair<NewShow, QString> >& shows, const QJ
             }
         });
     };
-    (*step)();
+    st->step();
+}
+
+int nextRecordingNumber(const QJsonObject& recordings, const QString& prefix)
+{
+    // ids in "deleted" and the releases count as taken too: an id given out again would be dropped by
+    // mergeSongRecordings (which honours "deleted") or clash with a release
+    int n = 1;
+    auto take = [&](const QString& id) {
+        if (id.startsWith(prefix)) {
+            n = std::max(n, id.mid(prefix.size()).toInt() + 1);
+        }
+    };
+    for (const char* key : { "performances", "releases" }) {
+        for (const QJsonValue& v : recordings.value(key).toArray()) {
+            take(v.toObject().value("id").toString());
+        }
+    }
+    for (const QJsonValue& v : recordings.value("deleted").toArray()) {
+        take(v.toString());
+    }
+    return n;
 }
 
 QString newRecordingId(const QJsonObject& recordings, const QString& prefix)
 {
-    std::set<QString> used;
-    for (const char* key : { "performances", "releases" }) {
-        for (const QJsonValue& v : recordings.value(key).toArray()) {
-            used.insert(v.toObject().value("id").toString());
+    return QString("%1%2").arg(prefix).arg(nextRecordingNumber(recordings, prefix), 4, 10, QChar('0'));
+}
+
+QString newShowId(const QDate& date, const std::set<QString>& takenIds)
+{
+    // "ss-2026-10-03"; a second show on the same day gets "ss-2026-10-03-2" (one id for both used to merge their takes)
+    const QString base = "ss-" + date.toString(Qt::ISODate);
+    if (!takenIds.count(base)) {
+        return base;
+    }
+    for (int i = 2;; ++i) {
+        const QString id = QString("%1-%2").arg(base).arg(i);
+        if (!takenIds.count(id)) {
+            return id;
         }
     }
-    for (const QJsonValue& v : recordings.value("deleted").toArray()) {
-        used.insert(v.toString());
+}
+
+std::set<QString> showIds(const QJsonArray& shows)
+{
+    std::set<QString> ids;
+    for (const QJsonValue& v : shows) {
+        ids.insert(v.toObject().value("id").toString());
     }
-    int n = 1;
-    for (const QString& u : used) {
-        if (u.startsWith(prefix)) {
-            n = std::max(n, u.mid(prefix.size()).toInt() + 1);
-        }
-    }
-    return QString("%1%2").arg(prefix).arg(n, 4, 10, QChar('0'));
+    return ids;
 }
 
 QStringList applyShows(QJsonObject& recordings, const std::vector<NewShow>& offered, const std::vector<ShowAnswer>& answers,
@@ -289,6 +328,9 @@ QStringList applyShows(QJsonObject& recordings, const std::vector<NewShow>& offe
         skipNorm.insert(normalizeName(v.toString()));
     }
     const QString todayIso = today.toString(Qt::ISODate);
+    std::set<QString> takenShowIds = showIds(shows);
+    // the performance numbers run on from everything that exists, has existed ("deleted") or is a release
+    int nextPerf = nextRecordingNumber(recordings, "p");
 
     for (const NewShow& ns : offered) {
         const SetlistShow& s = ns.show;
@@ -308,7 +350,8 @@ QStringList applyShows(QJsonObject& recordings, const std::vector<NewShow>& offe
                     : QString("%1, %2: skipped for now; StarScore will ask again next time.").arg(when, esc(s.venue)));
             continue;
         }
-        const QString showId = "ss-" + s.date.toString(Qt::ISODate);
+        const QString showId = newShowId(s.date, takenShowIds);
+        takenShowIds.insert(showId);
         QJsonArray unmatched;
         int added = 0;
         for (const MatchedTimestamp& m : v->songs) {
@@ -328,7 +371,7 @@ QStringList applyShows(QJsonObject& recordings, const std::vector<NewShow>& offe
                 aliases[m.name] = m.code;
                 aliasNorm.insert(norm);
             }
-            QJsonObject p { { "id", newRecordingId(QJsonObject { { "performances", perfs } }, "p") }, { "song", m.code }, { "show", showId },
+            QJsonObject p { { "id", QString("p%1").arg(nextPerf++, 4, 10, QChar('0')) }, { "song", m.code }, { "show", showId },
                             { "seconds", m.seconds }, { "variant", m.variant.isEmpty() ? QJsonValue() : QJsonValue(m.variant) },
                             { "name", m.name }, { "rating", QJsonValue() }, { "modified", todayIso } };
             perfs.append(p);
@@ -372,17 +415,16 @@ void mapPlayCounts(const QJsonObject& recordings, const QMap<QString, int>& byNa
     for (const QJsonValue& v : recordings.value("skipNames").toArray()) {
         skip << v.toString();
     }
-    const QJsonObject notIn = recordings.value("notInLibrary").toObject();
+    const NameMatcher matcher(aliases, skip);
     for (auto it = byName.begin(); it != byName.end(); ++it) {
         // a medley ("Live Strong / Strasbourg") counts for its song
-        const MatchedTimestamp m = matchTimestamp({ 0, it.key() }, aliases, skip);
+        const MatchedTimestamp m = matcher.match({ 0, it.key() });
         if (!m.code.isEmpty() && m.code != "-") {
             byCode[m.code] += it.value();
         } else if (m.code.isEmpty() && !notInLibrary.contains(it.key())) {
             notInLibrary << it.key();
         }
     }
-    Q_UNUSED(notIn);
 }
 
 void storePlayCounts(QJsonObject& recordings, const OnlineResult& r, const QDate& today)
@@ -495,6 +537,175 @@ bool mergeSongRecordings(QJsonObject& recordings, const QString& code, const QJs
     }
     recordings["shows"] = shows;
     recordings["deleted"] = deleted;
+    return changed;
+}
+
+bool mergeRecordingsFiles(QJsonObject& current, const QJsonObject& ours)
+{
+    bool changed = false;
+    // ids removed anywhere stay removed
+    QJsonArray deleted = current.value("deleted").toArray();
+    QSet<QString> gone;
+    for (const QJsonValue& v : deleted) {
+        gone.insert(v.toString());
+    }
+    for (const QJsonValue& v : ours.value("deleted").toArray()) {
+        if (!gone.contains(v.toString())) {
+            gone.insert(v.toString());
+            deleted.append(v);
+            changed = true;
+        }
+    }
+    // performances and releases: by id, the newer "modified" wins (a tie keeps the file's: it is the later write)
+    for (const char* key : { "performances", "releases" }) {
+        QJsonArray master = current.value(key).toArray();
+        std::map<QString, int> index;
+        for (int i = 0; i < master.size(); ++i) {
+            index[master[i].toObject().value("id").toString()] = i;
+        }
+        for (const QJsonValue& v : ours.value(key).toArray()) {
+            const QJsonObject e = v.toObject();
+            const QString id = e.value("id").toString();
+            if (id.isEmpty() || gone.contains(id)) {
+                continue;
+            }
+            auto it = index.find(id);
+            if (it == index.end()) {
+                index[id] = master.size();
+                master.append(e);
+                changed = true;
+            } else if (e != master[it->second].toObject()
+                       && e.value("modified").toString() > master[it->second].toObject().value("modified").toString()) {
+                master[it->second] = e;
+                changed = true;
+            }
+        }
+        QJsonArray kept;
+        for (const QJsonValue& v : master) {
+            if (gone.contains(v.toObject().value("id").toString())) {
+                changed = true;
+            } else {
+                kept.append(v);
+            }
+        }
+        current[key] = kept;
+    }
+    // shows: by id, the file's version kept where both have one
+    QJsonArray shows = current.value("shows").toArray();
+    std::set<QString> have = showIds(shows);
+    for (const QJsonValue& v : ours.value("shows").toArray()) {
+        const QString id = v.toObject().value("id").toString();
+        if (!have.count(id)) {
+            have.insert(id);
+            shows.append(v);
+            changed = true;
+        }
+    }
+    current["shows"] = shows;
+    if (changed || current.value("deleted").toArray() != deleted) {
+        current["deleted"] = deleted;
+    }
+    // aliases: the run adds names it confirmed; nothing else edits them, so ours go on top
+    QJsonObject aliases = current.value("aliases").toObject();
+    const QJsonObject ourAliases = ours.value("aliases").toObject();
+    for (auto it = ourAliases.begin(); it != ourAliases.end(); ++it) {
+        if (aliases.value(it.key()) != it.value()) {
+            aliases[it.key()] = it.value();
+            changed = true;
+        }
+    }
+    current["aliases"] = aliases;
+    // skipNames: union, in order
+    QJsonArray skipNames = current.value("skipNames").toArray();
+    QSet<QString> skipHave;
+    for (const QJsonValue& v : skipNames) {
+        skipHave.insert(v.toString());
+    }
+    for (const QJsonValue& v : ours.value("skipNames").toArray()) {
+        if (!skipHave.contains(v.toString())) {
+            skipHave.insert(v.toString());
+            skipNames.append(v);
+            changed = true;
+        }
+    }
+    current["skipNames"] = skipNames;
+    // what only the run writes (setlist.fm state, play counts): ours; everything else (venueShort, playlists,
+    // footnotes…) stays as the file has it, and keys the file lacks are taken from ours
+    for (const char* key : { "setlistfm", "playCounts" }) {
+        if (ours.contains(key) && current.value(key) != ours.value(key)) {
+            current[key] = ours.value(key);
+            changed = true;
+        }
+    }
+    for (auto it = ours.begin(); it != ours.end(); ++it) {
+        if (!current.contains(it.key())) {
+            current[it.key()] = it.value();
+            changed = true;
+        }
+    }
+    return changed;
+}
+
+bool mergeChangelogFiles(QJsonObject& current, const QJsonObject& ours)
+{
+    // ours has, per song and player, the file's entries as loaded plus this run's on top (or merged into the
+    // newest one); anything in ours that the file doesn't have goes in, newest first, in ours' order
+    bool changed = false;
+    for (auto song = ours.begin(); song != ours.end(); ++song) {
+        QJsonObject songLog = current.value(song.key()).toObject();
+        const QJsonObject ourSong = song.value().toObject();
+        for (auto player = ourSong.begin(); player != ourSong.end(); ++player) {
+            QJsonArray entries = songLog.value(player.key()).toArray();
+            const QJsonArray ourEntries = player.value().toArray();
+            // entries are matched by date and title; an entry the run extended (a second export the same day)
+            // replaces the file's version of that day
+            std::map<std::pair<QString, QString>, int> index;
+            for (int i = 0; i < entries.size(); ++i) {
+                const QJsonObject e = entries[i].toObject();
+                index[{ e.value("date").toString(), e.value("title").toString() }] = i;
+            }
+            QJsonArray fresh;    // this run's new entries, to go on top
+            for (const QJsonValue& v : ourEntries) {
+                const QJsonObject e = v.toObject();
+                auto it = index.find({ e.value("date").toString(), e.value("title").toString() });
+                if (it == index.end()) {
+                    fresh.append(e);
+                    changed = true;
+                } else if (entries[it->second].toObject() != e) {
+                    // keep the union of both versions' changes
+                    QJsonObject merged = entries[it->second].toObject();
+                    QJsonArray c = merged.value("changes").toArray();
+                    for (const QJsonValue& ch : e.value("changes").toArray()) {
+                        if (!c.contains(ch)) {
+                            c.append(ch);
+                            changed = true;
+                        }
+                    }
+                    merged["changes"] = c;
+                    entries[it->second] = merged;
+                }
+            }
+            for (int i = fresh.size() - 1; i >= 0; --i) {
+                entries.insert(0, fresh[i]);
+            }
+            songLog[player.key()] = entries;
+        }
+        current[song.key()] = songLog;
+    }
+    return changed;
+}
+
+bool mergeLogArrays(QJsonArray& current, const QJsonArray& ours)
+{
+    // newest first; ours' entries the file doesn't have go on top, in ours' order
+    bool changed = false;
+    int insertAt = 0;
+    for (const QJsonValue& v : ours) {
+        if (!current.contains(v)) {
+            current.insert(insertAt++, v);
+            changed = true;
+        }
+    }
     return changed;
 }
 }

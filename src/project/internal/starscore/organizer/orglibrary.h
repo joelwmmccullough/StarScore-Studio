@@ -65,7 +65,8 @@ struct SongInfo {
     QStringList extras, demos, references;
     std::map<QString, QStringList> other;    // folders the organizer doesn't know
     int archive = 0;             // files in Version History
-    QString updateNotes;         // "Update Notes 26-08-19" ("" when missing)
+    QString updateNotes;         // "Update Notes 26-08-19" ("" when missing); filled in by the organizer once the
+                                 // folder has been re-dated for this run, not by buildLibrary
     QStringList hornGuides;      // files in Horn Part Guides
     bool hasRecordingsPdf = false;
     SongStatus status;
@@ -94,4 +95,11 @@ Library buildLibrary(const ScanResult& scan, const std::map<QString, QString>& c
 //! "5H 2Tpt Alt Ten Tbn" -> 5, { "Trumpet 1", "Trumpet 2", "Alto Sax", "Tenor Sax", "Trombone" }
 bool expandHornFolder(const QString& folder, int& n, QStringList& instruments, bool& generic);
 QString hornFolderName(const QStringList& instruments);
+
+//! The horns in score order, with the abbreviation the folder names use: { "Trumpet", "Tpt" }, … , { "Bass Trombone", "Btb" }.
+//! The one table for filing (orgfiling), folder names (here) and the Band Guide's key (orghtml_home).
+const std::vector<std::pair<QString, QString> >& hornOrder();
+//! "Alto Sax" -> "Alt" ("" for anything that isn't a horn); "Alt" -> "Alto Sax" (the abbreviation itself when unknown)
+QString hornAbbr(const QString& instrument);
+QString hornFromAbbr(const QString& abbr);
 }

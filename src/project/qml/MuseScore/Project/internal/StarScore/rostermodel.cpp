@@ -21,14 +21,22 @@ void RosterModel::load()
 {
     const QString band = starScore()->bandFolder();
     if (band.isEmpty() || !QFileInfo(band).isDir()) {
-        m_roster = org::Roster::defaults();
+        m_roster = org::Roster();
         m_status = muse::qtrc("starscore", "Sheets and Demos wasn't found, so this list can't be saved yet.");
     } else {
         const org::Paths paths = org::Paths::make(band, QString());
-        m_roster.load(paths);
-        m_status = QFileInfo::exists(paths.toolkit + "/roster.json")
-                   ? muse::qtrc("starscore", "Changes rebuild every song's changelogs and Horn Part Guides at the next organization.")
-                   : muse::qtrc("starscore", "This is the band as of October 2026. Save to keep it in Sheets and Demos.");
+        const QString problem = m_roster.load(paths);
+        m_unreadable = !problem.isEmpty();
+        if (m_unreadable) {
+            // the file is there but can't be read: say so rather than show an empty band that a Save would write over it
+            m_status = muse::qtrc("starscore", "%1 Fix or remove it before editing the roster here.").arg(problem);
+        } else if (QFileInfo::exists(paths.toolkit + "/roster.json")) {
+            m_status = muse::qtrc("starscore", "Changes rebuild every song's changelogs and Horn Part Guides at the next organization.");
+        } else {
+            // no roster.json yet: the band isn't built into the program, so the list starts empty
+            m_status = muse::qtrc("starscore", "No roster yet. Add the band members and save to keep them in Sheets and Demos "
+                                               "(6 Inbox/.organizer/roster.json).");
+        }
     }
     m_dirty = false;
     emit changed();
@@ -103,6 +111,12 @@ bool RosterModel::save()
 {
     const QString band = starScore()->bandFolder();
     if (band.isEmpty() || !QFileInfo(band).isDir()) {
+        return false;
+    }
+    if (m_unreadable) {
+        // the band's roster is kept forever; an unreadable file is never replaced by this (empty) list
+        m_status = muse::qtrc("starscore", "Not saved: roster.json is there but couldn't be read. Fix or remove it first.");
+        emit changed();
         return false;
     }
     const bool ok = m_roster.save(org::Paths::make(band, QString()));

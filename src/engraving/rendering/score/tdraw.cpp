@@ -1745,14 +1745,20 @@ void TDraw::draw(const TextBlock& textBlock, const TextBase* item, Painter* pain
 //! Only drawing changes; the text itself is untouched.
 static bool starscoreDrawRaisedMc(const TextFragment& f, const TextBase* item, muse::draw::Painter* painter)
 {
+    // This runs for every text fragment drawn, so the common path (no "Mc" in the text) must stay cheap:
+    // a length test and a substring search on the fragment's own buffer, with nothing allocated.
     const String& text = f.text;
     const size_t n = text.size();
-    if (n < 3 || text.indexOf(u"Mc") == muse::nidx) {
+    if (n < 3) {
+        return false;
+    }
+    const size_t firstMc = text.indexOf(u"Mc");
+    if (firstMc == muse::nidx) {
         return false;
     }
 
-    std::vector<size_t> raised;   // indexes of the c's to raise
-    for (size_t i = 0; i + 2 < n; ++i) {
+    std::vector<size_t> raised;   // indexes of the c's to raise; allocated only once an "Mc" is known to exist
+    for (size_t i = firstMc; i + 2 < n; ++i) {
         const bool wordStart = i == 0 || !text.at(i - 1).isLetter();
         if (wordStart && text.at(i) == u'M' && text.at(i + 1) == u'c' && text.at(i + 2).isLetter() && text.at(i + 2).isUpper()) {
             raised.push_back(i + 1);

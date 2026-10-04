@@ -17,15 +17,29 @@
 #include <QRegularExpression>
 
 namespace mu::project::starscore::org {
-static const std::vector<std::pair<QString, QString> > HORN_ORDER {
-    { "Trumpet", "Tpt" }, { "Flugelhorn", "Flg" }, { "Flute", "Flu" }, { "Clarinet", "Cla" }, { "Soprano Sax", "Sop" },
-    { "Alto Sax", "Alt" }, { "Tenor Sax", "Ten" }, { "Bari Sax", "Bar" }, { "Bass Sax", "Bsx" }, { "Bass Clarinet", "Bcl" },
-    { "Trombone", "Tbn" }, { "Bass Trombone", "Btb" },
-};
-
-static QString hornFromAbbr(const QString& abbr)
+const std::vector<std::pair<QString, QString> >& hornOrder()
 {
-    for (const auto& [name, a] : HORN_ORDER) {
+    static const std::vector<std::pair<QString, QString> > HORN_ORDER {
+        { "Trumpet", "Tpt" }, { "Flugelhorn", "Flg" }, { "Flute", "Flu" }, { "Clarinet", "Cla" }, { "Soprano Sax", "Sop" },
+        { "Alto Sax", "Alt" }, { "Tenor Sax", "Ten" }, { "Bari Sax", "Bar" }, { "Bass Sax", "Bsx" }, { "Bass Clarinet", "Bcl" },
+        { "Trombone", "Tbn" }, { "Bass Trombone", "Btb" },
+    };
+    return HORN_ORDER;
+}
+
+QString hornAbbr(const QString& instrument)
+{
+    for (const auto& [name, a] : hornOrder()) {
+        if (name == instrument) {
+            return a;
+        }
+    }
+    return QString();
+}
+
+QString hornFromAbbr(const QString& abbr)
+{
+    for (const auto& [name, a] : hornOrder()) {
         if (a == abbr) {
             return name;
         }
@@ -81,7 +95,7 @@ QString hornFolderName(const QStringList& instruments)
     }
     QStringList parts;
     int total = 0;
-    for (const auto& [name, abbr] : HORN_ORDER) {
+    for (const auto& [name, abbr] : hornOrder()) {
         auto it = count.find(name);
         if (it != count.end()) {
             parts << (it->second > 1 ? QString::number(it->second) : QString()) + abbr;
@@ -235,6 +249,7 @@ Library buildLibrary(const ScanResult& scan, const std::map<QString, QString>& c
     std::map<QString, Raw> raw;
     static const QMap<QChar, QString> CAT { { '1', "orig" }, { '2', "cover" }, { '3', "vocal" } };
     static const QRegularExpression leadName("lead[_ ]?sheet", QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression songGroup("^[123] ");
 
     for (const FileEntry& f : scan.tree) {
         lib.totalFiles++;
@@ -250,18 +265,17 @@ Library buildLibrary(const ScanResult& scan, const std::map<QString, QString>& c
         QString name, cat, root;
         QStringList rest;
         if (seg[0] == "4 Works In Progress" && seg.size() >= 3) {
-            name = seg[1];
             cat = "wip";
             root = seg[0] + "/" + seg[1];
             rest = seg.mid(2);
-        } else if (seg.size() >= 2 && QRegularExpression("^[123] ").match(seg[0]).hasMatch()) {
-            name = seg[0].mid(2);
+        } else if (seg.size() >= 2 && songGroup.match(seg[0]).hasMatch()) {
             cat = CAT.value(seg[0].at(0));
             root = seg[0];
             rest = seg.mid(1);
         } else {
             continue;
         }
+        name = songTitleOf(root);
         Raw& r = raw[root];
         r.name = name;
         r.cat = cat;
@@ -292,13 +306,8 @@ Library buildLibrary(const ScanResult& scan, const std::map<QString, QString>& c
         if (!raw.count(root)) {
             Raw& r = raw[root];
             r.root = root;
-            if (root.startsWith("4 Works In Progress/")) {
-                r.name = root.mid(20);
-                r.cat = "wip";
-            } else {
-                r.name = root.mid(2);
-                r.cat = CAT.value(root.at(0), "orig");
-            }
+            r.name = songTitleOf(root);
+            r.cat = root.startsWith("4 Works In Progress/") ? QString("wip") : CAT.value(root.at(0), "orig");
         }
     }
 
@@ -373,9 +382,8 @@ Library buildLibrary(const ScanResult& scan, const std::map<QString, QString>& c
             } else if (folder == "Horn Part Guides") {
                 s.hornGuides = files;
             } else if (folder.startsWith("Update Notes")) {
-                if (s.updateNotes.isEmpty() || folder > s.updateNotes) {
-                    s.updateNotes = folder;
-                }
+                // known folder, nothing to list: SongInfo::updateNotes is set by the organizer after the folder
+                // is re-dated (the scan this library comes from predates that, and a fresh folder has no files yet)
             } else if (expandHornFolder(folder, n, instruments, generic)) {
                 ArrangementInfo a;
                 a.folder = folder;

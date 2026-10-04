@@ -47,5 +47,6 @@ private:
     starscore::org::Roster m_roster;
     QString m_status;
     bool m_dirty = false;
+    bool m_unreadable = false;    // roster.json is there but couldn't be read: never save over it
 };
 }

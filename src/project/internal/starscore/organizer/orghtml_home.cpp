@@ -162,15 +162,16 @@ QString bandGuideHtml(const Library& lib, const QDate& today)
          "<p style=\"margin:11px 0 2px;\">The number before <b>H</b> is how many horn players the arrangement is written for. Everything "
          "after it lists the instruments in score order, highest to lowest. A number in front of an instrument means more than one of "
          "them: <b>2Tpt</b> is two trumpet parts, <b>2Ten</b> is two tenor parts.</p>";
-    static const std::vector<std::pair<QString, QString> > HORN_KEY { { "Tpt", "Trumpet" }, { "Flg", "Flugelhorn" }, { "Flu", "Flute" },
-        { "Cla", "Clarinet" }, { "Sop", "Soprano sax" }, { "Alt", "Alto sax" }, { "Ten", "Tenor sax" }, { "Bar", "Bari sax" },
-        { "Bsx", "Bass sax" }, { "Bcl", "Bass clarinet" }, { "Tbn", "Trombone" }, { "Btb", "Bass trombone" } };
+    // the one horn table (orglibrary), written the guide's way: "Soprano sax", "Bass trombone"
+    const auto& horns = hornOrder();
+    const int half = (int(horns.size()) + 1) / 2;
     b += "<h2>The instrument codes</h2><table><tr><td style=\"width:50%;vertical-align:top;padding:0;\"><table class=\"keytab\">";
-    for (int i = 0; i < 12; ++i) {
-        if (i == 6) {
+    for (int i = 0; i < int(horns.size()); ++i) {
+        if (i == half) {
             b += "</table></td><td style=\"vertical-align:top;padding:0;\"><table class=\"keytab\">";
         }
-        b += QString("<tr><td class=\"ab\">%1</td><td>%2</td></tr>").arg(HORN_KEY[i].first, HORN_KEY[i].second);
+        const QString name = horns[i].first.left(1) + horns[i].first.mid(1).toLower();
+        b += QString("<tr><td class=\"ab\">%1</td><td>%2</td></tr>").arg(horns[i].second, name);
     }
     b += "</table></td></tr></table>";
     b += "<h2>The standard ladder</h2><p style=\"margin:2px 0 4px;\">Unless a tune says otherwise, arrangements are built up in this order:</p>"
@@ -328,12 +329,6 @@ static QString hornState(const SongInfo& d, int n)
     return !any ? "none" : score ? "score" : blank ? "blank" : "none";
 }
 
-struct Task {
-    QString tier, song, code, text, shortText;
-    int sc = 0, thisYear = 0, lastYear = 0, sub = 1, n = 0;
-    bool wip = false;
-};
-
 static const std::vector<std::array<QString, 3> > TIERS {
     { "3h", "3-horn arrangements", "Trumpet / alto / tenor, occasionally swapping the alto for something else. The whole point of the "
       "exercise &mdash; nothing else matters until these exist. Tunes with no 4-horn arrangement either come first: there is nothing "
@@ -348,7 +343,7 @@ static const std::vector<std::array<QString, 3> > TIERS {
       "&mdash; they are ordered by how often the tune gets played, so work top-down or follow your nose." },
 };
 
-static std::vector<Task> buildTasks(const Library& lib, const PlayCounts& plays)
+std::vector<Task> buildTasks(const Library& lib, const PlayCounts& plays)
 {
     static const QMap<QString, QString> SHORT { { "none", "write it" }, { "score", "extract parts &mdash; score exists" },
         { "blank", "fill in the blank parts" }, { "thin", "finish it &mdash; runs short" } };
@@ -584,7 +579,7 @@ static QString mark(const QString& st)
            : "<span class=\"sq s-none\"></span>";
 }
 
-QString progressHtml(const Library& lib, const PlayCounts& plays, const QDate& today)
+QString progressHtml(const Library& lib, const PlayCounts& plays, const std::vector<Task>& tasks, const QDate& today)
 {
     const auto songs = ordered(lib);
     const int tot = std::max<int>(1, int(songs.size()));
@@ -596,7 +591,6 @@ QString progressHtml(const Library& lib, const PlayCounts& plays, const QDate& t
         thN += d->status.three == "done";
     }
     const int pct = int(std::lround(100.0 * p1 / tot));
-    const std::vector<Task> tasks = buildTasks(lib, plays);
     const int y = plays.year ? plays.year : today.year();
 
     QString b = "<div class=\"hero\"><h1>Progress tracker</h1><div class=\"sub\">Starsign &middot; Sheets and Demos &middot; for Joel</div></div>";
@@ -808,7 +802,12 @@ QString progressHtml(const Library& lib, const PlayCounts& plays, const QDate& t
                     continue;
                 }
                 QString nm = i.file;
-                nm.remove(QRegularExpression("^" + d->code + " - ")).remove(QRegularExpression("\\.pdf$"));
+                if (nm.startsWith(d->code + " - ")) {
+                    nm = nm.mid(d->code.size() + 3);
+                }
+                if (nm.endsWith(".pdf")) {
+                    nm.chop(4);
+                }
                 out << QString("%1 <span class=\"dim\">(%2)</span>").arg(esc(nm), esc(i.folder));
             }
             return out.isEmpty() ? QString("<span class=\"dim\">&mdash;</span>") : out.join(", ");
@@ -913,10 +912,9 @@ QString logEntryHtml(const QJsonObject& e, bool newest)
     return b + "</div>";
 }
 
-QString maintenanceHtml(const Library& lib, const PlayCounts& plays, const QJsonArray& log, const QDate& today, int hornGuides,
+QString maintenanceHtml(const Library& lib, const std::vector<Task>& tasks, const QJsonArray& log, const QDate& today, int hornGuides,
                         int changelogs)
 {
-    const std::vector<Task> tasks = buildTasks(lib, plays);
     const int tot = int(lib.songs.size());
     int p1 = 0, blanks = 0, shorts = 0, guides = 0;
     for (const SongInfo& d : lib.songs) {
@@ -926,8 +924,20 @@ QString maintenanceHtml(const Library& lib, const PlayCounts& plays, const QJson
         }
     }
     guides = tot;
+    // The PDF shows the last twelve months. maintlog.json keeps every entry forever; printing all of them made the
+    // report grow by a page or so every month (Oct 2026).
+    const QString since = today.addMonths(-12).toString(Qt::ISODate);
+    QJsonArray recent;
+    int older = 0;
+    for (const QJsonValue& v : log) {
+        if (v.toObject().value("date").toString() >= since) {
+            recent.append(v);
+        } else {
+            ++older;
+        }
+    }
     QString b = "<div class=\"hero\"><h1>Maintenance report</h1><div class=\"sub\">Starsign &middot; Sheets and Demos &middot; every "
-                "update to this drive, newest first</div></div>";
+                "update to this drive in the last twelve months, newest first</div></div>";
     b += QString("<div class=\"tiles\"><div class=\"tile\"><div class=\"big\">%1</div><div class=\"lab\">Files tracked</div></div>"
                  "<div class=\"tile\"><div class=\"big\">%2</div><div class=\"lab\">Songs</div></div>"
                  "<div class=\"tile\"><div class=\"big\">%3<span style=\"font-size:12pt;color:#8b90a0;\">/%2</span></div><div class=\"lab\">Phase 1 done</div></div>"
@@ -951,9 +961,14 @@ QString maintenanceHtml(const Library& lib, const PlayCounts& plays, const QJson
         b += QString("<tr><td class=\"kk\">%1</td><td class=\"v\">%2</td></tr>").arg(k, v);
     }
     b += "</table><div class=\"note\">This log is added to, never overwritten. If something looks wrong after an update, the entry that "
-         "caused it is right here.</div><h2>Session log</h2>";
+         "caused it is right here.</div><h2>Session log</h2>"
+         "<p class=\"dim\" style=\"font-size:8.8pt;margin:0 0 4px;\">The last twelve months (since " + prettyDate(since) + "). "
+         + (older ? QString("%1 older %2 in <span class=\"mono\">6 Inbox/.organizer/maintlog.json</span>, which keeps every entry.")
+            .arg(older).arg(older == 1 ? "entry is" : "entries are")
+            : QString("Every entry so far is shown; <span class=\"mono\">6 Inbox/.organizer/maintlog.json</span> keeps them all."))
+         + "</p>";
     bool newest = true;
-    for (const QJsonValue& v : log) {
+    for (const QJsonValue& v : recent) {
         b += logEntryHtml(v.toObject(), newest);
         newest = false;
     }

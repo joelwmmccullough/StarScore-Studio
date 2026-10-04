@@ -74,6 +74,7 @@ private:
     void render(std::shared_ptr<Run> r);
     void deploy(std::shared_ptr<Run> r);
     void finish(std::shared_ptr<Run> r);
+    void saveCodesAndRecordings(std::shared_ptr<Run> r);
 
     Paths m_paths;
     Fetcher m_fetch;

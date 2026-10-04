@@ -25,6 +25,7 @@
 #include "types/ret.h"
 #include "async/promise.h"
 #include "async/notification.h"
+#include "io/path.h"
 
 #include "modularity/imoduleinterface.h"
 
@@ -44,5 +45,11 @@ public:
 
     virtual bool hasUpdate() const = 0;
     virtual async::Promise<Ret> showUpdate() = 0;
+
+    // StarScore: called from the quit path once the app is really closing with a downloaded installer. On macOS
+    // the real implementation starts a detached script that replaces the installed app from the dmg after we have
+    // exited and relaunches it; it returns false when it could not start that script, and the caller then falls
+    // back to simply opening the installer (MuseScore's behaviour). Defaulted so the stub module needs no change.
+    virtual bool startInstallerOnQuit(const io::path_t& installerPath) { (void)installerPath; return false; }
 };
 }

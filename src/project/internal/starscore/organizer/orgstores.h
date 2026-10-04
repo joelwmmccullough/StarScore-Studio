@@ -46,12 +46,17 @@ struct Player {
     static Player fromJson(const QJsonObject& o);
 };
 
+//! "roster.json is there but can't be read (…)" — the message a loader returns for a data file that exists but
+//! can't be read; "" when the file was read or isn't there. The run stops on it (see Organizer::run).
+QString unreadableMessage(const QString& fileName, const JsonRead& read);
+
 class Roster
 {
 public:
-    void load(const Paths& paths);
+    //! Returns unreadableMessage() for a roster.json that is there but can't be read, else "". A missing file
+    //! leaves the roster empty: the band lives in roster.json (Dashboard > Band roster), never in the program.
+    QString load(const Paths& paths);
     bool save(const Paths& paths) const;
-    static Roster defaults();
 
     std::vector<Player> players;
     //! Old sheets named after a player ("Seagrass-Name.pdf"): first name -> instrument, for filing them
@@ -68,12 +73,20 @@ public:
 class Codes
 {
 public:
-    void load(const Paths& paths);
+    //! Returns unreadableMessage() for a codes file that is there but can't be read, else ""
+    QString load(const Paths& paths);
     bool saveBand(const Paths& paths) const;
     bool saveProjects(const Paths& paths) const;
+    //! Save after a run: the file is read again and merged first, because "Add song" or a registration in StarScore
+    //! may have written it while the run was going. Only entries this run added or changed are written over; an
+    //! entry the file gained meanwhile is kept. Nothing is written when the result equals the file. Returns false
+    //! only when a write failed; a file that is there but unreadable is left alone (problem says so).
+    bool saveBandMerged(const Paths& paths, QString* problem = nullptr) const;
+    bool saveProjectsMerged(const Paths& paths, QString* problem = nullptr) const;
 
     std::map<QString, QString> band;      // "1 Amplitudes" -> "AMPL"
     std::map<QString, QString> projects;  // "Amplitudes" -> "AMPL"
+    std::map<QString, QString> bandLoaded, projectsLoaded;   // as read at the start of the run
     bool bandChanged = false;
     bool projectsChanged = false;
 
@@ -86,11 +99,20 @@ QString suggestCode(const QString& title, const QStringList& taken);
 
 //! A JSON file kept as it is, with the parts StarScore doesn't know about left alone
 struct JsonStore {
+    explicit JsonStore(QString fileName)
+        : file(std::move(fileName)) {}
+
     QString file;            // relative to the toolkit folder
-    QJsonDocument doc;
+    QJsonDocument doc;       // the working copy
+    QJsonDocument loaded;    // as read at the start of the run (to see whether the file changed meanwhile)
     bool changed = false;
 
-    bool load(const QString& folder);
+    //! Returns unreadableMessage() for a file that is there but can't be read, else "" (missing = empty doc)
+    QString load(const QString& folder);
     bool save(const QString& folder);
+    //! The file as it is now: ok() false when it is there but can't be read (then don't write over it)
+    JsonRead reread(const QString& folder) const;
+    //! Has the file on disk changed since load()?
+    bool changedOnDisk(const JsonRead& now) const;
 };
 }

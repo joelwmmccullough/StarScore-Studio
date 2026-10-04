@@ -1768,10 +1768,13 @@ void TextBase::createBlocks(LayoutData* ldata) const
             } else {
                 if (symState) {
                     sym += c;
-                } else if (!isHarmony() && hasSymbolSize() && cursor.format()->fontFamily() != u"ScoreText"
-                           && c.unicode() >= 0x266D && c.unicode() <= 0x266F) {
+                } else if (c.unicode() >= 0x266D && c.unicode() <= 0x266F
+                           && !isHarmony() && hasSymbolSize() && cursor.format()->fontFamily() != u"ScoreText") {
                     // StarScore: a typed ♭ ♮ ♯ ("Trumpet in B♭") is drawn as the music font's accidental, like an
-                    // inserted symbol, so it gets the same size and position (text fonts often have no such glyph)
+                    // inserted symbol, so it gets the same size and position (text fonts often have no such glyph).
+                    // The character range test comes first: this runs for every character of every text on every
+                    // layout, and the font-family string compare is the expensive part. plainText() maps the
+                    // fragment back to the typed character, so part names and exports keep their ♭.
                     static const SymId ACCS[] = { SymId::accidentalFlat, SymId::accidentalNatural, SymId::accidentalSharp };
                     const SymId id = ACCS[c.unicode() - 0x266D];
                     CharFormat fmt = *cursor.format();
@@ -2420,10 +2423,34 @@ String TextBase::plainText() const
         text = tmpText.get();
     }
 
+    // StarScore: createBlocks() turns a typed ♭ ♮ ♯ into a music-font (ScoreText) accidental fragment. Without
+    // this mapping the plain text carried the font's private-use code instead, so part names lost their
+    // accidental ("Trumpet in B♭" came out as "Trumpet in B" in MusicXML and the mixer). The three codes map
+    // back to the characters the user typed; an inserted <sym>accidentalFlat</sym> maps the same way.
+    const IEngravingFontPtr fallback = score() ? score()->engravingFonts()->fallbackFont() : nullptr;
+    const char32_t flatCode = fallback ? fallback->symCode(SymId::accidentalFlat) : 0;
+    const char32_t naturalCode = fallback ? fallback->symCode(SymId::accidentalNatural) : 0;
+    const char32_t sharpCode = fallback ? fallback->symCode(SymId::accidentalSharp) : 0;
+
     const LayoutData* tmlldata = text->ldata();
     for (const TextBlock& block : tmlldata->blocks) {
         for (const TextFragment& f : block.fragments()) {
-            s += f.text;
+            if (fallback && f.format.fontFamily() == u"ScoreText") {
+                for (size_t i = 0; i < f.text.size(); ++i) {
+                    const char32_t c = f.text.at(i).unicode();
+                    if (c == flatCode) {
+                        s += Char(u'♭');
+                    } else if (c == naturalCode) {
+                        s += Char(u'♮');
+                    } else if (c == sharpCode) {
+                        s += Char(u'♯');
+                    } else {
+                        s += f.text.at(i);
+                    }
+                }
+            } else {
+                s += f.text;
+            }
         }
         if (block.eol()) {
             s += Char::LineFeed;

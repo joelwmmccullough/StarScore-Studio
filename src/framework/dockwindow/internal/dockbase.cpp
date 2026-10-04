@@ -382,8 +382,16 @@ void DockBase::setIsCompact(bool compact)
         return;
     }
 
-    if (compact && m_nonCompactWidth <= 0) {
-        m_nonCompactWidth = width();
+    // StarScore: the width to come back to is recorded when the dock goes compact (the window sets it from the
+    // content width first; width() is the fallback) and forgotten when it expands again, so the next compaction
+    // measures afresh. It used to be kept forever, so a toolbar whose content grew while compact never got the
+    // room it needed back.
+    if (compact) {
+        if (m_nonCompactWidth <= 0) {
+            m_nonCompactWidth = width();
+        }
+    } else {
+        m_nonCompactWidth = 0;
     }
 
     m_isCompact = compact;

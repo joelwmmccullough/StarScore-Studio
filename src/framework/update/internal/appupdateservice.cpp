@@ -23,6 +23,8 @@
 #include "appupdateservice.h"
 
 #include <QBuffer>
+#include <QFile>
+#include <QFileInfo>
 #include <QJsonParseError>
 #include <QJsonObject>
 #include <QJsonValue>
@@ -31,9 +33,17 @@
 
 #include "update/updateerrors.h"
 
+#include "async/async.h"
 #include "defer.h"
 #include "translation.h"
 #include "log.h"
+
+#include "starscoregithubrelease.h"
+
+// StarScore: the running StarScore version (version.cmake), the one compared with the GitHub release name.
+#ifndef STARSCORE_VERSION_STR
+#define STARSCORE_VERSION_STR "1.0.0"
+#endif
 
 using namespace muse;
 using namespace muse::update;
@@ -167,7 +177,9 @@ Promise<RetVal<ReleaseInfo> > AppUpdateService::checkForUpdate()
                 return;
             }
 
-            Version current(application()->fullVersion());
+            // StarScore: compares StarScore versions (1.15.10 vs 1.16.0), not MuseScore's 4.7.5, when the
+            // release came from GitHub.
+            Version current(currentAppVersion());
             Version update(releaseInfo.val.version);
 
             bool allowUpdateOnPreRelease = configuration()->allowUpdateOnPreRelease();
@@ -186,6 +198,13 @@ Promise<RetVal<ReleaseInfo> > AppUpdateService::checkForUpdate()
             }
 
             m_lastCheckResult = releaseInfo;
+
+            if (isStarScoreGitHubSource()) {
+                // StarScore: the release body already is the changelog block for this version; there is no
+                // separate "all releases" feed to fetch, so previousReleasesNotes stays empty.
+                (void)resolve(m_lastCheckResult);
+                return;
+            }
 
             downloadPreviousReleasesNotes(update, [this, resolve](const PrevReleasesNotesList& notes) {
                 m_lastCheckResult.val.previousReleasesNotes = notes;
@@ -209,6 +228,11 @@ RetVal<Progress> AppUpdateService::downloadRelease()
     }
 
     const ReleaseInfo info = m_lastCheckResult.val;
+
+    if (isStarScoreGitHubSource()) {
+        return downloadStarScoreRelease(info);
+    }
+
     const QUrl fileUrl = QUrl::fromUserInput(QString::fromStdString(info.fileUrl));
     auto buff = std::make_shared<QBuffer>();
 
@@ -253,6 +277,12 @@ RetVal<Progress> AppUpdateService::downloadRelease()
 RequestHeaders AppUpdateService::prepareHeaders(const UpdateRequestHistory& history) const
 {
     RequestHeaders headers = configuration()->updateHeaders();
+
+    // StarScore: the "installed week" / "previous request day" headers are MuseScore's usage statistics;
+    // they mean nothing to GitHub and are not sent there.
+    if (isStarScoreGitHubSource()) {
+        return headers;
+    }
 
     if (history.isValid()) {
         std::string iwbString = history.installedWeekBeginning.toString(Qt::ISODate).toStdString();
@@ -309,6 +339,12 @@ Ret AppUpdateService::writeUpdateRequestHistory(const io::path_t& path, const Up
 
 RetVal<ReleaseInfo> AppUpdateService::parseRelease(const QByteArray& json) const
 {
+    if (isStarScoreGitHubSource()) {
+        return parseStarScoreRelease(json);
+    }
+
+    // MuseScore's own feed (updates.musescore.org): kept so the module still works against it, but unused by
+    // StarScore Studio, see UpdateConfiguration::checkForAppUpdateUrl().
     QJsonParseError err;
     QJsonDocument jsonDoc = QJsonDocument::fromJson(json, &err);
     if (err.error != QJsonParseError::NoError || !jsonDoc.isObject()) {
@@ -444,7 +480,148 @@ void AppUpdateService::clear()
 {
     m_lastCheckResult = RetVal<ReleaseInfo>::make_ok(ReleaseInfo());
 
+    // StarScore: updateDataPath() is the user's Downloads folder now, so MuseScore's wipe of that folder on
+    // macOS/Windows must not run (it would delete the user's downloads). The MuseScore feed path keeps it.
+    if (isStarScoreGitHubSource()) {
+        return;
+    }
+
 #if !defined(Q_OS_LINUX)
     fileSystem()->remove(configuration()->updateDataPath());
 #endif
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// StarScore: GitHub releases as the update source
+// ---------------------------------------------------------------------------------------------------------------
+
+bool AppUpdateService::isStarScoreGitHubSource() const
+{
+    const QUrl url(QString::fromStdString(configuration()->checkForAppUpdateUrl()));
+    return url.host() == "api.github.com";
+}
+
+Version AppUpdateService::currentAppVersion() const
+{
+    return isStarScoreGitHubSource() ? Version(std::string(STARSCORE_VERSION_STR)) : application()->fullVersion();
+}
+
+RetVal<ReleaseInfo> AppUpdateService::parseStarScoreRelease(const QByteArray& json) const
+{
+    QString error;
+    const StarScoreGitHubRelease release = pickNewestStarScoreRelease(json, &error);
+    if (!release.isValid()) {
+        // No comparable mac build at all (for example only "build N" releases without a version) is not an error
+        // worth a dialog: the user simply has nothing newer to install.
+        LOGI() << error;
+        return make_ret(Err::NoUpdate);
+    }
+
+    RetVal<ReleaseInfo> result;
+    result.ret = muse::make_ok();
+    result.val.version = release.version.toStdString();
+    result.val.fileName = QString("StarScore Studio %1.dmg").arg(release.version).toStdString();
+    result.val.fileUrl = release.assetUrl.toStdString();
+    // GitHub may hand the body back with Windows line endings; the dialog renders it as markdown.
+    result.val.notes = QString(release.notes).replace("\r\n", "\n").toStdString();
+    result.val.additionInfo["fileSize"] = Val(static_cast<int64_t>(release.assetSize));
+    result.val.additionInfo["tagName"] = Val(release.tagName.toStdString());
+
+    return result;
+}
+
+RetVal<Progress> AppUpdateService::downloadStarScoreRelease(const ReleaseInfo& info)
+{
+    const path_t downloadsDir = configuration()->updateDataPath();
+    path_t installerPath = downloadsDir + "/" + info.fileName;
+
+    const auto fileSizeIt = info.additionInfo.find("fileSize");
+    const int64_t expectedSize = fileSizeIt != info.additionInfo.end() ? fileSizeIt->second.toInt64() : 0;
+
+    m_updateProgress.start();
+
+    // The dmg may already be in Downloads (the owner keeps them there, or a previous attempt got this far).
+    // Reuse it when its size matches what GitHub reports. A same-named file of another size is somebody's file
+    // (the rule here: never delete the user's files), so the download goes to "… (2).dmg" instead.
+    const QFileInfo existing(installerPath.toQString());
+    if (existing.exists() && expectedSize > 0 && existing.size() != expectedSize) {
+        const QString base = QFileInfo(info.fileName.c_str()).completeBaseName();
+        for (int i = 2;; ++i) {
+            const path_t candidate = downloadsDir + "/" + QString("%1 (%2).dmg").arg(base).arg(i).toStdString();
+            const QFileInfo c(candidate.toQString());
+            if (!c.exists() || c.size() == expectedSize) {
+                installerPath = candidate;
+                break;
+            }
+        }
+    }
+    const QString installerQPath = installerPath.toQString();
+    const QString partQPath = installerQPath + ".part";
+    const QFileInfo chosen(installerQPath);
+    if (chosen.exists() && expectedSize > 0 && chosen.size() == expectedSize) {
+        LOGI() << "using the already downloaded " << installerPath;
+        // The caller connects to finished() only after this returns, so finish on the next event loop turn.
+        async::Async::call(this, [this, installerPath]() {
+            m_updateProgress.finish(ProgressResult::make_ok(Val(installerPath)));
+        });
+        return RetVal<Progress>::make_ok(m_updateProgress);
+    }
+
+    fileSystem()->makePath(downloadsDir);
+
+    // Stream straight into "<name>.dmg.part" instead of holding the whole 170 MB in memory; the finished file is
+    // renamed into place, so a half-downloaded dmg never sits in Downloads under the real name.
+    auto partFile = std::make_shared<QFile>(partQPath);
+    const QUrl fileUrl = QUrl::fromUserInput(QString::fromStdString(info.fileUrl));
+
+    // GitHub redirects browser_download_url to its object store; the network manager follows that. Only the
+    // User-Agent goes along: the API-specific Accept header is for api.github.com, not for the file server.
+    RequestHeaders downloadHeaders;
+    downloadHeaders.knownHeaders = configuration()->updateHeaders().knownHeaders;
+
+    RetVal<Progress> downloadProgress = m_networkManager->get(fileUrl, partFile, downloadHeaders);
+    if (!downloadProgress.ret) {
+        m_updateProgress.finish(ProgressResult::make_ret(downloadProgress.ret));
+        return RetVal<Progress>::make_ret(downloadProgress.ret);
+    }
+
+    m_updateProgress.canceled().onNotify(this, [this, downloadProgress]() {
+        Progress mutProgress = downloadProgress.val;
+        mutProgress.cancel();
+        m_updateProgress.canceled().disconnect(this);
+    });
+
+    downloadProgress.val.progressChanged().onReceive(this, [this](int64_t current, int64_t total, const std::string& msg) {
+        m_updateProgress.progress(current, total, msg);
+    });
+
+    downloadProgress.val.finished().onReceive(this, [this, installerPath, installerQPath, partQPath, partFile,
+                                                     expectedSize](const ProgressResult& res) {
+        partFile->close();
+
+        if (!res.ret) {
+            QFile::remove(partQPath);
+            m_updateProgress.finish(ProgressResult::make_ret(res.ret));
+            return;
+        }
+
+        const int64_t downloadedSize = QFileInfo(partQPath).size();
+        if (expectedSize > 0 && downloadedSize != expectedSize) {
+            QFile::remove(partQPath);
+            LOGE() << "downloaded " << downloadedSize << " bytes, GitHub reports " << expectedSize;
+            m_updateProgress.finish(ProgressResult::make_ret(make_ret(Err::NetworkError, "Incomplete download")));
+            return;
+        }
+
+        if (!QFile::rename(partQPath, installerQPath)) {
+            QFile::remove(partQPath);
+            m_updateProgress.finish(ProgressResult::make_ret(make_ret(Err::UnknownError,
+                                                                      "Could not write " + installerPath.toStdString())));
+            return;
+        }
+
+        m_updateProgress.finish(ProgressResult::make_ok(Val(installerPath)));
+    });
+
+    return RetVal<Progress>::make_ok(m_updateProgress);
 }

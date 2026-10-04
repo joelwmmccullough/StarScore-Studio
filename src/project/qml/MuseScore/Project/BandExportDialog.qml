@@ -113,22 +113,26 @@ StyledDialogView {
             Layout.fillHeight: true
             visible: root.listMode
             spacing: 2
-            model: exportModel.items
+            // the model itself is the list (one row per folder header and sheet); a tick updates its row in place
+            model: exportModel
 
             delegate: Item {
-                required property var modelData
+                id: row
                 required property int index
+                required property bool header
+                required property string name
+                required property bool checked
                 width: list.width
-                height: modelData.header ? 34 : 28
+                height: row.header ? 34 : 28
 
                 CheckBox {
                     anchors.left: parent.left
-                    anchors.leftMargin: modelData.header ? 0 : 28
+                    anchors.leftMargin: row.header ? 0 : 28
                     anchors.verticalCenter: parent.verticalCenter
-                    text: modelData.name
-                    font: modelData.header ? ui.theme.bodyBoldFont : ui.theme.bodyFont
-                    checked: modelData.checked
-                    onClicked: exportModel.setChecked(index, !checked)
+                    text: row.name
+                    font: row.header ? ui.theme.bodyBoldFont : ui.theme.bodyFont
+                    checked: row.checked
+                    onClicked: exportModel.setChecked(row.index, !row.checked)
                 }
             }
         }
@@ -199,6 +203,8 @@ StyledDialogView {
             Item { Layout.fillHeight: true }
         }
 
+        // the plan's notes before the export, the export's result after it: one binding, never assigned to
+        // (an assignment used to replace the binding, so the notes came back when the model reloaded)
         StyledTextLabel {
             id: resultLabel
             Layout.fillWidth: true
@@ -208,7 +214,7 @@ StyledDialogView {
             wrapMode: Text.WordWrap
             visible: root.done || (exportModel.notes !== "" && root.listMode)
             color: root.done ? ui.theme.fontPrimaryColor : ui.theme.fontSecondaryColor
-            text: exportModel.notes
+            text: root.done ? exportModel.result : exportModel.notes
         }
 
         CheckBox {
@@ -245,9 +251,8 @@ StyledDialogView {
                 buttonRole: ButtonBoxModel.ApplyRole
                 buttonId: ButtonBoxModel.CustomButton + 1
                 onClicked: {
-                    resultLabel.text = qsTrc("starscore", "Exporting…")
                     root.done = true
-                    resultLabel.text = exportModel.exportNow()
+                    exportModel.exportNow()    // its summary shows through exportModel.result
                     if (exportModel.runOrganizer) {
                         exportModel.openOrganizer()
                         root.hide()

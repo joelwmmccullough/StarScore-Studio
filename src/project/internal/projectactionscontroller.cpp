@@ -892,6 +892,11 @@ bool ProjectActionsController::closeOpenedProject(bool goToHome)
     if (starScoreService()->isSoloProject(project.get())) {
         starScoreService()->showMainScore();
         project = currentNotationProject();
+        if (!project) {
+            // showMainScore() could not bring the main score back, so there is nothing left to close:
+            // same answer as when no project was open to begin with (this used to dereference null)
+            return true;
+        }
     }
 
     bool result = true;

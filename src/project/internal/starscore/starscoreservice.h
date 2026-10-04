@@ -5,11 +5,15 @@
  */
 #pragma once
 
+#include <map>
+#include <optional>
 #include <set>
 
 #include <QJsonObject>
+#include <QObject>
 
 #include "../../istarscoreservice.h"
+#include "global/types/string.h"
 
 #include "modularity/ioc.h"
 #include "async/asyncable.h"
@@ -205,7 +209,6 @@ public:
         std::vector<StarScoreArrangement> arrangements;
         std::vector<StarScoreSolo> solos;
         std::vector<StarScoreReference> references;
-        std::map<QString, QString> referenceForScore;   // part score name ("" = main score) -> reference shown with it
         QString version;   // "4.0.1"; printed in the footer
         std::map<QString, QString> partStatus;   // part id -> status key
         // Big Band, Orchestra and Marching Band: their full score has a status of its own (arrangement id ->
@@ -241,11 +244,17 @@ public:
     static QString toJson(const Data& data);
     static QString statusKey(StarScoreStatus status);
     static StarScoreStatus statusFromKey(const QString& key);
-    static QString idTextOf(const mu::engraving::Part* part);
+    static QString idTextOf(const mu::engraving::Part* part);   // the same as idText (defined in starscoreaudit.cpp)
     //! Big Band, Orchestra and Marching Band are the arrangements whose full score has its own status
     static bool hasOwnScoreStatus(const QString& arrangementTemplateKey);
     //! The full score's own status of such an arrangement (Empty when it has none yet)
     static StarScoreStatus ownScoreStatus(const Data& data, const StarScoreArrangement& arrangement);
+    //! A rhythm-section instrument's role: "drums", "percussion", "bass", "guitar" or "keys". The one classifier
+    //! behind a section's automatic status (who reads the lead sheet) and the to-do list's rhythm steps.
+    static QString rhythmRole(const QString& instrumentId);
+    //! Main-score parts of the parts in a part score (each part score staff is linked to a main-score staff);
+    //! empty for the main score itself
+    static std::vector<mu::engraving::Part*> masterPartsOf(const mu::engraving::Score* score, const mu::engraving::MasterScore* ms);
 
 private:
     //! Organizer: per-bar signatures of a sheet ({bars: [...], marks: {bar: "A"}}), and the 1-3 horn parts analysed
@@ -263,7 +272,26 @@ private:
     void listenCurrentProject();
     Data load() const;
     void store(const Data& data);
+    //! The score's StarScore data. Parsing the "starscore" meta tag on every query made each panel refresh parse
+    //! it dozens of times, so the result is cached per score and reused while the tag and the instruments are
+    //! the same (store() rewrites the tag, which is what invalidates it).
     Data loadFrom(const mu::engraving::MasterScore* score) const;
+    struct LoadCacheEntry {
+        muse::String tag;
+        QString parts;   // the parts' ids and instruments, which loadFrom's result also depends on
+        Data data;
+    };
+    mutable std::map<const mu::engraving::MasterScore*, LoadCacheEntry> m_loadCache;
+    //! The sections with their derived "on" flag worked out from the instruments showing
+    std::vector<StarScoreSection> sectionsWithOn(const Data& data) const;
+    //! The open project whose main score this is (the main project, a solo project or the current one)
+    std::shared_ptr<INotationProject> projectOf(const mu::engraving::MasterScore* score) const;
+    //! changed() is fired once from the event loop however many stores and undo-stack changes asked for it:
+    //! every listener re-reads everything when it fires
+    void scheduleChanged();
+    bool m_changedScheduled = false;
+    //! Not a QObject itself: the context for its timers, so a pending timer is dropped with the service
+    QObject m_timerGuard;
     std::vector<StarScoreFileArrangement> summarizeArrangements(const Data& data, const StarScoreAuditReport& report) const;
     void storeTo(mu::engraving::MasterScore* score, const Data& data, const std::shared_ptr<INotationProject>& project);
 
@@ -282,7 +310,8 @@ private:
     QStringList onSectionIds(const Data& data) const;
     std::vector<mu::engraving::Part*> masterPartsOf(const mu::engraving::Excerpt* excerpt) const;
     void addPartBooksFor(const QStringList& partIds);
-    int applyStylesOnly(const QStringList& partIds);
+    int applyStylesOnly(const QStringList& partIds, const Data& data);
+    void syncMinMajDefaults(const Data& data);
     //! Sound, volume, pan, reverb and mute for each instrument, from the defaults in mixer_defaults.json
     void applyMixerDefaults(const QStringList& partIds);
     void standardizeImported();
@@ -297,7 +326,7 @@ private:
     //! Name the new parts, hide default-hidden parts/staves, make part books; returns the new section
     StarScoreSection finishNewParts(const std::vector<mu::engraving::Part*>& newParts,
                                     const std::vector<StarScoreInstrument>& instruments);
-    const StarScoreSectionTemplate* sectionTemplate(const QString& key) const;
+    std::optional<StarScoreSectionTemplate> sectionTemplate(const QString& key) const;
     static void autoHideLeadBassStaff(const notation::IMasterNotationPtr& master, mu::engraving::Part* part);
     void removePartsKeepingSystemObjects(const QStringList& partIdsToRemove);
     static void removePartsKeepingSystemObjects(const notation::IMasterNotationPtr& master, const QStringList& partIdsToRemove);
@@ -310,8 +339,11 @@ private:
         std::vector<StarScoreStyleRule> rules;
     };
     void installBuiltinDefaultStyle();
+    //! starscore_styles.json, read once and kept until saveStyleSettings() writes it (it was re-read on every
+    //! defaultStylePath() / styleRules() / bandFolder() call, several times per refresh)
     StyleSettings loadStyleSettings() const;
     void saveStyleSettings(const StyleSettings& settings);
+    mutable std::optional<StyleSettings> m_styleSettings;
 
     static QString uniqueId(const QStringList& taken, const QString& base);
     static QString idText(const mu::engraving::Part* part);
@@ -330,6 +362,7 @@ private:
     void showOldAlternates();
     //! The horn part scores show their exported title (instrument name, arrangement label); see starscorebandexport.cpp
     int labelPartBooks();
+    std::vector<StarScoreTodoItem> todoList(const Data& data) const;   // starscoretodo.cpp
     //! The to-do list as a printable page (HTML for the organizer's PDF printer)
     QString todoPdfHtml(const QString& title, const QString& code, const QString& version) const;
     //! Horn parts are named "7H: Bari Sax", "3H Flexible: Horn 1"…; returns how many were renamed

@@ -47,6 +47,40 @@ QJsonObject readJsonObject(const QString& path)
     return readJson(path).object();
 }
 
+JsonRead readJsonChecked(const QString& path)
+{
+    JsonRead r;
+    r.exists = QFileInfo::exists(path);
+    if (!r.exists) {
+        return r;
+    }
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly)) {
+        r.error = f.errorString();
+        return r;
+    }
+    const QByteArray data = f.readAll();
+    if (data.trimmed().isEmpty()) {
+        // a cloud-only placeholder reads as empty, as does a file that is still being written
+        r.error = "the file is empty";
+        return r;
+    }
+    QJsonParseError err;
+    r.doc = QJsonDocument::fromJson(data, &err);
+    if (err.error != QJsonParseError::NoError) {
+        r.error = err.errorString();
+        return r;
+    }
+    r.ok = true;
+    return r;
+}
+
+QString songTitleOf(const QString& songRoot)
+{
+    static const QString WIP = "4 Works In Progress/";
+    return songRoot.startsWith(WIP) ? songRoot.mid(WIP.size()) : songRoot.mid(2);
+}
+
 bool writeText(const QString& path, const QByteArray& data)
 {
     QDir().mkpath(QFileInfo(path).absolutePath());

@@ -28,6 +28,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QRegularExpression>
+#include <QSaveFile>
 #include <QSettings>
 #include <QUuid>
 
@@ -59,7 +60,7 @@
 #include "starscorepdf.h"
 #include "organizer/orgplatform.h"
 
-#include "io/filestream.h"
+#include "io/buffer.h"
 #include "global/serialization/zipreader.h"
 #include "translation.h"
 #include "log.h"
@@ -192,8 +193,25 @@ static QString starscoreRhythmName(const QString& id, const QString& partName)
 
 static QString starscoreSafeFileName(QString s)
 {
-    s.replace(QRegularExpression("[/:\\\\]"), "-");
+    static const QRegularExpression unsafe("[/:\\\\]");
+    s.replace(unsafe, "-");
     return s.trimmed();
+}
+
+//! "AMPL - Amplitudes" -> (AMPL, Amplitudes): the song code and the rest of a file name
+static const QRegularExpression& starscoreCodedNameRe()
+{
+    static const QRegularExpression re("^([A-Z]{3,4})\\s*-\\s*(.*)$");
+    return re;
+}
+
+//! "1 Amplitudes" -> "amplitudes": a song folder's name without its number, in lower case
+static QString starscorePlainFolderName(const QString& folder)
+{
+    static const QRegularExpression number("^\\d+\\s+");
+    QString n = folder.section('/', -1);
+    n.remove(number);
+    return n.trimmed().toLower();
 }
 
 static bool starscoreIsUntitled(const QString& title)
@@ -202,10 +220,14 @@ static bool starscoreIsUntitled(const QString& title)
     return t.isEmpty() || t == "untitled score" || t == "untitled";
 }
 
-//! The text of the Title in the score's title frame
+//! The text of the Title in the score's title frame (the first vertical frame; a horizontal or text frame before it,
+//! as starscoreNeedsRetitle skips, doesn't hide it)
 static QString starscoreTitleFrameText(const mu::engraving::MasterScore* ms)
 {
     const mu::engraving::MeasureBase* first = ms ? ms->first() : nullptr;
+    while (first && !first->isVBox() && !first->isMeasure()) {
+        first = first->next();
+    }
     if (!first || !first->isVBox()) {
         return QString();
     }
@@ -230,7 +252,7 @@ static QString starscoreSongTitle(const INotationProjectPtr& project)
     }
     if (starscoreIsUntitled(title)) {
         const QString fileBase = QFileInfo(project->path().toQString()).completeBaseName();
-        const QRegularExpressionMatch m = QRegularExpression("^([A-Z]{3,4})\\s*-\\s*(.*)$").match(fileBase);
+        const QRegularExpressionMatch m = starscoreCodedNameRe().match(fileBase);
         title = m.hasMatch() ? m.captured(2).trimmed() : fileBase;
     }
     return starscoreIsUntitled(title) ? QString() : title;
@@ -252,9 +274,9 @@ static std::map<QString, QString> starscoreReadCodes(const QString& bandFolder)
 //! A four-letter code for a new song, in the style of the others (AMPL, FYKB, HTLS…), that no song uses yet
 static QString starscoreSuggestCode(const QString& title, const std::set<QString>& taken)
 {
+    static const QRegularExpression separators("[^A-Z0-9]+");
     QStringList words;
-    for (const QString& w : title.normalized(QString::NormalizationForm_D).toUpper().split(QRegularExpression("[^A-Z0-9]+"),
-                                                                                             Qt::SkipEmptyParts)) {
+    for (const QString& w : title.normalized(QString::NormalizationForm_D).toUpper().split(separators, Qt::SkipEmptyParts)) {
         words << w;
     }
     if (words.isEmpty()) {
@@ -402,7 +424,8 @@ QString StarScoreService::songCode() const
         return plan.val.code;
     }
     const QString fileBase = QFileInfo(project->path().toQString()).completeBaseName();
-    const QRegularExpressionMatch m = QRegularExpression("^([A-Z]{4})\\s*-\\s*").match(fileBase);
+    static const QRegularExpression codeRe("^([A-Z]{4})\\s*-\\s*");
+    const QRegularExpressionMatch m = codeRe.match(fileBase);
     return m.hasMatch() ? m.captured(1) : QString();
 }
 
@@ -456,16 +479,10 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
     const QString fileBase = QFileInfo(project->path().toQString()).completeBaseName();
     const QString title = starscoreSongTitle(project);
     QString codeFromName;
-    const QRegularExpressionMatch codeMatch = QRegularExpression("^([A-Z]{3,4})\\s*-\\s*(.*)$").match(fileBase);
+    const QRegularExpressionMatch codeMatch = starscoreCodedNameRe().match(fileBase);
     if (codeMatch.hasMatch()) {
         codeFromName = codeMatch.captured(1);
     }
-
-    auto plainName = [](const QString& folder) {
-        QString n = folder.section('/', -1);
-        n.remove(QRegularExpression("^\\d+\\s+"));
-        return n.trimmed().toLower();
-    };
 
     for (const auto& [folder, code] : folderToCode) {
         if (!codeFromName.isEmpty() && code == codeFromName) {
@@ -476,7 +493,7 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
     }
     if (plan.songFolder.isEmpty()) {
         for (const auto& [folder, code] : folderToCode) {
-            if (plainName(folder) == starscoreSafeFileName(title).toLower()) {
+            if (starscorePlainFolderName(folder) == starscoreSafeFileName(title).toLower()) {
                 plan.songFolder = folder;
                 plan.code = code;
                 break;
@@ -790,24 +807,6 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
     return RetVal<StarScoreBandExportPlan>::make_ok(plan);
 }
 
-//! Scores whose title frame got an arrangement label for printing. writePdf measures where the label and the
-//! instrument name actually landed and moves the label to the instrument name's height. Only the score pointer is
-//! kept (compared, never followed): the texts are looked up again in the score being printed.
-static std::vector<const mu::engraving::Score*> s_levelScores;
-
-//! Moves the arrangement label (right-positioned instrument-name text) to the instrument name's height
-static bool starscoreLevelSheetLabels(mu::engraving::Score* score)
-{
-    auto it = std::find(s_levelScores.begin(), s_levelScores.end(), score);
-    if (!score || it == s_levelScores.end()) {
-        return false;
-    }
-    s_levelScores.erase(it);
-
-    starscore::levelArrangementLabel(score);
-    return true;
-}
-
 //! Whether the title frame doesn't show these names yet (told without laying anything out)
 static bool starscoreNeedsRetitle(const mu::engraving::Score* score, const QString& left, const QString& right)
 {
@@ -835,14 +834,14 @@ static bool starscoreNeedsRetitle(const mu::engraving::Score* score, const QStri
     return !(leftOk && rightOk);
 }
 
-//! The sheet's title frame: the horn's name top left (the part name text), the arrangement top right. Running it
-//! again with the same names changes nothing: an arrangement label already there gets the new text. With
-//! `inApp`, the label is also levelled with the instrument name now (the export levels it at print time too) and the
-//! composer credit moves clear of it, so the part score in StarScore shows what the exported sheet will.
-static void starscoreRetitleSheet(mu::engraving::Score* score, const QString& left, const QString& right, bool inApp = false)
+//! The sheet's title frame texts: the horn's name top left (the part name text), the arrangement top right. Running
+//! it again with the same names changes nothing: an arrangement label already there gets the new text. Only edits
+//! (inside a command): nothing is laid out, so the caller can lay the sheet out once with everything else it changes.
+//! Returns whether anything changed.
+static bool starscoreRetitleTexts(mu::engraving::Score* score, const QString& left, const QString& right)
 {
-    if (!score) {
-        return;
+    if (!score || (left.isEmpty() && right.isEmpty())) {
+        return false;
     }
 
     mu::engraving::Box* box = nullptr;
@@ -856,7 +855,7 @@ static void starscoreRetitleSheet(mu::engraving::Score* score, const QString& le
         }
     }
     if (!box) {
-        return;
+        return false;
     }
     auto escape = [](const QString& t) {
         return muse::String::fromQString(t.toHtmlEscaped());
@@ -926,22 +925,21 @@ static void starscoreRetitleSheet(mu::engraving::Score* score, const QString& le
             score->undoAddElement(t);
             changed = true;
         }
-        if (std::find(s_levelScores.begin(), s_levelScores.end(), score) == s_levelScores.end()) {
-            s_levelScores.push_back(score);
-        }
     }
-    if (!changed) {
-        if (inApp) {
-            // already titled: nothing to lay out (the export levels the label again at print time)
-            s_levelScores.erase(std::remove(s_levelScores.begin(), s_levelScores.end(), score), s_levelScores.end());
-        }
+    return changed;
+}
+
+//! The sheet's title frame as the exported sheet prints it, for the part score in StarScore: the texts
+//! (starscoreRetitleTexts), and when they changed, the sheet laid out, the label levelled with the instrument name
+//! and the composer credit moved clear of it. Already titled: nothing is laid out.
+static void starscoreRetitleSheet(mu::engraving::Score* score, const QString& left, const QString& right)
+{
+    if (!starscoreRetitleTexts(score, left, right)) {
         return;
     }
     score->setLayoutAll();
     score->doLayout();
-    if (inApp) {
-        starscoreLevelSheetLabels(score);   // also takes it off the print-time list
-    }
+    starscore::levelArrangementLabel(score);
     starscore::clearComposerCredit(score);
 }
 
@@ -1025,7 +1023,7 @@ int StarScoreService::labelPartBooks()
             master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet titles"));
             open = true;
         }
-        starscoreRetitleSheet(es, f.sheetLeft, f.sheetRight, true);
+        starscoreRetitleSheet(es, f.sheetLeft, f.sheetRight);
         touched.push_back(n);
         ++changed;
     }
@@ -1118,9 +1116,36 @@ static QStringList starscorePdfDrawing(const QByteArray& pdf)
         if (to < 0) {
             return QByteArray();
         }
-        QByteArray data = pdf.mid(from, to - from);
-        while (data.endsWith('\n') || data.endsWith('\r')) {
-            data.chop(1);
+        // The stream is as long as its /Length says (given directly, or as the number in another object). Only
+        // without one is it taken as everything up to the line end before "endstream": the packed data itself can
+        // end in line-end bytes, and cutting every one of them off broke the unpacking, so such a sheet counted as
+        // changed and was archived and rewritten on every export (Bumper Cars' Horn 2 Tenor Sax version, one sheet
+        // in twenty)
+        qsizetype length = -1;
+        static const QRegularExpression lengthRe("/Length\\s+(\\d+)(?:\\s+0\\s+R)?");
+        const QRegularExpressionMatch lm = lengthRe.match(dictOf(number));
+        if (lm.hasMatch()) {
+            if (lm.captured(0).endsWith('R')) {
+                const QString other = dictOf(lm.captured(1).toInt()).trimmed();
+                bool ok = false;
+                const qsizetype n = other.toLongLong(&ok);
+                length = ok ? n : -1;
+            } else {
+                length = lm.captured(1).toLongLong();
+            }
+        }
+        QByteArray data;
+        // (the length is trusted when "endstream" does follow it, at most a line end away)
+        const qsizetype after = length >= 0 && from + length <= pdf.size() ? s.indexOf("endstream", from + length) : -1;
+        if (after >= 0 && after - (from + length) <= 2) {
+            data = pdf.mid(from, length);
+        } else {
+            data = pdf.mid(from, to - from);
+            if (data.endsWith("\r\n")) {
+                data.chop(2);
+            } else if (data.endsWith('\n') || data.endsWith('\r')) {
+                data.chop(1);
+            }
         }
         if (dictOf(number).contains("/FlateDecode")) {
             // qUncompress wants the unpacked size up front; a generous guess is enough
@@ -1197,23 +1222,24 @@ static QStringList starscorePdfDrawing(const QByteArray& pdf)
     return pages;
 }
 
-//! True when a freshly exported PDF shows exactly what the existing file shows: the same bytes apart
+//! True when a freshly exported PDF (its bytes) shows exactly what the existing file shows: the same bytes apart
 //! from the export date and the random document id, or else the same drawing on every page
-static bool starscoreSamePdf(const QString& freshPath, const QString& existingPath)
+static bool starscoreSamePdf(const QByteArray& fresh, const QString& existingPath)
 {
-    QFile a(freshPath), b(existingPath);
-    if (!a.open(QIODevice::ReadOnly) || !b.open(QIODevice::ReadOnly)) {
+    QFile b(existingPath);
+    if (!b.open(QIODevice::ReadOnly)) {
         return false;
     }
     // (sizes can differ by the creator text alone: a sheet made by a newer StarScore)
-    if (qAbs(a.size() - b.size()) > std::max<qint64>(4096, std::max(a.size(), b.size()) / 50)) {
+    const qint64 freshSize = fresh.size();
+    if (qAbs(freshSize - b.size()) > std::max<qint64>(4096, std::max(freshSize, b.size()) / 50)) {
         return false;
     }
-    const QByteArray x = a.readAll(), y = b.readAll();
-    if (x == y || starscorePdfWithoutStamps(x) == starscorePdfWithoutStamps(y)) {
+    const QByteArray y = b.readAll();
+    if (fresh == y || starscorePdfWithoutStamps(fresh) == starscorePdfWithoutStamps(y)) {
         return true;
     }
-    const QStringList drawn = starscorePdfDrawing(x);
+    const QStringList drawn = starscorePdfDrawing(fresh);
     return !drawn.isEmpty() && drawn == starscorePdfDrawing(y);
 }
 
@@ -1270,6 +1296,63 @@ static mu::notation::IExcerptNotationPtr starscorePotentialBook(const mu::notati
     return nullptr;
 }
 
+//! The PDF of the score as it is laid out now, as bytes: nothing is laid out here, so the caller decides when the one
+//! layout a sheet needs happens (and the bytes are at hand for comparing with the file already exported, for the
+//! sheet record's md5 and for writing the file, without a temporary file read back from disk)
+static Ret starscorePdfBytes(const INotationWriterPtr& writer, const INotationPtr& notation, QByteArray& pdf)
+{
+    if (!writer || !notation) {
+        return make_ret(Ret::Code::InternalError);
+    }
+    io::Buffer out;
+    if (!out.open(io::IODevice::WriteOnly)) {
+        return make_ret(Ret::Code::UnknownError);
+    }
+    INotationWriter::Options options { { INotationWriter::OptionKey::UNIT_TYPE, Val(INotationWriter::UnitType::PER_PART) } };
+    const Ret ret = writer->write(notation, out, options);
+    out.close();
+    pdf = out.data().toQByteArray();
+    return ret;
+}
+
+//! A sheet as the export prints it, in ONE full layout. Inside a command and in page view: the title texts (the
+//! instrument name top left, the arrangement top right) are set, the sheet is laid out once, the arrangement label is
+//! levelled with the instrument name and the composer credit moved clear of it (both measure that layout; each lays
+//! out again only when it moves something), and the PDF is taken from that layout. The sheet goes back to its view
+//! afterwards. A Score (partSheet false) has no sheet title or label; only its credit is placed.
+//!
+//! The levelling and the credit rely on measuring a page-view layout of the sheet's current state: that is kept, the
+//! layout just isn't repeated (an export of 74 sheets laid each one out up to six times).
+static Ret starscorePrintSheet(const INotationWriterPtr& writer, const INotationPtr& notation, const QString& left,
+                               const QString& right, bool partSheet, QByteArray& pdf)
+{
+    mu::engraving::Score* score = notation && notation->elements() ? notation->elements()->msScore() : nullptr;
+    if (!score) {
+        return make_ret(Ret::Code::InternalError);
+    }
+    if (partSheet) {
+        starscoreRetitleTexts(score, left, right);
+    }
+    // the one full layout, in page view (switching the view lays out by itself)
+    const ViewMode oldMode = notation->painting()->viewMode();
+    if (oldMode != ViewMode::PAGE) {
+        notation->painting()->setViewMode(ViewMode::PAGE);
+    } else {
+        score->doLayout();
+    }
+    if (partSheet) {
+        starscore::levelArrangementLabel(score);
+    }
+    starscore::clearComposerCredit(score);
+    const Ret ret = starscorePdfBytes(writer, notation, pdf);
+    if (oldMode != ViewMode::PAGE) {
+        notation->painting()->setViewMode(oldMode);
+    }
+    return ret;
+}
+
+//! Writes the score as it is to a PDF file, laid out in page view. Lays it out only when that changes the view,
+//! or when the score isn't kept laid out by MuseScore (a part book not open in a tab) or hasn't been laid out yet.
 Ret StarScoreService::writePdf(const INotationPtr& notation, const QString& path) const
 {
     INotationWriterPtr writer = writers()->writer("pdf");
@@ -1278,30 +1361,96 @@ Ret StarScoreService::writePdf(const INotationPtr& notation, const QString& path
     }
 
     engraving::Score* score = notation->elements()->msScore();
-    if (score && !score->autoLayoutEnabled()) {
-        score->doLayout();
-    }
-
     const ViewMode oldMode = notation->painting()->viewMode();
-    notation->painting()->setViewMode(ViewMode::PAGE);
-    if (score) {
+    if (oldMode != ViewMode::PAGE) {
+        notation->painting()->setViewMode(ViewMode::PAGE);
+    } else if (score && (!score->autoLayoutEnabled() || score->pages().empty())) {
         score->doLayout();
-        if (starscoreLevelSheetLabels(score)) {
-            // the label sits where it prints now: the composer credit moves clear of it if they meet
-            starscore::clearComposerCredit(score);
-        }
     }
 
-    io::FileStream out { io::path_t(path) };
-    Ret ret = make_ret(Ret::Code::UnknownError);
-    if (out.open(io::IODevice::WriteOnly)) {
-        INotationWriter::Options options { { INotationWriter::OptionKey::UNIT_TYPE, Val(INotationWriter::UnitType::PER_PART) } };
-        ret = writer->write(notation, out, options);
-        out.close();
+    QByteArray pdf;
+    Ret ret = starscorePdfBytes(writer, notation, pdf);
+    if (ret) {
+        QFile out(path);
+        ret = out.open(QIODevice::WriteOnly | QIODevice::Truncate) && out.write(pdf) == pdf.size()
+              ? make_ok() : make_ret(Ret::Code::UnknownError, muse::trc("starscore", "couldn't write the file"));
     }
 
-    notation->painting()->setViewMode(oldMode);
+    if (oldMode != ViewMode::PAGE) {
+        notation->painting()->setViewMode(oldMode);
+    }
     return ret;
+}
+
+//! Turns `part` of a throwaway copy of the song into the instrument a version sheet is for: shown, with this
+//! transposition and clef (0 treble, 1 bass, 2 alto). The copy's own part books go first: there is nothing to keep
+//! in step with the change, and the version's book is made fresh from the part.
+static void starscoreRewritePartInstrument(const IMasterNotationPtr& vm, mu::engraving::Part* part, int diatonic, int chromatic,
+                                           int clefKind)
+{
+    vm->setExcerpts({});
+    if (!part->show()) {
+        vm->parts()->setPartsVisible({ { part->id(), true } }, TranslatableString::untranslatable("Show"));
+    }
+    mu::engraving::Instrument instrument = *part->instrument();
+    instrument.setTranspose(mu::engraving::Interval(diatonic, chromatic));
+    const mu::engraving::ClefType clef = clefKind == 1 ? mu::engraving::ClefType::F
+                                     : clefKind == 2 ? mu::engraving::ClefType::C3 : mu::engraving::ClefType::G;
+    instrument.setClefType(0, mu::engraving::ClefTypeList(clef, clef));
+    const InstrumentKey key { part->instrumentId(), part->id(), mu::engraving::Fraction(0, 1) };
+    vm->parts()->replaceInstrument(key, instrument);
+}
+
+//! The part's book made fresh (the one MuseScore would make for the part), named `bookName` like the part itself,
+//! with the look and line breaks of `srcBook` (the chair's own part book; the default style when there is none),
+//! at written pitch. MuseScore may still list the book under the part's earlier name, `oldName` (see
+//! starscorePotentialBook). Null when MuseScore has no book for the part. `tmpDir` holds the style file copied over.
+static INotationPtr starscoreMakeVersionBook(const IMasterNotationPtr& vm, mu::engraving::Part* part, const QString& bookName,
+                                             const QString& oldName, const INotationPtr& srcBook, const QString& tmpDir,
+                                             const QString& defaultStyle)
+{
+    vm->parts()->setInstrumentName(InstrumentKey { part->instrumentId(), part->id(), mu::engraving::Fraction(0, 1) }, bookName);
+    part->setPartName(String::fromQString(bookName));
+
+    IExcerptNotationPtr book = starscorePotentialBook(vm, { bookName, oldName });
+    if (!book) {
+        return nullptr;
+    }
+    book->setName(bookName);
+    vm->initExcerpts({ book });
+    INotationPtr n = book->notation();
+    if (!n) {
+        return nullptr;
+    }
+
+    if (srcBook) {
+        const QString mss = tmpDir + "/version.mss";
+        if (srcBook->style()->saveStyle(io::path_t(mss))) {
+            n->style()->loadStyle(io::path_t(mss), true);
+        }
+        mu::engraving::Score* es = n->elements()->msScore();
+        const mu::engraving::Score* srcScore = srcBook->elements()->msScore();
+        if (es && srcScore) {
+            n->undoStack()->prepareChanges(TranslatableString::untranslatable("Copy layout"));
+            starscore::copyLayout(srcScore, { es }, starscore::LayoutCopyOptions());
+            n->undoStack()->commitChanges();
+        }
+    } else if (!defaultStyle.isEmpty() && QFileInfo::exists(defaultStyle)) {
+        n->style()->loadStyle(io::path_t(defaultStyle), true);
+    }
+
+    // Written pitch, not concert pitch
+    n->undoStack()->prepareChanges(TranslatableString::untranslatable("Concert pitch"));
+    n->style()->setStyleValue(StyleId::concertPitch, false);
+    n->undoStack()->commitChanges();
+    return n;
+}
+
+//! The md5 of a PDF the export wrote, remembered for the sheet record (starscoresheetrecord.cpp) so the record
+//! doesn't read the file back from Drive. Defined there; the service header is shared, so it isn't declared in it.
+namespace mu::project::starscore {
+void noteExportedPdf(const QString& absolutePath, const QByteArray& pdf);
+void forgetExportedPdfs();
 }
 
 QStringList StarScoreService::bandExportUnticked(const QString& code) const
@@ -1325,39 +1474,55 @@ void StarScoreService::setBandExportUnticked(const QString& code, const QStringL
 
 RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPaths)
 {
-    RetVal<StarScoreBandExportPlan> plan = planBandExport();
-    if (!plan.ret) {
-        return RetVal<QString>::make_ret(plan.ret);
+    // The plan is made once: the sheets to write come from it, and so do the archiving of sheets under older names
+    // and the sheet record, which need every sheet, not only the ticked ones (each plan reads codes.json from Drive)
+    const RetVal<StarScoreBandExportPlan> fullPlan = planBandExport();
+    if (!fullPlan.ret) {
+        return RetVal<QString>::make_ret(fullPlan.ret);
     }
+    if (fullPlan.val.newSong || fullPlan.val.songFolder.isEmpty()) {
+        // An unregistered song has no folder: the export would have written next to the song folders, into
+        // "Sheets and Demos/". The dialog registers a new song first (registerBandSong) and plans again.
+        return RetVal<QString>::make_ret(Ret::Code::UnknownError,
+                                         muse::trc("starscore", "This song isn't in Sheets and Demos yet. Add it there first "
+                                                                "(Export to Sheets and Demos asks where it goes)."));
+    }
+    const StarScoreBandExportPlan& full = fullPlan.val;
+    StarScoreBandExportPlan plan = full;
     if (!onlyPaths.isEmpty()) {
         std::vector<StarScoreBandFile> chosen;
-        for (const StarScoreBandFile& f : plan.val.files) {
+        for (const StarScoreBandFile& f : full.files) {
             if (onlyPaths.contains(f.relativePath)) {
                 chosen.push_back(f);
             }
         }
-        plan.val.files = chosen;
+        plan.files = chosen;
     }
 
     INotationProjectPtr project = exportSourceProject();
     IMasterNotationPtr master = project->masterNotation();
     engraving::MasterScore* ms = master->masterScore();
+    INotationWriterPtr writer = writers()->writer("pdf");
+    if (!writer) {
+        return RetVal<QString>::make_ret(Ret::Code::InternalError);
+    }
+    starscore::forgetExportedPdfs();
+
+    // The score is shown again once, at the end, whatever changed in it below; a part book that changed is shown
+    // again once too (a notification per sheet redrew the app 74 times)
+    bool masterChanged = false;
+    std::vector<INotationPtr> touchedBooks;
 
     // Every part book numbers its bars like the main score. MuseScore keeps "exclude from measure count" per score,
     // so a pickup bar excluded in the main score after the part books were made stayed counted in them, and those
-    // sheets' bar numbers ran one ahead of the others (Bet, Two). The fix is kept in the file (one undo step).
+    // sheets' bar numbers ran one ahead of the others (Bet, Two). The fix is kept in the file (one undo step). The
+    // part books aren't laid out here: each sheet is laid out once when it is printed.
     int renumbered = 0;
     if (starscore::syncBarNumbering(ms, starscore::BarNumberingSync::Check) > 0) {
         master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Bar numbers in the parts like the score"));
         renumbered = starscore::syncBarNumbering(ms, starscore::BarNumberingSync::Undoable);
         master->notation()->undoStack()->commitChanges();
-        for (engraving::Excerpt* ex : ms->excerpts()) {
-            if (engraving::Score* es = ex ? ex->excerptScore() : nullptr) {
-                es->setLayoutAll();
-                es->doLayout();
-            }
-        }
-        master->notation()->notationChanged().notify();
+        masterChanged = true;
     }
 
     // Every staff with the same barlines (double barlines missing from staves added later, e.g. the Bass Trombone's
@@ -1368,25 +1533,23 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         barlinesSynced = starscore::syncEndBarlines(ms, true);
         master->notation()->undoStack()->commitChanges();
         project->markAsUnsaved();
+        masterChanged = true;
     }
 
-    // The Keys sheet: bass staff "Always hide", empty staves hidden from the first system on
+    // The Keys sheet: bass staff "Always hide", empty staves hidden from the first system on (set directly, not
+    // through the undo stack; the scores are marked for layout and laid out when printed)
     if (starscore::applyKeysStaffRules(ms) > 0) {
-        for (engraving::Score* sc : ms->scoreList()) {
-            sc->doLayout();
-        }
         project->markAsUnsaved();
-        master->notation()->notationChanged().notify();
+        masterChanged = true;
     }
 
-    const QString songDir = plan.val.bandFolder + "/" + plan.val.songFolder;
+    const QString songDir = plan.bandFolder + "/" + plan.songFolder;
     const QString today = QDate::currentDate().toString(Qt::ISODate);
     const QString tmpDir = QDir::tempPath() + "/StarScoreExport-" + QUuid::createUuid().toString(QUuid::Id128);
     QDir().mkpath(tmpDir);
 
     // Part books by instrument: prefer a single-instrument part book, named like the part
     ExcerptNotationList excerpts = master->excerpts();
-    ExcerptNotationList potential = master->potentialExcerpts();
     std::map<QString, IExcerptNotationPtr> bookForPart;
     for (const IExcerptNotationPtr& e : excerpts) {
         INotationPtr n = e->notation();
@@ -1405,119 +1568,179 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         }
     }
 
-    // Scores of a few instruments come from a scratch copy with only those instruments showing
-    INotationProjectPtr scratch;
+    // Sheets that aren't one of the song's own part books are made from throwaway copies of the song without its
+    // part books: the Scores (a copy with only the score's instruments showing), the Flexible version sheets (a chair
+    // re-written for one instrument, as a fresh part book) and the sheet of a part that has no part book yet (the
+    // book MuseScore would make, made in the copy so nothing is left behind in the open score). The song is saved
+    // once, loaded once, stripped of its part books and saved again as the file the copies load: each load of the
+    // full file read all 74 part books (and every edit in such a copy laid them all out again), and a Balkan Wedding
+    // export loaded it once per version sheet (16 times) and once more for the Scores; that was most of its ten
+    // minutes. The copies are loaded fresh from the stripped file (a fraction of the full load): a copy edited for
+    // one version sheet isn't reused for the next.
     const QString copyPath = tmpDir + "/copy.mscz";
-    bool copySaved = false;
-    auto loadCopy = [&]() -> INotationProjectPtr {
-        if (!copySaved) {
-            if (!project->save(io::path_t(copyPath), SaveMode::SaveCopy, false)) {
-                return nullptr;
-            }
-            copySaved = true;
-        }
+    const QString strippedPath = tmpDir + "/copy-noparts.mscz";
+    bool strippedSaved = false;
+    bool strippedFailed = false;
+    auto loadProject = [&](const QString& path) -> INotationProjectPtr {
         INotationProjectPtr p = projectCreator()->newProject(iocContext());
-        if (!p->load(io::path_t(copyPath))) {
+        if (!p->load(io::path_t(path)) || !p->masterNotation() || !p->masterNotation()->masterScore()) {
             return nullptr;
         }
         return p;
     };
+    auto loadStripped = [&]() -> INotationProjectPtr {
+        if (strippedFailed) {
+            return nullptr;
+        }
+        if (!strippedSaved) {
+            INotationProjectPtr p = project->save(io::path_t(copyPath), SaveMode::SaveCopy, false) ? loadProject(copyPath) : nullptr;
+            if (p) {
+                p->masterNotation()->setExcerpts({});
+                strippedSaved = bool(p->save(io::path_t(strippedPath), SaveMode::SaveCopy, false));
+            }
+            if (!strippedSaved) {
+                strippedFailed = true;
+                return nullptr;
+            }
+        }
+        INotationProjectPtr p = loadProject(strippedPath);
+        if (!p) {
+            strippedFailed = true;
+        }
+        return p;
+    };
+    // Scores of a few instruments come from one such copy with only those instruments showing
+    INotationProjectPtr scratch;
     auto scratchProject = [&]() -> INotationProjectPtr {
         if (!scratch) {
-            scratch = loadCopy();
+            scratch = loadStripped();
         }
         return scratch;
     };
 
-    // An "Any Horns" chair re-written for one transposition and clef, as a part book of its own
-    auto writeVersion = [&](const StarScoreBandFile& file, const QString& pdfPath) -> Ret {
-        INotationProjectPtr p = loadCopy();
+    // One of the song's own part books (kept in the file: the sheet title it gets now stays)
+    auto writePartBook = [&](const StarScoreBandFile& file, const INotationPtr& book, QByteArray& pdf) -> Ret {
+        // Lead and rhythm sheets have no sheet title to add, but their credit is placed the same way (Balkan Wedding's
+        // long credit printed above the instrument name on the Lead Sheet and every rhythm sheet). A sheet titled
+        // already but not laid out since (a new Bass Trombone version printed with the composer credit over its label)
+        // gets its label on the instrument name's line and the credit below it; both change nothing when in place.
+        // The edits are kept, never undone: an edit undone after a layout could leave stray bars in the score (Balkan
+        // Wedding gained two empty bars).
+        book->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
+        const Ret ret = starscorePrintSheet(writer, book, file.sheetLeft, file.sheetRight, true, pdf);
+        book->undoStack()->commitChanges();
+        touchedBooks.push_back(book);
+        return ret;
+    };
+
+    // A part without a part book: the book MuseScore would make for it, in a copy
+    auto writePotentialBook = [&](const StarScoreBandFile& file, QByteArray& pdf) -> Ret {
+        INotationProjectPtr p = loadStripped();
+        if (!p) {
+            return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "couldn't make a copy of the score"));
+        }
+        const engraving::Part* part = p->masterNotation()->masterScore()->partById(ID(file.partIds.value(0)));
+        IExcerptNotationPtr book = part ? starscorePotentialBook(p->masterNotation(), { part->partName().toQString() }) : nullptr;
+        if (!book) {
+            return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "no part book for this instrument"));
+        }
+        p->masterNotation()->initExcerpts({ book });
+        INotationPtr n = book->notation();
+        if (!n) {
+            return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "no part book for this instrument"));
+        }
+        n->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
+        const Ret ret = starscorePrintSheet(writer, n, file.sheetLeft, file.sheetRight, true, pdf);
+        n->undoStack()->commitChanges();
+        return ret;
+    };
+
+    // A Flexible chair re-written for one transposition and clef, as a part book of its own
+    auto writeVersion = [&](const StarScoreBandFile& file, QByteArray& pdf) -> Ret {
+        INotationProjectPtr p = loadStripped();
         if (!p) {
             return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "couldn't make a copy of the score"));
         }
         IMasterNotationPtr vm = p->masterNotation();
-        engraving::MasterScore* vs = vm->masterScore();
-        engraving::Part* part = vs->partById(ID(file.partIds.value(0)));
+        engraving::Part* part = vm->masterScore()->partById(ID(file.partIds.value(0)));
         if (!part || !part->instrument()) {
             return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "instrument not found"));
         }
         const QString oldName = part->partName().toQString();
-
-        vm->setExcerpts({});
-        if (!part->show()) {
-            vm->parts()->setPartsVisible({ { part->id(), true } }, TranslatableString::untranslatable("Show"));
-        }
-
-        engraving::Instrument instrument = *part->instrument();
-        instrument.setTranspose(engraving::Interval(file.transposeDiatonic, file.transposeChromatic));
-        const engraving::ClefType clef = file.clef == 1 ? engraving::ClefType::F
-                                         : file.clef == 2 ? engraving::ClefType::C3 : engraving::ClefType::G;
-        instrument.setClefType(0, engraving::ClefTypeList(clef, clef));
-        const InstrumentKey key { part->instrumentId(), part->id(), engraving::Fraction(0, 1) };
-        vm->parts()->replaceInstrument(key, instrument);
-        vm->parts()->setInstrumentName(InstrumentKey { part->instrumentId(), part->id(), engraving::Fraction(0, 1) }, file.header);
-        part->setPartName(String::fromQString(file.header));
-
-        IExcerptNotationPtr book = starscorePotentialBook(vm, { file.header, oldName });
-        if (!book) {
-            return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "couldn't make the part"));
-        }
-        book->setName(file.header);
-        vm->initExcerpts({ book });
-        INotationPtr n = book->notation();
-        if (!n) {
-            return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "couldn't make the part"));
-        }
+        starscoreRewritePartInstrument(vm, part, file.transposeDiatonic, file.transposeChromatic, file.clef);
 
         // Same look and line breaks as the chair's own part book
         auto src = bookForPart.find(file.partIds.value(0));
-        if (src != bookForPart.end() && src->second->notation()) {
-            const QString mss = tmpDir + "/chair.mss";
-            if (src->second->notation()->style()->saveStyle(io::path_t(mss))) {
-                n->style()->loadStyle(io::path_t(mss), true);
-            }
-            engraving::Score* es = n->elements()->msScore();
-            const engraving::Score* srcScore = src->second->notation()->elements()->msScore();
-            if (es && srcScore) {
-                n->undoStack()->prepareChanges(TranslatableString::untranslatable("Copy layout"));
-                starscore::copyLayout(srcScore, { es }, starscore::LayoutCopyOptions());
-                n->undoStack()->commitChanges();
-            }
-        } else {
-            const QString def = defaultStylePath();
-            if (!def.isEmpty() && QFileInfo::exists(def)) {
-                n->style()->loadStyle(io::path_t(def), true);
-            }
+        const INotationPtr srcBook = src != bookForPart.end() ? src->second->notation() : nullptr;
+        INotationPtr n = starscoreMakeVersionBook(vm, part, file.header, oldName, srcBook, tmpDir, defaultStylePath());
+        if (!n) {
+            return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "couldn't make the part"));
         }
-
-        // Written pitch, not concert pitch
-        n->undoStack()->prepareChanges(TranslatableString::untranslatable("Concert pitch"));
-        n->style()->setStyleValue(StyleId::concertPitch, false);
+        // a copy of the song, so nothing of this is kept
+        n->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
+        const Ret ret = starscorePrintSheet(writer, n, file.sheetLeft, file.sheetRight, true, pdf);
         n->undoStack()->commitChanges();
-        if (!file.sheetLeft.isEmpty() || !file.sheetRight.isEmpty()) {
-            // open while printing: the label is levelled and the composer credit moved at print time
-            n->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
-            // laid out, label levelled and composer credit placed below it now (a copy of the song, so nothing is kept)
-            engraving::Score* vsScore = n->elements()->msScore();
-            starscoreRetitleSheet(vsScore, file.sheetLeft, file.sheetRight, true);
-            // as for the horn part scores: laid out, label on the instrument name's line, credit below the label
-            vsScore->setLayoutAll();
-            vsScore->doLayout();
-            starscore::levelArrangementLabel(vsScore);
-            starscore::clearComposerCredit(vsScore);
-            const Ret written = writePdf(n, pdfPath);
-            n->undoStack()->commitChanges();
-            return written;
-        }
+        return ret;
+    };
 
-        return writePdf(n, pdfPath);
+    // A Score: the scratch copy with only the score's instruments showing
+    auto writeScore = [&](const StarScoreBandFile& file, QByteArray& pdf) -> Ret {
+        INotationProjectPtr p = scratchProject();
+        if (!p) {
+            return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "couldn't make the score copy"));
+        }
+        engraving::MasterScore* cs = p->masterNotation()->masterScore();
+        std::vector<std::pair<muse::ID, bool> > vis;
+        for (const engraving::Part* part : cs->parts()) {
+            vis.emplace_back(part->id(), file.partIds.contains(idText(part)));
+        }
+        p->masterNotation()->parts()->setPartsVisible(vis, TranslatableString::untranslatable("Export"));
+        // The score names its staves without StarScore's section prefix: "Trumpet 1", not "7H: Trumpet 1"
+        // (this is a copy of the file, so the names change only for the printing)
+        p->masterNotation()->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Staff names"));
+        for (engraving::Part* part : cs->parts()) {
+            const QString name = part->longName().toQString();
+            const int at = name.lastIndexOf(": ");
+            if (file.partIds.contains(idText(part)) && at >= 0) {
+                engraving::EditPart::setInstrumentName(cs, part, engraving::Fraction(0, 1),
+                                                       String::fromQString(name.mid(at + 2).trimmed()));
+            }
+        }
+        p->masterNotation()->notation()->undoStack()->commitChanges();
+        // A part can also be hidden staff by staff (the eye on each staff in the Instruments panel); a part on
+        // this score with every staff hidden would leave it empty (Balkan Wedding's 2- to 5-Horn scores were
+        // blank pages). Its staves show; a part with some staves showing keeps its choice. (One edit per staff, as
+        // MuseScore does it: showing a staff also drops the system locks that hold a multimeasure rest, judged on
+        // the layout after the staff before it was shown.)
+        for (engraving::Part* part : cs->parts()) {
+            if (!file.partIds.contains(idText(part))) {
+                continue;
+            }
+            const bool anyShown = std::any_of(part->staves().begin(), part->staves().end(),
+                                              [](const engraving::Staff* st) { return st->visible(); });
+            if (!anyShown) {
+                for (engraving::Staff* st : part->staves()) {
+                    p->masterNotation()->parts()->setStaffVisible(st->id(), true);
+                }
+            }
+        }
+        // The composer credit at its house position (last line on the subtitle's baseline), measured in page
+        // view: the main score's style can carry a credit moved too far (1.15.7's Apply Styles measured it in
+        // continuous view and printed Bumper Cars' credit in the music)
+        p->masterNotation()->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Composer credit"));
+        const Ret ret = starscorePrintSheet(writer, p->masterNotation()->notation(), QString(), QString(), false, pdf);
+        p->masterNotation()->notation()->undoStack()->commitChanges();
+        return ret;
     };
 
     QStringList archivedPaths;
-    auto supersede = [&](const QString& rel) {
+    QStringList problems = plan.notes;
+    // The file already at `rel` goes to Version History (never deleted). Returns false, with the file left where
+    // it is, when it can't be moved there: a rename Drive refuses is retried as a copy and a remove.
+    auto supersede = [&](const QString& rel, QString* archivedTo = nullptr) -> bool {
         const QString target = songDir + "/" + rel;
         if (!QFileInfo::exists(target)) {
-            return;
+            return true;
         }
         QString archived = songDir + "/Version History/Superseded " + today + "/" + rel;
         QDir().mkpath(QFileInfo(archived).absolutePath());
@@ -1525,112 +1748,47 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         for (int i = 2; QFileInfo::exists(archived); ++i) {
             archived = QString("%1 (%2).pdf").arg(base).arg(i);
         }
-        if (QFile::rename(target, archived)) {
-            archivedPaths << rel;
+        bool moved = QFile::rename(target, archived);
+        if (!moved) {
+            moved = QFile::copy(target, archived) && QFile::remove(target);
+            if (!moved) {
+                QFile::remove(archived);   // a half-made copy
+            }
         }
+        if (!moved) {
+            problems << muse::qtrc("starscore", "%1: the file already there couldn't be moved to Version History, so it was "
+                                                "left as it was.").arg(rel);
+            return false;
+        }
+        archivedPaths << rel;
+        if (archivedTo) {
+            *archivedTo = archived;
+        }
+        return true;
     };
 
     QStringList written;
     QStringList unchanged;
-    QStringList problems = plan.val.notes;
 
-    for (const StarScoreBandFile& file : plan.val.files) {
-        const QString tmpPdf = tmpDir + "/" + QString::number(written.size() + problems.size()) + ".pdf";
+    for (const StarScoreBandFile& file : plan.files) {
+        QByteArray pdf;
         Ret ret;
 
         if (!file.sourceFile.isEmpty()) {
-            ret = QFile::copy(file.sourceFile, tmpPdf) ? make_ok()
+            QFile source(file.sourceFile);
+            ret = source.open(QIODevice::ReadOnly) ? make_ok()
                   : make_ret(Ret::Code::UnknownError, muse::trc("starscore", "the reference PDF is missing; save and reopen the score"));
+            if (ret) {
+                pdf = source.readAll();
+            }
         } else if (file.isVersion) {
-            ret = writeVersion(file, tmpPdf);
+            ret = writeVersion(file, pdf);
         } else if (!file.isScore) {
             auto it = bookForPart.find(file.partIds.value(0));
-            if (it == bookForPart.end()) {
-                // no part book yet: use the potential one MuseScore would make
-                for (const IExcerptNotationPtr& e : potential) {
-                    if (e->name() == ms->partById(ID(file.partIds.value(0)))->partName().toQString()) {
-                        master->initExcerpts({ e });
-                        it = bookForPart.emplace(file.partIds.value(0), e).first;
-                        break;
-                    }
-                }
-            }
-            if (it == bookForPart.end()) {
-                problems << muse::qtrc("starscore", "%1: no part book for this instrument.").arg(file.relativePath);
-                continue;
-            }
-            INotationPtr bookNotation = it->second->notation();
-            // The part score shows its sheet title in StarScore (instrument name, arrangement label). One that doesn't
-            // yet gets it now, kept in the file. Nothing is changed and undone again around the printing: an edit
-            // undone after a layout could leave stray bars in the score (Balkan Wedding gained two empty bars).
-            engraving::Score* bs = bookNotation ? bookNotation->elements()->msScore() : nullptr;
-            // Lead and rhythm sheets have no sheet title to add, but their credit is placed the same way (Balkan
-            // Wedding's long credit printed above the instrument name on the Lead Sheet and every rhythm sheet)
-            if (bs) {
-                const bool titled = !file.sheetLeft.isEmpty() || !file.sheetRight.isEmpty();
-                bookNotation->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
-                if (titled && starscoreNeedsRetitle(bs, file.sheetLeft, file.sheetRight)) {
-                    starscoreRetitleSheet(bs, file.sheetLeft, file.sheetRight, true);
-                } else {
-                    // titled already, but not necessarily laid out since (a new Bass Trombone version printed with
-                    // the composer credit over its label): the label on the instrument name's line, the credit
-                    // level with the instrument name or below the label. Both change nothing when already in place.
-                    bs->doLayout();
-                    starscore::levelArrangementLabel(bs);
-                    starscore::clearComposerCredit(bs);
-                }
-                bookNotation->undoStack()->commitChanges();
-                bookNotation->notationChanged().notify();
-            }
-            ret = writePdf(bookNotation, tmpPdf);
+            ret = it != bookForPart.end() && it->second->notation() ? writePartBook(file, it->second->notation(), pdf)
+                  : writePotentialBook(file, pdf);
         } else {
-            INotationProjectPtr p = scratchProject();
-            if (!p) {
-                problems << muse::qtrc("starscore", "%1: couldn't make the score copy.").arg(file.relativePath);
-                continue;
-            }
-            engraving::MasterScore* cs = p->masterNotation()->masterScore();
-            std::vector<std::pair<muse::ID, bool> > vis;
-            for (const engraving::Part* part : cs->parts()) {
-                vis.emplace_back(part->id(), file.partIds.contains(idText(part)));
-            }
-            p->masterNotation()->parts()->setPartsVisible(vis, TranslatableString::untranslatable("Export"));
-            // The score names its staves without StarScore's section prefix: "Trumpet 1", not "7H: Trumpet 1"
-            // (this is a copy of the file, so the names change only for the printing)
-            p->masterNotation()->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Staff names"));
-            for (engraving::Part* part : cs->parts()) {
-                const QString name = part->longName().toQString();
-                const int at = name.lastIndexOf(": ");
-                if (file.partIds.contains(idText(part)) && at >= 0) {
-                    engraving::EditPart::setInstrumentName(cs, part, engraving::Fraction(0, 1),
-                                                           String::fromQString(name.mid(at + 2).trimmed()));
-                }
-            }
-            p->masterNotation()->notation()->undoStack()->commitChanges();
-            // A part can also be hidden staff by staff (the eye on each staff in the Instruments panel); a part on
-            // this score with every staff hidden would leave it empty (Balkan Wedding's 2- to 5-Horn scores were
-            // blank pages). Its staves show; a part with some staves showing keeps its choice.
-            for (engraving::Part* part : cs->parts()) {
-                if (!file.partIds.contains(idText(part))) {
-                    continue;
-                }
-                const bool anyShown = std::any_of(part->staves().begin(), part->staves().end(),
-                                                  [](const engraving::Staff* st) { return st->visible(); });
-                if (!anyShown) {
-                    for (engraving::Staff* st : part->staves()) {
-                        p->masterNotation()->parts()->setStaffVisible(st->id(), true);
-                    }
-                }
-            }
-            // The composer credit at its house position (last line on the subtitle's baseline), measured in page
-            // view: the main score's style can carry a credit moved too far (1.15.7's Apply Styles measured it in
-            // continuous view and printed Bumper Cars' credit in the music)
-            p->masterNotation()->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Composer credit"));
-            cs->setLayoutAll();
-            cs->doLayout();
-            starscore::clearComposerCredit(cs);
-            p->masterNotation()->notation()->undoStack()->commitChanges();
-            ret = writePdf(p->masterNotation()->notation(), tmpPdf);
+            ret = writeScore(file, pdf);
         }
 
         if (!ret) {
@@ -1641,17 +1799,33 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         const QString target = songDir + "/" + file.relativePath;
         // the same pages as the file already there (a re-export with nothing changed in this sheet):
         // the existing file stays, and nothing is archived
-        if (QFileInfo::exists(target) && starscoreSamePdf(tmpPdf, target)) {
+        if (QFileInfo::exists(target) && starscoreSamePdf(pdf, target)) {
             unchanged << file.relativePath;
             continue;
         }
-        supersede(file.relativePath);
+        // The new file is written under a temporary name next to the target, the old file moves to Version History,
+        // and only then does the new one take its name. An old file that can't be archived is left as it is.
         QDir().mkpath(QFileInfo(target).absolutePath());
-        QFile::remove(target);
-        if (!QFile::copy(tmpPdf, target)) {
+        QSaveFile out(target);
+        if (!out.open(QIODevice::WriteOnly) || out.write(pdf) != pdf.size()) {
+            out.cancelWriting();
             problems << muse::qtrc("starscore", "%1: couldn't write the file.").arg(file.relativePath);
             continue;
         }
+        QString archivedTo;
+        if (!supersede(file.relativePath, &archivedTo)) {
+            out.cancelWriting();
+            continue;
+        }
+        if (!out.commit()) {
+            if (!archivedTo.isEmpty()) {
+                QFile::rename(archivedTo, target);   // the old file back where it was
+                archivedPaths.removeAll(file.relativePath);
+            }
+            problems << muse::qtrc("starscore", "%1: couldn't write the file.").arg(file.relativePath);
+            continue;
+        }
+        starscore::noteExportedPdf(target, pdf);
         written << file.relativePath;
     }
 
@@ -1659,20 +1833,19 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     // are archived, as replaced sheets are
     {
         QStringList current;
-        const RetVal<StarScoreBandExportPlan> full = planBandExport();
-        for (const StarScoreBandFile& f : (full.ret ? full.val.files : plan.val.files)) {
+        for (const StarScoreBandFile& f : full.files) {
             current << f.relativePath;
         }
         // Keyboard sheets under their older names ("Elec Piano", "Organ", "Clavinet", "Piano"), once a Keys sheet is there
         {
-            const QString prefix = "1 Rhythm/" + plan.val.code + " - Keys";
+            const QString prefix = "1 Rhythm/" + plan.code + " - Keys";
             const bool keysThere = std::any_of(current.begin(), current.end(), [&](const QString& rel) {
                 return rel.startsWith(prefix) && QFileInfo::exists(songDir + "/" + rel);
             });
             if (keysThere) {
                 const QDir dir(songDir + "/1 Rhythm");
-                for (const QString& fileName : dir.entryList({ plan.val.code + " - Elec Piano*.pdf", plan.val.code + " - Organ*.pdf",
-                                                               plan.val.code + " - Clavinet*.pdf", plan.val.code + " - Piano*.pdf" },
+                for (const QString& fileName : dir.entryList({ plan.code + " - Elec Piano*.pdf", plan.code + " - Organ*.pdf",
+                                                               plan.code + " - Clavinet*.pdf", plan.code + " - Piano*.pdf" },
                                                              QDir::Files)) {
                     const QString rel = "1 Rhythm/" + fileName;
                     if (!current.contains(rel)) {
@@ -1683,14 +1856,14 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         }
         // Percussion sheets under older names ("Congas", "Bongos"…), once a Percussion sheet is there
         {
-            const QString prefix = "1 Rhythm/" + plan.val.code + " - Percussion";
+            const QString prefix = "1 Rhythm/" + plan.code + " - Percussion";
             const bool percThere = std::any_of(current.begin(), current.end(), [&](const QString& rel) {
                 return rel.startsWith(prefix) && QFileInfo::exists(songDir + "/" + rel);
             });
             if (percThere) {
                 const QDir dir(songDir + "/1 Rhythm");
-                for (const QString& fileName : dir.entryList({ plan.val.code + " - Congas*.pdf", plan.val.code + " - Bongos*.pdf",
-                                                               plan.val.code + " - Timbales*.pdf", plan.val.code + " - Cajon*.pdf" },
+                for (const QString& fileName : dir.entryList({ plan.code + " - Congas*.pdf", plan.code + " - Bongos*.pdf",
+                                                               plan.code + " - Timbales*.pdf", plan.code + " - Cajon*.pdf" },
                                                              QDir::Files)) {
                     const QString rel = "1 Rhythm/" + fileName;
                     if (!current.contains(rel)) {
@@ -1711,7 +1884,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                 supersede(old);
             }
         }
-        for (const QString& folder : plan.val.anyHornFolders) {
+        for (const QString& folder : plan.anyHornFolders) {
             // the folder's old name ("3H Any Horns", before 1.15.7): its sheets are archived once the new one is there
             const QString oldFolder = QString(folder).replace("Flexible", "Any Horns");
             const QDir oldDir(songDir + "/" + oldFolder);
@@ -1723,7 +1896,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                 QDir(songDir).rmdir(oldFolder);
             }
             const QDir dir(songDir + "/" + folder);
-            for (const QString& fileName : dir.entryList({ plan.val.code + " - Horn *.pdf" }, QDir::Files)) {
+            for (const QString& fileName : dir.entryList({ plan.code + " - Horn *.pdf" }, QDir::Files)) {
                 const QString rel = folder + "/" + fileName;
                 if (!current.contains(rel)) {
                     supersede(rel);
@@ -1738,14 +1911,14 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     {
         Data data = loadFrom(ms);
         starscore::org::ExportInfo info;
-        info.songRoot = plan.val.songFolder;
-        info.code = plan.val.code;
+        info.songRoot = plan.songFolder;
+        info.code = plan.code;
         info.title = starscoreSongTitle(project);
         info.version = data.version;
         info.written = written;
         info.archived = archivedPaths;
         QJsonObject sigs = data.exportSignatures;
-        for (const StarScoreBandFile& f : plan.val.files) {
+        for (const StarScoreBandFile& f : plan.files) {
             if (!f.sourceFile.isEmpty()) {
                 continue;
             }
@@ -1774,8 +1947,12 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
             c.isScore = f.isScore;
             c.arrangement = f.sheetRight;
             QString part = f.relativePath.section('/', -1);
-            part.remove(QRegularExpression("^" + QRegularExpression::escape(plan.val.code) + " - "));
-            part.remove(QRegularExpression("\\.pdf$"));
+            if (part.startsWith(plan.code + " - ")) {
+                part.remove(0, plan.code.size() + 3);
+            }
+            if (part.endsWith(".pdf")) {
+                part.chop(4);
+            }
             c.part = part;
             if (before.isEmpty()) {
                 // first export since bar signatures were kept: new, or replacing a sheet made before
@@ -1816,7 +1993,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
             stored["version"] = data.version;
             sigs[f.relativePath] = stored;
         }
-        info.hornAnalysis = organizerHornAnalysis(ms, plan.val);
+        info.hornAnalysis = organizerHornAnalysis(ms, plan);
         if (!info.hornAnalysis.isEmpty()) {
             info.hornAnalysis["scoreVersion"] = data.version;
         }
@@ -1826,8 +2003,15 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         m_lastExport = info;
 
         // --- for the folder colours: each sheet's status as exported, and what each colour needs
-        const RetVal<StarScoreBandExportPlan> full = planBandExport();
-        writeSheetRecord(ms, data, full.ret ? full.val : plan.val, written + unchanged);
+        writeSheetRecord(ms, data, full, written + unchanged);
+    }
+
+    // shown again once, with everything this export changed in them
+    if (masterChanged) {
+        master->notation()->notationChanged().notify();
+    }
+    for (const INotationPtr& n : touchedBooks) {
+        n->notationChanged().notify();
     }
 
     // --- the song's to-do list as a PDF, next to the .starscore in Projects and Sheets ("BALK - To-Do.pdf"); it's about
@@ -1838,10 +2022,10 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         const QString source = project->path().toQString();
         const QString dir = source.isEmpty() ? QString() : QFileInfo(source).absolutePath();
         if (!projects.isEmpty() && !dir.isEmpty() && QDir::cleanPath(dir).startsWith(QDir::cleanPath(projects) + "/")
-            && !plan.val.code.isEmpty() && starscore::org::canRenderPdf()) {
+            && !plan.code.isEmpty() && starscore::org::canRenderPdf()) {
             starscore::org::RenderJob job;
-            job.html = todoPdfHtml(starscoreSongTitle(project), plan.val.code, loadFrom(ms).version);
-            job.pdfPath = dir + "/" + plan.val.code + " - To-Do.pdf";
+            job.html = todoPdfHtml(starscoreSongTitle(project), plan.code, loadFrom(ms).version);
+            job.pdfPath = dir + "/" + plan.code + " - To-Do.pdf";
             if (!job.html.isEmpty()) {
                 starscore::org::renderPdfs({ job }, [](int, bool) {}, []() {});
                 todoNote = muse::qtrc("starscore", "The to-do list is in %1.").arg(QFileInfo(job.pdfPath).fileName()
@@ -1858,8 +2042,8 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     }
     QString summary = written.isEmpty() && !unchanged.isEmpty()
                       ? muse::qtrc("starscore", "Nothing to write: every sheet is the same as the file already in %1.")
-                      .arg(plan.val.songFolder)
-                      : muse::qtrc("starscore", "Wrote %1 PDF(s) to %2.").arg(written.size()).arg(plan.val.songFolder);
+                      .arg(plan.songFolder)
+                      : muse::qtrc("starscore", "Wrote %1 PDF(s) to %2.").arg(written.size()).arg(plan.songFolder);
     if (!written.isEmpty() && !unchanged.isEmpty()) {
         summary += " " + muse::qtrc("starscore", "%1 sheet(s) came out the same as before, so those files were left as they were.")
                    .arg(unchanged.size());
@@ -1922,7 +2106,7 @@ QString StarScoreService::scoreVersion() const
     }
 
     const QString fileBase = QFileInfo(project->path().toQString()).completeBaseName();
-    const QRegularExpressionMatch m = QRegularExpression("^([A-Z]{3,4})\\s*-\\s*(.*)$").match(fileBase);
+    const QRegularExpressionMatch m = starscoreCodedNameRe().match(fileBase);
     const QString code = m.hasMatch() ? m.captured(1) : QString();
     const QString title = starscoreSongTitle(project);
     const bool existingSong = STARSCORE_V4_CODES.count(code) || STARSCORE_V4_TITLES.count(title.toLower());
@@ -1976,7 +2160,8 @@ Ret StarScoreService::registerBandSong(const QString& titleIn, int category, con
     if (starscoreIsUntitled(title)) {
         return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "Type the song's title."));
     }
-    if (!QRegularExpression("^[A-Z]{4}$").match(code).hasMatch()) {
+    static const QRegularExpression fourLetters("^[A-Z]{4}$");
+    if (!fourLetters.match(code).hasMatch()) {
         return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "The code must be four capital letters, like AMPL."));
     }
     if (category < 1 || category > 4) {
@@ -1997,9 +2182,7 @@ Ret StarScoreService::registerBandSong(const QString& titleIn, int category, con
             return make_ret(Ret::Code::UnknownError,
                             muse::qtrc("starscore", "%1 is already the code for “%2”. Choose another code.").arg(code, f).toStdString());
         }
-        QString plain = f.section('/', -1);
-        plain.remove(QRegularExpression("^\\d+\\s+"));
-        if (plain.trimmed().toLower() == title.toLower() && f != folder) {
+        if (starscorePlainFolderName(f) == title.toLower() && f != folder) {
             return make_ret(Ret::Code::UnknownError,
                             muse::qtrc("starscore", "“%1” is already in Sheets and Demos as “%2”.").arg(title, f).toStdString());
         }
@@ -2021,13 +2204,13 @@ Ret StarScoreService::registerBandSong(const QString& titleIn, int category, con
         json += (++i < int(codes.size())) ? ",\n" : "\n";
     }
     json += "}";
-    QFile out(codesPath);
-    if (!out.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+    // written whole or not at all: a write cut short (Drive syncing the file) would leave the organizer without any
+    // of the song codes
+    QSaveFile out(codesPath);
+    if (!out.open(QIODevice::WriteOnly) || out.write(json.toUtf8()) < 0 || !out.commit()) {
         return make_ret(Ret::Code::UnknownError,
                         muse::qtrc("starscore", "Couldn't write %1.").arg(codesPath).toStdString());
     }
-    out.write(json.toUtf8());
-    out.close();
 
     // Give the score its title so the sheets and later exports use it
     INotationProjectPtr project = exportSourceProject();
@@ -2057,7 +2240,7 @@ RetVal<QString> StarScoreService::exportArrangementsAsMscz(const QString& folder
     // "AMPL - 3-Horn Standard.mscz": the song's code when the file name or Sheets and Demos has one, else its title
     QString prefix;
     const QString fileBase = QFileInfo(project->path().toQString()).completeBaseName();
-    const QRegularExpressionMatch m = QRegularExpression("^([A-Z]{3,4})\\s*-\\s*(.*)$").match(fileBase);
+    const QRegularExpressionMatch m = starscoreCodedNameRe().match(fileBase);
     if (m.hasMatch()) {
         prefix = m.captured(1);
     } else {
@@ -2065,9 +2248,7 @@ RetVal<QString> StarScoreService::exportArrangementsAsMscz(const QString& folder
         const QString title = starscoreSongTitle(project);
         if (!band.isEmpty() && !title.isEmpty()) {
             for (const auto& [f, c] : starscoreReadCodes(band)) {
-                QString plain = f.section('/', -1);
-                plain.remove(QRegularExpression("^\\d+\\s+"));
-                if (plain.trimmed().toLower() == starscoreSafeFileName(title).toLower()) {
+                if (starscorePlainFolderName(f) == starscoreSafeFileName(title).toLower()) {
                     prefix = c;
                     break;
                 }
@@ -2276,15 +2457,22 @@ void StarScoreService::songbookRenderSheets(const QString& songPath, std::vector
         return QString();
     };
 
+    const INotationWriterPtr writer = writers()->writer("pdf");
+    // Titled, laid out once in page view, the arrangement label levelled with the instrument name and the composer
+    // credit clear of it, as the band export prints its sheets (inside the edit: the levelling and the credit are edits)
     auto finish = [&](INotationPtr n, StarScoreSongbookSheet& sheet) {
-        engraving::Score* score = n->elements()->msScore();
         n->undoStack()->prepareChanges(TranslatableString::untranslatable("Songbook sheet"));
         n->style()->setStyleValue(StyleId::showPageNumber, false);   // the book numbers its pages
-        starscoreRetitleSheet(score, sheet.left, sheet.right);
-        QDir().mkpath(QFileInfo(sheet.pdfPath).absolutePath());
-        QFile::remove(sheet.pdfPath);
-        const Ret ret = writePdf(n, sheet.pdfPath);   // inside the edit: printing may move the composer credit
+        QByteArray pdf;
+        Ret ret = starscorePrintSheet(writer, n, sheet.left, sheet.right, true, pdf);
         n->undoStack()->commitChanges();
+        if (ret) {
+            QDir().mkpath(QFileInfo(sheet.pdfPath).absolutePath());
+            QFile::remove(sheet.pdfPath);
+            QFile out(sheet.pdfPath);
+            ret = out.open(QIODevice::WriteOnly | QIODevice::Truncate) && out.write(pdf) == pdf.size()
+                  ? make_ok() : make_ret(Ret::Code::UnknownError, muse::trc("starscore", "couldn't write the file"));
+        }
         if (!ret) {
             sheet.error = QString::fromStdString(ret.toString());
         } else {
@@ -2365,17 +2553,7 @@ void StarScoreService::songbookRenderSheets(const QString& songPath, std::vector
             sheet.error = muse::qtrc("starscore", "part not found");
             continue;
         }
-        vm->setExcerpts({});
-        if (!part->show()) {
-            vm->parts()->setPartsVisible({ { part->id(), true } }, TranslatableString::untranslatable("Show"));
-        }
-        engraving::Instrument instrument = *part->instrument();
-        instrument.setTranspose(engraving::Interval(sheet.transposeDiatonic, sheet.transposeChromatic));
-        const engraving::ClefType clef = sheet.clef == 1 ? engraving::ClefType::F
-                                         : sheet.clef == 2 ? engraving::ClefType::C3 : engraving::ClefType::G;
-        instrument.setClefType(0, engraving::ClefTypeList(clef, clef));
-        const InstrumentKey key { part->instrumentId(), part->id(), engraving::Fraction(0, 1) };
-        vm->parts()->replaceInstrument(key, instrument);
+        starscoreRewritePartInstrument(vm, part, sheet.transposeDiatonic, sheet.transposeChromatic, sheet.clef);
         // Horn books read the lead sheet in treble clef: bars it writes in bass clef (a bass riff) become rests
         // marked "(bass)", and its clef changes go
         if (sheet.kind == "lead" && sheet.clef == 0 && !part->staves().empty()) {
@@ -2436,42 +2614,12 @@ void StarScoreService::songbookRenderSheets(const QString& songPath, std::vector
         }
 
         const QString bookName = "StarScore songbook " + QUuid::createUuid().toString(QUuid::Id128);
-        const QString oldBookName = part->partName().toQString();
-        vm->parts()->setInstrumentName(InstrumentKey { part->instrumentId(), part->id(), engraving::Fraction(0, 1) }, bookName);
-        part->setPartName(String::fromQString(bookName));
-        IExcerptNotationPtr book = starscorePotentialBook(vm, { bookName, oldBookName });
-        if (!book) {
-            sheet.error = muse::qtrc("starscore", "couldn't make the part");
-            continue;
-        }
-        book->setName(bookName);
-        vm->initExcerpts({ book });
-        INotationPtr n = book->notation();
+        INotationPtr n = starscoreMakeVersionBook(vm, part, bookName, part->partName().toQString(), srcBook, tmpDir,
+                                                  defaultStylePath());
         if (!n) {
             sheet.error = muse::qtrc("starscore", "couldn't make the part");
             continue;
         }
-        if (srcBook) {
-            const QString mss = tmpDir + "/part.mss";
-            if (srcBook->style()->saveStyle(io::path_t(mss))) {
-                n->style()->loadStyle(io::path_t(mss), true);
-            }
-            engraving::Score* es = n->elements()->msScore();
-            const engraving::Score* srcScore = srcBook->elements()->msScore();
-            if (es && srcScore) {
-                n->undoStack()->prepareChanges(TranslatableString::untranslatable("Copy layout"));
-                starscore::copyLayout(srcScore, { es }, starscore::LayoutCopyOptions());
-                n->undoStack()->commitChanges();
-            }
-        } else {
-            const QString def = defaultStylePath();
-            if (!def.isEmpty() && QFileInfo::exists(def)) {
-                n->style()->loadStyle(io::path_t(def), true);
-            }
-        }
-        n->undoStack()->prepareChanges(TranslatableString::untranslatable("Concert pitch"));
-        n->style()->setStyleValue(StyleId::concertPitch, false);
-        n->undoStack()->commitChanges();
         finish(n, sheet);
     }
 

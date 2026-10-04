@@ -21,13 +21,12 @@
 
 namespace mu::project::starscore::org {
 // ------------------------------------------------------------------ instruments
-static const QStringList HORNS { "Trumpet", "Flugelhorn", "Flute", "Clarinet", "Soprano Sax", "Alto Sax", "Tenor Sax", "Bari Sax",
-                                 "Bass Sax", "Bass Clarinet", "Trombone", "Bass Trombone" };
-static const QMap<QString, QString> HORN_ABBR { { "Trumpet", "Tpt" }, { "Flugelhorn", "Flg" }, { "Flute", "Flu" }, { "Clarinet", "Cla" },
-    { "Soprano Sax", "Sop" }, { "Alto Sax", "Alt" }, { "Tenor Sax", "Ten" }, { "Bari Sax", "Bar" }, { "Bass Sax", "Bsx" },
-    { "Bass Clarinet", "Bcl" }, { "Trombone", "Tbn" }, { "Bass Trombone", "Btb" } };
+// the horns and their abbreviations are hornOrder() (orglibrary.h), shared with the folder names and the Band Guide
 static const QStringList RHYTHM { "Bass", "Guitar", "Keys", "Elec Piano", "Organ", "Bass Synth", "Drums", "Percussion", "Congas", "Clavinet" };
 static const QStringList STRINGS { "Violin", "Viola", "Cello", "Strings", "Bassoon", "Accordion" };
+
+//! "CODE - " at the start of a file name, as every filed sheet has it
+static const QRegularExpression CODE_PREFIX("^([A-Z]{4}) - ");
 
 static const std::vector<std::pair<QString, QString> > CANON {
     { "^bass tromb", "Bass Trombone" }, { "^(bass sax|bass saxophone)", "Bass Sax" }, { "^tromb", "Trombone" },
@@ -47,16 +46,25 @@ QString canonInstrument(const QString& raw)
     QString low = QString(raw).replace('_', ' ').simplified().toLower();
     QString num;
     static const QRegularExpression trailing("\\b([12])\\b\\s*$");
+    static const QRegularExpression paren("\\s*\\(.*?\\)\\s*$");
+    static const QRegularExpression key("\\bin b\\W*b?\\b|\\bin bb\\b|\\bin e\\W*b?\\b|\\bin eb\\b|\\bin c\\b");
+    static const std::vector<std::pair<QRegularExpression, QString> > canon = []() {
+        std::vector<std::pair<QRegularExpression, QString> > out;
+        for (const auto& [pat, name] : CANON) {
+            out.emplace_back(QRegularExpression(pat), name);
+        }
+        return out;
+    }();
     const QRegularExpressionMatch m = trailing.match(low);
     if (m.hasMatch()) {
         num = " " + m.captured(1);
         low = low.left(m.capturedStart()).trimmed();
     }
-    low.remove(QRegularExpression("\\s*\\(.*?\\)\\s*$"));
-    low.remove(QRegularExpression("\\bin b\\W*b?\\b|\\bin bb\\b|\\bin e\\W*b?\\b|\\bin eb\\b|\\bin c\\b"));
+    low.remove(paren);
+    low.remove(key);
     low = low.trimmed();
-    for (const auto& [pat, name] : CANON) {
-        if (QRegularExpression(pat).match(low).hasMatch()) {
+    for (const auto& [re, name] : canon) {
+        if (re.match(low).hasMatch()) {
             return name + num;
         }
     }
@@ -65,13 +73,14 @@ QString canonInstrument(const QString& raw)
 
 static QString instrumentBase(const QString& i)
 {
-    return QString(i).remove(QRegularExpression("\\s+[12]$"));
+    static const QRegularExpression num("\\s+[12]$");
+    return QString(i).remove(num);
 }
 
 static QString family(const QString& i)
 {
     const QString b = instrumentBase(i);
-    return HORN_ABBR.contains(b) ? "horn" : RHYTHM.contains(b) ? "rhythm" : STRINGS.contains(b) ? "strings" : "other";
+    return !hornAbbr(b).isEmpty() ? "horn" : RHYTHM.contains(b) ? "rhythm" : STRINGS.contains(b) ? "strings" : "other";
 }
 
 static QString instrumentFromPdf(const QString& path)
@@ -81,12 +90,19 @@ static QString instrumentFromPdf(const QString& path)
                                       "Trombone", "Trumpet", "Bass Guitar", "Electric Guitar", "Electric Piano", "Hammond Organ", "Keys",
                                       "Piano", "Drumset", "Drums", "Congas", "Percussion", "Violin", "Viola", "Cello", "Bassoon", "Strings",
                                       "Vocals", "Clavinet", "Synthesizer", "Guitar", "Organ" };
+    static const std::vector<QRegularExpression> patterns = []() {
+        std::vector<QRegularExpression> out;
+        for (const QString& i : SEARCH) {
+            out.emplace_back("\\b" + QRegularExpression::escape(i) + "\\b", QRegularExpression::CaseInsensitiveOption);
+        }
+        return out;
+    }();
     const QString t = pdfFirstPageText(path);
     int bestPos = -1, bestLen = 0;
     QString best;
-    for (const QString& i : SEARCH) {
-        const QRegularExpressionMatch m = QRegularExpression("\\b" + QRegularExpression::escape(i) + "\\b",
-                                                             QRegularExpression::CaseInsensitiveOption).match(t);
+    for (int k = 0; k < SEARCH.size(); ++k) {
+        const QString& i = SEARCH[k];
+        const QRegularExpressionMatch m = patterns[k].match(t);
         if (m.hasMatch() && (bestPos < 0 || m.capturedStart() < bestPos || (m.capturedStart() == bestPos && i.size() > bestLen))) {
             bestPos = int(m.capturedStart());
             bestLen = int(i.size());
@@ -96,10 +112,28 @@ static QString instrumentFromPdf(const QString& path)
     return best.isEmpty() ? QString() : canonInstrument(best);
 }
 
-
 static bool hidden(const QString& name)
 {
     return name.startsWith('.') || name.startsWith("~$") || name.startsWith("Icon\r");
+}
+
+//! Everything to file below a folder: files, and bundles (.logicx, .band, .pages…) as one item each, never their
+//! insides. Hidden names and shortcuts (symlinks) are left alone. Paths come back relative to `base`, under `dirRel`.
+//! Until Oct 2026 the 6 Inbox walk went inside bundles and filed a Logic project's inner files one by one, which
+//! destroyed the project.
+static void walkLeaves(const QString& base, const QString& dirRel, QStringList& out)
+{
+    for (const QFileInfo& fi : QDir(joinPath(base, dirRel)).entryInfoList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
+        if (fi.isSymLink() || hidden(fi.fileName())) {
+            continue;
+        }
+        const QString rel = joinPath(dirRel, fi.fileName());
+        if (fi.isDir() && !isBundle(fi.filePath())) {
+            walkLeaves(base, rel, out);
+        } else {
+            out << rel;
+        }
+    }
 }
 
 // ------------------------------------------------------------------ Sheets and Demos
@@ -111,16 +145,19 @@ struct BandFiler {
 
     QString abs(const QString& rel) const { return paths.band + "/" + rel; }
 
-    void supersede(const QString& dstRel, const QString& song)
+    //! Moves what is at dstRel to Version History; returns where it went ("" when nothing was there or it couldn't move)
+    QString supersede(const QString& dstRel, const QString& song)
     {
         if (!QFileInfo::exists(abs(dstRel))) {
-            return;
+            return QString();
         }
         const QString rel = relativeTo(abs(song), abs(dstRel));
         const QString tgt = freeName(abs(song + "/Version History/Superseded " + paths.todayIso() + "/" + rel));
         if (moveItem(abs(dstRel), tgt)) {
             report.superseded.push_back({ dstRel, relativeTo(paths.band, tgt) });
+            return tgt;
         }
+        return QString();
     }
 
     void place(const QString& srcRel, const QString& song, const QString& sub, const QString& newName)
@@ -129,12 +166,21 @@ struct BandFiler {
         if (QDir::cleanPath(abs(srcRel)) == QDir::cleanPath(abs(dst))) {
             return;
         }
-        supersede(dst, song);
+        if (!QFileInfo::exists(abs(srcRel))) {
+            report.unrecognised << srcRel + " (couldn't move it)";
+            return;
+        }
+        const QString archived = supersede(dst, song);
         if (moveItem(abs(srcRel), abs(dst))) {
             report.filed.push_back({ srcRel, dst });
-        } else {
-            report.unrecognised << srcRel + " (couldn't move it)";
+            return;
         }
+        // the move failed after the sheet it replaces had gone to Version History: put that one back, so the
+        // song isn't left without its sheet
+        if (!archived.isEmpty() && moveItem(archived, abs(dst))) {
+            report.superseded.pop_back();
+        }
+        report.unrecognised << srcRel + " (couldn't move it)";
     }
 
     QString existingHornFolder(const QString& song, int n, const QString& inst) const
@@ -149,7 +195,7 @@ struct BandFiler {
             return QString();
         }
         if (!inst.isEmpty()) {
-            const QString ab = HORN_ABBR.value(instrumentBase(inst));
+            const QString ab = hornAbbr(instrumentBase(inst));
             for (const QString& c : cands) {
                 if (!ab.isEmpty() && c.contains(ab)) {
                     return c;
@@ -165,11 +211,22 @@ struct BandFiler {
         const QString name = fi.fileName();
         const QString base = fi.completeBaseName();
         const QString ext = fi.suffix().toLower();
-        const QString songTitle = QFileInfo(song).fileName().mid(song.startsWith("4 Works In Progress/") ? 0 : 2);
+        const QString songTitle = songTitleOf(song);
         auto restOf = [&]() {
+            // the title and the code the file may start with ("Amplitudes - Bass", "AMPL - Bass"), then stray edges
             QString r = base;
-            r.remove(QRegularExpression("^" + QRegularExpression::escape(songTitle) + "\\s*[-_]?\\s*", QRegularExpression::CaseInsensitiveOption));
-            r.remove(QRegularExpression("^" + code + "\\s*-\\s*"));
+            if (r.startsWith(songTitle, Qt::CaseInsensitive)) {
+                r = r.mid(songTitle.size());
+                static const QRegularExpression afterTitle("^\\s*[-_]?\\s*");
+                r.remove(afterTitle);
+            }
+            if (r.startsWith(code)) {
+                static const QRegularExpression dash("^\\s*-\\s*");
+                const QRegularExpressionMatch m = dash.match(r.mid(code.size()));
+                if (m.hasMatch()) {
+                    r = r.mid(code.size() + m.capturedLength());
+                }
+            }
             static const QRegularExpression edge("^[\\s\\-_]+|[\\s\\-_]+$");
             return r.remove(edge);
         };
@@ -184,8 +241,8 @@ struct BandFiler {
         if (base.contains("What's Here") || base.endsWith(" - Recordings")) {
             return;
         }
-        if (QRegularExpression("lead[_ ]sheet", QRegularExpression::CaseInsensitiveOption).match(base).hasMatch()
-            || pdfFirstPageText(abs(rel)).toLower().startsWith("lead sheet")) {
+        static const QRegularExpression leadSheet("lead[_ ]sheet", QRegularExpression::CaseInsensitiveOption);
+        if (leadSheet.match(base).hasMatch() || pdfFirstPageText(abs(rel)).toLower().startsWith("lead sheet")) {
             return place(rel, song, "1 Lead Sheet", code + " - Lead Sheet.pdf");
         }
         if (base.toLower().startsWith("arrangement guide")) {
@@ -196,7 +253,8 @@ struct BandFiler {
         if (m.hasMatch()) {
             const int n = m.captured(1).toInt();
             QString tail = base.mid(m.capturedEnd());
-            tail.remove(QRegularExpression("^[\\s_\\-:]+"));
+            static const QRegularExpression tailEdge("^[\\s_\\-:]+");
+            tail.remove(tailEdge);
             if (tail.isEmpty() || QStringList { "horns", "score", "full score" }.contains(tail.trimmed().toLower())) {
                 const QString f = existingHornFolder(song, n, QString());
                 return place(rel, song, f.isEmpty() ? QString("%1H Flexible").arg(n) : f, code + " - Score.pdf");
@@ -216,7 +274,7 @@ struct BandFiler {
             }
             if (!inst.isEmpty() && family(inst) == "horn") {
                 const QString f = existingHornFolder(song, n, inst);
-                return place(rel, song, f.isEmpty() ? QString("%1H %2").arg(n).arg(HORN_ABBR.value(instrumentBase(inst))) : f,
+                return place(rel, song, f.isEmpty() ? QString("%1H %2").arg(n).arg(hornAbbr(instrumentBase(inst))) : f,
                              code + " - " + inst + ".pdf");
             }
         }
@@ -226,7 +284,8 @@ struct BandFiler {
             inst = instrumentFromPdf(abs(rel));
         }
         if (inst.isEmpty()) {
-            const QRegularExpressionMatch pm = QRegularExpression("^([A-Za-z]+)(?:[_ ]?\\(.*\\))?$").match(rest);
+            static const QRegularExpression playerName("^([A-Za-z]+)(?:[_ ]?\\(.*\\))?$");
+            const QRegularExpressionMatch pm = playerName.match(rest);
             if (pm.hasMatch()) {
                 auto hint = roster.fileNameHints.find(pm.captured(1));
                 if (hint != roster.fileNameHints.end()) {
@@ -250,11 +309,12 @@ struct BandFiler {
         }
         if (fam == "horn") {
             // the horn folders that have this instrument; with more than one it's a guess, so leave it for Joel
-            const QString ab = HORN_ABBR.value(instrumentBase(inst));
+            const QString ab = hornAbbr(instrumentBase(inst));
             const bool numbered = inst != instrumentBase(inst);
             QStringList fits;
+            static const QRegularExpression hornFolder("^\\dH ");
             for (const QString& d : QDir(abs(song)).entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
-                if (!QRegularExpression("^\\dH ").match(d).hasMatch() || d.contains("Any") || d.contains("Flexible")) {
+                if (!hornFolder.match(d).hasMatch() || d.contains("Any") || d.contains("Flexible")) {
                     continue;
                 }
                 const QStringList toks = d.split(' ').mid(1);
@@ -275,8 +335,9 @@ struct BandFiler {
         }
         if (fam == "strings") {
             QStringList sf;
+            static const QRegularExpression stringsFolder("^\\dS ");
             for (const QString& d : QDir(abs(song)).entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
-                if (QRegularExpression("^\\dS ").match(d).hasMatch()) {
+                if (stringsFolder.match(d).hasMatch()) {
                     sf << d;
                 }
             }
@@ -289,11 +350,6 @@ struct BandFiler {
 };
 }
 
-static QString songTitleOf(const QString& root)
-{
-    return root.startsWith("4 Works In Progress/") ? root.mid(20) : root.mid(2);
-}
-
 BandFilingReport fileBand(const Paths& paths, Codes& codes, const Roster& roster, QJsonObject& aliases, const Progress& progress)
 {
     BandFilingReport report;
@@ -302,8 +358,9 @@ BandFilingReport fileBand(const Paths& paths, Codes& codes, const Roster& roster
 
     // --- song folders with a number but no code: register them (this is how Mxter Shirts sat unfiled until 21 Aug)
     QStringList roots;
+    static const QRegularExpression songGroup("^[123] "), otherGroup("^[4-9] ");
     for (const QString& d : base.entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
-        if (QRegularExpression("^[123] ").match(d).hasMatch()) {
+        if (songGroup.match(d).hasMatch()) {
             roots << d;
         } else if (d == "4 Works In Progress") {
             for (const QString& w : QDir(base.filePath(d)).entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
@@ -311,7 +368,7 @@ BandFilingReport fileBand(const Paths& paths, Codes& codes, const Roster& roster
                     roots << d + "/" + w;
                 }
             }
-        } else if (!hidden(d) && !QRegularExpression("^[4-9] ").match(d).hasMatch()) {
+        } else if (!hidden(d) && !otherGroup.match(d).hasMatch()) {
             report.newSongs << d;
         }
     }
@@ -328,7 +385,7 @@ BandFilingReport fileBand(const Paths& paths, Codes& codes, const Roster& roster
             if (it.filePath().contains("/Version History/")) {
                 continue;
             }
-            const QRegularExpressionMatch m = QRegularExpression("^([A-Z]{4}) - ").match(it.fileName());
+            const QRegularExpressionMatch m = CODE_PREFIX.match(it.fileName());
             if (m.hasMatch()) {
                 seen[m.captured(1)]++;
             }
@@ -354,31 +411,37 @@ BandFilingReport fileBand(const Paths& paths, Codes& codes, const Roster& roster
 
     // --- 6 Inbox
     std::map<QString, QString> byCode;
-    std::vector<std::pair<QString, QString> > byName;   // (bare title, root), longest first
+    struct Title {
+        QString title, norm, root;    // bare title, normalizeName(title), song folder
+    };
+    std::vector<Title> byName;        // longest title first, so "Live Strong + Strasbourg" beats "Live Strong"
     for (const auto& [root, code] : codes.band) {
         byCode[code] = root;
-        byName.emplace_back(songTitleOf(root), root);
+        const QString title = songTitleOf(root);
+        byName.push_back({ title, normalizeName(title), root });
     }
-    std::sort(byName.begin(), byName.end(), [](const auto& a, const auto& b) { return a.first.size() > b.first.size(); });
+    std::sort(byName.begin(), byName.end(), [](const Title& a, const Title& b) { return a.title.size() > b.title.size(); });
+    static const QRegularExpression codeStart("^([A-Z]{3,4})\\s*-\\s*");
     auto target = [&](const QString& fname, const QString& subdir) -> QString {
-        const QRegularExpressionMatch m = QRegularExpression("^([A-Z]{3,4})\\s*-\\s*").match(fname);
+        const QRegularExpressionMatch m = codeStart.match(fname);
         if (m.hasMatch() && byCode.count(m.captured(1))) {
             return byCode[m.captured(1)];
         }
         const QString low = normalizeName(fname);
-        for (const auto& [title, root] : byName) {
-            const QString t = normalizeName(title);
-            if (low.startsWith(t + " ") || low == t || (" " + low + " ").contains(" " + t + " ")) {
-                return root;
+        const QString padded = " " + low + " ";
+        for (const Title& t : byName) {
+            if (low.startsWith(t.norm + " ") || low == t.norm || padded.contains(" " + t.norm + " ")) {
+                return t.root;
             }
         }
         if (!subdir.isEmpty()) {
             if (byCode.count(subdir.trimmed())) {
                 return byCode[subdir.trimmed()];
             }
-            for (const auto& [title, root] : byName) {
-                if (normalizeName(subdir) == normalizeName(title)) {
-                    return root;
+            const QString sub = normalizeName(subdir);
+            for (const Title& t : byName) {
+                if (sub == t.norm) {
+                    return t.root;
                 }
             }
         }
@@ -386,19 +449,8 @@ BandFilingReport fileBand(const Paths& paths, Codes& codes, const Roster& roster
     };
     const QString inbox = paths.band + "/6 Inbox";
     QDir().mkpath(inbox);
-    std::vector<QString> inboxFiles;
-    QDirIterator iit(inbox, QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
-    while (iit.hasNext()) {
-        iit.next();
-        const QString rel = relativeTo(inbox, iit.filePath());
-        bool skip = false;
-        for (const QString& seg : rel.split('/')) {
-            skip |= hidden(seg);
-        }
-        if (!skip) {
-            inboxFiles.push_back(rel);
-        }
-    }
+    QStringList inboxFiles;    // files and bundles, relative to 6 Inbox
+    walkLeaves(inbox, QString(), inboxFiles);
     std::sort(inboxFiles.begin(), inboxFiles.end());
     for (const QString& rel : inboxFiles) {
         const QString fname = QFileInfo(rel).fileName();
@@ -423,8 +475,14 @@ BandFilingReport fileBand(const Paths& paths, Codes& codes, const Roster& roster
         if (!dir.exists()) {
             continue;
         }
-        for (const QString& f : dir.entryList(QDir::Files | QDir::NoDotAndDotDot, QDir::Name)) {
-            if (hidden(f) || QRegularExpression("^[A-Z]{3,4} - What").match(f).hasMatch() || f.endsWith(" - Recordings.pdf")) {
+        // loose files, and bundles (a .logicx dropped in the song root goes to Demos as one item)
+        static const QRegularExpression whatsHere("^[A-Z]{3,4} - What");
+        for (const QFileInfo& fi : dir.entryInfoList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
+            const QString f = fi.fileName();
+            if (fi.isSymLink() || hidden(f) || (fi.isDir() && !isBundle(fi.filePath()))) {
+                continue;
+            }
+            if (whatsHere.match(f).hasMatch() || f.endsWith(" - Recordings.pdf")) {
                 continue;
             }
             filer.fileOne(song + "/" + f, song, code);
@@ -474,24 +532,48 @@ void redateUpdateNotes(const Paths& paths, const Codes& codes, const QStringList
 }
 
 // ------------------------------------------------------------------ Projects and Sheets
-std::map<QString, QString> projectTunes(const Paths& paths)
+std::vector<ProjectTune> listProjectTunes(const Paths& paths)
 {
-    std::map<QString, QString> tunes;
+    // Listed once per run and shared (syncCodes, fileProjects, projectsSnapshot and the folder colours each used
+    // to list the groups and every tune's *.starscore again). Groups 1-4; the colours take only 1-3 from this list,
+    // see ProjectTune::starsign.
+    std::vector<ProjectTune> tunes;
     if (paths.projects.isEmpty()) {
         return tunes;
     }
+    static const QRegularExpression anyGroup("^[1234] "), starsignGroup("^[123] ");
     const QDir base(paths.projects);
     for (const QString& group : base.entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
-        if (!QRegularExpression("^[1234] ").match(group).hasMatch()) {
+        if (!anyGroup.match(group).hasMatch()) {
             continue;
         }
-        for (const QString& t : QDir(base.filePath(group)).entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
-            if (!hidden(t)) {
-                tunes[t] = group + "/" + t;
+        for (const QFileInfo& t : QDir(base.filePath(group)).entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
+            // shortcuts (symlinks into another band's shared Drive) are not tunes of this folder
+            if (t.isSymLink() || hidden(t.fileName())) {
+                continue;
             }
+            ProjectTune tune;
+            tune.name = t.fileName();
+            tune.group = group;
+            tune.rel = group + "/" + tune.name;
+            tune.starsign = starsignGroup.match(group).hasMatch();
+            for (const QString& f : QDir(t.filePath()).entryList({ "*.starscore" }, QDir::Files, QDir::Name)) {
+                tune.hasStarScore = true;
+                const QRegularExpressionMatch m = CODE_PREFIX.match(f);
+                if (m.hasMatch() && tune.fileCode.isEmpty()) {
+                    tune.fileCode = m.captured(1);
+                }
+            }
+            tunes.push_back(tune);
         }
     }
     return tunes;
+}
+
+QString ProjectTune::codeIn(const Codes& codes) const
+{
+    const auto known = codes.projects.find(name);
+    return known != codes.projects.end() ? known->second : fileCode;
 }
 
 static QString purposeOf(const QString& path)
@@ -506,22 +588,25 @@ static QString purposeOf(const QString& path)
     if (p.contains("marching")) {
         return "Marching Band";
     }
-    if (QRegularExpression("deprecated|antiquated|\\(old\\)|old sw|even older").match(p).hasMatch()) {
+    static const QRegularExpression deprecated("deprecated|antiquated|\\(old\\)|old sw|even older");
+    static const QRegularExpression solo("\\bsolo\\b|comping|solo map");
+    static const QRegularExpression reference("\\.(pdf|mp3|wav|mid|aif|aiff|jpg|png)$");
+    if (deprecated.match(p).hasMatch()) {
         return "Deprecated";
     }
-    if (QRegularExpression("\\bsolo\\b|comping|solo map").match(p).hasMatch()) {
+    if (solo.match(p).hasMatch()) {
         return "Solos & Practice";
     }
     if (p.contains("transcription")) {
         return "Transcriptions";
     }
-    if (QRegularExpression("\\.(pdf|mp3|wav|mid|aif|aiff|jpg|png)$").match(p).hasMatch()) {
+    if (reference.match(p).hasMatch()) {
         return "Reference";
     }
     return QString();
 }
 
-ProjectsFilingReport fileProjects(const Paths& paths, const Progress& progress)
+ProjectsFilingReport fileProjects(const Paths& paths, const std::vector<ProjectTune>& tunes, const Progress& progress)
 {
     ProjectsFilingReport report;
     if (paths.projects.isEmpty() || !QDir(paths.projects).exists()) {
@@ -529,7 +614,6 @@ ProjectsFilingReport fileProjects(const Paths& paths, const Progress& progress)
     }
     const QString base = paths.projects;
     const qint64 quiet = QDateTime::currentMSecsSinceEpoch() - 2 * 3600 * 1000;   // leave anything touched in the last 2 hours
-    const std::map<QString, QString> tunes = projectTunes(paths);
     static const QStringList KEEP_TOP { "Projects Maintenance Report.pdf", "All Recordings.pdf", "Starsign Library.command" };
 
     // what to file: loose top-level files and everything in 9 Inbox (bundles move whole)
@@ -545,31 +629,28 @@ ProjectsFilingReport fileProjects(const Paths& paths, const Progress& progress)
     }
     const QString inbox = base + "/9 Inbox";
     QDir().mkpath(inbox);
-    std::function<void(const QString&)> walk = [&](const QString& dirRel) {
-        for (const QFileInfo& fi : QDir(base + "/" + dirRel).entryInfoList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
-            if (fi.isSymLink() || hidden(fi.fileName())) {
-                continue;
-            }
-            const QString rel = dirRel + "/" + fi.fileName();
-            if (fi.isDir() && !isBundle(fi.filePath())) {
-                walk(rel);
-            } else {
-                targets << rel;
-            }
-        }
-    };
-    walk("9 Inbox");
+    walkLeaves(base, "9 Inbox", targets);
 
+    // one pattern per tune name, built once
+    struct TuneMatch {
+        const ProjectTune* tune;
+        QRegularExpression re;
+    };
+    std::vector<TuneMatch> matchers;
+    for (const ProjectTune& t : tunes) {
+        matchers.push_back({ &t, QRegularExpression("(?<![A-Za-z])" + QRegularExpression::escape(t.name) + "(?![A-Za-z])",
+                                                    QRegularExpression::CaseInsensitiveOption) });
+    }
     auto findTune = [&](const QString& rel) -> QString {
         const QString folder = QFileInfo(rel).path().replace('_', ' ');
         const QString fname = QFileInfo(rel).fileName().replace('_', ' ');
         QString best;
         int bw = 0, bl = 0;
-        for (const auto& [t, d] : tunes) {
-            const QRegularExpression re("(?<![A-Za-z])" + QRegularExpression::escape(t) + "(?![A-Za-z])", QRegularExpression::CaseInsensitiveOption);
+        for (const TuneMatch& tm : matchers) {
+            const QString& t = tm.tune->name;
             for (const auto& [hay, w] : std::vector<std::pair<QString, int> > { { folder, 2 }, { fname, 1 } }) {
-                if (re.match(hay).hasMatch() && (w > bw || (w == bw && t.size() > bl))) {
-                    best = d;
+                if (tm.re.match(hay).hasMatch() && (w > bw || (w == bw && t.size() > bl))) {
+                    best = tm.tune->rel;
                     bw = w;
                     bl = int(t.size());
                 }
@@ -577,11 +658,11 @@ ProjectsFilingReport fileProjects(const Paths& paths, const Progress& progress)
         }
         if (best.isEmpty()) {
             // "AMPL - …" files: the tune whose .starscore carries that code
-            const QRegularExpressionMatch m = QRegularExpression("^([A-Z]{4}) - ").match(QFileInfo(rel).fileName());
+            const QRegularExpressionMatch m = CODE_PREFIX.match(QFileInfo(rel).fileName());
             if (m.hasMatch()) {
-                for (const auto& [t, d] : tunes) {
-                    if (!QDir(base + "/" + d).entryList({ m.captured(1) + " - *.starscore" }, QDir::Files).isEmpty()) {
-                        return d;
+                for (const ProjectTune& t : tunes) {
+                    if (t.fileCode == m.captured(1)) {
+                        return t.rel;
                     }
                 }
             }
@@ -612,8 +693,9 @@ ProjectsFilingReport fileProjects(const Paths& paths, const Progress& progress)
             dst = tune + "/MuseScore Files/" + (sub.isEmpty() ? QString() : sub + "/") + fi.fileName();
             archive = tune + "/MuseScore Files/Deprecated/Superseded " + paths.todayIso() + "/" + fi.fileName();
         }
+        QString old;
         if (QFileInfo::exists(base + "/" + dst)) {
-            const QString old = freeName(base + "/" + archive);
+            old = freeName(base + "/" + archive);
             if (!moveItem(base + "/" + dst, old)) {
                 report.unmatched << rel + " (couldn't move the file it replaces)";
                 continue;
@@ -623,11 +705,19 @@ ProjectsFilingReport fileProjects(const Paths& paths, const Progress& progress)
         if (moveItem(base + "/" + rel, base + "/" + dst)) {
             report.filed.push_back({ rel, dst });
         } else {
+            // the move failed after the file it replaces had gone to Deprecated: put that one back
+            if (!old.isEmpty() && moveItem(old, base + "/" + dst)) {
+                report.superseded.pop_back();
+            }
             report.unmatched << rel + " (couldn't move it)";
         }
     }
 
     // empty folders -> "Z Empty Folders (safe to delete)/<where they were>"
+    // One walk, children first: a folder that is empty once its empty children have moved out is seen on the way
+    // back up. Group folders (1-4, 6-8) and tune folders stay even when empty; so does anything touched in the last
+    // two hours (the walk looks at a folder's date after its children moved, so a parent that just emptied waits
+    // for the next run, as it did when this took several passes).
     const QString EMPTY = "Z Empty Folders (safe to delete)";
     static const QStringList KEEP { EMPTY, ".organizer", "9 Inbox", "6 Templates", "7 Sketches" };
     auto isEmpty = [](const QString& p) {
@@ -638,43 +728,44 @@ ProjectsFilingReport fileProjects(const Paths& paths, const Progress& progress)
         }
         return true;
     };
-    for (int pass = 0; pass < 4 && !progress.stopped(); ++pass) {
-        QStringList cands;
-        std::function<void(const QString&)> scan = [&](const QString& dirRel) {
-            if (progress.stopped()) {
-                return;
-            }
-            for (const QFileInfo& fi : QDir(base + "/" + dirRel).entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot | QDir::Hidden, QDir::Name)) {
-                const QString rel = dirRel.isEmpty() ? fi.fileName() : dirRel + "/" + fi.fileName();
-                if (fi.isSymLink() || fi.fileName().startsWith('.') || isBundle(fi.filePath()) || KEEP.contains(rel.section('/', 0, 0))) {
-                    continue;
-                }
-                scan(rel);
-                // group folders (1–4, 6–8) and tune folders stay even when empty
-                if (rel.count('/') >= 2 && isEmpty(fi.filePath()) && fi.lastModified().toMSecsSinceEpoch() < quiet) {
-                    cands << rel;
-                }
-            }
-        };
-        scan(QString());
-        if (cands.isEmpty() || progress.stopped()) {
-            break;
+    std::function<void(const QString&)> sweep = [&](const QString& dirRel) {
+        if (progress.stopped()) {
+            return;
         }
-        for (const QString& c : cands) {
-            const QString d = freeName(base + "/" + EMPTY + "/" + c);
-            if (moveItem(base + "/" + c, d)) {
-                report.swept.push_back({ c, relativeTo(base, d) });
+        for (const QFileInfo& fi : QDir(base + "/" + dirRel).entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot | QDir::Hidden, QDir::Name)) {
+            const QString rel = dirRel.isEmpty() ? fi.fileName() : dirRel + "/" + fi.fileName();
+            if (fi.isSymLink() || fi.fileName().startsWith('.') || isBundle(fi.filePath()) || KEEP.contains(rel.section('/', 0, 0))) {
+                continue;
+            }
+            sweep(rel);
+            if (rel.count('/') >= 2 && isEmpty(fi.filePath())
+                && QFileInfo(fi.filePath()).lastModified().toMSecsSinceEpoch() < quiet) {
+                const QString d = freeName(base + "/" + EMPTY + "/" + rel);
+                if (moveItem(base + "/" + rel, d)) {
+                    report.swept.push_back({ rel, relativeTo(base, d) });
+                }
             }
         }
-    }
+    };
+    sweep(QString());
     return report;
 }
 
-QJsonObject projectsSnapshot(const Paths& paths, const Codes& codes)
+QJsonObject projectsSnapshot(const Paths& paths, const Codes& codes, const std::vector<ProjectTune>& tunes)
 {
     QJsonObject o;
     if (paths.projects.isEmpty()) {
         return o;
+    }
+    // One walk of the folder gives every count; each tune's figures come from the path prefix (until Oct 2026
+    // this walked the folder once and then every tune four more times).
+    struct Counts {
+        int museScoreFiles = 0, versionHistory = 0, deprecated = 0;
+    };
+    std::map<QString, Counts> perTune;   // by rel
+    std::map<QString, const ProjectTune*> tuneByRel;
+    for (const ProjectTune& t : tunes) {
+        tuneByRel[t.rel] = &t;
     }
     int files = 0, starscore = 0, mscz = 0, templates = 0, quarantined = 0;
     QDirIterator it(paths.projects, QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
@@ -693,51 +784,43 @@ QJsonObject projectsSnapshot(const Paths& paths, const Codes& codes)
             templates += rel.startsWith("6 Templates/");
         }
         quarantined += rel.startsWith("8 Quarantine");
-    }
-    std::map<QString, QString> codeByTitle;
-    for (const auto& [t, c] : codes.projects) {
-        codeByTitle[t] = c;
-    }
-    std::vector<std::pair<QString, QString> > ordered;   // by group, then name
-    for (const auto& [name, rel] : projectTunes(paths)) {
-        ordered.emplace_back(name, rel);
-    }
-    std::stable_sort(ordered.begin(), ordered.end(), [](const auto& a, const auto& b) {
-        return a.second.section('/', 0, 0) < b.second.section('/', 0, 0);
-    });
-    QJsonArray tunes;
-    for (const auto& [name, rel] : ordered) {
-        const QDir d(paths.projects + "/" + rel);
-        auto count = [&](const QString& sub) {
-            int n = 0;
-            QDirIterator i(d.filePath(sub), QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
-            while (i.hasNext()) {
-                i.next();
-                n += i.fileName() != ".DS_Store";
-            }
-            return n;
-        };
-        const QStringList ss = d.entryList({ "*.starscore" }, QDir::Files);
-        QString code = codeByTitle.count(name) ? codeByTitle[name] : QString();
-        if (code.isEmpty() && !ss.isEmpty()) {
-            code = QRegularExpression("^([A-Z]{4}) - ").match(ss.first()).captured(1);
+        // "1 Starsign Originals/Amplitudes/MuseScore Files/…": the tune is the first two segments
+        const int slash1 = rel.indexOf('/');
+        const int slash2 = slash1 < 0 ? -1 : rel.indexOf('/', slash1 + 1);
+        if (slash2 < 0 || !tuneByRel.count(rel.left(slash2))) {
+            continue;
         }
-        int deprecated = count("Deprecated") + count("MuseScore Files/Deprecated");
-        tunes.append(QJsonObject { { "name", name }, { "group", rel.section('/', 0, 0) }, { "code", code }, { "starscore", !ss.isEmpty() },
-                                   { "museScoreFiles", count("MuseScore Files") }, { "versionHistory", count("Version History") },
-                                   { "deprecated", deprecated } });
+        Counts& c = perTune[rel.left(slash2)];
+        const QString inTune = rel.mid(slash2 + 1);
+        c.museScoreFiles += inTune.startsWith("MuseScore Files/");
+        c.versionHistory += inTune.startsWith("Version History/");
+        c.deprecated += inTune.startsWith("Deprecated/") || inTune.startsWith("MuseScore Files/Deprecated/");
+    }
+    std::vector<const ProjectTune*> ordered;   // by group, then name (the list is already by group, then name)
+    for (const ProjectTune& t : tunes) {
+        ordered.push_back(&t);
+    }
+    std::stable_sort(ordered.begin(), ordered.end(), [](const ProjectTune* a, const ProjectTune* b) {
+        return a->group != b->group ? a->group < b->group : a->name < b->name;
+    });
+    QJsonArray tunesJson;
+    for (const ProjectTune* t : ordered) {
+        const Counts c = perTune.count(t->rel) ? perTune[t->rel] : Counts();
+        tunesJson.append(QJsonObject { { "name", t->name }, { "group", t->group }, { "code", t->codeIn(codes) }, { "starscore", t->hasStarScore },
+                                       { "museScoreFiles", c.museScoreFiles }, { "versionHistory", c.versionHistory },
+                                       { "deprecated", c.deprecated } });
     }
     o["files"] = files;
     o["starscore"] = starscore;
     o["mscz"] = mscz;
     o["templates"] = templates;
     o["quarantined"] = quarantined;
-    o["tunes"] = tunes;
+    o["tunes"] = tunesJson;
     return o;
 }
 
 // ------------------------------------------------------------------ codes
-QStringList syncCodes(const Paths& paths, Codes& codes)
+QStringList syncCodes(const Paths& paths, Codes& codes, const std::vector<ProjectTune>& tunes)
 {
     QStringList log, added;
     if (paths.projects.isEmpty()) {
@@ -749,16 +832,10 @@ QStringList syncCodes(const Paths& paths, Codes& codes)
         bandByTitle[normalizeName(songTitleOf(root))] = code;
         bandTitleOf[code] = songTitleOf(root);
     }
-    for (const auto& [tune, rel] : projectTunes(paths)) {
+    for (const ProjectTune& t : tunes) {
         // the code: the .starscore's "CODE - Title.starscore", then the band folder by title
-        QString fileCode;
-        for (const QString& f : QDir(paths.projects + "/" + rel).entryList({ "*.starscore" }, QDir::Files, QDir::Name)) {
-            const QRegularExpressionMatch m = QRegularExpression("^([A-Z]{4}) - ").match(f);
-            if (m.hasMatch()) {
-                fileCode = m.captured(1);
-                break;
-            }
-        }
+        const QString& fileCode = t.fileCode;
+        const QString& tune = t.name;
         const QString norm = normalizeName(tune);
         QString bandCode = bandByTitle.count(norm) ? bandByTitle[norm] : QString();
         if (bandCode.isEmpty() && !fileCode.isEmpty() && bandTitleOf.count(fileCode)) {

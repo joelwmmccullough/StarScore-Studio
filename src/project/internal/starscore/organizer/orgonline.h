@@ -11,6 +11,7 @@
 #include <QDate>
 #include <QJsonObject>
 #include <QMap>
+#include <QSet>
 #include <QString>
 #include <QStringList>
 
@@ -72,8 +73,17 @@ bool parseYouTubeWatchPage(const QString& html, YouTubeVideo& out);
 QJsonObject extractJsonAssignment(const QString& html, const QString& name);
 std::vector<Timestamp> parseTimestamps(const QString& description);
 
-//! Map a description's song name to a library code with the aliases (normalized, case-insensitive).
-//! aliases: name -> code; skipNames: names that are not songs.
+//! Maps a description's song name to a library code with the aliases (normalized, case-insensitive).
+//! aliases: name -> code; skipNames: names that are not songs. Build one and match many: normalizing every
+//! alias again for each name made the setlist.fm stats and a video's timestamps O(names × aliases).
+struct NameMatcher {
+    QMap<QString, QString> byNorm;    // normalized alias -> code
+    QSet<QString> skip;               // normalized names that aren't songs
+
+    NameMatcher(const QMap<QString, QString>& aliases, const QStringList& skipNames);
+    MatchedTimestamp match(const Timestamp& t) const;
+};
+//! One-off form of NameMatcher::match
 MatchedTimestamp matchTimestamp(const Timestamp& t, const QMap<QString, QString>& aliases, const QStringList& skipNames);
 //! Lower case, accents and punctuation removed, "&" = "and", single spaces
 QString normalizeName(const QString& s);

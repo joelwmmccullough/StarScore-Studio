@@ -67,6 +67,13 @@ private:
 
     RetVal<ReleaseInfo> parseRelease(const QByteArray& json) const;
 
+    // StarScore: true when checkForAppUpdateUrl() points at the fork's GitHub releases (the normal case);
+    // false means MuseScore's own update feed, which is kept compiled but unused.
+    bool isStarScoreGitHubSource() const;
+    Version currentAppVersion() const;
+    RetVal<ReleaseInfo> parseStarScoreRelease(const QByteArray& json) const;
+    RetVal<Progress> downloadStarScoreRelease(const ReleaseInfo& info);
+
     std::string platformFileSuffix() const;
     QJsonObject resolveReleaseAsset(const QJsonObject& release) const;
 

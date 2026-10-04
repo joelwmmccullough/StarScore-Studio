@@ -101,8 +101,14 @@ if(BUILD_CONFIGURATION STREQUAL "APP-PORTABLE")
     set(WIN_PORTABLE ON)
 endif()
 
-# StarScore Studio: never offer MuseScore updates
-set(MUSE_MODULE_UPDATE OFF)
+# StarScore Studio: the update module checks the fork's GitHub releases (never MuseScore's feed) and is only useful
+# on macOS, the one platform with published builds. It is also compiled on Linux so the Linux test build catches
+# errors in it, but there it is switched off at run time (UpdateConfiguration::isAppUpdatable).
+if (OS_IS_MAC OR OS_IS_LIN)
+    set(MUSE_MODULE_UPDATE ON)
+else()
+    set(MUSE_MODULE_UPDATE OFF)
+endif()
 
 if (WIN_PORTABLE)
     set(MUSE_MODULE_UPDATE OFF)

@@ -29,9 +29,33 @@ void StarScoreBarModel::load()
             m_pendingUpdate = true;
             return;
         }
-        emit changed();
+        refresh();
     });
+    refresh();
+}
+
+void StarScoreBarModel::refresh()
+{
+    QVariantList arrangements = buildArrangements();
+    QVariantList sections = buildSections();
+    QVariantList solos = buildSolos();
+    const bool arrangementsDiffer = arrangements != m_arrangements;
+    const bool sectionsDiffer = sections != m_sections;
+    const bool solosDiffer = solos != m_solos;
+    m_arrangements = std::move(arrangements);
+    m_sections = std::move(sections);
+    m_solos = std::move(solos);
+
     emit changed();
+    if (arrangementsDiffer) {
+        emit arrangementsChanged();
+    }
+    if (sectionsDiffer) {
+        emit sectionsChanged();
+    }
+    if (solosDiffer) {
+        emit solosChanged();
+    }
 }
 
 void StarScoreBarModel::setHoldUpdates(bool hold)
@@ -39,7 +63,7 @@ void StarScoreBarModel::setHoldUpdates(bool hold)
     m_holdUpdates = hold;
     if (!hold && m_pendingUpdate) {
         m_pendingUpdate = false;
-        emit changed();
+        refresh();
     }
 }
 
@@ -66,6 +90,21 @@ bool StarScoreBarModel::isStarScoreFile() const
 
 QVariantList StarScoreBarModel::arrangements() const
 {
+    return m_arrangements;
+}
+
+QVariantList StarScoreBarModel::sections() const
+{
+    return m_sections;
+}
+
+QVariantList StarScoreBarModel::solos() const
+{
+    return m_solos;
+}
+
+QVariantList StarScoreBarModel::buildArrangements() const
+{
     QVariantList result;
     const QString active = starScore()->activeArrangementId();
     const std::vector<StarScoreSection> sections = starScore()->sections();
@@ -91,7 +130,7 @@ QVariantList StarScoreBarModel::arrangements() const
     return result;
 }
 
-QVariantList StarScoreBarModel::sections() const
+QVariantList StarScoreBarModel::buildSections() const
 {
     QVariantList result;
     for (const StarScoreSection& s : starScore()->sections()) {
@@ -109,7 +148,7 @@ QVariantList StarScoreBarModel::sections() const
     return result;
 }
 
-QVariantList StarScoreBarModel::solos() const
+QVariantList StarScoreBarModel::buildSolos() const
 {
     QVariantList result;
     const QString current = starScore()->currentSoloId();

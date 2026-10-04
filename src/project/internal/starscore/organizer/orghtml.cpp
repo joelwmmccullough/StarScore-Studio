@@ -6,7 +6,6 @@
 #include "orghtml.h"
 
 #include <QLocale>
-#include <QRegularExpression>
 
 namespace mu::project::starscore::org {
 QString esc(const QString& s)
@@ -120,8 +119,12 @@ static const QMap<QString, QString> FOLDER_BLURB {
 static QString stripCode(const QString& file, const QString& code)
 {
     QString s = file;
-    s.remove(QRegularExpression("^" + QRegularExpression::escape(code) + " - "));
-    s.remove(QRegularExpression("\\.pdf$"));
+    if (s.startsWith(code + " - ")) {
+        s = s.mid(code.size() + 3);
+    }
+    if (s.endsWith(".pdf")) {
+        s.chop(4);
+    }
     return s;
 }
 

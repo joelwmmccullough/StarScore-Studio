@@ -76,7 +76,8 @@ QJsonObject rectJson(const mu::engraving::RectF& r)
 
 QString safeName(QString s)
 {
-    s.replace(QRegularExpression("[/:\\\\]"), "-");
+    static const QRegularExpression unsafeRe("[/:\\\\]");
+    s.replace(unsafeRe, "-");
     return s.trimmed();
 }
 }
@@ -101,7 +102,7 @@ void StarScoreService::startAutotest()
     autotestLog(QString("autotest: StarScore %1, steps %2").arg(version, qEnvironmentVariable("STARSCORE_AUTOTEST_STEPS")));
     QStringList steps = qEnvironmentVariable("STARSCORE_AUTOTEST_STEPS", "report").split(',', Qt::SkipEmptyParts);
     // after the tidying on opening (a zero timer) and the window settling
-    QTimer::singleShot(3000, [this, steps]() { runAutotestSteps(steps, 1); });
+    QTimer::singleShot(3000, &m_timerGuard, [this, steps]() { runAutotestSteps(steps, 1); });
 }
 
 void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
@@ -247,7 +248,7 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         autotestLog("  unknown step");
     }
 
-    QTimer::singleShot(500, [this, steps, reportNumber]() { runAutotestSteps(steps, reportNumber); });
+    QTimer::singleShot(500, &m_timerGuard, [this, steps, reportNumber]() { runAutotestSteps(steps, reportNumber); });
 }
 
 void StarScoreService::autotestReport(const QString& base)

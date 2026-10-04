@@ -12,6 +12,7 @@
 namespace mu::engraving {
 class Score;
 class MasterScore;
+class Measure;
 class Part;
 }
 
@@ -61,10 +62,6 @@ int colorNotes(mu::engraving::Score* score, bool colorize);
 //! True when the instrument has notes in fewer than a fifth of the bars (an empty or barely started part)
 bool partLooksUnfinished(const mu::engraving::Score* score, const mu::engraving::Part* part);
 
-//! Additive time signature, e.g. numerators {4,4,4,3} over 8: bars of 4/8, 4/8, 4/8, 3/8, repeating.
-//! The first bar shows "4+4+4+3 / 8"; the following changes are hidden. Runs from `start` to the end
-//! of `last` (or, when last is null, up to the next existing time signature or the end of the score).
-//! Must be called inside a command. Returns an error message, or an empty string.
 //! Lists, for every visible instrument, the bars with notes outside its pro range and outside its
 //! amateur range (concert pitch, as MuseScore's own range colouring). Returns a readable report.
 QString checkRanges(const mu::engraving::Score* score);
@@ -91,18 +88,22 @@ int applyKeysStaffRules(mu::engraving::MasterScore* master);
 //! is not a horn
 QString bandHornName(const QString& instrumentId);
 
-//! Gives the first staff of each of `to` the end barlines (double, final…) of the first staff of `from`, bar by bar,
-//! in the score and every part book (undoable). Pasted music doesn't bring its barlines: a new stand-in version of
-//! the Bass Trombone lost the double barline before each repeat. Returns how many barlines changed.
 //! Every staff gets the same end barline in each bar: where some staves have a double, final or other special
 //! barline and the rest have a plain one, the plain ones get it too (in the score and every part book). Bars whose
 //! staves disagree between two special barlines are left alone. Undoable when apply is true; returns how many
-//! barlines differ (Check) or changed.
+//! barlines differ (apply false) or changed.
 int syncEndBarlines(mu::engraving::MasterScore* master, bool apply);
 
+//! Gives the first staff of each of `to` the end barlines (double, final…) of the first staff of `from`, bar by bar,
+//! in the score and every part book (undoable). Pasted music doesn't bring its barlines: a new stand-in version of
+//! the Bass Trombone lost the double barline before each repeat. Returns how many barlines changed.
 int copyEndBarlines(mu::engraving::MasterScore* master, const mu::engraving::Part* from,
                     const std::vector<mu::engraving::Part*>& to);
 
+//! Additive time signature, e.g. numerators {4,4,4,3} over 8: bars of 4/8, 4/8, 4/8, 3/8, repeating.
+//! The first bar shows "4+4+4+3 / 8"; the following changes are hidden. Runs from `start` to the end
+//! of `last` (or, when last is null, up to the next existing time signature or the end of the score).
+//! Must be called inside a command. Returns an error message, or an empty string.
 QString applyAdditiveTimeSig(mu::engraving::MasterScore* score, mu::engraving::Measure* start, mu::engraving::Measure* last,
                              const std::vector<int>& numerators, int denominator);
 }

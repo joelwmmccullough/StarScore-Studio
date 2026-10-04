@@ -97,9 +97,33 @@ jobs:
       run: |
         DMG=$(ls build.artifacts/*.dmg | head -1)
         cp "$DMG" StarScore-Studio.dmg
+
+        # The in-app updater (src/framework/update, starscoregithubrelease.h) reads the StarScore version from the
+        # release name ("StarScore Studio 1.16.0") and shows the release body as the release notes. Both come from
+        # the sources: STARSCORE_VERSION in version.cmake and that version's "## X.Y.Z" block of the changelog.
+        VERSION=$(sed -nE 's/^set\(STARSCORE_VERSION "([0-9]+\.[0-9]+\.[0-9]+)"\).*/\1/p' version.cmake | head -n 1)
+        if [ -z "$VERSION" ]; then
+          echo "STARSCORE_VERSION not found in version.cmake"
+          exit 1
+        fi
+
+        CHANGELOG=src/framework/learn/qml/Muse/Learn/resources/starscore_changelog.md
+        # Everything between "## $VERSION" and the next "## " heading, without the heading itself (the dialog
+        # already shows the version in its title).
+        awk -v v="$VERSION" '
+          $0 == "## " v { on = 1; next }
+          /^## / && on { exit }
+          on { print }
+        ' "$CHANGELOG" > release_notes.md
+        if [ ! -s release_notes.md ]; then
+          echo "No changelog block for $VERSION in $CHANGELOG; the release notes will say so."
+          printf 'No changelog entry for %s yet.\n' "$VERSION" > release_notes.md
+        fi
+        printf '\n_Build %s, commit %s._\n' "${{ github.run_number }}" "$(echo "${{ github.sha }}" | cut -c1-7)" >> release_notes.md
+
         TAG="build-${{ github.run_number }}"
         gh release create "$TAG" StarScore-Studio.dmg --repo "${{ github.repository }}" --target "${{ github.sha }}" \
-          --title "StarScore Studio build ${{ github.run_number }}" --notes "Built from ${{ github.sha }}" --prerelease
+          --title "StarScore Studio $VERSION" --notes-file release_notes.md --prerelease
 
     - name: Upload artifacts on GitHub
       if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[dmg]')

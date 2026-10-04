@@ -77,29 +77,30 @@ void StarScoreService::init()
 {
     installBuiltinDefaultStyle();
 
+    // One handler per channel: muse async keeps the first callback set for a receiver and silently drops a
+    // second onNotify(this, ...) on the same channel, so the reference-panel part of this used to never run
     globalContext()->currentProjectChanged().onNotify(this, [this]() {
         onCurrentProjectChanged();
         listenCurrentProject();
-        m_changed.notify();
+        scheduleChanged();
+
+        // Reference PDF panel: the notation page and its panels may still be loading: restore once they are there
+        m_projectOpenedMs = QDateTime::currentMSecsSinceEpoch();
+        m_referencePanelTouched = false;
+        m_auditRevealed.clear();
+        QTimer::singleShot(0, &m_timerGuard, [this]() { pickReferenceForCurrentScore(); });
+        QTimer::singleShot(1000, &m_timerGuard, [this]() { pickReferenceForCurrentScore(); });
+        QTimer::singleShot(2500, &m_timerGuard, [this]() { pickReferenceForCurrentScore(); });
+        QTimer::singleShot(5000, &m_timerGuard, [this]() { pickReferenceForCurrentScore(); });
+        // the part score the file reopens on: its composer credit placed once everything has loaded
+        QTimer::singleShot(1500, &m_timerGuard, [this]() { clearComposerInCurrentScore(); });
     });
 
     // Reference PDF panel: each part score shows the reference PDF last chosen for it (or stays closed)
     globalContext()->currentNotationChanged().onNotify(this, [this]() {
         pickReferenceForCurrentScore();
         // a part score being shown is laid out: if its composer credit runs into the arrangement label, move it now
-        QTimer::singleShot(0, [this]() { clearComposerInCurrentScore(); });
-    });
-    globalContext()->currentProjectChanged().onNotify(this, [this]() {
-        // the notation page and its panels may still be loading: restore once they are there
-        m_projectOpenedMs = QDateTime::currentMSecsSinceEpoch();
-        m_referencePanelTouched = false;
-        m_auditRevealed.clear();
-        QTimer::singleShot(0, [this]() { pickReferenceForCurrentScore(); });
-        QTimer::singleShot(1000, [this]() { pickReferenceForCurrentScore(); });
-        QTimer::singleShot(2500, [this]() { pickReferenceForCurrentScore(); });
-        QTimer::singleShot(5000, [this]() { pickReferenceForCurrentScore(); });
-        // the part score the file reopens on: its composer credit placed once everything has loaded
-        QTimer::singleShot(1500, [this]() { clearComposerInCurrentScore(); });
+        QTimer::singleShot(0, &m_timerGuard, [this]() { clearComposerInCurrentScore(); });
     });
     dockWindowProvider()->windowChanged().onNotify(this, [this]() {
         listenReferencePanel();
@@ -121,15 +122,27 @@ void StarScoreService::listenCurrentProject()
     }
 
     master->parts()->partsChanged().onNotify(this, [this]() {
-        m_changed.notify();
+        scheduleChanged();
     });
 
     master->notation()->undoStack()->stackChanged().onNotify(this, [this]() {
+        scheduleChanged();
+    });
+}
+
+void StarScoreService::scheduleChanged()
+{
+    if (m_changedScheduled) {
+        return;
+    }
+    m_changedScheduled = true;
+    QTimer::singleShot(0, &m_timerGuard, [this]() {
+        m_changedScheduled = false;
         m_changed.notify();
     });
 }
 
-//! The engraving Excerpt behind an (initialised) part book, or nullptr
+//! The name of an arrangement's own score (a part book of all its instruments)
 static QString starscoreArrangementScoreName(const QString& arrangementName)
 {
     return arrangementName + " Score";
@@ -148,6 +161,7 @@ static int starscoreFindExcerpt(const ExcerptNotationList& excerpts, const QStri
     return -1;
 }
 
+//! The engraving Excerpt behind an (initialised) part book, or nullptr
 static mu::engraving::Excerpt* starscoreExcerptOf(const IExcerptNotationPtr& excerptNotation)
 {
     if (!excerptNotation || !excerptNotation->isInited()) {
@@ -269,10 +283,8 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
         }
     }
 
-    const QJsonObject refForScore = root.value("referenceForScore").toObject();
-    for (auto it = refForScore.begin(); it != refForScore.end(); ++it) {
-        data.referenceForScore[it.key()] = it.value().toString();
-    }
+    // ("referenceForScore", written by earlier builds, is skipped: nothing ever read it; the reference shown with
+    // each part score is kept in the app settings, see referenceViewSettingsKeys)
 
     data.version = root.value("scoreVersion").toString();
     data.fileId = root.value("fileId").toString();
@@ -413,13 +425,6 @@ QString StarScoreService::toJson(const Data& data)
     if (!refs.isEmpty()) {
         root["references"] = refs;
     }
-    QJsonObject refForScore;
-    for (const auto& [score, id] : data.referenceForScore) {
-        refForScore[score] = id;
-    }
-    if (!refForScore.isEmpty()) {
-        root["referenceForScore"] = refForScore;
-    }
     if (!data.fileId.isEmpty()) {
         root["fileId"] = data.fileId;
     }
@@ -498,10 +503,9 @@ StarScoreService::Data StarScoreService::load() const
     return loadFrom(masterScore());
 }
 
-//! Rhythm players who can read the lead sheet instead of their own sheet: "drums", "percussion", "keys"
-//! (empty for guitar and bass)
-static QString starscoreLeadSheetKind(const QString& id)
+QString StarScoreService::rhythmRole(const QString& id)
 {
+    // the order matters for the section status: a bass drum is drums, not bass
     if (id == "drumset" || id == "drum-kit" || id.startsWith("drum")) {
         return "drums";
     }
@@ -509,10 +513,34 @@ static QString starscoreLeadSheetKind(const QString& id)
         || id.contains("shaker") || id.contains("tambourine") || id.contains("cowbell") || id.contains("conga")) {
         return "percussion";
     }
-    if (id.contains("guitar") || id.contains("bass")) {
-        return QString();
+    if (id.contains("bass")) {
+        return "bass";
+    }
+    if (id.contains("guitar")) {
+        return "guitar";
     }
     return "keys";
+}
+
+//! Rhythm players who can read the lead sheet instead of their own sheet: "drums", "percussion", "keys"
+//! (empty for guitar and bass)
+static QString starscoreLeadSheetKind(const QString& id)
+{
+    const QString role = StarScoreService::rhythmRole(id);
+    return role == "bass" || role == "guitar" ? QString() : role;
+}
+
+//! What loadFrom's result depends on besides the meta tag: which parts exist and what they play
+static QString starscorePartsFingerprint(const mu::engraving::MasterScore* ms)
+{
+    QString out;
+    for (const mu::engraving::Part* p : ms->parts()) {
+        out += StarScoreService::idTextOf(p);
+        out += '|';
+        out += p->instrumentId().toQString();
+        out += ';';
+    }
+    return out;
 }
 
 StarScoreService::Data StarScoreService::loadFrom(const engraving::MasterScore* ms) const
@@ -521,12 +549,18 @@ StarScoreService::Data StarScoreService::loadFrom(const engraving::MasterScore* 
         return {};
     }
 
-    Data data = fromJson(ms->metaTag(STARSCORE_META_TAG).toQString());
+    const String tag = ms->metaTag(STARSCORE_META_TAG);
+    const QString fingerprint = starscorePartsFingerprint(ms);
+    if (auto it = m_loadCache.find(ms); it != m_loadCache.end() && it->second.tag == tag && it->second.parts == fingerprint) {
+        return it->second.data;
+    }
+
+    Data data = fromJson(tag.toQString());
 
     // Drop parts that no longer exist (deleted in the Instruments panel)
     std::set<QString> existing;
     for (const engraving::Part* p : ms->parts()) {
-        existing.insert(QString::fromStdString(p->id().toStdString()));
+        existing.insert(idText(p));
     }
     for (StarScoreSection& s : data.sections) {
         QStringList kept;
@@ -621,6 +655,12 @@ StarScoreService::Data StarScoreService::loadFrom(const engraving::MasterScore* 
         }
     }
 
+    // The main score and a few solo scores at most; a score that has gone is harmless here, since an entry is
+    // only used when its tag and parts match again (then the result would be the same anyway)
+    if (m_loadCache.size() > 8) {
+        m_loadCache.clear();
+    }
+    m_loadCache[ms] = { tag, fingerprint, data };
     return data;
 }
 
@@ -643,7 +683,24 @@ void StarScoreService::storeTo(engraving::MasterScore* ms, const Data& data, con
         }
     }
 
-    m_changed.notify();
+    scheduleChanged();
+}
+
+INotationProjectPtr StarScoreService::projectOf(const engraving::MasterScore* ms) const
+{
+    if (m_mainProject && m_mainProject->masterNotation()->masterScore() == ms) {
+        return m_mainProject;
+    }
+    for (const auto& [id, project] : m_soloProjects) {
+        if (project && project->masterNotation()->masterScore() == ms) {
+            return project;
+        }
+    }
+    INotationProjectPtr current = globalContext()->currentProject();
+    if (current && current->masterNotation()->masterScore() == ms) {
+        return current;
+    }
+    return m_mainProject ? m_mainProject : current;
 }
 
 QString StarScoreService::uniqueId(const QStringList& taken, const QString& base)
@@ -662,7 +719,7 @@ QString StarScoreService::uniqueId(const QStringList& taken, const QString& base
 
 QString StarScoreService::idText(const engraving::Part* part)
 {
-    return QString::fromStdString(part->id().toStdString());
+    return part->id().toQString();
 }
 
 // ---------------------------------------------------------------------------
@@ -687,23 +744,28 @@ muse::async::Notification StarScoreService::changed() const
 
 std::vector<StarScoreSection> StarScoreService::sections() const
 {
-    Data data = load();
+    return sectionsWithOn(load());
+}
+
+std::vector<StarScoreSection> StarScoreService::sectionsWithOn(const Data& data) const
+{
     const engraving::MasterScore* ms = masterScore();
     if (!ms) {
         return {};
     }
+    std::vector<StarScoreSection> sections = data.sections;
 
     // A section is "on" when any of its own instruments is visible. An instrument shared with another section
     // (e.g. a soprano sax in both the 6- and 7-Horn sections) only counts when all of the section's instruments
     // are shared; otherwise showing one section would make the other look "on" too, and turning it off would
     // then remember just the shared instrument.
     std::map<QString, int> useCount;
-    for (const StarScoreSection& s : data.sections) {
+    for (const StarScoreSection& s : sections) {
         for (const QString& id : s.partIds) {
             ++useCount[id];
         }
     }
-    for (StarScoreSection& s : data.sections) {
+    for (StarScoreSection& s : sections) {
         const bool hasOwn = std::any_of(s.partIds.begin(), s.partIds.end(), [&](const QString& id) { return useCount[id] == 1; });
         bool anyVisible = false;
         for (const QString& id : s.partIds) {
@@ -719,7 +781,7 @@ std::vector<StarScoreSection> StarScoreService::sections() const
         s.on = anyVisible;
     }
 
-    return data.sections;
+    return sections;
 }
 
 std::vector<StarScoreArrangement> StarScoreService::arrangements() const
@@ -727,10 +789,10 @@ std::vector<StarScoreArrangement> StarScoreService::arrangements() const
     return load().arrangements;
 }
 
-QStringList StarScoreService::onSectionIds(const Data&) const
+QStringList StarScoreService::onSectionIds(const Data& data) const
 {
     QStringList ids;
-    for (const StarScoreSection& s : sections()) {
+    for (const StarScoreSection& s : sectionsWithOn(data)) {
         if (s.on) {
             ids << s.id;
         }
@@ -826,7 +888,7 @@ std::vector<StarScorePartInfo> StarScoreService::parts() const
     const Data data = load();
     for (const engraving::Part* p : ms->parts()) {
         StarScorePartInfo info;
-        info.partId = QString::fromStdString(p->id().toStdString());
+        info.partId = idText(p);
         info.name = p->partName().toQString();
         if (info.name.isEmpty()) {
             info.name = p->instrument()->nameAsPlainText().toQString();
@@ -855,7 +917,7 @@ void StarScoreService::applyOnSections(const QStringList& onIds, const QString& 
     }
 
     Data data = load();
-    const std::vector<StarScoreSection> current = sections();   // with the derived "on" flag
+    const std::vector<StarScoreSection> current = sectionsWithOn(data);   // with the derived "on" flag
 
     // an instrument shown only for an audit issue counts as hidden here
     auto isVisible = [this, ms](const QString& partId) {
@@ -941,18 +1003,20 @@ void StarScoreService::applyOnSections(const QStringList& onIds, const QString& 
         }
     }
 
+    // (one undo step per staff: NotationParts::setStaffVisible opens and commits its own command, and a nested
+    // commit would end an enclosing one early, so these can't be wrapped in one)
     for (const muse::ID& sid : unhideStaves) {
         master->parts()->setStaffVisible(sid, true);
     }
     if (changes.empty()) {
         if (!unhideStaves.empty()) {
-            m_changed.notify();
+            scheduleChanged();
         }
         return;
     }
 
     master->parts()->setPartsVisible(changes, TranslatableString::untranslatable(String::fromQString(actionName)));
-    m_changed.notify();
+    scheduleChanged();
 }
 
 void StarScoreService::showArrangement(const QString& arrangementId)
@@ -1059,12 +1123,7 @@ void StarScoreService::toggleDeco()
         data.decoRestore.clear();
     }
     store(data);
-    m_changed.notify();
 }
-
-// ---------------------------------------------------------------------------
-//  Sections
-// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 //  Templates
@@ -1212,17 +1271,20 @@ std::vector<StarScoreArrangementTemplate> StarScoreService::arrangementTemplates
     };
 }
 
-const StarScoreSectionTemplate* StarScoreService::sectionTemplate(const QString& key) const
+std::optional<StarScoreSectionTemplate> StarScoreService::sectionTemplate(const QString& key) const
 {
-    static std::vector<StarScoreSectionTemplate> templates;
-    templates = sectionTemplates();
-    for (const StarScoreSectionTemplate& t : templates) {
+    // by value: this used to hand out a pointer into a static vector that the next call replaced
+    for (const StarScoreSectionTemplate& t : sectionTemplates()) {
         if (t.key == key) {
-            return &t;
+            return t;
         }
     }
-    return nullptr;
+    return std::nullopt;
 }
+
+// ---------------------------------------------------------------------------
+//  Sections
+// ---------------------------------------------------------------------------
 
 void StarScoreService::addPartBooksFor(const QStringList& partIds)
 {
@@ -1236,7 +1298,7 @@ void StarScoreService::addPartBooksFor(const QStringList& partIds)
     std::set<QString> covered;
     for (const IExcerptNotationPtr& e : master->excerpts()) {
         if (engraving::Excerpt* ex = starscoreExcerptOf(e)) {
-            covered.insert(QString::fromStdString(ex->initialPartId().toStdString()));
+            covered.insert(ex->initialPartId().toQString());
         }
     }
     std::vector<engraving::Part*> uncovered;
@@ -1357,6 +1419,7 @@ StarScoreSection StarScoreService::finishNewParts(const std::vector<engraving::P
 
     master->notation()->undoStack()->commitChanges();
     master->parts()->partsChanged().notify();
+    // one undo step per staff: setStaffVisible commits a command of its own, which can't be nested in another
     for (const muse::ID& sid : hiddenStaves) {
         master->parts()->setStaffVisible(sid, false);
     }
@@ -1445,8 +1508,8 @@ RetVal<QString> StarScoreService::createSection(const QString& templateKey, cons
     applyStyles(section.partIds);
     // The mixer's tracks for new instruments appear a moment after they're added: apply the defaults again then
     const QStringList newIds = section.partIds;
-    QTimer::singleShot(1500, [this, newIds]() { applyMixerDefaults(newIds); });
-    QTimer::singleShot(4000, [this, newIds]() { applyMixerDefaults(newIds); });
+    QTimer::singleShot(1500, &m_timerGuard, [this, newIds]() { applyMixerDefaults(newIds); });
+    QTimer::singleShot(4000, &m_timerGuard, [this, newIds]() { applyMixerDefaults(newIds); });
 
     if (section.templateKey.endsWith("-horn-any")) {
         fillAnyHornsFromStandard(section);
@@ -1464,7 +1527,7 @@ RetVal<QString> StarScoreService::createSection(const QString& templateKey, cons
 
 RetVal<QString> StarScoreService::createSectionFromTemplate(const QString& templateKey)
 {
-    const StarScoreSectionTemplate* t = sectionTemplate(templateKey);
+    const std::optional<StarScoreSectionTemplate> t = sectionTemplate(templateKey);
     if (!t) {
         return RetVal<QString>::make_ret(Ret::Code::UnknownError);
     }
@@ -1498,13 +1561,21 @@ Ret StarScoreService::newStarScore(const StarScoreNewOptions& options)
 {
     const StarScoreArrangementTemplate* arrangement = nullptr;
     const std::vector<StarScoreArrangementTemplate> arrangementTpls = arrangementTemplates();
-    for (const StarScoreArrangementTemplate& a : arrangementTpls) {
-        if (a.key == options.arrangementTemplateKey) {
-            arrangement = &a;
+    auto findTemplate = [&](const QString& key) -> const StarScoreArrangementTemplate* {
+        for (const StarScoreArrangementTemplate& a : arrangementTpls) {
+            if (a.key == key) {
+                return &a;
+            }
         }
+        return nullptr;
+    };
+    arrangement = findTemplate(options.arrangementTemplateKey);
+    if (!arrangement) {
+        // 3-Horn Standard by default (looked up by key: by position this picked 2-Horn Standard)
+        arrangement = findTemplate("3-horn-standard");
     }
     if (!arrangement) {
-        arrangement = &arrangementTpls.at(1); // 3-Horn Standard
+        arrangement = &arrangementTpls.front();
     }
 
     // All instruments of the arrangement's sections, in section order
@@ -1647,23 +1718,37 @@ std::map<QString, StarScoreStatus> StarScoreService::partStatuses() const
     return result;
 }
 
+std::vector<mu::engraving::Part*> StarScoreService::masterPartsOf(const engraving::Score* score, const engraving::MasterScore* ms)
+{
+    std::vector<engraving::Part*> result;
+    if (!score || !ms || score == ms) {
+        return result;
+    }
+    for (engraving::Part* p : score->parts()) {
+        engraving::Part* masterPart = nullptr;
+        if (p->score() == ms) {
+            masterPart = p;
+        } else {
+            for (engraving::Staff* staff : p->staves()) {
+                if (engraving::Staff* linked = staff->findLinkedInScore(ms)) {
+                    masterPart = linked->part();
+                    break;
+                }
+            }
+        }
+        if (masterPart && std::find(result.begin(), result.end(), masterPart) == result.end()) {
+            result.push_back(masterPart);
+        }
+    }
+    return result;
+}
+
 //! Main-score part ids of the parts in a part score
 static QStringList starscorePartIdsOfScore(const mu::engraving::Score* score, const mu::engraving::MasterScore* ms)
 {
     QStringList ids;
-    if (!score || !ms || score == ms) {
-        return ids;
-    }
-    for (const mu::engraving::Part* p : score->parts()) {
-        for (mu::engraving::Staff* staff : p->staves()) {
-            if (mu::engraving::Staff* linked = staff->findLinkedInScore(ms)) {
-                const QString id = QString::fromStdString(linked->part()->id().toStdString());
-                if (!ids.contains(id)) {
-                    ids << id;
-                }
-                break;
-            }
-        }
+    for (const mu::engraving::Part* p : StarScoreService::masterPartsOf(score, ms)) {
+        ids << StarScoreService::idTextOf(p);
     }
     return ids;
 }
@@ -1712,7 +1797,8 @@ void StarScoreService::setPartScoreStatus(const engraving::Score* score, int sta
         } else {
             data.scoreStatus[family] = statusKey(static_cast<StarScoreStatus>(status));
         }
-        storeTo(ms, data, m_mainProject ? m_mainProject : globalContext()->currentProject());
+        // the project this score belongs to is marked unsaved: in a solo view that is the solo project, not the main one
+        storeTo(ms, data, projectOf(ms));
         if (status == int(StarScoreStatus::Finished)) {
             lockFinishedScore(const_cast<engraving::Score*>(score));
         }
@@ -1726,7 +1812,7 @@ void StarScoreService::setPartScoreStatus(const engraving::Score* score, int sta
         }
     }
     markPartsAudited(data, ms, ids, status == int(StarScoreStatus::Finished));
-    storeTo(ms, data, m_mainProject ? m_mainProject : globalContext()->currentProject());
+    storeTo(ms, data, projectOf(ms));
     if (status == int(StarScoreStatus::Finished)) {
         lockFinishedScore(const_cast<engraving::Score*>(score));
         offerLowAlternates(ids);
@@ -1761,9 +1847,8 @@ void StarScoreService::lockFinishedParts(const QStringList& partIds)
         if (!es || es->parts().size() != 1) {
             continue;
         }
-        const engraving::Staff* st = es->parts().front()->staves().empty() ? nullptr : es->parts().front()->staves().front();
-        const engraving::Staff* linked = st ? st->findLinkedInScore(ms) : nullptr;
-        if (linked && partIds.contains(idText(linked->part()))) {
+        const std::vector<engraving::Part*> parts = masterPartsOf(es, ms);
+        if (parts.size() == 1 && partIds.contains(idText(parts.front()))) {
             lockFinishedScore(es);
         }
     }
@@ -1797,7 +1882,6 @@ void StarScoreService::setSectionSkipSheet(const QString& sectionId, const QStri
             s.skipSheets << which;
         }
         store(data);
-        m_changed.notify();
         return;
     }
 }
@@ -1857,7 +1941,7 @@ void StarScoreService::removePartsKeepingSystemObjects(const IMasterNotationPtr&
         PartInstrument pi;
         pi.isExistingPart = true;
         pi.partId = p->id();
-        if (partIdsToRemove.contains(QString::fromStdString(p->id().toStdString()))) {
+        if (partIdsToRemove.contains(idText(p))) {
             doomed << pi;
         } else {
             survivors << pi;
@@ -1930,11 +2014,14 @@ RetVal<QString> StarScoreService::createArrangementFromTemplate(const QString& t
         return RetVal<QString>::make_ret(Ret::Code::UnknownError);
     }
 
-    // Reuse sections that already exist (same template key); create only the missing ones
+    // Reuse sections that already exist (same template key); create only the missing ones (a new section is
+    // stored as it's made, so the list is read once here, then kept up to date with the ones created)
     QStringList sectionIds;
+    const Data before = load();
+    std::vector<StarScoreSection> known = before.sections;
     for (const QString& sectionKey : tpl->sectionKeys) {
         QString existingId;
-        for (const StarScoreSection& s : load().sections) {
+        for (const StarScoreSection& s : known) {
             if (s.templateKey == sectionKey) {
                 existingId = s.id;
                 break;
@@ -1947,6 +2034,10 @@ RetVal<QString> StarScoreService::createArrangementFromTemplate(const QString& t
                 continue;
             }
             existingId = created.val;
+            StarScoreSection made;
+            made.id = existingId;
+            made.templateKey = sectionKey;
+            known.push_back(made);
         }
         sectionIds << existingId;
     }
@@ -1954,7 +2045,7 @@ RetVal<QString> StarScoreService::createArrangementFromTemplate(const QString& t
     // Name it after the template; "2-Horn Standard (2)" if that name is taken
     QString name = tpl->name;
     QStringList names;
-    for (const StarScoreArrangement& a : load().arrangements) {
+    for (const StarScoreArrangement& a : before.arrangements) {
         names << a.name;
     }
     for (int i = 2; names.contains(name); ++i) {
@@ -1991,7 +2082,8 @@ RetVal<QString> StarScoreService::createArrangement(const QString& name, const Q
     }
 
     QString base = name.toLower();
-    base.replace(QRegularExpression("[^a-z0-9]+"), "-");
+    static const QRegularExpression notIdRe("[^a-z0-9]+");
+    base.replace(notIdRe, "-");
 
     StarScoreArrangement a;
     a.id = uniqueId(taken, "arr-" + base);
@@ -2078,14 +2170,11 @@ std::vector<mu::engraving::Part*> StarScoreService::masterPartsOf(const engravin
         return result;
     }
 
-    std::vector<engraving::Part*> candidates;
     if (excerpt->excerptScore()) {
-        candidates = excerpt->excerptScore()->parts();
-    } else {
-        candidates = excerpt->parts();
+        return masterPartsOf(excerpt->excerptScore(), ms);
     }
-
-    for (engraving::Part* p : candidates) {
+    // a part book without a score yet lists its parts itself
+    for (engraving::Part* p : excerpt->parts()) {
         engraving::Part* masterPart = nullptr;
         if (p->score() == ms) {
             masterPart = p;
@@ -2101,7 +2190,6 @@ std::vector<mu::engraving::Part*> StarScoreService::masterPartsOf(const engravin
             result.push_back(masterPart);
         }
     }
-
     return result;
 }
 
@@ -2125,7 +2213,7 @@ int StarScoreService::detectSections()
         }
     }
 
-    auto partIdText = [](const engraving::Part* p) { return QString::fromStdString(p->id().toStdString()); };
+    auto partIdText = [](const engraving::Part* p) { return idText(p); };
 
     int added = 0;
     auto addSection = [&](const QString& key, const QString& name, const std::vector<engraving::Part*>& parts) {
@@ -2164,8 +2252,8 @@ int StarScoreService::detectSections()
         if (m.hasMatch() && parts.size() >= 2) {
             const QString n = m.captured(1);
             const QString rest = m.captured(2);
-            const bool inC = rest.contains(QRegularExpression("in\\s*C\\b", QRegularExpression::CaseInsensitiveOption))
-                             || rest.contains("any", Qt::CaseInsensitive);
+            static const QRegularExpression inCRe("in\\s*C\\b", QRegularExpression::CaseInsensitiveOption);
+            const bool inC = rest.contains(inCRe) || rest.contains("any", Qt::CaseInsensitive);
             addSection(inC ? QString("%1-horn-any").arg(n) : QString("%1-horn").arg(n),
                        inC ? QString("%1-Horn Flexible").arg(n) : QString("%1-Horn Section").arg(n), parts);
         }
@@ -2289,20 +2377,9 @@ Ret StarScoreService::exportArrangement(const QString& arrangementId, const io::
         if (!ex || !ex->excerptScore()) {
             continue;
         }
-        bool allKept = true;
-        for (engraving::Part* p : ex->excerptScore()->parts()) {
-            engraving::Part* mp = nullptr;
-            for (engraving::Staff* staff : p->staves()) {
-                if (engraving::Staff* linked = staff->findLinkedInScore(ms)) {
-                    mp = linked->part();
-                    break;
-                }
-            }
-            if (!mp || !keep.count(QString::fromStdString(mp->id().toStdString()))) {
-                allKept = false;
-                break;
-            }
-        }
+        const std::vector<engraving::Part*> mps = masterPartsOf(ex->excerptScore(), ms);
+        const bool allKept = mps.size() == ex->excerptScore()->parts().size()
+                             && std::all_of(mps.begin(), mps.end(), [&](const engraving::Part* mp) { return keep.count(idText(mp)) > 0; });
         if (allKept) {
             keptExcerpts.push_back(e);
         }
@@ -2317,7 +2394,7 @@ Ret StarScoreService::exportArrangement(const QString& arrangementId, const io::
         PartInstrument pi;
         pi.isExistingPart = true;
         pi.partId = p->id();
-        if (keep.count(QString::fromStdString(p->id().toStdString()))) {
+        if (keep.count(idText(p))) {
             kept << pi;
             show.emplace_back(p->id(), true);
         } else {
@@ -2349,25 +2426,29 @@ Ret StarScoreService::exportArrangement(const QString& arrangementId, const io::
 
 StarScoreService::StyleSettings StarScoreService::loadStyleSettings() const
 {
+    if (m_styleSettings) {
+        return *m_styleSettings;
+    }
     StyleSettings settings;
     QFile file(globalConfiguration()->userAppDataPath().appendingComponent("starscore_styles.json").toQString());
-    if (!file.open(QIODevice::ReadOnly)) {
-        return settings;
+    if (file.open(QIODevice::ReadOnly)) {
+        const QJsonObject root = QJsonDocument::fromJson(file.readAll()).object();
+        settings.defaultStyle = root.value("defaultStyle").toString();
+        settings.bandFolder = root.value("bandFolder").toString();
+        settings.builtinStyleVersion = root.value("builtinStyleVersion").toInt();
+        settings.exportUnticked = root.value("exportUnticked").toObject();
+        for (const QJsonValue& v : root.value("rules").toArray()) {
+            const QJsonObject o = v.toObject();
+            settings.rules.push_back({ o.value("section").toString(), o.value("part").toString(), o.value("style").toString() });
+        }
     }
-    const QJsonObject root = QJsonDocument::fromJson(file.readAll()).object();
-    settings.defaultStyle = root.value("defaultStyle").toString();
-    settings.bandFolder = root.value("bandFolder").toString();
-    settings.builtinStyleVersion = root.value("builtinStyleVersion").toInt();
-    settings.exportUnticked = root.value("exportUnticked").toObject();
-    for (const QJsonValue& v : root.value("rules").toArray()) {
-        const QJsonObject o = v.toObject();
-        settings.rules.push_back({ o.value("section").toString(), o.value("part").toString(), o.value("style").toString() });
-    }
+    m_styleSettings = settings;
     return settings;
 }
 
 void StarScoreService::saveStyleSettings(const StyleSettings& settings)
 {
+    m_styleSettings = settings;
     QJsonArray rules;
     for (const StarScoreStyleRule& r : settings.rules) {
         QJsonObject o;
@@ -2448,7 +2529,8 @@ void StarScoreService::setStyleRules(const std::vector<StarScoreStyleRule>& rule
 
 int StarScoreService::applyStyles(const QStringList& partIds)
 {
-    const int restyled = applyStylesOnly(partIds);
+    const Data data = load();
+    const int restyled = applyStylesOnly(partIds, data);
     applyMixerDefaults(partIds);
     // horn part scores show their exported title (after the style: the composer credit moves clear of the label)
     labelPartBooks();
@@ -2458,7 +2540,7 @@ int StarScoreService::applyStyles(const QStringList& partIds)
         IMasterNotationPtr master = globalContext()->currentMasterNotation();
         engraving::MasterScore* ms = masterScore();
         if (master && ms) {
-            for (const StarScoreSection& s : load().sections) {
+            for (const StarScoreSection& s : data.sections) {
                 if (s.templateKey == "lead-sheet" && !s.partIds.isEmpty()) {
                     autoHideLeadBassStaff(master, ms->partById(ID(s.partIds.front())));
                 }
@@ -2468,7 +2550,7 @@ int StarScoreService::applyStyles(const QStringList& partIds)
     return restyled;
 }
 
-int StarScoreService::applyStylesOnly(const QStringList& partIds)
+int StarScoreService::applyStylesOnly(const QStringList& partIds, const Data& data)
 {
     IMasterNotationPtr master = globalContext()->currentMasterNotation();
     engraving::MasterScore* ms = masterScore();
@@ -2476,10 +2558,9 @@ int StarScoreService::applyStylesOnly(const QStringList& partIds)
         return 0;
     }
 
-    syncMinMajDefaults();
+    syncMinMajDefaults(data);
 
     const StyleSettings settings = loadStyleSettings();
-    const Data data = load();
     const QString version = scoreVersion();
 
     auto usable = [](const QString& path) {
@@ -2575,10 +2656,7 @@ int StarScoreService::applyStylesOnly(const QStringList& partIds)
     return restyled;
 }
 
-// ---------------------------------------------------------------------------
-//  Solo transcriptions
-// ---------------------------------------------------------------------------
-
+// Entries inside the .starscore zip holding the solo scores and the reference PDFs
 static const QString STARSCORE_SOLOS_DIR("StarScoreSolos");
 static const QString STARSCORE_REFS_DIR("StarScoreReferences");
 
@@ -2632,7 +2710,6 @@ RetVal<QString> StarScoreService::addReference(const io::path_t& pdfFile)
 
     data.references.push_back(ref);
     storeTo(m_mainProject->masterNotation()->masterScore(), data, m_mainProject);
-    m_changed.notify();
     return RetVal<QString>::make_ok(ref.id);
 }
 
@@ -2765,7 +2842,7 @@ void StarScoreService::listenReferencePanel()
         // Every panel at once: the notation page has just been (re)loaded, which starts the panel closed. Put it
         // the way this file has it.
         if (names.size() > 1) {
-            QTimer::singleShot(0, [this]() { applyReferencePanelState(); });
+            QTimer::singleShot(0, &m_timerGuard, [this]() { applyReferencePanelState(); });
             return;
         }
         // One panel: you opened or closed it
@@ -2796,7 +2873,7 @@ void StarScoreService::setCurrentReferenceId(const QString& referenceId)
     m_currentReferenceId = referenceId;
     recordReferenceView();
     if (changed) {
-        m_changed.notify();
+        scheduleChanged();
     }
 }
 
@@ -2857,7 +2934,7 @@ void StarScoreService::pickReferenceForCurrentScore()
     }
     if (!chosen.isEmpty() && chosen != m_currentReferenceId) {
         m_currentReferenceId = chosen;
-        m_changed.notify();
+        scheduleChanged();
     }
 }
 
@@ -2916,7 +2993,8 @@ QStringList StarScoreService::referenceInstrumentChoices() const
     }
     for (const engraving::Part* p : m_mainProject->masterNotation()->masterScore()->parts()) {
         QString n = p->instrument()->nameAsPlainText().toQString().trimmed();
-        n.remove(QRegularExpression("\\s+\\d+$"));   // "Trumpet 2" -> "Trumpet"
+        static const QRegularExpression trailingNumberRe("\\s+\\d+$");
+        n.remove(trailingNumberRe);   // "Trumpet 2" -> "Trumpet"
         if (n.isEmpty()) {
             n = p->partName().toQString();
         }
@@ -2992,8 +3070,11 @@ void StarScoreService::removeReference(const QString& referenceId)
     for (const QString& png : QDir(m_workDir).entryList({ "ref-" + referenceId + "-p*.png" }, QDir::Files)) {
         QFile::remove(m_workDir + "/" + png);
     }
-    m_changed.notify();
 }
+
+// ---------------------------------------------------------------------------
+//  Solo transcriptions (and the project switching they need)
+// ---------------------------------------------------------------------------
 
 void StarScoreService::onCurrentProjectChanged()
 {
@@ -3035,7 +3116,7 @@ void StarScoreService::onCurrentProjectChanged()
     extractSolos();
     ensureFileId();
     // once the score is fully set up
-    QTimer::singleShot(0, [this]() { tidyOpenedScore(); });
+    QTimer::singleShot(0, &m_timerGuard, [this]() { tidyOpenedScore(); });
     if (autotestRequested()) {
         startAutotest();
     }
@@ -3533,10 +3614,9 @@ Ret StarScoreService::showSolo(const QString& soloId)
     }
 
     m_switching = true;
-    globalContext()->setCurrentProject(project.val);
+    globalContext()->setCurrentProject(project.val);   // its handler schedules changed()
     m_switching = false;
     listenCurrentProject();
-    m_changed.notify();
     return make_ok();
 }
 
@@ -3555,10 +3635,9 @@ Ret StarScoreService::showMainScore()
     }
 
     m_switching = true;
-    globalContext()->setCurrentProject(m_mainProject);
+    globalContext()->setCurrentProject(m_mainProject);   // its handler schedules changed()
     m_switching = false;
     listenCurrentProject();
-    m_changed.notify();
     return make_ok();
 }
 
@@ -3574,7 +3653,7 @@ Ret StarScoreService::refreshSoloBand(const QString& soloId)
         }
         Ret ret = buildSoloBand(project.val, solo);
         project.val->markAsUnsaved();
-        m_changed.notify();
+        scheduleChanged();
         return ret;
     }
     return make_ret(Ret::Code::UnknownError);
@@ -3695,7 +3774,7 @@ Ret StarScoreService::saveAll()
     }
 
     Ret ret = injectSolos(m_mainProject->path());
-    m_changed.notify();
+    scheduleChanged();
     return ret;
 }
 
@@ -3792,10 +3871,11 @@ void StarScoreService::syncArrangementScores()
     if (dataChanged) {
         store(data);
     }
-    syncMinMajDefaults();
+    syncMinMajDefaults(data);
 
     if (!created.empty()) {
         const StyleSettings settings = loadStyleSettings();
+        const QString version = scoreVersion();
         for (auto& [score, hidden] : created) {
             INotationPtr n = score->notation();
             if (!n) {
@@ -3812,7 +3892,7 @@ void StarScoreService::syncArrangementScores()
                 n->style()->loadStyle(settings.defaultStyle, true);
             }
             n->undoStack()->prepareChanges(TranslatableString::untranslatable("StarScore house style"));
-            starscore::applyHouseStyle(n->elements()->msScore(), false, scoreVersion());
+            starscore::applyHouseStyle(n->elements()->msScore(), false, version);
             n->undoStack()->commitChanges();
         }
     }
@@ -3849,12 +3929,16 @@ static const muse::String STARSCORE_MINMAJ_TAG(u"starscoreMinMaj");
 
 void StarScoreService::syncMinMajDefaults()
 {
+    syncMinMajDefaults(load());
+}
+
+void StarScoreService::syncMinMajDefaults(const Data& data)
+{
     IMasterNotationPtr master = globalContext()->currentMasterNotation();
     engraving::MasterScore* ms = masterScore();
     if (!master || !ms) {
         return;
     }
-    const Data data = load();
 
     auto isOrchestralPart = [&](const engraving::Part* p) {
         const QString pid = idText(p);
@@ -3917,7 +4001,7 @@ void StarScoreService::setMinMajSymbolInCurrentScore(bool on)
     if (INotationProjectPtr project = globalContext()->currentProject()) {
         project->markAsUnsaved();
     }
-    m_changed.notify();
+    scheduleChanged();
 }
 
 // ---------------------------------------------------------------------------
@@ -3936,7 +4020,7 @@ void StarScoreService::setPanelVisible(bool visible)
     }
     QSettings().setValue("StarScore/panelVisible", visible);
     m_panelVisibleChanged.notify();
-    m_changed.notify();
+    scheduleChanged();
 }
 
 muse::async::Notification StarScoreService::panelVisibleChanged() const
@@ -3991,11 +4075,11 @@ void StarScoreService::openPartBooks(const QStringList& partIds)
         for (const IExcerptNotationPtr& e : master->excerpts()) {
             INotationPtr n = e->notation();
             engraving::Score* es = n && n->elements() ? n->elements()->msScore() : nullptr;
-            if (!es || es->parts().size() != 1 || es->parts().front()->staves().empty()) {
+            if (!es || es->parts().size() != 1) {
                 continue;
             }
-            const engraving::Staff* linked = es->parts().front()->staves().front()->findLinkedInScore(ms);
-            if (linked && idText(linked->part()) == pid) {
+            const std::vector<engraving::Part*> parts = masterPartsOf(es, ms);
+            if (parts.size() == 1 && idText(parts.front()) == pid) {
                 books.push_back(n);
                 break;
             }

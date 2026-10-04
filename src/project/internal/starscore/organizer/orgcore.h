@@ -49,6 +49,17 @@ struct Progress {
 // --- JSON files
 QJsonDocument readJson(const QString& path, bool* ok = nullptr);
 QJsonObject readJsonObject(const QString& path);
+//! A read that tells a missing file from one that is there but can't be read (not openable, cloud-only placeholder,
+//! broken JSON). The organizer's data files are kept forever, so "present but unreadable" must never be treated as
+//! "missing" and rewritten from empty: callers stop the run instead.
+struct JsonRead {
+    QJsonDocument doc;
+    bool exists = false;
+    bool ok = false;          // exists and parsed
+    QString error;            // why it couldn't be read (empty when ok or missing)
+    bool unreadable() const { return exists && !ok; }
+};
+JsonRead readJsonChecked(const QString& path);
 //! Written to a temporary file next to it, then swapped in (never half-written)
 bool writeJson(const QString& path, const QJsonDocument& doc, bool compact = false);
 bool writeText(const QString& path, const QByteArray& data);
@@ -56,6 +67,8 @@ bool writeText(const QString& path, const QByteArray& data);
 QByteArray pythonStyleJson(const QJsonObject& o);
 
 // --- Files (relative paths use '/')
+//! The song title of a song folder: "1 Amplitudes" -> "Amplitudes", "4 Works In Progress/Jeju" -> "Jeju"
+QString songTitleOf(const QString& songRoot);
 QString joinPath(const QString& a, const QString& b);
 QString relativeTo(const QString& base, const QString& path);
 //! dst with " (2)", " (3)"… added before the extension until nothing is there

@@ -29,9 +29,11 @@ class StarScoreBarModel : public QObject, public muse::Contextable, public muse:
     Q_PROPERTY(bool hasScore READ hasScore NOTIFY changed)
     Q_PROPERTY(bool panelVisible READ panelVisible NOTIFY changed)
     Q_PROPERTY(bool isStarScoreFile READ isStarScoreFile NOTIFY changed)
-    Q_PROPERTY(QVariantList arrangements READ arrangements NOTIFY changed)
-    Q_PROPERTY(QVariantList sections READ sections NOTIFY changed)
-    Q_PROPERTY(QVariantList solos READ solos NOTIFY changed)
+    // Each chip list has its own signal, fired only when that list is different: one changed() used to rebuild
+    // every chip (and close its menu) on any undo-stack change
+    Q_PROPERTY(QVariantList arrangements READ arrangements NOTIFY arrangementsChanged)
+    Q_PROPERTY(QVariantList sections READ sections NOTIFY sectionsChanged)
+    Q_PROPERTY(QVariantList solos READ solos NOTIFY solosChanged)
     Q_PROPERTY(bool isSoloView READ isSoloView NOTIFY changed)
     Q_PROPERTY(bool canAddSolos READ canAddSolos NOTIFY changed)
     Q_PROPERTY(bool decoOn READ decoOn NOTIFY changed)
@@ -85,8 +87,20 @@ public:
 
 signals:
     void changed();
+    void arrangementsChanged();
+    void sectionsChanged();
+    void solosChanged();
 
 private:
+    //! Re-reads the service and fires changed(), plus the list signals whose list is different
+    void refresh();
+    QVariantList buildArrangements() const;
+    QVariantList buildSections() const;
+    QVariantList buildSolos() const;
+    QVariantList m_arrangements;
+    QVariantList m_sections;
+    QVariantList m_solos;
+
     QString leadSheetText(const QStringList& kinds) const;
     QVariantList statusSubmenu(const QString& prefix, int current, bool rhythm = false) const;
     void openEditDialog(const QString& mode, const QString& id, const QString& slot = QString());

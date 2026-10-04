@@ -35,6 +35,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 
+#include "io/path.h"
 #include "translation.h"
 #include "log.h"
 #include "realfn.h"
@@ -178,7 +179,11 @@ static QStringList chordChartHidden(const MasterScore* ms)
     return ids;
 }
 
-static QString chordChartId(EngravingItem* item)
+//! The text's id in the main score. With assignIfMissing a text that has no element id yet gets one — only
+//! setChordChartVisible() does that, since it is an edit of the score. The read path (loadProperties runs on
+//! every selection change) must not mutate anything, so there a text without an id is simply "not hidden":
+//! it cannot be in the hidden list, which only ever holds ids that were assigned on a tick.
+static QString chordChartId(EngravingItem* item, bool assignIfMissing)
 {
     MasterScore* ms = item ? item->masterScore() : nullptr;
     if (!ms) {
@@ -190,6 +195,9 @@ static QString chordChartId(EngravingItem* item)
     }
     EID id = main->eid();
     if (!id.isValid()) {
+        if (!assignIfMissing) {
+            return QString();
+        }
         id = main->assignNewEID();
     }
     return QString::fromStdString(id.toStdString());
@@ -197,20 +205,26 @@ static QString chordChartId(EngravingItem* item)
 
 void TextSettingsModel::updateChordChart()
 {
-    bool available = !m_elementList.isEmpty();
+    // The box only makes sense for a .starscore song: the chord charts are a StarScore export. An ordinary
+    // .mscz in this build does not get it (cheap check: the current project's file suffix).
+    const project::INotationProjectPtr project = context() ? context()->currentProject() : nullptr;
+    bool available = project && muse::io::suffix(project->path()) == "starscore" && !m_elementList.isEmpty();
     bool visible = true;
     QStringList hidden;
-    for (EngravingItem* item : m_elementList) {
-        if (!item || !(item->isStaffText() || item->isSystemText())) {
-            available = false;
-            break;
+    if (available) {
+        for (EngravingItem* item : m_elementList) {
+            if (!item || !(item->isStaffText() || item->isSystemText())) {
+                available = false;
+                break;
+            }
         }
     }
     if (available) {
         hidden = chordChartHidden(m_elementList.first()->masterScore());
         visible = false;
         for (EngravingItem* item : m_elementList) {
-            if (!hidden.contains(chordChartId(item))) {
+            const QString id = chordChartId(item, false);
+            if (id.isEmpty() || !hidden.contains(id)) {
                 visible = true;
                 break;
             }
@@ -241,7 +255,7 @@ void TextSettingsModel::setChordChartVisible(bool visible)
     MasterScore* ms = m_elementList.first()->masterScore();
     QStringList hidden = chordChartHidden(ms);
     for (EngravingItem* item : m_elementList) {
-        const QString id = chordChartId(item);
+        const QString id = chordChartId(item, true);
         if (id.isEmpty()) {
             continue;
         }

@@ -31,6 +31,7 @@
 #include <QJsonObject>
 
 #include "multiwindows/resourcelockguard.h"
+#include "settings.h"
 
 #include "app_config.h"
 
@@ -43,6 +44,10 @@ using namespace muse;
 using namespace muse::async;
 
 static const std::string RECENT_FILES_RESOURCE_NAME("RECENT_FILES");
+
+// StarScore Studio: set once the .starscore entries have been taken over from MuseScore Studio's shared
+// recent-files list, so that list is never read or rewritten again
+static const Settings::Key STARSCORE_RECENT_FILES_TAKEN(std::string("project"), "project/starscoreRecentFilesTaken");
 
 void RecentFilesController::init()
 {
@@ -148,16 +153,19 @@ void RecentFilesController::loadRecentFilesList()
     if (!data.ret || data.val.empty()) {
         // StarScore Studio, first run with its own list: take back the .starscore files that
         // earlier builds wrote into MuseScore Studio's shared list, and remove them from it.
-        newList = takeStarScoreFilesFromMuseScoreList();
-        if (!newList.empty()) {
-            async::Async::call(nullptr, [this]() {
-                saveRecentFilesList();
-            });
+        // Done once, remembered in the settings: before this flag the takeover ran, and rewrote
+        // MuseScore Studio's recent_files.json, on every launch for as long as our own list file
+        // was missing (an empty recent list keeps it missing).
+        if (!settings()->value(STARSCORE_RECENT_FILES_TAKEN).toBool()) {
+            newList = takeStarScoreFilesFromMuseScoreList();
+            settings()->setSharedValue(STARSCORE_RECENT_FILES_TAKEN, Val(true));
+            if (!newList.empty()) {
+                async::Async::call(nullptr, [this]() {
+                    saveRecentFilesList();
+                });
+            }
         }
-        return;
-    }
-
-    if (data.val.empty()) {
+        // nothing of our own to parse yet; the DEFER above installs newList (taken over or empty)
         return;
     }
 
@@ -220,9 +228,14 @@ RecentFilesList RecentFilesController::takeStarScoreFilesFromMuseScoreList()
         }
     }
 
-    if (!taken.empty() && file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        file.write(QJsonDocument(kept).toJson());
-        file.close();
+    if (!taken.empty()) {
+        // the entries stay in MuseScore Studio's list only if it cannot be opened for writing
+        if (file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+            file.write(QJsonDocument(kept).toJson());
+            file.close();
+        } else {
+            LOGW() << "could not rewrite MuseScore Studio's recent files list: " << sharedPath;
+        }
     }
 
     return taken;

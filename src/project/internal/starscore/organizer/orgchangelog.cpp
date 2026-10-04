@@ -25,14 +25,31 @@ QString barRanges(const std::vector<std::pair<int, int> >& bars)
 //! "AMPL - Alto Sax.pdf" -> "Alto Sax"; "AMPL - Horn 2 - Alto Sax.pdf" -> "Alto Sax"; "AMPL - Bass (Name).pdf" -> "Bass (Name)"
 static QString partOfFile(const QString& file, const QString& code)
 {
+    static const QRegularExpression chairRe("^Horn \\d+ - (.+)$");
+    static const QRegularExpression keyRe(" in (Bb|Eb|C|F|A)$");
     QString b = file.section('/', -1);
-    b.remove(QRegularExpression("^" + QRegularExpression::escape(code) + "\\s*-\\s*"));
-    b.remove(QRegularExpression("\\.pdf$", QRegularExpression::CaseInsensitiveOption));
-    const QRegularExpressionMatch chair = QRegularExpression("^Horn \\d+ - (.+)$").match(b);
+    if (b.startsWith(code)) {
+        // "CODE - Part": the code, optional spaces, a dash, optional spaces
+        int i = code.size();
+        while (i < b.size() && b.at(i).isSpace()) {
+            ++i;
+        }
+        if (i < b.size() && b.at(i) == '-') {
+            ++i;
+            while (i < b.size() && b.at(i).isSpace()) {
+                ++i;
+            }
+            b = b.mid(i);
+        }
+    }
+    if (b.endsWith(".pdf", Qt::CaseInsensitive)) {
+        b.chop(4);
+    }
+    const QRegularExpressionMatch chair = chairRe.match(b);
     if (chair.hasMatch()) {
         b = chair.captured(1);
     }
-    b.remove(QRegularExpression(" in (Bb|Eb|C|F|A)$"));
+    b.remove(keyRe);
     return b.trimmed();
 }
 
@@ -70,7 +87,8 @@ static QString folderLabel(const QString& relInSong)
     if (folder == "1H") {
         return "1-Horn Arrangement";
     }
-    const QRegularExpressionMatch m = QRegularExpression("^(\\d)H (Any)?").match(folder);
+    static const QRegularExpression hornFolder("^(\\d)H (Any)?");
+    const QRegularExpressionMatch m = hornFolder.match(folder);
     if (m.hasMatch()) {
         return m.captured(2).isEmpty() ? QString("%1-Horn Arrangement").arg(m.captured(1))
                : QString("Flexible %1-Horn Arrangement").arg(m.captured(1));
@@ -89,6 +107,7 @@ int addChangelogEntries(QJsonObject& changelog, const SongInfo& song, const Rost
         QStringList files;
     };
     std::map<std::pair<QString, QString>, ChairGroup> chairGroups;   // (player, folder|chair)
+    static const QRegularExpression chairNo("^Horn (\\d+)"), chairLabel("^Horn \\d+");
     const QString prefix = song.root + "/";
     auto addFor = [&](const QStringList& players, const QString& text, const QString& kind) {
         for (const QString& p : players) {
@@ -116,7 +135,7 @@ int addChangelogEntries(QJsonObject& changelog, const SongInfo& song, const Rost
             const QString arr = c.arrangement.isEmpty() ? folderLabel(c.relativePath) : c.arrangement;
             const bool lead = c.relativePath.startsWith("1 Lead Sheet/");
             // Any Horns: every version of a chair says the same thing; one line per chair
-            const QRegularExpressionMatch chair = QRegularExpression("^Horn (\\d+)").match(c.part);
+            const QRegularExpressionMatch chair = chairNo.match(c.part);
             if ((c.relativePath.section('/', 0, 0).contains("Any Horns") || c.relativePath.section('/', 0, 0).contains("Flexible")) && chair.hasMatch()) {
                 const QString key = c.relativePath.section('/', 0, 0) + "|" + chair.captured(1);
                 for (const QString& p : who) {
@@ -155,7 +174,7 @@ int addChangelogEntries(QJsonObject& changelog, const SongInfo& song, const Rost
 
     for (const auto& [pk, g] : chairGroups) {
         const SheetChange& c = g.change;
-        const QString chairName = QRegularExpression("^Horn \\d+").match(c.part).captured(0);
+        const QString chairName = chairLabel.match(c.part).captured(0);
         const QString sheets = QString("(your sheet%1: %2)").arg(g.files.size() > 1 ? "s" : "", esc(g.files.join(", ")));
         QString text;
         if (c.kind == SheetChange::Added) {

@@ -17,8 +17,9 @@
 namespace mu::project::starscoresongs {
 inline QString normalName(const QString& title)
 {
+    static const QRegularExpression notAlnum("[^a-z0-9]");
     QString n = title.toLower();
-    n.remove(QRegularExpression("[^a-z0-9]"));
+    n.remove(notAlnum);
     if (n == "feedyourkidsbugs") {
         n = "feedyourkidbugs";
     }

@@ -10,11 +10,8 @@
 #pragma once
 
 #include <map>
-#include <vector>
-
-#include <vector>
-
 #include <optional>
+#include <vector>
 
 #include <QJsonObject>
 #include <QString>
@@ -174,7 +171,6 @@ struct StarScoreSoloPlan
     QString warning;
 };
 
-//! One PDF the band export will write, relative to the song's folder in "Sheets and Demos"
 //! One instrument's part in "Compare parts": per bar, 0 = same as the reference part, 1 = different, 2 = both rest, 3 = same apart from the octave
 struct StarScoreComparedPart
 {
@@ -220,6 +216,7 @@ struct StarScoreVoiceSection
     std::vector<StarScoreVoiceRule> rules;
 };
 
+//! One PDF the band export will write, relative to the song's folder in "Sheets and Demos"
 struct StarScoreBandFile
 {
     QString relativePath;        // e.g. "3H Tpt Alt Ten/AMPL - Alto Sax.pdf"
@@ -321,7 +318,6 @@ struct StarScoreAuditReport
     QStringList referenceChoiceNames;
 };
 
-//! One file's line in the library audit
 //! One arrangement of a song, as the dashboard sees it
 struct StarScoreFileArrangement
 {
@@ -337,6 +333,7 @@ struct StarScoreFileArrangement
     int openIssues = 0;
 };
 
+//! One file's line in the library audit
 struct StarScoreAuditFileSummary
 {
     QString path;
@@ -612,8 +609,7 @@ public:
     virtual StarScoreAuditFileSummary auditFile(const QString& path, bool force) = 0;
     virtual std::vector<StarScoreAuditFileSummary> cachedLibraryAudit(const QString& folder) const = 0;
 
-    // --- Audit all songs: go through the songs one by one, each opened with the Audit panel (remembered across restarts)
-    // Songbooks: render sheets of one song (each gets its error / page count filled in)
+    // --- Songbooks: render sheets of one song (each gets its error / page count filled in)
     virtual void songbookRenderSheets(const QString& songPath, std::vector<StarScoreSongbookSheet>& sheets) = 0;
     //! The sheets of an arrangement's chart (score + every part), written into outDir
     virtual muse::RetVal<std::vector<StarScoreSongbookSheet> > songbookChartSheets(const QString& songPath,
@@ -621,6 +617,7 @@ public:
                                                                                  const QString& chartTitle,
                                                                                  const QString& outDir) = 0;
 
+    // --- Audit all songs: go through the songs one by one, each opened with the Audit panel (remembered across restarts)
     virtual void startAuditWalk(const QStringList& paths) = 0;
     virtual bool auditWalkActive() const = 0;
     virtual int auditWalkIndex() const = 0;          // 0-based

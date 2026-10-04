@@ -16,6 +16,7 @@
 #include "project/internal/starscore/organizer/orghtml.h"
 #include "project/internal/starscore/organizer/orgonline.h"
 #include "project/internal/starscore/organizer/orgrecordings.h"
+#include "project/internal/starscore/organizer/orgstores.h"
 #include "translation.h"
 
 using namespace mu::project;
@@ -36,13 +37,23 @@ void RecordingsModel::load()
 {
     m_code = starScore()->songCode();
     const QString file = recordingsFile();
-    m_all = file.isEmpty() ? QJsonObject() : org::readJsonObject(file);
+    QString unreadable;
+    m_all = QJsonObject();
+    if (!file.isEmpty()) {
+        // a file that is there but can't be read (broken JSON, cloud-only placeholder) must not be taken as empty:
+        // save() would then write this song's copy over everyone else's recordings
+        const org::JsonRead read = org::readJsonChecked(file);
+        unreadable = org::unreadableMessage("recordings.json", read);
+        m_all = read.doc.object();
+    }
     const QJsonObject copy = starScore()->songRecordings();
     if (!m_code.isEmpty() && !copy.isEmpty()) {
         org::mergeSongRecordings(m_all, m_code, copy);    // edits made while Sheets and Demos wasn't there
     }
     if (m_code.isEmpty()) {
         m_status = muse::qtrc("starscore", "This song has no code yet: export it to Sheets and Demos first.");
+    } else if (!unreadable.isEmpty()) {
+        m_status = muse::qtrc("starscore", "%1 Changes are kept in this file only until it is fixed.").arg(unreadable);
     } else if (file.isEmpty()) {
         m_status = muse::qtrc("starscore", "Sheets and Demos wasn't found: changes are kept in this file and copied over later.");
     } else {
@@ -142,7 +153,8 @@ void RecordingsModel::setRating(const QString& id, int stars)
 
 static int parseTime(const QString& t)
 {
-    const QRegularExpressionMatch m = QRegularExpression("^\\s*(?:(\\d+):)?(\\d{1,2}):(\\d{2})\\s*$").match(t);
+    static const QRegularExpression re("^\\s*(?:(\\d+):)?(\\d{1,2}):(\\d{2})\\s*$");
+    const QRegularExpressionMatch m = re.match(t);
     if (!m.hasMatch()) {
         return -1;
     }
@@ -204,9 +216,17 @@ QString RecordingsModel::addPerformance(const QString& showIdIn, const QString& 
         if (!d.isValid() || venue.trimmed().isEmpty() || vid.isEmpty()) {
             return muse::qtrc("starscore", "A new show needs its date (yyyy-mm-dd), venue and YouTube link.");
         }
-        showId = "ss-" + d.toString(Qt::ISODate);
-        if (showById(m_all, showId).isEmpty()) {
-            QJsonArray shows = m_all.value("shows").toArray();
+        // the same show again (same day, same video) is reused; another show that day gets its own id
+        // ("ss-<date>-2"), where one id per date used to merge two shows into one
+        QJsonArray shows = m_all.value("shows").toArray();
+        for (const QJsonValue& v : shows) {
+            const QJsonObject s = v.toObject();
+            if (s.value("date").toString() == d.toString(Qt::ISODate) && s.value("video").toString() == vid) {
+                showId = s.value("id").toString();
+            }
+        }
+        if (showId.isEmpty()) {
+            showId = org::newShowId(d, org::showIds(shows));
             shows.append(QJsonObject { { "id", showId }, { "band", "Starsign" }, { "date", d.toString(Qt::ISODate) }, { "approx", false },
                                        { "venue", venue.trimmed() }, { "video", vid }, { "timestamps", true }, { "status", "filmed" },
                                        { "added", QDate::currentDate().toString(Qt::ISODate) } });
@@ -268,14 +288,25 @@ bool RecordingsModel::save()
     starScore()->setSongRecordings(copy);
     const QString file = recordingsFile();
     bool ok = true;
+    QString why;
     if (!file.isEmpty()) {
-        // merge into the file as it is now (the organizer may have added shows meanwhile)
-        QJsonObject current = org::readJsonObject(file);
-        org::mergeSongRecordings(current, m_code, copy);
-        ok = org::writeJson(file, QJsonDocument(current));
-        m_all = current;
+        // merge into the file as it is now (the organizer may have added shows meanwhile); a file that is there but
+        // can't be read is left alone rather than replaced by this song's copy
+        const org::JsonRead read = org::readJsonChecked(file);
+        if (read.unreadable()) {
+            ok = false;
+            why = org::unreadableMessage("recordings.json", read);
+        } else {
+            QJsonObject current = read.doc.object();
+            org::mergeSongRecordings(current, m_code, copy);
+            ok = org::writeJson(file, QJsonDocument(current));
+            if (ok) {
+                m_all = current;
+            }
+        }
     }
     m_status = ok ? muse::qtrc("starscore", "Saved. Save the .starscore too to keep its copy.")
+               : !why.isEmpty() ? muse::qtrc("starscore", "Not saved to recordings.json: %1 The .starscore keeps the changes.").arg(why)
                : muse::qtrc("starscore", "Couldn't write recordings.json; the .starscore keeps the changes.");
     m_dirty = !ok;
     emit changed();

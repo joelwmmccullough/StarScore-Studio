@@ -15,6 +15,7 @@
 #include "starscoreservice.h"
 
 #include <algorithm>
+#include <map>
 #include <set>
 #include <vector>
 
@@ -35,16 +36,44 @@
 using namespace mu::project;
 using namespace muse;
 
+namespace mu::project::starscore {
+//! For the export (starscorebandexport.cpp): a PDF it wrote, with its bytes, and the end of its use of them. Declared
+//! there as well; the service header is shared, so it isn't declared in it.
+void noteExportedPdf(const QString& absolutePath, const QByteArray& pdf);
+void forgetExportedPdfs();
+}
+
 namespace {
-QString md5Of(const QString& path)
+//! The PDFs the running export wrote, by absolute path: their size and md5, from the bytes it wrote. The record used
+//! to read every exported PDF back from Drive for its md5 (74 reads of files Drive may not have finished syncing).
+struct ExportedPdf {
+    qint64 size = 0;
+    QString md5;
+};
+std::map<QString, ExportedPdf>& exportedPdfs()
 {
+    static std::map<QString, ExportedPdf> s_pdfs;
+    return s_pdfs;
+}
+
+//! A file's size and md5: from the bytes the export wrote when it wrote this file, else from the file on disk
+//! (a sheet left as it was because it came out the same). Empty md5 when the file can't be read.
+ExportedPdf sizeAndMd5Of(const QString& path)
+{
+    auto it = exportedPdfs().find(path);
+    if (it != exportedPdfs().end()) {
+        return it->second;
+    }
+    ExportedPdf info;
     QFile f(path);
     if (!f.open(QIODevice::ReadOnly)) {
-        return QString();
+        return info;
     }
+    info.size = f.size();
     QCryptographicHash h(QCryptographicHash::Md5);
     h.addData(&f);
-    return QString::fromLatin1(h.result().toHex());
+    info.md5 = QString::fromLatin1(h.result().toHex());
+    return info;
 }
 
 //! A rhythm-section part's role: "drums", "percussion", "keys", "guitar" or "bass"
@@ -83,6 +112,18 @@ void addUnique(QStringList& to, const QStringList& from)
         }
     }
 }
+}
+
+void mu::project::starscore::noteExportedPdf(const QString& absolutePath, const QByteArray& pdf)
+{
+    exportedPdfs()[absolutePath] = ExportedPdf {
+        qint64(pdf.size()), QString::fromLatin1(QCryptographicHash::hash(pdf, QCryptographicHash::Md5).toHex())
+    };
+}
+
+void mu::project::starscore::forgetExportedPdfs()
+{
+    exportedPdfs().clear();
 }
 
 void StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, const Data& data, const StarScoreBandExportPlan& full,
@@ -152,16 +193,16 @@ void StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, const 
         if (!f.sourceFile.isEmpty() || !onDisk.contains(f.relativePath)) {
             continue;
         }
-        const QString path = songDir + "/" + f.relativePath;
-        const QFileInfo fi(path);
-        if (!fi.exists()) {
-            continue;
+        const ExportedPdf pdf = sizeAndMd5Of(songDir + "/" + f.relativePath);
+        if (pdf.md5.isEmpty()) {
+            continue;   // not there (or unreadable)
         }
         sheets[f.relativePath] = QJsonObject {
-            { "status", statusKey(sheetStatus(f)) }, { "size", double(fi.size()) }, { "md5", md5Of(path) },
+            { "status", statusKey(sheetStatus(f)) }, { "size", double(pdf.size) }, { "md5", pdf.md5 },
             { "exported", today }, { "version", data.version },
         };
     }
+    starscore::forgetExportedPdfs();
 
     // --- which plan files belong to which part
     std::map<QString, QStringList> filesOfPart;      // part id -> its sheets (not scores)

@@ -33,6 +33,7 @@
 
 #include "async/async.h"
 #include "audio/common/soundfonttypes.h"
+#include "update/iappupdatescenario.h" // StarScore: install-on-quit, see quit()
 
 #include "defer.h"
 #include "translation.h"
@@ -246,7 +247,19 @@ bool ApplicationActionController::quit(bool isAllInstances, const muse::io::path
 #if defined(Q_OS_LINUX)
         interactive()->revealInFileBrowser(installerPath);
 #else
-        interactive()->openUrl(QUrl::fromLocalFile(installerPath.toQString()));
+        // StarScore: on macOS the update module starts a detached script that replaces the installed app from the
+        // downloaded dmg after we have exited and relaunches it (AppUpdateScenario::startInstallerOnQuit). Only
+        // opening the dmg, as MuseScore does, is the fallback when that script could not be started.
+        bool installerStarted = false;
+#if defined(Q_OS_MACOS)
+        muse::ContextInject<muse::update::IAppUpdateScenario> appUpdateScenario(iocContext());
+        if (appUpdateScenario()) {
+            installerStarted = appUpdateScenario()->startInstallerOnQuit(installerPath);
+        }
+#endif
+        if (!installerStarted) {
+            interactive()->openUrl(QUrl::fromLocalFile(installerPath.toQString()));
+        }
 #endif
     }
 

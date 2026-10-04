@@ -10,16 +10,23 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonObject>
+#include <QRegularExpression>
 
 #include "orgplatform.h"
+#include "orgstores.h"
 
 namespace mu::project::starscore::org {
 static const char* CACHE_FILE = "/sheetcache.json";
 
-void SheetCache::load(const Paths& paths)
+QString SheetCache::load(const Paths& paths)
 {
     m_entries.clear();
-    const QJsonObject o = readJsonObject(paths.toolkit + CACHE_FILE);
+    m_dirty = false;
+    const JsonRead read = readJsonChecked(paths.toolkit + CACHE_FILE);
+    if (read.unreadable()) {
+        return unreadableMessage("sheetcache.json", read);
+    }
+    const QJsonObject o = read.doc.object();
     if (!o.isEmpty()) {
         const QJsonObject files = o.value("files").toObject();
         for (auto it = files.begin(); it != files.end(); ++it) {
@@ -34,7 +41,7 @@ void SheetCache::load(const Paths& paths)
             e.measured = a.at(6).toBool(true);
             m_entries[it.key()] = e;
         }
-        return;
+        return QString();
     }
 
     // First run: the old toolkit's measurements (density.tsv) and fingerprints (fingerprints.json), in the
@@ -73,10 +80,24 @@ void SheetCache::load(const Paths& paths)
             e->second.md5 = it.value().toString();
         }
     }
+    // taken over from the old toolkit: not in sheetcache.json yet, so the first save must write it
+    m_dirty = !m_entries.empty();
+    return QString();
+}
+
+void SheetCache::replace(std::map<QString, SheetEntry> entries)
+{
+    if (entries != m_entries) {
+        m_entries = std::move(entries);
+        m_dirty = true;
+    }
 }
 
 bool SheetCache::save(const Paths& paths) const
 {
+    if (!m_dirty) {
+        return true;    // every entry is as it was read: sheetcache.json is up to date
+    }
     QJsonObject files;
     for (const auto& [rel, e] : m_entries) {
         files[rel] = QJsonArray { double(e.size), double(e.mtime), e.md5, e.pages, e.glyphs, e.words, e.measured };
@@ -106,7 +127,8 @@ bool isSheetPath(const QString& rel)
         return false;
     }
     const QStringList seg = rel.split('/');
-    if (seg[0].startsWith("5 Archive") || seg[0] == "6 Inbox" || !seg[0].contains(QRegularExpression("^[1-4] "))) {
+    static const QRegularExpression songGroup("^[1-4] ");
+    if (seg[0].startsWith("5 Archive") || seg[0] == "6 Inbox" || !songGroup.match(seg[0]).hasMatch()) {
         return false;
     }
     for (const QString& s : seg.mid(0, seg.size() - 1)) {
@@ -127,13 +149,30 @@ ScanResult scanBand(const Paths& paths, SheetCache& cache, const Progress& progr
 {
     ScanResult r;
     const QString base = paths.band;
-    QDirIterator it(base, QDir::Files | QDir::Hidden | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+    // Folders are listed too, so that a bundle (.logicx, .band, .pages…: a folder that is really one file) can be
+    // taken as one entry. Until Oct 2026 the walk went inside bundles and every inner file counted as a file of the
+    // song, which inflated the totals and listed a Logic project's innards in What's Here.
+    QDirIterator it(base, QDir::Files | QDir::Dirs | QDir::Hidden | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
     while (it.hasNext()) {
         it.next();
         const QFileInfo fi = it.fileInfo();
         const QString rel = relativeTo(base, fi.absoluteFilePath());
         if (rel.contains("/.organizer/") || rel.startsWith(".organizer/") || fi.fileName() == ".DS_Store"
             || fi.fileName().startsWith("Icon\r")) {
+            continue;
+        }
+        const QStringList seg = rel.split('/');
+        bool inBundle = false;
+        for (int i = 0; i < seg.size() - 1 && !inBundle; ++i) {
+            inBundle = isBundle(seg[i]);
+        }
+        if (inBundle) {
+            continue;
+        }
+        if (fi.isDir()) {
+            if (isBundle(fi.fileName())) {
+                r.tree.push_back({ rel, 0, fi.lastModified().toMSecsSinceEpoch() });
+            }
             continue;
         }
         r.tree.push_back({ rel, fi.size(), fi.lastModified().toMSecsSinceEpoch() });

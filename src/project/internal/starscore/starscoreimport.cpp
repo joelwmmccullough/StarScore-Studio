@@ -333,7 +333,7 @@ Ret StarScoreService::applyImport(const std::map<QString, QString>& sectionByPar
         }
         const QString& key = it->second;
         if (!sectionIndexByKey.count(key)) {
-            const StarScoreSectionTemplate* t = sectionTemplate(key);
+            const std::optional<StarScoreSectionTemplate> t = sectionTemplate(key);
             StarScoreSection s;
             s.templateKey = key;
             s.name = t ? t->name : key;
@@ -387,7 +387,7 @@ Ret StarScoreService::applyImport(const std::map<QString, QString>& sectionByPar
     }
 
     syncArrangementScores();
-    m_changed.notify();
+    scheduleChanged();
     return make_ok();
 }
 
@@ -432,7 +432,7 @@ void StarScoreService::standardizeImported()
     std::vector<std::pair<QString, StarScoreInstrument> > toAdd;   // section id, instrument
 
     for (const StarScoreSection& s : data.sections) {
-        const StarScoreSectionTemplate* t = sectionTemplate(s.templateKey);
+        const std::optional<StarScoreSectionTemplate> t = sectionTemplate(s.templateKey);
         if (!t) {
             continue;
         }
@@ -602,7 +602,7 @@ void StarScoreService::saveAsNewStarScore()
     if (!dir.empty() && !base.empty()) {
         project->setPath(dir.appendingComponent(base).appendingSuffix("starscore"));
     }
-    m_changed.notify();
+    scheduleChanged();
 }
 
 void StarScoreService::fillAnyHornsFromStandard(const StarScoreSection& anySection)
@@ -687,13 +687,9 @@ void StarScoreService::fillAnyHornsFromStandard(const StarScoreSection& anySecti
             if (!es || es->parts().size() != 1) {
                 continue;
             }
-            for (engraving::Staff* staff : es->parts().front()->staves()) {
-                if (engraving::Staff* linked = staff->findLinkedInScore(ms)) {
-                    if (linked->part() == part) {
-                        return n;
-                    }
-                    break;
-                }
+            const std::vector<engraving::Part*> ps = masterPartsOf(es, ms);
+            if (ps.size() == 1 && ps.front() == part) {
+                return n;
             }
         }
         return nullptr;
@@ -809,7 +805,7 @@ void StarScoreService::offerLowAlternates(const QStringList& partIds, bool asked
     }
     if (mainId.isEmpty()) {
         if (asked) {
-            QTimer::singleShot(0, [this]() {
+            QTimer::singleShot(0, &m_timerGuard, [this]() {
                 interactive()->info(muse::trc("starscore", "Nothing to make"),
                                     muse::trc("starscore", "The Bass Trombone already has every other version."));
             });
@@ -827,7 +823,7 @@ void StarScoreService::offerLowAlternates(const QStringList& partIds, bool asked
                          : names.mid(0, names.size() - 1).join(", ") + muse::qtrc("starscore", " and ") + names.last();
 
     // After the menu that set the status has closed
-    QTimer::singleShot(0, [this, sectionId, mainId, missing, list]() {
+    QTimer::singleShot(0, &m_timerGuard, [this, sectionId, mainId, missing, list]() {
         constexpr int Create = static_cast<int>(IInteractive::Button::CustomButton) + 1;
         constexpr int NotNow = static_cast<int>(IInteractive::Button::CustomButton) + 2;
         const IInteractive::Result answer = interactive()->questionSync(
@@ -1060,11 +1056,11 @@ RetVal<QStringList> StarScoreService::createLowAlternates(const QString& section
     }
 
     const QStringList newIds = made.partIds;
-    QTimer::singleShot(1500, [this, newIds]() { applyMixerDefaults(newIds); });
-    QTimer::singleShot(4000, [this, newIds]() { applyMixerDefaults(newIds); });
+    QTimer::singleShot(1500, &m_timerGuard, [this, newIds]() { applyMixerDefaults(newIds); });
+    QTimer::singleShot(4000, &m_timerGuard, [this, newIds]() { applyMixerDefaults(newIds); });
 
     master->notation()->notationChanged().notify();
-    m_changed.notify();
+    scheduleChanged();
     return RetVal<QStringList>::make_ok(made.partIds);
 }
 
@@ -1225,7 +1221,7 @@ int StarScoreService::standardizeHornNames()
     }
     master->parts()->partsChanged().notify();
     master->notation()->notationChanged().notify();
-    m_changed.notify();
+    scheduleChanged();
     return int(renames.size());
 }
 
@@ -1241,13 +1237,14 @@ void StarScoreService::tidyOpenedScore()
     if (!master || !ms || load().sections.empty()) {
         return;
     }
-    showOldAlternates();
+    showOldAlternates();   // may store, so the data is read after it
 
     // Stand-in versions made before 1.15.3 lost the double barlines of the line they stand in for: matched once per
     // file, then left alone (Joel adjusts stand-in parts by hand after they're made)
-    if (!load().alternateBarlinesMatched) {
+    Data d = load();
+    if (!d.alternateBarlinesMatched) {
         std::map<QString, std::vector<engraving::Part*> > altsOf;   // main part id -> its stand-ins
-        for (const StarScoreSection& s : load().sections) {
+        for (const StarScoreSection& s : d.sections) {
             for (const auto& [alt, main] : s.alternates) {
                 if (engraving::Part* a = ms->partById(ID(alt))) {
                     altsOf[main].push_back(a);
@@ -1264,7 +1261,6 @@ void StarScoreService::tidyOpenedScore()
             if (changed) {
                 master->notation()->notationChanged().notify();
             }
-            Data d = load();
             d.alternateBarlinesMatched = true;
             store(d);
         }

@@ -300,8 +300,11 @@ static std::vector<GuidePart> partsForPlayer(const QJsonObject& analysis, const 
                 GuidePart g;
                 g.n = n;
                 g.folder = folder;
+                // the roster's chair instrument is lower case ("alto sax"); it can also be blank for a new player
                 QString inst = chair->second.instrument;
-                inst[0] = inst.at(0).toUpper();
+                if (!inst.isEmpty()) {
+                    inst[0] = inst.at(0).toUpper();
+                }
                 g.instrument = inst.replace(" sax", " Sax");
                 g.label = QString("Horn %1 - %2").arg(chair->second.chair).arg(g.instrument);
                 g.trans = chair->second.key;

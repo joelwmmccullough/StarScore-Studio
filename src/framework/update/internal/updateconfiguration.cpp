@@ -21,11 +21,20 @@
  */
 #include "updateconfiguration.h"
 
+#include <QNetworkRequest>
+
 #include "global/configreader.h"
 
 #include "settings.h"
 
 #include "app_config.h"
+
+#include "starscoregithubrelease.h"
+
+// StarScore: the running StarScore version (version.cmake); appshell, project and imagesexport read it the same way.
+#ifndef STARSCORE_VERSION_STR
+#define STARSCORE_VERSION_STR "1.0.0"
+#endif
 
 using namespace muse;
 using namespace muse::update;
@@ -61,7 +70,13 @@ void UpdateConfiguration::init()
 
 bool UpdateConfiguration::isAppUpdatable() const
 {
+    // StarScore: builds are published for macOS only (the Linux build is a headless test build), so the Help menu
+    // item, the preference and the startup check exist on macOS alone.
+#ifdef Q_OS_MACOS
     return true;
+#else
+    return false;
+#endif
 }
 
 bool UpdateConfiguration::allowUpdateOnPreRelease() const
@@ -106,9 +121,10 @@ bool UpdateConfiguration::checkForUpdateTestMode() const
 
 std::string UpdateConfiguration::checkForAppUpdateUrl() const
 {
-    return !allowUpdateOnPreRelease()
-           ? m_config.value("latest").toString()
-           : m_config.value("latest.test").toString();
+    // StarScore: updates come from the fork's GitHub releases. MuseScore's feed URLs are still read from
+    // update.cfg into m_config (and AppUpdateService still knows how to parse that feed), but they are not used:
+    // offering a MuseScore Studio installer to a StarScore Studio user would be wrong.
+    return STARSCORE_RELEASES_API_URL;
 }
 
 std::string UpdateConfiguration::previousAppReleasesNotesUrl() const
@@ -120,7 +136,13 @@ std::string UpdateConfiguration::previousAppReleasesNotesUrl() const
 
 muse::network::RequestHeaders UpdateConfiguration::updateHeaders() const
 {
-    return networkConfiguration()->defaultHeaders();
+    // StarScore: the GitHub API refuses requests without a User-Agent and asks for these two headers.
+    // MuseScore's default headers (its own user agent) are not sent to GitHub.
+    muse::network::RequestHeaders headers;
+    headers.knownHeaders[QNetworkRequest::UserAgentHeader] = QString("StarScore-Studio/" STARSCORE_VERSION_STR);
+    headers.rawHeaders["Accept"] = "application/vnd.github+json";
+    headers.rawHeaders["X-GitHub-Api-Version"] = "2022-11-28";
+    return headers;
 }
 
 std::string UpdateConfiguration::museScoreUrl() const
@@ -135,11 +157,10 @@ std::string UpdateConfiguration::museScorePrivacyPolicyUrl() const
 
 muse::io::path_t UpdateConfiguration::updateDataPath() const
 {
-#if defined(Q_OS_LINUX)
-    return globalConfiguration()->downloadsPath() + "/";
-#else
-    return globalConfiguration()->userAppDataPath() + "/update";
-#endif
+    // StarScore: the dmg is saved to the user's Downloads folder on every platform (the owner keeps his dmgs there),
+    // not to a private folder under the app data. Because this is a folder full of the user's files, nothing may
+    // ever delete it (MuseScore's AppUpdateService::clear() used to wipe updateDataPath on macOS and Windows).
+    return globalConfiguration()->downloadsPath();
 }
 
 muse::io::path_t UpdateConfiguration::updateRequestHistoryJsonPath() const

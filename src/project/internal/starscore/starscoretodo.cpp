@@ -30,23 +30,23 @@ using namespace mu::project;
 using namespace muse;
 
 namespace {
-//! A rhythm-section part's role: "drums", "percussion", "keys", "guitar" or "bass"
-QString todoRhythmRole(const QString& id)
+//! A part's status: its own tag; untagged, the least finished of the sections set by hand that hold it; else none
+//! (Empty). The same rule for the steps and for the "Every part" page.
+StarScoreStatus todoPartStatus(const StarScoreService::Data& data, const QString& pid)
 {
-    if (id.contains("bass")) {
-        return "bass";
+    auto it = data.partStatus.find(pid);
+    if (it != data.partStatus.end()) {
+        return StarScoreService::statusFromKey(it->second);
     }
-    if (id.contains("guitar")) {
-        return "guitar";
+    bool found = false;
+    StarScoreStatus s = StarScoreStatus::Finished;
+    for (const StarScoreSection& sec : data.sections) {
+        if (!sec.autoStatus && sec.partIds.contains(pid)) {
+            s = found ? std::min(s, sec.status) : sec.status;
+            found = true;
+        }
     }
-    if (id == "drumset" || id == "drum-kit" || id.startsWith("drum")) {
-        return "drums";
-    }
-    if (id == "congas" || id == "bongos" || id == "percussion" || id == "timbales" || id == "cajon"
-        || id.contains("shaker") || id.contains("tambourine") || id.contains("cowbell") || id.contains("conga")) {
-        return "percussion";
-    }
-    return "keys";
+    return found ? s : StarScoreStatus::Empty;
 }
 
 QString statusText(StarScoreStatus s)
@@ -64,12 +64,16 @@ QString statusText(StarScoreStatus s)
 
 std::vector<StarScoreTodoItem> StarScoreService::todoList() const
 {
+    return todoList(load());
+}
+
+std::vector<StarScoreTodoItem> StarScoreService::todoList(const Data& data) const
+{
     std::vector<StarScoreTodoItem> out;
     const engraving::MasterScore* ms = masterScore();
     if (!ms) {
         return out;
     }
-    const Data data = load();
 
     auto partName = [&](const QString& pid) {
         const engraving::Part* p = ms->partById(ID(pid));
@@ -79,22 +83,7 @@ std::vector<StarScoreTodoItem> StarScoreService::todoList() const
         const engraving::Part* p = ms->partById(ID(pid));
         return p ? p->instrumentId().toQString() : QString();
     };
-    // a part's status: its own tag; untagged, a section set by hand that holds it; else none (Empty)
-    auto partStatus = [&](const QString& pid) {
-        auto it = data.partStatus.find(pid);
-        if (it != data.partStatus.end()) {
-            return statusFromKey(it->second);
-        }
-        bool found = false;
-        StarScoreStatus s = StarScoreStatus::Finished;
-        for (const StarScoreSection& sec : data.sections) {
-            if (!sec.autoStatus && sec.partIds.contains(pid)) {
-                s = found ? std::min(s, sec.status) : sec.status;
-                found = true;
-            }
-        }
-        return found ? s : StarScoreStatus::Empty;
-    };
+    auto partStatus = [&](const QString& pid) { return todoPartStatus(data, pid); };
 
     // Adds parts to an item: its status becomes the least finished, and each unfinished part is listed
     auto addParts = [&](StarScoreTodoItem& item, const QStringList& pids) {
@@ -129,7 +118,7 @@ std::vector<StarScoreTodoItem> StarScoreService::todoList() const
         }
         const QStringList& reads = sec.autoStatus ? sec.autoSkipSheets : sec.skipSheets;
         for (const QString& pid : sec.partIds) {
-            const QString role = todoRhythmRole(instrumentOf(pid));
+            const QString role = rhythmRole(instrumentOf(pid));   // the classifier the section status uses
             if ((role == "drums" || role == "keys" || role == "percussion") && reads.contains(role)
                 && data.partStatus.find(pid) == data.partStatus.end()) {
                 readsLead.insert(role);
@@ -323,7 +312,7 @@ QString StarScoreService::todoPdfHtml(const QString& title, const QString& code,
         return QString();
     }
     const Data data = load();
-    const std::vector<StarScoreTodoItem> steps = todoList();
+    const std::vector<StarScoreTodoItem> steps = todoList(data);
 
     // --- the steps
     int done = 0;
@@ -337,19 +326,7 @@ QString StarScoreService::todoPdfHtml(const QString& title, const QString& code,
     }
 
     // --- every part, by section
-    auto partStatus = [&](const QString& pid) {
-        auto it = data.partStatus.find(pid);
-        if (it != data.partStatus.end()) {
-            return int(statusFromKey(it->second));
-        }
-        int s = -1;
-        for (const StarScoreSection& sec : data.sections) {
-            if (!sec.autoStatus && sec.partIds.contains(pid)) {
-                s = s < 0 ? int(sec.status) : std::min(s, int(sec.status));
-            }
-        }
-        return s < 0 ? 0 : s;
-    };
+    auto partStatus = [&](const QString& pid) { return int(todoPartStatus(data, pid)); };
     auto bare = [](const QString& name) {
         const int at = name.lastIndexOf(": ");
         return at >= 0 ? name.mid(at + 2) : name;

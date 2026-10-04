@@ -54,6 +54,8 @@ public:
     bool hasUpdate() const override;
     muse::async::Promise<Ret> showUpdate() override;  // NOTE: Resolves to "OK" if the user wants to close and complete install of update...
 
+    bool startInstallerOnQuit(const io::path_t& installerPath) override;
+
 private:
     muse::async::Promise<Ret> processUpdateError(int errorCode);
 

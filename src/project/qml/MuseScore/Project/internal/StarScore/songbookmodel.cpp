@@ -161,8 +161,9 @@ const BookDef& bookDef(const QString& id)
 
 QString asciiName(QString s)
 {
+    static const QRegularExpression unsafe("[/\\\\:*?\"<>|]");
     s.replace(QString::fromUtf8("♭"), "b").replace(QString::fromUtf8("♯"), "#");
-    s.replace(QRegularExpression("[/\\\\:*?\"<>|]"), "-");
+    s.replace(unsafe, "-");
     return s.trimmed();
 }
 

@@ -5,8 +5,9 @@
  *
  * Automatic checks of the horn arrangements (and the structure of every part):
  *   any-keys   the versions of one "Any Horns" chair in different keys should hold the same music
- *   reference  each horn line against its closest line in the reference horn section
  *   melody     horn lines that follow the lead sheet melody and break from it for a bar
+ *   (the reference check, each horn line against the reference horn section, was removed in 1.10.0;
+ *   Data::auditReferenceSectionId is still stored for files that have it but is no longer read)
  *   structure  bars with the wrong number of beats, key signatures that don't match, hidden or silent notes
  *   range      notes outside the instrument's range
  *   crossing / doubling   voice order inside a section
@@ -57,6 +58,7 @@
 #include "engraving/dom/harmony.h"
 #include "engraving/dom/spanner.h"
 #include "engraving/dom/key.h"
+#include "engraving/editing/undo.h"
 #include "engraving/types/constants.h"
 #include "engraving/types/symnames.h"
 
@@ -433,8 +435,8 @@ static bool auditIsAny(const StarScoreSection& s)
            || s.templateKey.contains("any");
 }
 
-//! Horn sections for the reference comparison and the listen-through: biggest first, the standard
-//! section of a size before its "Any" section
+//! Horn sections for the listen-through (and, until 1.10.0, the reference comparison): biggest first,
+//! the standard section of a size before its "Any" section
 static std::vector<const StarScoreSection*> auditHornSections(const std::vector<StarScoreSection>& sections)
 {
     std::vector<const StarScoreSection*> out;
@@ -1116,13 +1118,16 @@ StarScoreAuditReport StarScoreService::auditScore(const MasterScore* ms, const D
     std::set<QString> hornPartIds;
     std::vector<const Part*> hornParts;
     std::vector<std::pair<const StarScoreSection*, std::vector<const Part*> > > linesBySection;   // one line per chair
+    std::map<QString, std::vector<std::vector<const Part*> > > chairGroupsBySection;   // "Any" section id -> chair groups
     for (const StarScoreSection& s : data.sections) {
         if (auditIsLeadOrRhythm(s)) {
             continue;
         }
         std::vector<const Part*> sectionLines;
         if (auditIsAny(s)) {
-            const auto groups = auditChairGroups(ctx, s);
+            // computed once per section here and reused by the any-keys check below (it regexes every
+            // excerpt name and part name, and used to run twice per section)
+            const auto& groups = chairGroupsBySection.emplace(s.id, auditChairGroups(ctx, s)).first->second;
             if (auditHasVersions(groups)) {
                 // label the versions by their part books ("3-Horn Arr: Horn 2 in Eb")
                 static const QRegularExpression bookRe("Horn\\s*\\d+", QRegularExpression::CaseInsensitiveOption);
@@ -1165,9 +1170,9 @@ StarScoreAuditReport StarScoreService::auditScore(const MasterScore* ms, const D
     // 1: "Any Horns" versions in different keys
     for (const StarScoreSection& s : data.sections) {
         if (!auditIsLeadOrRhythm(s) && auditIsAny(s)) {
-            const auto groups = auditChairGroups(ctx, s);
-            if (auditHasVersions(groups)) {
-                auditAnyKeys(ctx, add, groups);
+            const auto git = chairGroupsBySection.find(s.id);   // built in the section loop above
+            if (git != chairGroupsBySection.end() && auditHasVersions(git->second)) {
+                auditAnyKeys(ctx, add, git->second);
             }
         }
         // Stand-in versions (7-Horn Baritone and Bass Saxophone) against the part they stand in for
@@ -1271,6 +1276,15 @@ StarScoreAuditReport StarScoreService::auditScore(const MasterScore* ms, const D
     report.issues = std::move(issues);
 
     // Arrangements: open issues and "audited" (with a fingerprint of their music)
+    // A part's own fingerprint is the same in every arrangement it is in, so it is hashed once
+    std::map<QString, QString> partFingerprints;
+    auto partFingerprint = [&](const QString& pid) -> const QString& {
+        auto it = partFingerprints.find(pid);
+        if (it == partFingerprints.end()) {
+            it = partFingerprints.emplace(pid, auditFingerprint({ pid }, ctx.lines)).first;
+        }
+        return it->second;
+    };
     for (const StarScoreArrangement& arr : data.arrangements) {
         StarScoreAuditArrangementState st;
         st.id = arr.id;
@@ -1311,7 +1325,7 @@ StarScoreAuditReport StarScoreService::auditScore(const MasterScore* ms, const D
             auto pit = data.auditPartAudited.find(pid);
             if (pit != data.auditPartAudited.end()) {
                 latest = std::max(latest, pit->second.first);
-                if (pit->second.second != auditFingerprint({ pid }, ctx.lines)) {
+                if (pit->second.second != partFingerprint(pid)) {
                     sheetsOk = false;
                 }
                 continue;
@@ -1414,6 +1428,8 @@ StarScoreAuditReport StarScoreService::audit() const
     return auditScore(ms, loadFrom(ms));
 }
 
+//! Kept for the interface: the reference-section check it chose a section for was removed in 1.10.0, so the
+//! stored id is written but nothing reads it any more
 void StarScoreService::setAuditReferenceSection(const QString& sectionId)
 {
     MasterScore* ms = auditMainScore(m_mainProject, masterScore());
@@ -1763,24 +1779,75 @@ static QString auditCachePath()
     return dir + "/starscore-audit-library.json";
 }
 
-static QJsonObject auditReadCache()
+//! The library cache (one JSON object, file path -> summary) is kept in memory for the life of the process.
+//! A library scan audits one file per timer tick through auditFile(), and the file used to be read and rewritten
+//! whole on every one of those calls. Now it is read once, updated in memory, and written back a few seconds
+//! after the last change (and when the application quits), so a scan writes it once or a handful of times.
+namespace {
+struct AuditLibraryCache {
+    QJsonObject entries;
+    bool loaded = false;
+    bool dirty = false;
+    QTimer* flushTimer = nullptr;
+};
+
+AuditLibraryCache& auditLibraryCache()
 {
-    QFile f(auditCachePath());
-    if (!f.open(QIODevice::ReadOnly)) {
-        return QJsonObject();
-    }
-    return QJsonDocument::fromJson(f.readAll()).object();
+    static AuditLibraryCache cache;
+    return cache;
+}
 }
 
-static void auditWriteCache(const QJsonObject& cache)
+static void auditFlushCache()
 {
+    AuditLibraryCache& c = auditLibraryCache();
+    if (!c.dirty) {
+        return;
+    }
     QFile f(auditCachePath());
     if (f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        f.write(QJsonDocument(cache).toJson(QJsonDocument::Compact));
+        f.write(QJsonDocument(c.entries).toJson(QJsonDocument::Compact));
+        c.dirty = false;
     }
 }
 
-// Cache entries from before the dashboard (no arrangement list) are read again
+static const QJsonObject& auditReadCache()
+{
+    AuditLibraryCache& c = auditLibraryCache();
+    if (!c.loaded) {
+        c.loaded = true;
+        QFile f(auditCachePath());
+        if (f.open(QIODevice::ReadOnly)) {
+            c.entries = QJsonDocument::fromJson(f.readAll()).object();
+        }
+    }
+    return c.entries;
+}
+
+static void auditUpdateCache(const QString& path, const QJsonObject& entry)
+{
+    auditReadCache();   // so an update never replaces entries that weren't loaded yet
+    AuditLibraryCache& c = auditLibraryCache();
+    c.entries[path] = entry;
+    c.dirty = true;
+
+    QCoreApplication* app = QCoreApplication::instance();
+    if (!app) {
+        auditFlushCache();   // no event loop to defer to
+        return;
+    }
+    if (!c.flushTimer) {
+        c.flushTimer = new QTimer(app);
+        c.flushTimer->setSingleShot(true);
+        c.flushTimer->setInterval(3000);
+        QObject::connect(c.flushTimer, &QTimer::timeout, app, [] { auditFlushCache(); });
+        QObject::connect(app, &QCoreApplication::aboutToQuit, app, [] { auditFlushCache(); });
+    }
+    c.flushTimer->start();   // restarts the wait after each audited file
+}
+
+// Bumped whenever a cached summary would be read differently; entries with another version are audited again
+// (3: the dashboard's arrangement list, 1.8.0; 4: the reference check removed, 1.10.0)
 static const int AUDIT_CACHE_VERSION = 4;
 
 static QJsonObject auditSummaryToJson(const StarScoreAuditFileSummary& s)
@@ -2031,10 +2098,9 @@ StarScoreAuditFileSummary StarScoreService::auditFile(const QString& path, bool 
         return live;
     }
 
-    QJsonObject cache = auditReadCache();
     const QString stamp = auditFileStamp(fi);
     if (!force) {
-        const QJsonObject entry = cache.value(path).toObject();
+        const QJsonObject entry = auditReadCache().value(path).toObject();
         if (auditCacheCurrent(entry, stamp)) {
             return auditSummaryFromJson(path, entry);
         }
@@ -2070,15 +2136,14 @@ StarScoreAuditFileSummary StarScoreService::auditFile(const QString& path, bool 
 
     QJsonObject entry = auditSummaryToJson(summary);
     entry["stamp"] = stamp;
-    cache[path] = entry;
-    auditWriteCache(cache);
+    auditUpdateCache(path, entry);
     return summary;
 }
 
 std::vector<StarScoreAuditFileSummary> StarScoreService::cachedLibraryAudit(const QString& folder) const
 {
     std::vector<StarScoreAuditFileSummary> out;
-    const QJsonObject cache = auditReadCache();
+    const QJsonObject& cache = auditReadCache();
     for (const QString& path : auditLibraryFiles(folder)) {
         const QJsonObject entry = cache.value(path).toObject();
         if (!entry.isEmpty() && auditCacheCurrent(entry, auditFileStamp(QFileInfo(path)))) {
@@ -2216,36 +2281,116 @@ static std::vector<std::pair<int, QString> > organizerMarks(const std::vector<co
     return marks;
 }
 
+//! What the organizer functions below read from the score, built once per score state and reused.
+//!
+//! A band export calls organizerSignature() once per exported sheet (70-odd times) and organizerHornAnalysis()
+//! once more; each call used to rebuild the measure list, rescan every spanner for the part's slurs, read the
+//! part's line again and walk every segment for the rehearsal marks. The callers (starscorebandexport.cpp) go
+//! through the fixed service interface, so the cache is file-static, keyed on the score and its edit state.
+//! The output of the functions is unchanged: the same code runs, from cached inputs.
+namespace {
+struct OrganizerCache {
+    QString key;                                     // organizerCacheKey() of the score this was built from
+    qint64 builtAt = 0;                              // ms since epoch, for the safety expiry
+    std::vector<const Measure*> measures;
+    std::vector<std::pair<int, QString> > marks;     // bar index, text (organizerMarks)
+    bool marksBuilt = false;
+    std::map<QString, std::vector<QString> > barSigs;   // part id -> auditBarSig + chord symbols, per bar (signature)
+    std::map<QString, AuditLine> topLines;              // part id -> auditLineOf(…, {}, true) (horn analysis)
+};
+
+OrganizerCache& organizerCache()
+{
+    static OrganizerCache cache;
+    return cache;
+}
+
+//! Identifies the score and its edit state: every change the signatures depend on (notes, chord symbols,
+//! dynamics, slurs, rehearsal marks, parts and staves) goes through the undo stack, so the stack's position and
+//! its last command tell one state from another. The file path, measure and part counts guard against a new score
+//! allocated at a freed score's address, and the expiry below is a last safety net.
+QString organizerCacheKey(const MasterScore* ms)
+{
+    const UndoStack* us = ms->undoStack();
+    int measureCount = 0;
+    for (const Measure* m = ms->firstMeasure(); m; m = m->nextMeasure()) {
+        ++measureCount;
+    }
+    return QString("%1|%2|%3|%4|%5|%6|%7")
+           .arg(quintptr(ms))
+           .arg(us ? qulonglong(us->currentIndex()) : 0)
+           .arg(us ? qulonglong(us->size()) : 0)
+           .arg(quintptr(us ? us->last() : nullptr))
+           .arg(measureCount)
+           .arg(qulonglong(ms->parts().size()))
+           .arg(ms->fileInfo() ? ms->fileInfo()->path().toQString() : QString());
+}
+
+OrganizerCache& organizerCacheFor(const MasterScore* ms)
+{
+    static constexpr qint64 EXPIRY_MS = 10 * 60 * 1000;
+    OrganizerCache& c = organizerCache();
+    const QString key = organizerCacheKey(ms);
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    if (c.key != key || now - c.builtAt > EXPIRY_MS) {
+        c = OrganizerCache();
+        c.key = key;
+        c.builtAt = now;
+        for (const Measure* m = ms->firstMeasure(); m; m = m->nextMeasure()) {
+            c.measures.push_back(m);
+        }
+    }
+    return c;
+}
+
+const std::vector<std::pair<int, QString> >& organizerCachedMarks(OrganizerCache& c)
+{
+    if (!c.marksBuilt) {
+        c.marks = organizerMarks(c.measures);
+        c.marksBuilt = true;
+    }
+    return c.marks;
+}
+}
+
 QJsonObject StarScoreService::organizerSignature(const MasterScore* ms, const QStringList& partIds) const
 {
     QJsonObject out;
     if (!ms) {
         return out;
     }
-    std::vector<const Measure*> measures;
-    for (const Measure* m = ms->firstMeasure(); m; m = m->nextMeasure()) {
-        measures.push_back(m);
-    }
+    OrganizerCache& cache = organizerCacheFor(ms);
+    const std::vector<const Measure*>& measures = cache.measures;
     std::vector<QString> bars(measures.size());
     for (const QString& pid : partIds) {
-        const Part* p = ms->partById(ID(pid));
-        if (!p) {
-            continue;
-        }
-        const AuditLine line = auditLineOf(p, measures, auditSlurTicks(ms, p), false);
-        const track_idx_t firstTrack = p->staves().front()->idx() * VOICES;
-        const track_idx_t endTrack = (p->staves().back()->idx() + 1) * VOICES;
-        for (size_t b = 0; b < measures.size() && b < line.size(); ++b) {
-            QString sig = auditBarSig(line[b]);
-            // chord symbols belong to the sheet too
-            for (const Segment* s = measures[b]->first(SegmentType::ChordRest); s; s = s->next(SegmentType::ChordRest)) {
-                for (const EngravingItem* ann : s->annotations()) {
-                    if (ann->isHarmony() && ann->track() >= firstTrack && ann->track() < endTrack) {
-                        sig += QString("H%1%2").arg(s->rtick().ticks()).arg(toHarmony(ann)->harmonyName().toQString());
+        auto sit = cache.barSigs.find(pid);
+        if (sit == cache.barSigs.end()) {
+            const Part* p = ms->partById(ID(pid));
+            if (!p) {
+                continue;
+            }
+            // the part's bar signatures, once per export: a part is in several exported sheets
+            std::vector<QString> sigs;
+            const AuditLine line = auditLineOf(p, measures, auditSlurTicks(ms, p), false);
+            const track_idx_t firstTrack = p->staves().front()->idx() * VOICES;
+            const track_idx_t endTrack = (p->staves().back()->idx() + 1) * VOICES;
+            for (size_t b = 0; b < measures.size() && b < line.size(); ++b) {
+                QString sig = auditBarSig(line[b]);
+                // chord symbols belong to the sheet too
+                for (const Segment* s = measures[b]->first(SegmentType::ChordRest); s; s = s->next(SegmentType::ChordRest)) {
+                    for (const EngravingItem* ann : s->annotations()) {
+                        if (ann->isHarmony() && ann->track() >= firstTrack && ann->track() < endTrack) {
+                            sig += QString("H%1%2").arg(s->rtick().ticks()).arg(toHarmony(ann)->harmonyName().toQString());
+                        }
                     }
                 }
+                sigs.push_back(sig);
             }
-            bars[b] += pid + sig + "/";
+            sit = cache.barSigs.emplace(pid, std::move(sigs)).first;
+        }
+        const std::vector<QString>& sigs = sit->second;
+        for (size_t b = 0; b < sigs.size(); ++b) {
+            bars[b] += pid + sigs[b] + "/";
         }
     }
     QJsonArray hashes;
@@ -2253,7 +2398,7 @@ QJsonObject StarScoreService::organizerSignature(const MasterScore* ms, const QS
         hashes.append(auditHash(b).left(8));
     }
     QJsonObject marks;
-    for (const auto& [b, text] : organizerMarks(measures)) {
+    for (const auto& [b, text] : organizerCachedMarks(cache)) {
         marks[QString::number(b + 1)] = text;
     }
     out["bars"] = hashes;
@@ -2267,12 +2412,10 @@ QJsonObject StarScoreService::organizerHornAnalysis(const MasterScore* ms, const
     if (!ms) {
         return out;
     }
-    std::vector<const Measure*> measures;
-    for (const Measure* m = ms->firstMeasure(); m; m = m->nextMeasure()) {
-        measures.push_back(m);
-    }
+    OrganizerCache& cache = organizerCacheFor(ms);
+    const std::vector<const Measure*>& measures = cache.measures;
     // sections of the song, rehearsal mark by rehearsal mark
-    const auto marks = organizerMarks(measures);
+    const auto& marks = organizerCachedMarks(cache);
     std::vector<std::tuple<int, int, QString> > ranges;
     if (marks.empty() || marks.front().first > 0) {
         ranges.push_back({ 0, (marks.empty() ? int(measures.size()) : marks.front().first) - 1, QString(marks.empty() ? "Whole song" : "Start") });
@@ -2312,7 +2455,12 @@ QJsonObject StarScoreService::organizerHornAnalysis(const MasterScore* ms, const
         }
         // written pitch for named horns; concert pitch for Any Horns chairs
         const int written = generic ? 0 : -p->instrument()->transpose().chromatic;
-        const AuditLine line = auditLineOf(p, measures, {}, true);
+        auto lit = cache.topLines.find(f.partIds.first());
+        if (lit == cache.topLines.end()) {
+            // the same part is in several horn files (one per folder it is exported to)
+            lit = cache.topLines.emplace(f.partIds.first(), auditLineOf(p, measures, {}, true)).first;
+        }
+        const AuditLine& line = lit->second;
         QJsonArray sections;
         int notes = 0;
         for (const auto& [a, b, name] : ranges) {
@@ -2334,8 +2482,11 @@ QJsonObject StarScoreService::organizerHornAnalysis(const MasterScore* ms, const
             sections.append(QJsonObject { { "mark", name }, { "n", n }, { "restBars", restBars }, { "seq", seq } });
         }
         QString label = f.relativePath.section('/', -1);
-        label.remove(QRegularExpression("^" + QRegularExpression::escape(plan.code) + " - "));
-        label.remove(QRegularExpression("\\.pdf$"));
+        if (label.startsWith(plan.code + " - ")) {
+            label.remove(0, plan.code.size() + 3);
+        }
+        static const QRegularExpression pdfRe("\\.pdf$");
+        label.remove(pdfRe);
         parts.append(QJsonObject { { "n", fm.captured(1).toInt() }, { "folder", folder }, { "label", generic ? QString("Horn %1").arg(chair) : label },
                                    { "generic", generic }, { "chair", chair }, { "notes", notes }, { "file", f.relativePath },
                                    { "sections", sections } });

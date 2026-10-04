@@ -14,9 +14,11 @@
 #pragma once
 
 #include <functional>
+#include <set>
 #include <vector>
 
 #include <QDate>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QMap>
 #include <QString>
@@ -88,5 +90,20 @@ QJsonObject songRecordings(const QJsonObject& recordings, const QString& code);
 //! Merge a song's copy (edited in the Recordings window, or kept in a .starscore) into recordings.json.
 //! Entries are matched by id; the newer "modified" wins; ids in "deleted" are removed.
 bool mergeSongRecordings(QJsonObject& recordings, const QString& code, const QJsonObject& songCopy);
+//! Merge a run's whole recordings.json (ours) into the file as it is now (current), for saving at the end of a run:
+//! the Recordings window may have written the file while the run was going. Lists by id (newer "modified" wins),
+//! shows and skipNames by union, ours' aliases on top, setlist.fm state and play counts from ours. Returns whether
+//! current changed.
+bool mergeRecordingsFiles(QJsonObject& current, const QJsonObject& ours);
+//! Same for changelog.json (song -> player -> entries, newest first; entries matched by date and title) …
+bool mergeChangelogFiles(QJsonObject& current, const QJsonObject& ours);
+//! … and for a newest-first log array (maintlog.json, projstate.json "log"): ours' new entries go on top
+bool mergeLogArrays(QJsonArray& current, const QJsonArray& ours);
+
+//! "p0042": the next free number after every performance, release and deleted id with this prefix
 QString newRecordingId(const QJsonObject& recordings, const QString& prefix);
+int nextRecordingNumber(const QJsonObject& recordings, const QString& prefix);
+//! "ss-2026-10-03", or "ss-2026-10-03-2" when that id is taken (two shows on one day)
+QString newShowId(const QDate& date, const std::set<QString>& takenIds);
+std::set<QString> showIds(const QJsonArray& shows);
 }

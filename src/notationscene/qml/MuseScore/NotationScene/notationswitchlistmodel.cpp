@@ -50,6 +50,15 @@ void NotationSwitchListModel::load()
     context()->currentNotationChanged().onNotify(m_notationChangedReceiver.get(), [this]() {
         onCurrentNotationChanged();
     });
+
+    // StarScore: part score status dots follow the parts' tags. The service's notification outlives any one
+    // project, so it is subscribed once here (it used to be re-subscribed in onCurrentProjectChanged on every
+    // project switch) with the receiver that is not cleared by async_disconnectAll().
+    starScore()->changed().onNotify(m_notationChangedReceiver.get(), [this]() {
+        if (!m_notations.isEmpty()) {
+            emit dataChanged(index(0), index(m_notations.size() - 1), { RoleStatusColor, RoleStatusName });
+        }
+    });
 }
 
 void NotationSwitchListModel::onCurrentProjectChanged()
@@ -72,13 +81,6 @@ void NotationSwitchListModel::onCurrentProjectChanged()
     });
 
     listenProjectSavingStatusChanged();
-
-    // StarScore: part score status dots follow the parts' tags
-    starScore()->changed().onNotify(this, [this]() {
-        if (!m_notations.isEmpty()) {
-            emit dataChanged(index(0), index(m_notations.size() - 1), { RoleStatusColor, RoleStatusName });
-        }
-    });
 }
 
 void NotationSwitchListModel::onCurrentNotationChanged()

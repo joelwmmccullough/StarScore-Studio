@@ -34,6 +34,16 @@ using namespace muse::draw;
 using namespace mu::engraving;
 using namespace mu::engraving::rendering::score;
 
+namespace {
+// StarScore: the chord-symbol tweaks in this file (simpler root spelling, the bass-slash pull-back, no kerning)
+// were reviewed on sheets that use StarScore's own chord description file. They used to run for every score;
+// now they are gated on that file so an ordinary MuseScore score renders exactly as upstream does.
+bool isStarsignChordFile(const MStyle& style)
+{
+    return style.styleSt(Sid::chordDescriptionFile) == u"chords_starsign.xml";
+}
+}
+
 void HarmonyLayout::layoutHarmony(Harmony* item, Harmony::LayoutData* ldata,
                                   const LayoutContext& ctx)
 {
@@ -571,9 +581,11 @@ void HarmonyLayout::doRenderSingleHarmony(Harmony* item, Harmony::LayoutData* ld
             render(item, ldata, { std::make_shared<RenderActionMove>(0.05, 0.0) }, harmonyCtx, ctx,
                    bassTpc, spelling, bassCase, item->bassScale());
         } else if (item->harmonyType() == HarmonyType::STANDARD && cd && !cd->renderList.empty()
-                   && !style.styleB(Sid::chordBassNoteStagger)) {
+                   && !style.styleB(Sid::chordBassNoteStagger) && isStarsignChordFile(style)) {
             // StarScore: after a raised extension (G♭△7/B♭) the slash tucks under the extension's empty lower half,
             // so the chord and its bass read as one unit. A bare root (C/E) keeps the normal spacing.
+            // Only with StarScore's chord file: elsewhere the extension need not be raised and the pull-back
+            // would run the slash into it.
             render(item, ldata, { std::make_shared<RenderActionMove>(-0.2, 0.0) }, harmonyCtx, ctx,
                    bassTpc, spelling, bassCase, item->bassScale());
         }
@@ -589,21 +601,28 @@ void HarmonyLayout::renderSingleHarmony(Harmony* item, Harmony::LayoutData* ldat
     HarmonyInfo* info = harmonyCtx.info;
 
     // StarScore: chord roots and bass notes are written with their easier name (Cb as B, Fb as E, E# as F, B# as C,
-    // any double sharp or double flat as its plain note), in the score and in transposed parts alike
-    auto starscoreSimplerTpc = [](int tpc) {
-        if (!tpcIsValid(tpc)) {
+    // any double sharp or double flat as its plain note), in the score and in transposed parts alike.
+    // Only for standard chord symbols with StarScore's chord file: a Nashville number's "root" is a scale
+    // degree, so respelling it changed the function number (♭VII became VII), and Roman numerals have the
+    // same problem. Ordinary MuseScore scores keep the spelling the user typed.
+    int rootTpc = info->rootTpc();
+    int bassTpc = info->bassTpc();
+    if (item->harmonyType() == HarmonyType::STANDARD && isStarsignChordFile(style)) {
+        auto starscoreSimplerTpc = [](int tpc) {
+            if (!tpcIsValid(tpc)) {
+                return tpc;
+            }
+            while (tpc < int(Tpc::TPC_G_B)) {
+                tpc += TPC_DELTA_ENHARMONIC;
+            }
+            while (tpc > int(Tpc::TPC_A_S)) {
+                tpc -= TPC_DELTA_ENHARMONIC;
+            }
             return tpc;
-        }
-        while (tpc < int(Tpc::TPC_G_B)) {
-            tpc += TPC_DELTA_ENHARMONIC;
-        }
-        while (tpc > int(Tpc::TPC_A_S)) {
-            tpc -= TPC_DELTA_ENHARMONIC;
-        }
-        return tpc;
-    };
-    int rootTpc = starscoreSimplerTpc(info->rootTpc());
-    int bassTpc = starscoreSimplerTpc(info->bassTpc());
+        };
+        rootTpc = starscoreSimplerTpc(rootTpc);
+        bassTpc = starscoreSimplerTpc(bassTpc);
+    }
 
     DisplayCapoChordType displayCapo = style.styleV(Sid::displayCapoChords).value<DisplayCapoChordType>();
 
@@ -797,7 +816,6 @@ void HarmonyLayout::renderActionNote(Harmony* item, Harmony::LayoutData* ldata, 
     String text = cs.isValid() ? cs.value : c;
     muse::draw::Font font = cs.isValid() ? ldata->fontList.value()[cs.fontIdx] : ldata->fontList.value().front();
     font.setPointSizeF(font.pointSizeF() * harmonyCtx.scale);
-
 
     TextSegment* ts = new TextSegment(text, font, harmonyCtx.x(), harmonyCtx.y(), harmonyCtx.hAlign);
     harmonyCtx.renderItemList.push_back(ts);
@@ -1068,6 +1086,13 @@ void HarmonyLayout::renderActionSet(Harmony* item, Harmony::LayoutData* ldata, c
             delete tri;
         }
         return;
+    }
+
+    // Upstream kerns some character pairs (A followed by a dim circle, triangle before dim, the jazz accidentals).
+    // The call was lost in the StarScore triangle edit above, which left kernCharacters() dead; it is back for
+    // ordinary scores. StarScore's own chord file skips it on purpose: every sheet was reviewed without kerning.
+    if (!isStarsignChordFile(ctx.conf().style())) {
+        kernCharacters(item, text, harmonyCtx, ctx);
     }
 
     TextSegment* ts = new TextSegment(text, font, harmonyCtx.x(), harmonyCtx.y(), harmonyCtx.hAlign);

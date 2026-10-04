@@ -51,9 +51,9 @@ Since October 2026 StarScore Studio does all of this. It runs after every "Expor
 - Nothing is ever deleted. A sheet that is replaced moves to the song's `Version History/Superseded <date>/`.
 - Nothing inside `Version History`, `Old Versions` or `5 Archive` is ever renamed.
 - Log entries (changelogs, the Maintenance Report) are only ever added on top.
-- Every song folder has `1 Lead Sheet`, `1 Rhythm`, `Horn Part Guides`, `Demos`, `Version History` and one
-  `Update Notes yy-mm-dd` folder, dated the last time the song's sheets changed. Horn folders appear only when
-  there is a sheet for them.
+- Every song folder has `1 Lead Sheet`, `1 Rhythm`, `Horn Part Guides` and one `Update Notes yy-mm-dd` folder,
+  dated the last time the song's sheets changed. `Demos`, `Extras` and `Version History` appear when something is
+  filed into them; horn folders appear only when there is a sheet for them.
 - Folder and file names: see the Band Guide (`NH <instruments>`, `NH Any Horns`, `1H`, `CODE - Part.pdf`).
 
 ## What a run does
@@ -92,7 +92,6 @@ struct Organizer::Run {
     // stores
     Codes codes;
     Roster roster;
-    bool rosterWasMissing = false;
     JsonStore recordings { "recordings.json" };
     JsonStore changelog { "changelog.json" };
     JsonStore maintlog { "maintlog.json" };
@@ -120,6 +119,7 @@ struct Organizer::Run {
     std::vector<std::pair<QString, QString> > colours;   // folder, colour
     QJsonObject bandEntry, projEntry;
     bool stoppedEarly = false;
+    QString abortReason;       // set in the worker when a data file can't be read: nothing is saved
     QString tempDir;
 };
 
@@ -153,15 +153,31 @@ void Organizer::run(const RunRequest& request, const Progress& progress, std::fu
         r->done(r->summary);
         return;
     }
-    r->codes.load(m_paths);
-    r->rosterWasMissing = !QFileInfo::exists(m_paths.toolkit + "/roster.json");
-    r->roster.load(m_paths);
-    r->recordings.load(m_paths.toolkit);
-    r->changelog.load(m_paths.toolkit);
-    r->maintlog.load(m_paths.toolkit);
-    r->state.load(m_paths.toolkit);
+    // A data file that is there but can't be read (broken JSON, a cloud-only placeholder, a read that failed) stops
+    // the run before anything is touched. Until Oct 2026 such a file counted as missing, and the run then wrote
+    // recordings.json, changelog.json, maintlog.json and the rest back from empty, wiping history kept forever.
+    QStringList unreadable;
+    auto check = [&](const QString& problem) {
+        if (!problem.isEmpty()) {
+            unreadable << problem;
+        }
+    };
+    check(r->codes.load(m_paths));
+    check(r->roster.load(m_paths));
+    check(r->recordings.load(m_paths.toolkit));
+    check(r->changelog.load(m_paths.toolkit));
+    check(r->maintlog.load(m_paths.toolkit));
+    check(r->state.load(m_paths.toolkit));
     if (!m_paths.projToolkit.isEmpty()) {
-        r->projstate.load(m_paths.projToolkit);
+        check(r->projstate.load(m_paths.projToolkit));
+    }
+    if (!unreadable.isEmpty()) {
+        r->summary.ok = false;
+        r->summary.headline = "Nothing was organized: one of the organizer's data files couldn't be read. "
+                              "Check the file (is Google Drive still downloading it?) and run again.";
+        r->summary.warnings = unreadable;
+        r->done(r->summary);
+        return;
     }
     if (r->recordings.doc.isNull()) {
         r->recordings.doc = QJsonDocument(QJsonObject { { "version", 1 } });
@@ -219,8 +235,9 @@ void Organizer::online(std::shared_ptr<Run> r)
                 r->recordingLog = applyShows(rec, r->offered, r->answers, r->videos, self->m_paths.today, r->recordingsChanged);
                 r->recordings.doc = QJsonDocument(rec);
                 r->recordings.changed = true;
+                static const QRegularExpression tag("<[^>]*>");
                 for (const QString& l : r->recordingLog) {
-                    r->progress.say(QString(l).remove(QRegularExpression("<[^>]*>")).replace("&rsquo;", "’"));
+                    r->progress.say(QString(l).remove(tag).replace("&rsquo;", "’"));
                 }
                 self->prepare(r);
             };
@@ -231,21 +248,14 @@ void Organizer::online(std::shared_ptr<Run> r)
             r->progress.at("Reading the YouTube videos", 0.05);
             readVideos(toRead, r->recordings.doc.object(), self->m_fetch, [self, r, apply](std::vector<ShowVideo> videos) {
                 r->videos = videos;
-                bool anyUnsure = false;
-                for (const ShowVideo& v : r->videos) {
-                    for (const MatchedTimestamp& m : v.songs) {
-                        anyUnsure |= m.code.isEmpty();
-                    }
-                }
                 if (!self->m_prompts.confirmSongs || r->videos.empty()) {
                     apply();
                     return;
                 }
                 QStringList choices;
                 for (const auto& [root, code] : r->codes.band) {
-                    choices << code + " — " + (root.startsWith("4 Works In Progress/") ? root.mid(20) : root.mid(2));
+                    choices << code + " — " + songTitleOf(root);
                 }
-                Q_UNUSED(anyUnsure);
                 self->m_prompts.confirmSongs(r->videos, choices, apply);
             });
         });
@@ -292,8 +302,14 @@ void Organizer::prepare(std::shared_ptr<Run> r)
         const bool firstRun = orgState.isEmpty();
 
         // the sheet measurements (the first run takes the old toolkit's, before that toolkit is retired)
-        r->cache.load(paths);
+        r->abortReason = r->cache.load(paths);
+        if (!r->abortReason.isEmpty()) {
+            return;      // the file is there but can't be read: nothing is saved (see the continuation below)
+        }
         const bool cacheWasEmpty = r->cache.isEmpty();
+        // the tune folders of Projects and Sheets, listed once for the whole run
+        const bool haveProjects = !paths.projects.isEmpty() && QFileInfo(paths.projects).isDir();
+        std::vector<ProjectTune> tunes = haveProjects ? listProjectTunes(paths) : std::vector<ProjectTune>();
 
         // --- first run: retire the Python toolkits, write the new rule book
         if (firstRun) {
@@ -373,7 +389,7 @@ void Organizer::prepare(std::shared_ptr<Run> r)
         }
 
         // --- codes in Projects and Sheets
-        const QStringList codeLog = syncCodes(paths, r->codes);
+        const QStringList codeLog = syncCodes(paths, r->codes, tunes);
         if (!codeLog.isEmpty()) {
             projActions.append(action("Codes", "change", codeLog.join("<br>")));
         }
@@ -554,12 +570,19 @@ void Organizer::prepare(std::shared_ptr<Run> r)
         }
 
         // --- Projects and Sheets
-        if (!paths.projects.isEmpty() && QFileInfo(paths.projects).isDir()) {
+        if (haveProjects) {
             bg.at("Filing Projects and Sheets", 0.65);
-            const ProjectsFilingReport pf = fileProjects(paths, bg);
+            const ProjectsFilingReport pf = fileProjects(paths, tunes, bg);
             if (!pf.filed.empty()) {
                 projActions.append(action("Filed", "change", QString("%1: %2.").arg(plural(int(pf.filed.size()), "file"), movesHtml(pf.filed))));
                 plainLines << QString("Filed %1 in Projects and Sheets.").arg(plural(int(pf.filed.size()), "file"));
+                // a .starscore filed into a tune changes that tune's code and "has StarScore" for the snapshot and colours
+                for (const Move& m : pf.filed) {
+                    if (m.to.endsWith(".starscore", Qt::CaseInsensitive)) {
+                        tunes = listProjectTunes(paths);
+                        break;
+                    }
+                }
             }
             if (!pf.superseded.empty()) {
                 projActions.append(action("Superseded", "", movesHtml(pf.superseded)));
@@ -627,12 +650,14 @@ void Organizer::prepare(std::shared_ptr<Run> r)
         }
 
         if (topLevel) {
+            // the checklist is built once for the Progress tracker and the Maintenance Report
+            const std::vector<Task> tasks = buildTasks(lib, plays);
             job(bandGuideHtml(lib, paths.today), paths.band + "/Starsign Band Guide.pdf", "Band Guide", BASE_M);
-            job(progressHtml(lib, plays, paths.today), paths.band + "/Starsign Progress - Joel.pdf", "Progress tracker", BASE_M);
-            job(maintenanceHtml(lib, plays, mlog, paths.today, hornGuideFiles, changelogFiles), paths.band + "/Starsign Maintenance Report.pdf",
+            job(progressHtml(lib, plays, tasks, paths.today), paths.band + "/Starsign Progress - Joel.pdf", "Progress tracker", BASE_M);
+            job(maintenanceHtml(lib, tasks, mlog, paths.today, hornGuideFiles, changelogFiles), paths.band + "/Starsign Maintenance Report.pdf",
                 "Maintenance Report", BASE_M);
         }
-        if (!paths.projects.isEmpty() && QFileInfo(paths.projects).isDir()) {
+        if (haveProjects) {
             const bool recordingsMoved = !r->recordingsChanged.isEmpty() || everything
                                          || !QFileInfo::exists(paths.projects + "/All Recordings.pdf");
             if (recordingsMoved) {
@@ -640,9 +665,8 @@ void Organizer::prepare(std::shared_ptr<Run> r)
                 projActions.append(action("All Recordings", "", "Rebuilt from the latest recordings."));
             }
             QJsonObject ps = r->projstate.doc.object();
-            const QJsonObject snap = projectsSnapshot(paths, r->codes);
+            const QJsonObject snap = projectsSnapshot(paths, r->codes, tunes);
             QJsonArray plog = ps.value("log").toArray();
-            const bool countsMoved = snap.value("files") != ps.value("files") || snap.value("tunes") != ps.value("tunes");
             if (projActions.size() > (recordingsMoved ? 1 : 0)) {
                 r->projEntry = QJsonObject { { "date", paths.todayIso() }, { "title", title }, { "actions", projActions } };
                 plog.insert(0, r->projEntry);
@@ -656,7 +680,6 @@ void Organizer::prepare(std::shared_ptr<Run> r)
                 r->projstate.changed = true;
                 job(projectsReportHtml(ps, paths.today), paths.projects + "/Projects Maintenance Report.pdf", "Projects Maintenance Report", BASE_M);
             }
-            Q_UNUSED(countsMoved);
         }
 
         // --- folder colours: the band's song folders, and each tune folder in Projects and Sheets in its song's colour
@@ -670,9 +693,9 @@ void Organizer::prepare(std::shared_ptr<Run> r)
                 continue;
             }
             QString c;
-            auto rec = records.find(s.code);
-            if (rec != records.end()) {
-                const SongColours sc = songColours(paths, s.root, rec->second, scan.sheets);
+            const auto record = records.find(s.code);
+            if (record != records.end()) {
+                const SongColours sc = songColours(paths, s.root, record->second, scan.sheets);
                 c = sc.song;
                 for (const auto& [folder, colour] : sc.folders) {
                     r->colours.emplace_back(paths.band + "/" + s.root + "/" + folder, colour);
@@ -681,36 +704,17 @@ void Organizer::prepare(std::shared_ptr<Run> r)
             r->colours.emplace_back(paths.band + "/" + s.root, c);
             colourOfCode[s.code] = c;
         }
-        if (!paths.projects.isEmpty() && QFileInfo(paths.projects).isDir()) {
-            // only the Starsign groups (1 Originals, 2 Covers, 3 WIP): "4 Other Projects" can hold a tune of the same name
-            std::vector<std::pair<QString, QString> > starsignTunes;
-            const QDir base(paths.projects);
-            for (const QString& group : base.entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
-                if (!QRegularExpression("^[123] ").match(group).hasMatch()) {
+        if (haveProjects) {
+            // only the Starsign groups (1 Originals, 2 Covers, 3 WIP): "4 Other Projects" can hold a tune of the same
+            // name as a band song and must not take its colour (filing and the snapshot do take group 4)
+            for (const ProjectTune& t : tunes) {
+                if (!t.starsign) {
                     continue;
                 }
-                for (const QFileInfo& t : QDir(base.filePath(group)).entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
-                    if (!t.isSymLink() && !t.fileName().startsWith('.')) {
-                        starsignTunes.emplace_back(t.fileName(), group + "/" + t.fileName());
-                    }
-                }
-            }
-            for (const auto& [name, rel] : starsignTunes) {
-                QString code;
-                const auto known = r->codes.projects.find(name);
-                if (known != r->codes.projects.end()) {
-                    code = known->second;
-                } else {
-                    for (const QString& f : QDir(paths.projects + "/" + rel).entryList({ "*.starscore" }, QDir::Files, QDir::Name)) {
-                        code = QRegularExpression("^([A-Z]{4}) - ").match(f).captured(1);
-                        if (!code.isEmpty()) {
-                            break;
-                        }
-                    }
-                }
+                const QString code = t.codeIn(r->codes);
                 const auto c = colourOfCode.find(code);
                 if (!code.isEmpty() && c != colourOfCode.end()) {
-                    r->colours.emplace_back(paths.projects + "/" + rel, c->second);
+                    r->colours.emplace_back(paths.projects + "/" + t.rel, c->second);
                 }
             }
         }
@@ -729,16 +733,57 @@ void Organizer::prepare(std::shared_ptr<Run> r)
         r->summary.warnings = warnings;
         r->summary.changedCodes = r->recordingsChanged;
     }, [self, r]() {
+        if (!r->abortReason.isEmpty()) {
+            r->summary.ok = false;
+            r->summary.headline = "Nothing was organized: one of the organizer's data files couldn't be read. "
+                                  "Check the file (is Google Drive still downloading it?) and run again.";
+            r->summary.warnings << r->abortReason;
+            self->finish(r);
+            return;
+        }
         if (r->stoppedEarly || self->m_stop) {
             r->summary.stopped = true;
             // keep what was filed and registered; nothing else is half-saved
-            r->codes.saveBand(self->m_paths);
-            r->recordings.save(self->m_paths.toolkit);
+            self->saveCodesAndRecordings(r);
             self->finish(r);
             return;
         }
         self->render(r);
     });
+}
+
+//! codes.json and recordings.json, merged with the files as they are now (StarScore's "Add song", a registration
+//! and the Recordings window write them too, and a run takes minutes)
+void Organizer::saveCodesAndRecordings(std::shared_ptr<Run> r)
+{
+    const Paths& paths = m_paths;
+    QString problem;
+    if (r->codes.bandChanged) {
+        r->codes.saveBandMerged(paths, &problem);
+    }
+    if (!problem.isEmpty()) {
+        r->summary.warnings << problem;
+        problem.clear();
+    }
+    if (r->codes.projectsChanged) {
+        r->codes.saveProjectsMerged(paths, &problem);
+    }
+    if (!problem.isEmpty()) {
+        r->summary.warnings << problem;
+    }
+    if (r->recordings.changed) {
+        const JsonRead now = r->recordings.reread(paths.toolkit);
+        if (now.unreadable()) {
+            r->summary.warnings << unreadableMessage("recordings.json", now) + " This run's recordings changes were not saved.";
+        } else {
+            if (r->recordings.changedOnDisk(now)) {
+                QJsonObject current = now.doc.object();
+                mergeRecordingsFiles(current, r->recordings.doc.object());
+                r->recordings.doc = QJsonDocument(current);
+            }
+            r->recordings.save(paths.toolkit);
+        }
+    }
 }
 
 // ------------------------------------------------------------------ 3. printing
@@ -749,13 +794,22 @@ void Organizer::render(std::shared_ptr<Run> r)
         deploy(r);
         return;
     }
-    if (!m_htmlInstead.isEmpty() || !canRenderPdf()) {
+    if (!m_htmlInstead.isEmpty()) {
+        // test mode: each "PDF" holds its HTML, and a copy named after the PDF goes to the preview folder
         for (Run::Job& j : r->jobs) {
             j.ok = writeText(j.render.pdfPath, j.render.html.toUtf8());
-            if (!m_htmlInstead.isEmpty()) {
-                writeText(m_htmlInstead + "/" + relativeTo(QFileInfo(m_paths.band).absolutePath(), j.finalPath) + ".html",
-                          j.render.html.toUtf8());
-            }
+            writeText(m_htmlInstead + "/" + relativeTo(QFileInfo(m_paths.band).absolutePath(), j.finalPath) + ".html",
+                      j.render.html.toUtf8());
+        }
+        deploy(r);
+        return;
+    }
+    if (!canRenderPdf()) {
+        // no WebKit here (not macOS): the PDFs can't be made, so the ones in place stay as they are. Until Oct 2026
+        // the HTML was written into the *.pdf files instead.
+        r->progress.say(QString("PDFs can't be made on this system; %1 left as they were.").arg(plural(int(r->jobs.size()), "PDF")));
+        for (Run::Job& j : r->jobs) {
+            j.ok = false;
         }
         deploy(r);
         return;
@@ -793,21 +847,46 @@ void Organizer::deploy(std::shared_ptr<Run> r)
                 ++r->summary.pdfsFailed;
             }
         }
+        // The data files. Those that other parts of StarScore write too (codes, recordings) are read again and
+        // merged; the logs are only ever added on top, so a file that changed meanwhile keeps what it gained.
+        // Nothing is written when nothing changed (sheetcache.json and codes.json used to be rewritten every run).
         const Paths& paths = self->m_paths;
         r->cache.save(paths);
-        r->codes.saveBand(paths);
-        if (r->codes.projectsChanged) {
-            r->codes.saveProjects(paths);
-        }
-        if (r->rosterWasMissing && !r->roster.players.empty()) {
-            r->roster.save(paths);
-        }
-        r->recordings.save(paths.toolkit);
-        r->changelog.save(paths.toolkit);
-        r->maintlog.save(paths.toolkit);
-        r->state.save(paths.toolkit);
+        self->saveCodesAndRecordings(r);
+        auto saveLog = [&](JsonStore& store, const QString& folder, auto merge) {
+            if (!store.changed) {
+                return;
+            }
+            const JsonRead now = store.reread(folder);
+            if (now.unreadable()) {
+                r->summary.warnings << unreadableMessage(store.file, now) + " This run's entries were not added to it.";
+                return;
+            }
+            if (store.changedOnDisk(now)) {
+                store.doc = merge(now.doc, store.doc);
+            }
+            store.save(folder);
+        };
+        saveLog(r->changelog, paths.toolkit, [](const QJsonDocument& now, const QJsonDocument& ours) {
+            QJsonObject current = now.object();
+            mergeChangelogFiles(current, ours.object());
+            return QJsonDocument(current);
+        });
+        saveLog(r->maintlog, paths.toolkit, [](const QJsonDocument& now, const QJsonDocument& ours) {
+            QJsonArray current = now.array();
+            mergeLogArrays(current, ours.array());
+            return QJsonDocument(current);
+        });
+        r->state.save(paths.toolkit);     // this run's state only: the last run, the roster hash
         if (!paths.projToolkit.isEmpty()) {
-            r->projstate.save(paths.projToolkit);
+            saveLog(r->projstate, paths.projToolkit, [](const QJsonDocument& now, const QJsonDocument& ours) {
+                // counts and the tunes table are this run's; the log keeps what the file gained
+                QJsonObject current = ours.object();
+                QJsonArray log = now.object().value("log").toArray();
+                mergeLogArrays(log, ours.object().value("log").toArray());
+                current["log"] = log;
+                return QJsonDocument(current);
+            });
         }
         QDir(r->tempDir).removeRecursively();   // our own temporary copies
     }, [self, r]() {
@@ -829,6 +908,8 @@ void Organizer::finish(std::shared_ptr<Run> r)
     RunSummary& s = r->summary;
     if (s.stopped) {
         s.headline = "Stopped. Files already filed stay filed; everything else is left for the next run.";
+    } else if (!s.ok && !s.headline.isEmpty()) {
+        // a run called off before it did anything (a data file couldn't be read): the reason is the headline
     } else {
         QStringList bits;
         if (s.pdfsWritten) {

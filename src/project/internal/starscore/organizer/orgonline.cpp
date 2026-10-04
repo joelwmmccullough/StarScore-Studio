@@ -72,8 +72,14 @@ static int monthNumber(const QString& name)
 
 static QString attr(const QString& tag, const QString& name)
 {
-    const QRegularExpression re("\\b" + QRegularExpression::escape(name) + "\\s*=\\s*\"([^\"]*)\"");
-    const QRegularExpressionMatch m = re.match(tag);
+    // called for every <td> of a stats page: the few attribute names it is asked for keep their pattern
+    // (the pages are parsed on the main thread only, so a plain static map is fine)
+    static QMap<QString, QRegularExpression> cache;
+    auto it = cache.find(name);
+    if (it == cache.end()) {
+        it = cache.insert(name, QRegularExpression("\\b" + QRegularExpression::escape(name) + "\\s*=\\s*\"([^\"]*)\""));
+    }
+    const QRegularExpressionMatch m = it->match(tag);
     return m.hasMatch() ? htmlUnescape(m.captured(1)) : QString();
 }
 
@@ -327,20 +333,26 @@ QString normalizeName(const QString& s)
     return out.simplified();
 }
 
+NameMatcher::NameMatcher(const QMap<QString, QString>& aliases, const QStringList& skipNames)
+{
+    for (auto it = aliases.begin(); it != aliases.end(); ++it) {
+        byNorm[normalizeName(it.key())] = it.value();
+    }
+    for (const QString& s : skipNames) {
+        skip.insert(normalizeName(s));
+    }
+}
+
 MatchedTimestamp matchTimestamp(const Timestamp& t, const QMap<QString, QString>& aliases, const QStringList& skipNames)
+{
+    return NameMatcher(aliases, skipNames).match(t);
+}
+
+MatchedTimestamp NameMatcher::match(const Timestamp& t) const
 {
     MatchedTimestamp r;
     r.seconds = t.seconds;
     r.name = t.name;
-
-    QMap<QString, QString> byNorm;
-    for (auto it = aliases.begin(); it != aliases.end(); ++it) {
-        byNorm[normalizeName(it.key())] = it.value();
-    }
-    QSet<QString> skip;
-    for (const QString& s : skipNames) {
-        skip.insert(normalizeName(s));
-    }
 
     // the name split from its brackets: "Branston Pickle (Piano Intro)" -> "Branston Pickle" + "Piano Intro"
     static const QRegularExpression bracket("\\(([^)]*)\\)");

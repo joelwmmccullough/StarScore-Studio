@@ -171,6 +171,11 @@ void Font::setHinting(Hinting hinting)
 //! installed as static fonts ("TT Modernoir Trial"), use those for bold and italic text.
 static QString starscoreStaticFamilyFor(const QString& family)
 {
+    // toQFont() is called for every bold or italic metric query, so the regex only runs once a plain
+    // substring search has found "VF" at all (almost no family name has it)
+    if (!family.contains(QLatin1String("VF"))) {
+        return family;
+    }
     static const QRegularExpression vfRe("\\s*\\bVF\\b\\s*");
     if (!family.contains(vfRe)) {
         return family;

@@ -30,6 +30,7 @@ import "internal"
 StyledDialogView {
     id: root
 
+    property string version: "" // StarScore: the StarScore version being offered, e.g. "1.16.0"
     property alias notes: view.notes
     property alias previousReleasesNotes: view.previousReleasesNotes
 
@@ -78,7 +79,10 @@ StyledDialogView {
             StyledTextLabel {
                 id: releaseTitleLabel
 
-                text: qsTrc("update", "A new version of MuseScore Studio is available!")
+                // StarScore: names StarScore Studio and the version (the release notes below are that version's changelog block)
+                text: root.version !== ""
+                      ? qsTrc("update", "StarScore Studio %1 is available!").arg(root.version)
+                      : qsTrc("update", "A new version of StarScore Studio is available!")
                 font: ui.theme.headerBoldFont
             }
 

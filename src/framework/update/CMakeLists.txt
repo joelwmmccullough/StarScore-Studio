@@ -39,7 +39,24 @@ target_sources(muse_update PRIVATE
     internal/appupdatescenario.h
     internal/appupdateservice.cpp
     internal/appupdateservice.h
+
+    # StarScore: updates come from the fork's GitHub releases; see starscoregithubrelease.h
+    internal/starscoregithubrelease.cpp
+    internal/starscoregithubrelease.h
 )
+
+# StarScore: the running version to compare against GitHub is STARSCORE_VERSION (version.cmake), not MuseScore's.
+target_compile_definitions(muse_update PRIVATE STARSCORE_VERSION_STR="${STARSCORE_VERSION}")
+
+# StarScore: the macOS install script (internal/starscore_macos_install.sh) is embedded as a string, so the app can
+# write it to a temporary file and run it detached when it quits. configure_file rewrites the header only when the
+# script's contents changed, and CMAKE_CONFIGURE_DEPENDS makes an edit to the script re-run the configure step.
+set(STARSCORE_MACOS_INSTALL_SCRIPT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/internal/starscore_macos_install.sh")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${STARSCORE_MACOS_INSTALL_SCRIPT_FILE}")
+file(READ "${STARSCORE_MACOS_INSTALL_SCRIPT_FILE}" STARSCORE_MACOS_INSTALL_SCRIPT)
+configure_file(internal/starscore_macos_install_script.h.in
+               "${CMAKE_CURRENT_BINARY_DIR}/starscore_macos_install_script.h" @ONLY)
+unset(STARSCORE_MACOS_INSTALL_SCRIPT)
 
 if (MUSE_QT_SUPPORT)
     target_link_libraries(muse_update PRIVATE Qt::Concurrent)

@@ -48,28 +48,35 @@ Player Player::fromJson(const QJsonObject& o)
     return p;
 }
 
-Roster Roster::defaults()
+QString unreadableMessage(const QString& fileName, const JsonRead& read)
 {
-    // The band itself lives in roster.json (Sheets and Demos), never in the program
-    return Roster();
+    if (!read.unreadable()) {
+        return QString();
+    }
+    return QString("%1 is there but can't be read (%2).").arg(fileName, read.error);
 }
 
-void Roster::load(const Paths& paths)
+QString Roster::load(const Paths& paths)
 {
-    const QJsonObject o = readJsonObject(paths.toolkit + "/roster.json");
-    if (o.isEmpty()) {
-        *this = defaults();
-        return;
-    }
     players.clear();
+    fileNameHints.clear();
+    const JsonRead read = readJsonChecked(paths.toolkit + "/roster.json");
+    if (read.unreadable()) {
+        return unreadableMessage("roster.json", read);
+    }
+    const QJsonObject o = read.doc.object();
+    if (o.isEmpty()) {
+        // no roster yet: the band lives in roster.json (Dashboard > Band roster), never in the program
+        return QString();
+    }
     for (const QJsonValue& v : o.value("players").toArray()) {
         players.push_back(Player::fromJson(v.toObject()));
     }
-    fileNameHints.clear();
     const QJsonObject hints = o.value("fileNameHints").toObject();
     for (auto it = hints.begin(); it != hints.end(); ++it) {
         fileNameHints[it.key()] = it.value().toString();
     }
+    return QString();
 }
 
 bool Roster::save(const Paths& paths) const
@@ -138,20 +145,33 @@ QString Roster::ownerOf(const QString& part) const
 }
 
 // ------------------------------------------------------------------ codes
-void Codes::load(const Paths& paths)
+static std::map<QString, QString> toCodeMap(const QJsonObject& o)
+{
+    std::map<QString, QString> m;
+    for (auto it = o.begin(); it != o.end(); ++it) {
+        m[it.key()] = it.value().toString();
+    }
+    return m;
+}
+
+QString Codes::load(const Paths& paths)
 {
     band.clear();
     projects.clear();
-    const QJsonObject b = readJsonObject(paths.toolkit + "/codes.json");
-    for (auto it = b.begin(); it != b.end(); ++it) {
-        band[it.key()] = it.value().toString();
+    bandChanged = projectsChanged = false;
+    const JsonRead b = readJsonChecked(paths.toolkit + "/codes.json");
+    if (b.unreadable()) {
+        return unreadableMessage("codes.json", b);
     }
+    band = bandLoaded = toCodeMap(b.doc.object());
     if (!paths.projToolkit.isEmpty()) {
-        const QJsonObject p = readJsonObject(paths.projToolkit + "/codes_proj.json");
-        for (auto it = p.begin(); it != p.end(); ++it) {
-            projects[it.key()] = it.value().toString();
+        const JsonRead p = readJsonChecked(paths.projToolkit + "/codes_proj.json");
+        if (p.unreadable()) {
+            return unreadableMessage("codes_proj.json", p);
         }
+        projects = projectsLoaded = toCodeMap(p.doc.object());
     }
+    return QString();
 }
 
 static QJsonObject toObject(const std::map<QString, QString>& m)
@@ -171,6 +191,49 @@ bool Codes::saveBand(const Paths& paths) const
 bool Codes::saveProjects(const Paths& paths) const
 {
     return !paths.projToolkit.isEmpty() && writeText(paths.projToolkit + "/codes_proj.json", pythonStyleJson(toObject(projects)));
+}
+
+//! The file as it is now, with this run's additions and changes on top. Until Oct 2026 the run wrote back the map
+//! it had loaded at the start, so a code added in StarScore ("Add song") during a long run was lost.
+static bool saveCodesMerged(const QString& path, const QString& fileName, const std::map<QString, QString>& loaded,
+                            const std::map<QString, QString>& ours, QString* problem)
+{
+    const JsonRead now = readJsonChecked(path);
+    if (now.unreadable()) {
+        if (problem) {
+            *problem = unreadableMessage(fileName, now) + " It was left as it is.";
+        }
+        return true;
+    }
+    std::map<QString, QString> merged = now.exists ? toCodeMap(now.doc.object()) : loaded;
+    for (const auto& [key, code] : ours) {
+        auto was = loaded.find(key);
+        if (was == loaded.end() || was->second != code) {
+            merged[key] = code;        // added or changed by this run
+        }
+    }
+    for (const auto& [key, code] : loaded) {
+        if (!ours.count(key)) {
+            merged.erase(key);         // removed by this run (nothing does this today, but keep the merge honest)
+        }
+    }
+    if (now.exists ? merged == toCodeMap(now.doc.object()) : merged.empty()) {
+        return true;                   // unchanged (or nothing to write): don't touch the file
+    }
+    return writeText(path, pythonStyleJson(toObject(merged)));
+}
+
+bool Codes::saveBandMerged(const Paths& paths, QString* problem) const
+{
+    return saveCodesMerged(paths.toolkit + "/codes.json", "codes.json", bandLoaded, band, problem);
+}
+
+bool Codes::saveProjectsMerged(const Paths& paths, QString* problem) const
+{
+    if (paths.projToolkit.isEmpty()) {
+        return true;
+    }
+    return saveCodesMerged(paths.projToolkit + "/codes_proj.json", "codes_proj.json", projectsLoaded, projects, problem);
 }
 
 QString Codes::rootOf(const QString& code) const
@@ -248,12 +311,16 @@ QString suggestCode(const QString& title, const QStringList& takenList)
 }
 
 // ------------------------------------------------------------------ plain JSON files
-bool JsonStore::load(const QString& folder)
+QString JsonStore::load(const QString& folder)
 {
-    bool ok = false;
-    doc = readJson(folder + "/" + file, &ok);
+    const JsonRead read = readJsonChecked(folder + "/" + file);
     changed = false;
-    return ok;
+    if (read.unreadable()) {
+        doc = loaded = QJsonDocument();
+        return unreadableMessage(file, read);
+    }
+    doc = loaded = read.doc;
+    return QString();
 }
 
 bool JsonStore::save(const QString& folder)
@@ -264,5 +331,18 @@ bool JsonStore::save(const QString& folder)
     const bool ok = writeJson(folder + "/" + file, doc);
     changed = !ok;
     return ok;
+}
+
+JsonRead JsonStore::reread(const QString& folder) const
+{
+    return readJsonChecked(folder + "/" + file);
+}
+
+bool JsonStore::changedOnDisk(const JsonRead& now) const
+{
+    if (!now.exists) {
+        return !loaded.isNull() && !loaded.isEmpty();   // it was there at the start and is gone now
+    }
+    return now.ok && now.doc != loaded;
 }
 }

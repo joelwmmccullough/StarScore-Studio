@@ -14,8 +14,36 @@
 using namespace mu::project;
 
 BandExportModel::BandExportModel(QObject* parent)
-    : QObject(parent), muse::Contextable(muse::iocCtxForQmlObject(this))
+    : QAbstractListModel(parent), muse::Contextable(muse::iocCtxForQmlObject(this))
 {
+}
+
+QVariant BandExportModel::data(const QModelIndex& index, int role) const
+{
+    if (!index.isValid() || index.row() < 0 || index.row() >= int(m_items.size())) {
+        return QVariant();
+    }
+    const Item& item = m_items[size_t(index.row())];
+    switch (role) {
+    case HeaderRole: return item.header;
+    case PathRole: return item.path;
+    case FolderRole: return item.folder;
+    case NameRole: return item.name;
+    case CheckedRole: return item.checked;
+    default: return QVariant();
+    }
+}
+
+int BandExportModel::rowCount(const QModelIndex& parent) const
+{
+    return parent.isValid() ? 0 : int(m_items.size());
+}
+
+QHash<int, QByteArray> BandExportModel::roleNames() const
+{
+    return {
+        { HeaderRole, "header" }, { PathRole, "path" }, { FolderRole, "folder" }, { NameRole, "name" }, { CheckedRole, "checked" },
+    };
 }
 
 QString BandExportModel::heading() const
@@ -33,19 +61,26 @@ QString BandExportModel::notes() const
     return m_notes;
 }
 
-QVariantList BandExportModel::items() const
-{
-    return m_items;
-}
-
 int BandExportModel::checkedCount() const
 {
     int n = 0;
-    for (const QVariant& v : m_items) {
-        const QVariantMap item = v.toMap();
-        n += (!item.value("header").toBool() && item.value("checked").toBool()) ? 1 : 0;
+    for (const Item& item : m_items) {
+        n += (!item.header && item.checked) ? 1 : 0;
     }
     return n;
+}
+
+QString BandExportModel::result() const
+{
+    return m_result;
+}
+
+void BandExportModel::setResult(const QString& text)
+{
+    if (m_result != text) {
+        m_result = text;
+        emit resultChanged();
+    }
 }
 
 QString BandExportModel::currentVersion() const
@@ -119,6 +154,7 @@ void BandExportModel::load()
     m_bump = 0;
     emit bumpChanged();
 
+    beginResetModel();
     m_items.clear();
     m_error.clear();
     m_notes.clear();
@@ -150,82 +186,96 @@ void BandExportModel::load()
             }
         }
         for (const QString& folder : folders) {
-            m_items << QVariantMap { { "header", true }, { "folder", folder }, { "name", folder }, { "checked", true } };
+            m_items.push_back({ true, QString(), folder, folder, true });
             for (const StarScoreBandFile& f : plan.val.files) {
                 if (f.relativePath.section('/', 0, -2) != folder) {
                     continue;
                 }
-                m_items << QVariantMap {
-                    { "header", false },
-                    { "path", f.relativePath },
-                    { "folder", folder },
-                    { "name", f.relativePath.section('/', -1) },
-                    { "checked", !unticked.contains(f.relativePath) && !f.defaultUnchecked },
-                };
+                m_items.push_back({ false, f.relativePath, folder, f.relativePath.section('/', -1),
+                                    !unticked.contains(f.relativePath) && !f.defaultUnchecked });
             }
         }
-        refreshHeaders();
+        for (Item& item : m_items) {
+            if (item.header) {
+                item.checked = isFolderChecked(item.folder);
+            }
+        }
     }
+    endResetModel();
 
     emit loaded();
-    emit itemsChanged();
+    emit checkedCountChanged();
 }
 
 void BandExportModel::setChecked(int index, bool checked)
 {
-    if (index < 0 || index >= m_items.size()) {
+    if (index < 0 || index >= int(m_items.size())) {
         return;
     }
-    QVariantMap item = m_items[index].toMap();
-    if (item.value("header").toBool()) {
-        setFolderChecked(item.value("folder").toString(), checked);
+    Item& item = m_items[size_t(index)];
+    if (item.header) {
+        setFolderChecked(item.folder, checked);
         return;
     }
-    item["checked"] = checked;
-    m_items[index] = item;
+    if (item.checked == checked) {
+        return;
+    }
+    item.checked = checked;
+    emit dataChanged(this->index(index), this->index(index), { CheckedRole });
     refreshHeaders();
-    emit itemsChanged();
+    emit checkedCountChanged();
 }
 
 void BandExportModel::refreshHeaders()
 {
-    for (int i = 0; i < m_items.size(); ++i) {
-        QVariantMap item = m_items[i].toMap();
-        if (item.value("header").toBool()) {
-            item["checked"] = isFolderChecked(item.value("folder").toString());
-            m_items[i] = item;
+    for (int i = 0; i < int(m_items.size()); ++i) {
+        Item& item = m_items[size_t(i)];
+        if (!item.header) {
+            continue;
+        }
+        const bool want = isFolderChecked(item.folder);
+        if (item.checked != want) {
+            item.checked = want;
+            emit dataChanged(index(i), index(i), { CheckedRole });
         }
     }
 }
 
 void BandExportModel::setFolderChecked(const QString& folder, bool checked)
 {
-    for (int i = 0; i < m_items.size(); ++i) {
-        QVariantMap item = m_items[i].toMap();
-        if (item.value("folder").toString() == folder) {
-            item["checked"] = checked;
-            m_items[i] = item;
+    // the folder's rows are consecutive (its header, then its sheets): one change notice covers them
+    int first = -1, last = -1;
+    for (int i = 0; i < int(m_items.size()); ++i) {
+        Item& item = m_items[size_t(i)];
+        if (item.folder == folder && item.checked != checked) {
+            item.checked = checked;
+            first = first < 0 ? i : first;
+            last = i;
         }
     }
+    if (first >= 0) {
+        emit dataChanged(index(first), index(last), { CheckedRole });
+    }
     refreshHeaders();
-    emit itemsChanged();
+    emit checkedCountChanged();
 }
 
 void BandExportModel::setAllChecked(bool checked)
 {
-    for (int i = 0; i < m_items.size(); ++i) {
-        QVariantMap item = m_items[i].toMap();
-        item["checked"] = checked;
-        m_items[i] = item;
+    if (m_items.empty()) {
+        return;
     }
-    emit itemsChanged();
+    for (Item& item : m_items) {
+        item.checked = checked;
+    }
+    emit dataChanged(index(0), index(int(m_items.size()) - 1), { CheckedRole });
+    emit checkedCountChanged();
 }
 
 bool BandExportModel::isFolderChecked(const QString& folder) const
 {
-    for (const QVariant& v : m_items) {
-        const QVariantMap item = v.toMap();
-        if (!item.value("header").toBool() && item.value("folder").toString() == folder && !item.value("checked").toBool()) {
+    for (const Item& item : m_items) {
+        if (!item.header && item.folder == folder && !item.checked) {
             return false;
         }
     }
@@ -235,10 +285,9 @@ bool BandExportModel::isFolderChecked(const QString& folder) const
 void BandExportModel::saveTicks()
 {
     QStringList unticked;
-    for (const QVariant& v : m_items) {
-        const QVariantMap item = v.toMap();
-        if (!item.value("header").toBool() && !item.value("checked").toBool()) {
-            unticked << item.value("path").toString();
+    for (const Item& item : m_items) {
+        if (!item.header && !item.checked) {
+            unticked << item.path;
         }
     }
     starScore()->setBandExportUnticked(m_code, unticked);
@@ -249,14 +298,14 @@ QString BandExportModel::exportNow()
     saveTicks();
 
     QStringList paths;
-    for (const QVariant& v : m_items) {
-        const QVariantMap item = v.toMap();
-        if (!item.value("header").toBool() && item.value("checked").toBool()) {
-            paths << item.value("path").toString();
+    for (const Item& item : m_items) {
+        if (!item.header && item.checked) {
+            paths << item.path;
         }
     }
     if (paths.isEmpty()) {
-        return muse::qtrc("starscore", "Nothing is ticked.");
+        setResult(muse::qtrc("starscore", "Nothing is ticked."));
+        return m_result;
     }
 
     // The version printed on these sheets (and kept in the score for next time)
@@ -269,9 +318,12 @@ QString BandExportModel::exportNow()
 
     muse::RetVal<QString> summary = starScore()->exportToBandFolder(paths);
     if (!summary.ret) {
-        return muse::qtrc("starscore", "Export failed: %1").arg(QString::fromStdString(summary.ret.toString()));
+        setResult(muse::qtrc("starscore", "Export failed: %1").arg(QString::fromStdString(summary.ret.toString())));
+        return m_result;
     }
-    return summary.val + "\n\n" + muse::qtrc("starscore", "Sheets are marked Version %1. Save the .starscore to keep this version number.").arg(version);
+    setResult(summary.val + "\n\n"
+              + muse::qtrc("starscore", "Sheets are marked Version %1. Save the .starscore to keep this version number.").arg(version));
+    return m_result;
 }
 
 bool BandExportModel::runOrganizer() const

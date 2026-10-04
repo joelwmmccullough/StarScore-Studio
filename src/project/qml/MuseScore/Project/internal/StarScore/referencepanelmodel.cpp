@@ -167,6 +167,9 @@ QUrl ReferencePanelModel::pageUrl(int page, int widthPx) const
 
 void ReferencePanelModel::addReference()
 {
+    // The same pick-files / "already here?" / addReference loop is in StarScoreBarModel ("ref-add",
+    // starscorebarmodel.cpp). It belongs in one place (StarScoreService, say, with the question asked through a
+    // callback); left duplicated for now so the two can be changed together.
     const QFileInfo mainFile(starScore()->mainProjectPath().toQString());
     const muse::io::paths_t paths = interactive()->selectOpeningFilesSync(
         muse::trc("starscore", "Add reference PDFs"), muse::io::path_t(mainFile.absolutePath()), { "PDF (*.pdf)" });

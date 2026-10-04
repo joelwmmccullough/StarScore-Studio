@@ -13,13 +13,6 @@
 #include <QRegularExpression>
 
 namespace mu::project::starscore::org {
-//! Long venue names shortened for the table (recordings.json "venueShort")
-static QJsonObject g_venueShort;
-static QString venue(const QString& v)
-{
-    return g_venueShort.value(v).toString(v);
-}
-
 static const char* REC_CSS = R"CSS(
 a { color:#1a4f8a; text-decoration:none; }
 .hero{background:#16213e;color:#fff;margin:0 0 11px;padding:14px 20px 12px;border-radius:8px;
@@ -74,7 +67,7 @@ td.best{background:#fdf8ec;}
 void RecordingsData::load(const QJsonObject& o)
 {
     root = o;
-    g_venueShort = o.value("venueShort").toObject();
+    venueShort = o.value("venueShort").toObject();    // kept here, not in a global: a run and the Recordings window can both load
     shows.clear();
     for (const QJsonValue& v : o.value("shows").toArray()) {
         const QJsonObject s = v.toObject();
@@ -192,8 +185,9 @@ static std::vector<std::vector<Take> > groupedTakes(const RecordingsData& rec, c
     return groups;
 }
 
-static void takeRows(const std::vector<std::vector<Take> >& groups, QString& b)
+static void takeRows(const RecordingsData& rec, const std::vector<std::vector<Take> >& groups, QString& b)
 {
+    static const QRegularExpression onlySuffix("\\s+only$");
     for (const auto& g : groups) {
         const Take& t0 = g[0];
         const QString note = g.size() == 1 ? t0.variant : QString();
@@ -202,7 +196,7 @@ static void takeRows(const std::vector<std::vector<Take> >& groups, QString& b)
         for (size_t i = 1; i < g.size(); ++i) {
             if (g[i].variant.isEmpty()) {
                 QString skip = t0.variant.isEmpty() ? QString("intro") : t0.variant;
-                skip.remove(QRegularExpression("\\s+only$"));
+                skip.remove(onlySuffix);
                 cues.push_back({ &g[i], "skip " + skip });
             } else if (g[i].variant == "encore") {
                 cues.push_back({ &g[i], "encore" });
@@ -221,7 +215,7 @@ static void takeRows(const std::vector<std::vector<Take> >& groups, QString& b)
         }
         b += QString("<tr><td class=\"dt\">%1%2</td><td class=\"vn\">%3%4</td><td class=\"ts\">%5</td><td class=\"rate\">%6</td>"
                      "<td class=\"go\">%7</td></tr>")
-             .arg(t0.approx ? "c. " : "", prettyDate(t0.date), esc(venue(t0.venue)), v, times, stars(rating), links);
+             .arg(t0.approx ? "c. " : "", prettyDate(t0.date), esc(rec.venue(t0.venue)), v, times, stars(rating), links);
     }
 }
 
@@ -332,11 +326,11 @@ QString recordingsBlock(const RecordingsData& rec, const QString& name, const QS
         }
         if (!liveGroups.empty()) {
             b += secRow("Live performances", QString("%1 of the %2 filmed shows").arg(liveGroups.size()).arg(nSet), first);
-            takeRows(liveGroups, b);
+            takeRows(rec, liveGroups, b);
         }
         if (!swGroups.empty()) {
             b += secRow("Sweater Weather, live", swOnly ? QString() : QString("the tune before it was a Starsign tune"), first, true);
-            takeRows(swGroups, b);
+            takeRows(rec, swGroups, b);
         }
         b += "</table>";
     }
@@ -396,7 +390,8 @@ QString recordingsHtml(const RecordingsData& rec, const SongInfo& song, const QD
 
 static QString slug(const QString& name)
 {
-    return "x" + name.toLower().replace(QRegularExpression("[^a-z0-9]+"), "-").remove(QRegularExpression("^-|-$"));
+    static const QRegularExpression notAlnum("[^a-z0-9]+"), edgeDash("^-|-$");
+    return "x" + name.toLower().replace(notAlnum, "-").remove(edgeDash);
 }
 
 QString allRecordingsHtml(const RecordingsData& rec, const Library& lib, const QDate& today)
