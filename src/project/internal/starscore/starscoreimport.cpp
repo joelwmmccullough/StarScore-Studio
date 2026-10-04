@@ -717,13 +717,43 @@ void StarScoreService::fillAnyHornsFromStandard(const StarScoreSection& anySecti
 }
 
 // ---------------------------------------------------------------------------
-//  7-Horn: stand-in versions of the main low horn's line on the other low horns
+//  Stand-in versions: the same music written for another instrument
 //
-//  The 7th chair is a bass trombone unless the song was made with another low horn (New StarScore's "Preferred 7th
-//  horn"). Whichever it is, the section's part on one of the eight low horns that isn't itself a stand-in is the
-//  "main low horn", and the versions are made from its music on the other seven (lowVersionsFor). Until 1.16 this
-//  code only knew the bass trombone, so a 7-Horn section built on a contrabass clarinet got no versions at all.
+//  7-Horn: the 7th chair is a bass trombone unless the song was made with another low horn (New StarScore's
+//  "Preferred 7th horn"). Whichever it is, the section's part on one of the eight low horns that isn't itself a
+//  stand-in is the "main low horn", and the versions are made from its music on the other seven (lowVersionsFor).
+//  Until 1.16 this code only knew the bass trombone, so a 7-Horn section built on a contrabass clarinet got no
+//  versions at all.
+//
+//  Piccolo (any horn section, 1.17.1): a Flute version with the same written notes, which sound an octave lower.
+//
+//  versionsFor() says which versions a part gets; versionMains() lists a section's parts that get any.
 // ---------------------------------------------------------------------------
+
+std::vector<std::pair<QString, QString> > StarScoreService::versionMains(const QString& sectionId) const
+{
+    std::vector<std::pair<QString, QString> > out;
+    engraving::MasterScore* ms = masterScore();
+    if (!ms) {
+        return out;
+    }
+    for (const StarScoreSection& s : load().sections) {
+        if (s.id != sectionId) {
+            continue;
+        }
+        for (const QString& pid : s.partIds) {
+            const engraving::Part* p = ms->partById(ID(pid));
+            if (!p || s.alternates.count(pid)) {
+                continue;
+            }
+            const QString inst = p->instrumentId().toQString();
+            if (!versionsFor(inst, s.templateKey).empty()) {
+                out.emplace_back(pid, versionMainName(inst));
+            }
+        }
+    }
+    return out;
+}
 
 std::pair<QString, QString> StarScoreService::mainLowHorn(const QString& sectionId) const
 {
@@ -751,26 +781,14 @@ std::pair<QString, QString> StarScoreService::mainLowHorn(const QString& section
 
 void StarScoreService::makeBassHornVersions(const QString& sectionId)
 {
-    engraving::MasterScore* ms = masterScore();
-    if (!ms) {
-        return;
-    }
     QStringList mains;
-    for (const StarScoreSection& s : load().sections) {
-        if (s.id != sectionId) {
-            continue;
-        }
-        for (const QString& pid : s.partIds) {
-            const engraving::Part* p = ms->partById(ID(pid));
-            if (p && !lowHornName(p->instrumentId().toQString()).isEmpty() && !s.alternates.count(pid)) {
-                mains << pid;
-            }
-        }
+    for (const auto& [pid, name] : versionMains(sectionId)) {
+        mains << pid;
     }
     if (mains.isEmpty()) {
-        interactive()->info(muse::trc("starscore", "No low horn"),
-                            muse::trc("starscore", "This section has no bass trombone (or other low horn) part to make the other "
-                                                   "versions from."));
+        interactive()->info(muse::trc("starscore", "No part with other versions"),
+                            muse::trc("starscore", "This section has no part that gets stand-in versions: a 7-Horn section's bass "
+                                                   "trombone (or other low horn), or a piccolo."));
         return;
     }
     offerLowAlternates(mains, true);
@@ -785,19 +803,18 @@ void StarScoreService::offerLowAlternates(const QStringList& partIds, bool asked
     const Data data = load();
     QString sectionId;
     QString mainId;
-    QString mainName;      // the band's name for the main low horn, for the texts ("Bass Trombone", "Contrabass Clarinet")
+    QString mainName;      // the band's name for the main part, for the texts ("Bass Trombone", "Contrabass Clarinet", "Piccolo")
     QStringList missing;   // instrument ids of the versions the line doesn't have yet
+    std::vector<StarScoreHornChoice> all;   // every version the main part can have, in order
     for (const StarScoreSection& s : data.sections) {
-        if (s.templateKey != "7-horn") {
-            continue;
-        }
         for (const QString& pid : partIds) {
             const engraving::Part* p = ms->partById(ID(pid));
             if (!p || !s.partIds.contains(pid) || s.alternates.count(pid)) {
                 continue;
             }
             const QString mainInstrument = p->instrumentId().toQString();
-            if (lowHornName(mainInstrument).isEmpty()) {
+            const std::vector<StarScoreHornChoice> versions = versionsFor(mainInstrument, s.templateKey);
+            if (versions.empty()) {
                 continue;
             }
             // The versions there now: stand-ins of this line, and any other instrument of that kind in the section
@@ -807,19 +824,19 @@ void StarScoreService::offerLowAlternates(const QStringList& partIds, bool asked
             for (const auto& [alt, main] : s.alternates) {
                 if (main == pid) {
                     if (const engraving::Part* a = ms->partById(ID(alt))) {
-                        have << lowHornName(a->instrumentId().toQString());
+                        have << starscore::bandHornName(a->instrumentId().toQString());
                     }
                 }
             }
             for (const QString& other : s.partIds) {
                 if (other != pid) {
                     if (const engraving::Part* a = ms->partById(ID(other))) {
-                        have << lowHornName(a->instrumentId().toQString());
+                        have << starscore::bandHornName(a->instrumentId().toQString());
                     }
                 }
             }
             QStringList want;
-            for (const StarScoreHornChoice& c : lowVersionsFor(mainInstrument)) {
+            for (const StarScoreHornChoice& c : versions) {
                 if (!have.contains(c.bandName)) {
                     want << c.instrumentId;
                 }
@@ -827,8 +844,9 @@ void StarScoreService::offerLowAlternates(const QStringList& partIds, bool asked
             if (!want.isEmpty()) {
                 sectionId = s.id;
                 mainId = pid;
-                mainName = lowHornName(mainInstrument);
+                mainName = versionMainName(mainInstrument);
                 missing = want;
+                all = versions;
             }
         }
     }
@@ -837,7 +855,7 @@ void StarScoreService::offerLowAlternates(const QStringList& partIds, bool asked
             QString name = "Bass Trombone";
             for (const QString& pid : partIds) {
                 if (const engraving::Part* p = ms->partById(ID(pid))) {
-                    const QString n = lowHornName(p->instrumentId().toQString());
+                    const QString n = versionMainName(p->instrumentId().toQString());
                     if (!n.isEmpty()) {
                         name = n;
                         break;
@@ -853,39 +871,57 @@ void StarScoreService::offerLowAlternates(const QStringList& partIds, bool asked
     }
 
     QStringList names;
-    for (const StarScoreHornChoice& c : lowHornChoices()) {
+    for (const StarScoreHornChoice& c : all) {
         if (missing.contains(c.instrumentId)) {
             names << c.bandName;
         }
     }
     const QString list = names.size() == 1 ? names.first()
                          : names.mid(0, names.size() - 1).join(", ") + muse::qtrc("starscore", " and ") + names.last();
+    const bool one = names.size() == 1;
+    const bool piccolo = mainName == "Piccolo";
 
     // After the menu that set the status has closed
-    QTimer::singleShot(0, &m_timerGuard, [this, sectionId, mainId, mainName, missing, list]() {
+    QTimer::singleShot(0, &m_timerGuard, [this, sectionId, mainId, mainName, missing, list, one, piccolo]() {
         constexpr int Create = static_cast<int>(IInteractive::Button::CustomButton) + 1;
         constexpr int NotNow = static_cast<int>(IInteractive::Button::CustomButton) + 2;
+        const QString question = piccolo
+                                 ? muse::qtrc("starscore", "Create a %1 part with the same written notes? The flute plays them an "
+                                                           "octave below the piccolo. Check it afterwards: notes outside the "
+                                                           "flute's range need moving.").arg(list)
+                                 : one
+                                 ? muse::qtrc("starscore", "Create a %1 part with the same music? It is written for its own "
+                                                           "instrument. Check it afterwards: notes outside the instrument's range "
+                                                           "need moving.").arg(list)
+                                 : muse::qtrc("starscore", "Create %1 parts with the same music? Each is written for its own "
+                                                           "instrument. Check them afterwards: notes outside an instrument's range "
+                                                           "need moving.").arg(list);
         const IInteractive::Result answer = interactive()->questionSync(
-            muse::qtrc("starscore", "%1 part finished").arg(mainName).toStdString(),
-            muse::qtrc("starscore", "Create %1 parts with the same music? Each is written for its own instrument. "
-                                    "Check them afterwards: notes outside an instrument's range need moving.").arg(list).toStdString(), {
+            muse::qtrc("starscore", "%1 part finished").arg(mainName).toStdString(), question.toStdString(), {
             IInteractive::ButtonData(NotNow, muse::trc("starscore", "Not now")),
-            IInteractive::ButtonData(Create, muse::trc("starscore", "Create parts"), true),
+            IInteractive::ButtonData(Create, one ? muse::trc("starscore", "Create part") : muse::trc("starscore", "Create parts"), true),
         }, Create);
         if (answer.button() != Create) {
             return;
         }
         const RetVal<QStringList> made = createLowAlternates(sectionId, mainId, missing);
         if (!made.ret) {
-            interactive()->error(muse::trc("starscore", "Couldn't create the parts"), made.ret.toString());
+            interactive()->error(one ? muse::trc("starscore", "Couldn't create the part") : muse::trc("starscore", "Couldn't create the parts"),
+                                 made.ret.toString());
             return;
         }
-        interactive()->info(muse::trc("starscore", "Parts created"),
-                            muse::qtrc("starscore", "%1 now have the %2's music, below it in the 7-Horn section, and their status "
-                                                    "is Needs review. They show and hide with the 7-Horn section and are in the "
-                                                    "7-Horn arrangement's score. Their part scores are open, with the %2 part's "
-                                                    "page breaks, system breaks and system locks. Notes outside an instrument's "
-                                                    "range are colored.").arg(list, mainName).toStdString());
+        interactive()->info(one ? muse::trc("starscore", "Part created") : muse::trc("starscore", "Parts created"),
+                            (one
+                             ? muse::qtrc("starscore", "The %1 now has the %2's music, below it in the same section, and its status "
+                                                       "is Needs review. It shows and hides with the section and is in the "
+                                                       "arrangement's score. Its part score is open, with the %2 part's page "
+                                                       "breaks, system breaks and system locks. Notes outside the instrument's "
+                                                       "range are colored.")
+                             : muse::qtrc("starscore", "%1 now have the %2's music, below it in the same section, and their status "
+                                                       "is Needs review. They show and hide with the section and are in the "
+                                                       "arrangement's score. Their part scores are open, with the %2 part's "
+                                                       "page breaks, system breaks and system locks. Notes outside an instrument's "
+                                                       "range are colored.")).arg(list, mainName).toStdString());
     });
 }
 
@@ -902,29 +938,16 @@ RetVal<QStringList> StarScoreService::createLowAlternates(const QString& section
         return RetVal<QStringList>::make_ret(Ret::Code::UnknownError);
     }
 
-    // The versions, in the usual order, never the main part's own horn (a Bass Trombone version of the bass trombone)
-    std::vector<StarScoreInstrument> wanted;
-    for (const StarScoreHornChoice& c : lowVersionsFor(mainPart->instrumentId().toQString())) {
-        if (instrumentIds.contains(c.instrumentId)) {
-            StarScoreInstrument inst;
-            inst.instrumentId = c.instrumentId;
-            inst.partName = c.bandName;
-            inst.hidden = false;   // shown like the rest of the 7-Horn section (set below)
-            wanted.push_back(inst);
-        }
-    }
-    if (wanted.empty()) {
-        return RetVal<QStringList>::make_ret(Ret::Code::UnknownError);
-    }
-
-    // Whether the 7-Horn section is showing now (any of its instruments visible): the new versions match it
+    // Whether the section is showing now (any of its instruments visible): the new versions match it
     bool sectionOn = false;
+    QString templateKey;
     {
         const Data d0 = load();
         for (const StarScoreSection& s0 : d0.sections) {
             if (s0.id != sectionId) {
                 continue;
             }
+            templateKey = s0.templateKey;
             for (const QString& pid : s0.partIds) {
                 if (const engraving::Part* p = ms->partById(ID(pid))) {
                     sectionOn |= p->show();
@@ -932,6 +955,25 @@ RetVal<QStringList> StarScoreService::createLowAlternates(const QString& section
             }
         }
     }
+
+    // The versions, in the usual order, never the main part's own horn (a Bass Trombone version of the bass trombone)
+    const QString mainInstrument = mainPart->instrumentId().toQString();
+    std::vector<StarScoreInstrument> wanted;
+    for (const StarScoreHornChoice& c : versionsFor(mainInstrument, templateKey)) {
+        if (instrumentIds.contains(c.instrumentId)) {
+            StarScoreInstrument inst;
+            inst.instrumentId = c.instrumentId;
+            inst.partName = c.bandName;
+            inst.hidden = false;   // shown like the rest of the section (set below)
+            wanted.push_back(inst);
+        }
+    }
+    if (wanted.empty()) {
+        return RetVal<QStringList>::make_ret(Ret::Code::UnknownError);
+    }
+    // A Flute made from a Piccolo keeps the piccolo's written notes (so it sounds an octave lower); every other
+    // version keeps the sounding pitch
+    const bool sameWrittenNotes = starscore::bandHornName(mainInstrument) == "Piccolo";
 
     // Right after the main low horn
     std::set<QString> before;
@@ -1000,6 +1042,34 @@ RetVal<QStringList> StarScoreService::createLowAlternates(const QString& section
             }
             engraving::XmlReader reader(mime);
             ms->pasteStaff(reader, start, to->staves().front()->idx());
+            if (sameWrittenNotes) {
+                // pasted at sounding pitch, so written an octave above the piccolo's notes: back down by an octave,
+                // same spelling (the written notes of both parts match)
+                const int octaves = (mainPart->instrument()->transpose().chromatic
+                                     - to->instrument()->transpose().chromatic) / 12;
+                if (octaves != 0) {
+                    const engraving::staff_idx_t dst = to->staves().front()->idx();
+                    std::vector<engraving::Note*> notes;
+                    for (engraving::Segment* seg = start; seg; seg = seg->next1(engraving::SegmentType::ChordRest)) {
+                        for (engraving::track_idx_t t = dst * engraving::VOICES; t < (dst + 1) * engraving::VOICES; ++t) {
+                            engraving::ChordRest* cr = engraving::toChordRest(seg->element(t));
+                            if (!cr || !cr->isChord()) {
+                                continue;
+                            }
+                            for (engraving::Chord* c : engraving::toChord(cr)->graceNotes()) {
+                                notes.insert(notes.end(), c->notes().begin(), c->notes().end());
+                            }
+                            notes.insert(notes.end(), engraving::toChord(cr)->notes().begin(), engraving::toChord(cr)->notes().end());
+                        }
+                    }
+                    for (engraving::Note* n : notes) {
+                        const int pitch = n->pitch() - 12 * octaves;
+                        if (pitch >= 0 && pitch < 128) {
+                            ms->undoChangePitch(n, pitch, n->tpc1(), n->tpc2());
+                        }
+                    }
+                }
+            }
         }
         // pasting brings the notes, not the barlines: the double barlines (before each repeat) too
         starscore::copyEndBarlines(ms, mainPart, newParts);
@@ -1008,7 +1078,7 @@ RetVal<QStringList> StarScoreService::createLowAlternates(const QString& section
 
     const StarScoreSection made = finishNewParts(newParts, added);
 
-    // Hidden only while the 7-Horn section is off
+    // Hidden only while the section is off
     if (!sectionOn) {
         std::vector<std::pair<muse::ID, bool> > hide;
         for (const QString& pid : made.partIds) {
@@ -1037,9 +1107,9 @@ RetVal<QStringList> StarScoreService::createLowAlternates(const QString& section
     d.alternatesInSection = true;
     d.alternateBarlinesMatched = true;
     store(d);
-    // named like the rest of the section ("7H: Bari Sax")
+    // named like the rest of the section ("7H: Bari Sax", "3H: Flute")
     standardizeHornNames();
-    // the 7-Horn arrangement's own score gets them too
+    // the arrangement's own score gets them too
     syncArrangementScores();
     applyStyles(made.partIds);
 

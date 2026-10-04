@@ -50,5 +50,15 @@ public:
     Q_INVOKABLE QVariantList lowHornChoices() const;
 
     Q_INVOKABLE bool create(const QVariantMap& options);
+
+    // --- Add arrangement (the StarScore bar's menu, in an open score): the same doubler / 7th horn questions ---
+    //! The arrangement template's name ("3-Horn Standard")
+    Q_INVOKABLE QString arrangementName(const QString& arrangementKey) const;
+    //! Whether adding this arrangement to the open score asks anything: a Standard arrangement of 3 or more horns
+    //! whose horn section the score doesn't have yet
+    Q_INVOKABLE bool asksOnAdd(const QString& arrangementKey) const;
+    //! Adds the arrangement to the open score with the chosen doubler and 7th horn (ignored where they don't apply)
+    Q_INVOKABLE bool addArrangement(const QString& arrangementKey, const QString& doublerInstrumentId,
+                                    const QString& lowHornInstrumentId);
 };
 }

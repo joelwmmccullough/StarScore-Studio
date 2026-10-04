@@ -185,6 +185,7 @@ qt_add_qml_module(project_qml
         StarScoreEditDialog.qml
         CopyLayoutDialog.qml
         NewStarScoreDialog.qml
+        AddArrangementDialog.qml
         StarScoreStylesDialog.qml
         AddSoloDialog.qml
         AdditiveTimeSigDialog.qml

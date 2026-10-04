@@ -97,7 +97,8 @@ public:
     void moveSection(const QString& sectionId, int newIndex) override;
     void removeSection(const QString& sectionId, bool deleteInstruments) override;
 
-    muse::RetVal<QString> createArrangementFromTemplate(const QString& templateKey) override;
+    muse::RetVal<QString> createArrangementFromTemplate(const QString& templateKey, const QString& doublerInstrumentId = {},
+                                                        const QString& lowHornInstrumentId = {}) override;
     muse::RetVal<QString> createArrangement(const QString& name, const QStringList& sectionIds) override;
     void renameArrangement(const QString& arrangementId, const QString& name) override;
     void setArrangementSections(const QString& arrangementId, const QStringList& sectionIds) override;
@@ -152,6 +153,7 @@ public:
     void setSongRecordings(const QJsonObject& recordings) override;
     muse::RetVal<StarScoreBandExportPlan> planBandExport() const override;
     void makeBassHornVersions(const QString& sectionId) override;
+    std::vector<std::pair<QString, QString> > versionMains(const QString& sectionId) const override;
     std::pair<QString, QString> mainLowHorn(const QString& sectionId) const override;
     //! The band's name for a low horn ("Bass Trombone", "Bari Sax", …, "Tuba"), or "" when the instrument isn't one
     //! of the eight. The low horn a 7-Horn section is built on and its stand-in versions are all told apart this way.
@@ -325,16 +327,23 @@ private:
     void standardizeImported();
     //! A new "N-Horn Any" section starts with the music of the "N-Horn" section, chair by chair
     void fillAnyHornsFromStandard(const StarScoreSection& anySection);
-    //! A 7-Horn section's main low horn (Bass Trombone, or whatever the 7th chair is) marked Finished: offer the
-    //! stand-in versions on the other low horns it lacks
+    //! A part with stand-in versions (a 7-Horn section's main low horn, a Piccolo) marked Finished: offer the versions
+    //! it lacks (versionsFor)
     void offerLowAlternates(const QStringList& partIds, bool asked = false);
     //! Legacy audit: marks (or unmarks) these sheets as no longer needing auditing, with a fingerprint of their music
     void markPartsAudited(Data& data, const mu::engraving::MasterScore* ms, const QStringList& partIds, bool audited) const;
-    //! instrumentIds: which of the low horns (lowHornChoices() ids other than the main part's) to make
+    //! instrumentIds: which of the main part's versions (versionsFor ids) to make
     muse::RetVal<QStringList> createLowAlternates(const QString& sectionId, const QString& mainPartId, const QStringList& instrumentIds);
     //! The low horns a 7-Horn main part's stand-in versions can be made on: everything in lowHornChoices() except
     //! the main part's own instrument (the versions are made in this order)
     std::vector<StarScoreHornChoice> lowVersionsFor(const QString& mainInstrumentId) const;
+    //! The stand-in versions a part gets, by its instrument and its section's template: the other low horns for a
+    //! 7-Horn section's low horn; a Flute for a Piccolo in any horn section (Standard, 1-Horn or custom; not a Flexible
+    //! section, whose chairs are concert-pitch "Horn N" staves, nor a big band / orchestra / marching band). Empty for
+    //! everything else.
+    std::vector<StarScoreHornChoice> versionsFor(const QString& mainInstrumentId, const QString& sectionTemplateKey) const;
+    //! The band's name for a part's instrument, for the versions' texts ("Bass Trombone", "Piccolo")
+    static QString versionMainName(const QString& instrumentId);
     //! A template's instruments with the New StarScore choices applied: the doubler takes the alto sax chair of a
     //! 3/4/5-Horn section or the soprano sax chair of a 6/7-Horn one; the low horn takes the 7-Horn bass trombone
     std::vector<StarScoreInstrument> templateInstrumentsFor(const StarScoreSectionTemplate& t, const QString& doublerInstrumentId,

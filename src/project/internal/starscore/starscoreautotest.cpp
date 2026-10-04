@@ -56,6 +56,10 @@
 #include "engraving/dom/text.h"
 #include "engraving/dom/box.h"
 #include "engraving/dom/measurebase.h"
+#include "engraving/dom/measure.h"
+#include "engraving/dom/segment.h"
+#include "engraving/dom/chord.h"
+#include "engraving/dom/note.h"
 #include "engraving/style/style.h"
 
 #include "notation/iexcerptnotation.h"
@@ -199,38 +203,58 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         }
         globalContext()->setCurrentNotation(master->notation());
         autotestLog(QString("  switched to %1 part scores").arg(master->excerpts().size()));
-    } else if (step == "bassversions" || step == "lowversions") {
-        // The 7-Horn section's main low horn (bass trombone or whatever the 7th chair is) gets its missing versions on
-        // the other low horns, as "Make the other versions…" does without asking
+    } else if (step == "bassversions" || step == "lowversions" || step == "versions") {
+        // Every part with stand-in versions (a 7-Horn section's main low horn, a piccolo) gets the versions it lacks, as
+        // "Make the other versions…" does without asking
         for (const StarScoreSection& s : load().sections) {
-            if (s.templateKey != "7-horn") {
-                continue;
-            }
-            const auto [pid, mainName] = mainLowHorn(s.id);
-            const engraving::Part* p = pid.isEmpty() ? nullptr : ms->partById(ID(pid));
-            if (!p) {
-                autotestLog("  no main low horn in " + s.id);
-                continue;
-            }
-            autotestLog(QString("  main low horn: %1 (%2, %3)").arg(p->partName().toQString(), p->instrumentId().toQString(), mainName));
-            QStringList have;
-            for (const QString& other : s.partIds) {
-                if (const engraving::Part* a = ms->partById(ID(other))) {
-                    have << lowHornName(a->instrumentId().toQString());
+            for (const auto& [pid, mainName] : versionMains(s.id)) {
+                const engraving::Part* p = ms->partById(ID(pid));
+                if (!p) {
+                    continue;
+                }
+                autotestLog(QString("  main part: %1 (%2, %3) in %4").arg(p->partName().toQString(), p->instrumentId().toQString(),
+                                                                         mainName, s.templateKey));
+                QStringList have;
+                for (const QString& other : s.partIds) {
+                    if (const engraving::Part* a = ms->partById(ID(other))) {
+                        have << starscore::bandHornName(a->instrumentId().toQString());
+                    }
+                }
+                QStringList missing;
+                for (const StarScoreHornChoice& c : versionsFor(p->instrumentId().toQString(), s.templateKey)) {
+                    if (!have.contains(c.bandName)) {
+                        missing << c.instrumentId;
+                    }
+                }
+                autotestLog("  missing: " + missing.join(", "));
+                if (!missing.isEmpty()) {
+                    const RetVal<QStringList> made = createLowAlternates(s.id, pid, missing);
+                    autotestLog(QString("  made: %1 (%2)").arg(made.ret ? made.val.join(", ") : QString("failed"),
+                                                               QString::fromStdString(made.ret.toString())));
                 }
             }
-            QStringList missing;
-            for (const StarScoreHornChoice& c : lowVersionsFor(p->instrumentId().toQString())) {
-                if (!have.contains(c.bandName)) {
-                    missing << c.instrumentId;
+        }
+    } else if (step.startsWith("notes:")) {
+        // notes:<part name> logs the part's first notes: sounding pitch, written pitch and spelling (tpc)
+        const QString name = step.mid(QString("notes:").size());
+        for (const engraving::Part* p : ms->parts()) {
+            if (p->partName().toQString() != name || p->staves().empty()) {
+                continue;
+            }
+            QStringList out;
+            const engraving::staff_idx_t st = p->staves().front()->idx();
+            for (engraving::Segment* seg = ms->firstMeasure()->first(engraving::SegmentType::ChordRest);
+                 seg && out.size() < 16; seg = seg->next1(engraving::SegmentType::ChordRest)) {
+                for (engraving::track_idx_t t = st * engraving::VOICES; t < (st + 1) * engraving::VOICES; ++t) {
+                    engraving::EngravingItem* e = seg->element(t);
+                    if (e && e->isChord()) {
+                        for (const engraving::Note* n : engraving::toChord(e)->notes()) {
+                            out << QString("%1/%2/%3").arg(n->pitch()).arg(n->pitch() - n->transposition()).arg(n->tpc());
+                        }
+                    }
                 }
             }
-            autotestLog("  missing: " + missing.join(", "));
-            if (!missing.isEmpty()) {
-                const RetVal<QStringList> made = createLowAlternates(s.id, pid, missing);
-                autotestLog(QString("  made: %1 (%2)").arg(made.ret ? made.val.join(", ") : QString("failed"),
-                                                           QString::fromStdString(made.ret.toString())));
-            }
+            autotestLog(QString("  notes of %1 (%2): %3").arg(name, p->instrumentId().toQString(), out.join(' ')));
         }
     } else if (step.startsWith("section:")) {
         // section:<template key>[:<doubler id>[:<low horn id>]], e.g. section:2-horn-any (a 2-Horn Flexible section) or
@@ -239,6 +263,12 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         const QString key = a.value(0);
         const RetVal<QString> made = createSectionFromTemplate(key, a.value(1), a.value(2));
         autotestLog(QString("  %1: %2").arg(key, made.ret ? made.val : QString::fromStdString(made.ret.toString())));
+    } else if (step.startsWith("arrangement:")) {
+        // arrangement:<arrangement key>[:<doubler id>[:<low horn id>]], as the StarScore bar's Add arrangement menu makes
+        // it (with the Add arrangement dialog's choices)
+        const QStringList a = step.mid(QString("arrangement:").size()).split(':');
+        const RetVal<QString> made = createArrangementFromTemplate(a.value(0), a.value(1), a.value(2));
+        autotestLog(QString("  %1: %2").arg(a.value(0), made.ret ? made.val : QString::fromStdString(made.ret.toString())));
     } else if (step.startsWith("new:")) {
         // new:<arrangement key>[:<doubler id>[:<low horn id>]]: a new StarScore as File › New makes it (title "Autotest"),
         // which replaces the open song; its parts and sections are logged

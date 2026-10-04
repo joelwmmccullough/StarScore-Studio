@@ -384,7 +384,8 @@ void StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, const 
             green.missing << QString("no %1 arrangement").arg(nameOf(tpl));
             continue;
         }
-        const QStringList files = hornSheets(*a, true, nullptr);
+        // (stand-in versions — a Flute made from a Piccolo — don't hold the song back, as the 7-Horn bass horns don't)
+        const QStringList files = hornSheets(*a, false, nullptr);
         if (files.isEmpty()) {
             green.missing << QString("no horn sheets in %1").arg(nameOf(tpl));
         }

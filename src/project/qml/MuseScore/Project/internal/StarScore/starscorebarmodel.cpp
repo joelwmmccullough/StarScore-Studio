@@ -366,11 +366,11 @@ QVariantList StarScoreBarModel::sectionMenu(const QString& id) const
         }
     }
 
-    bool sevenHorn = false;
-    for (const StarScoreSection& s : starScore()->sections()) {
-        if (s.id == id && s.templateKey == "7-horn") {
-            sevenHorn = true;
-        }
+    // the parts with stand-in versions: a 7-Horn section's main low horn (the bass trombone, or whatever 7th horn the
+    // song was made with), a piccolo
+    QStringList versionMains;
+    for (const auto& [pid, name] : starScore()->versionMains(id)) {
+        versionMains << name;
     }
 
     QVariantList items {
@@ -390,13 +390,16 @@ QVariantList StarScoreBarModel::sectionMenu(const QString& id) const
         QVariantMap { { "id", "sec-delete-all:" + id }, { "title", muse::qtrc("starscore", "Delete section and its instruments") },
                       { "enabled", true } },
     };
-    if (sevenHorn) {
-        // the main low horn's other versions (Bari Sax, Bass Sax, Bassoon…): only the ones the section doesn't have.
-        // Named after the main low horn: the bass trombone, or whatever 7th horn the song was made with.
-        const QString mainName = starScore()->mainLowHorn(id).second;
+    if (!versionMains.isEmpty()) {
+        // the other versions (Bari Sax, Bass Sax, Bassoon… of the low horn; a Flute of a piccolo): only the ones the
+        // section doesn't have
+        const QString who = versionMains.size() == 1 ? versionMains.first()
+                            : versionMains.mid(0, versionMains.size() - 1).join(", ") + muse::qtrc("starscore", " and ")
+                            + versionMains.last();
         items.insert(4, QVariantMap { { "id", "sec-bass-versions:" + id },
-                                      { "title", muse::qtrc("starscore", "Make the %1's other versions…")
-                                        .arg(mainName.isEmpty() ? QString("Bass Trombone") : mainName) },
+                                      { "title", versionMains.size() == 1 && versionMains.first() == "Piccolo"
+                                        ? muse::qtrc("starscore", "Make the Piccolo's Flute version…")
+                                        : muse::qtrc("starscore", "Make the %1's other versions…").arg(who) },
                                       { "enabled", true } });
     }
     return items;
@@ -630,9 +633,23 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
     } else if (action == "arr-new-blank") {
         openEditDialog("arrangement", QString());
     } else if (action == "arr-new-tpl") {
-        RetVal<QString> ret = starScore()->createArrangementFromTemplate(arg);
-        if (!ret.ret) {
-            interactive()->error(muse::trc("starscore", "Couldn't create the arrangement"), ret.ret.toString());
+        // A Standard arrangement of 3 or more horns whose horn section is new asks what the doubler plays (and the
+        // 7th horn of a 7-Horn), as File › New does; everything else is made at once
+        bool asks = false;
+        if (arg.endsWith("-horn-standard") && arg.left(arg.indexOf('-')).toInt() >= 3) {
+            const QString hornKey = QString("%1-horn").arg(arg.left(arg.indexOf('-')).toInt());
+            const std::vector<StarScoreSection> sections = starScore()->sections();
+            asks = std::none_of(sections.begin(), sections.end(), [&](const StarScoreSection& s) { return s.templateKey == hornKey; });
+        }
+        if (asks) {
+            UriQuery query("musescore://starscore/addarrangement");
+            query.addParam("arrangementKey", Val(arg.toStdString()));
+            interactive()->open(query);
+        } else {
+            RetVal<QString> ret = starScore()->createArrangementFromTemplate(arg);
+            if (!ret.ret) {
+                interactive()->error(muse::trc("starscore", "Couldn't create the arrangement"), ret.ret.toString());
+            }
         }
     } else if (action == "sec-bass-versions") {
         starScore()->makeBassHornVersions(arg);

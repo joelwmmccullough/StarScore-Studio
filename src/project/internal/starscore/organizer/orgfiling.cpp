@@ -33,7 +33,7 @@ static const std::vector<std::pair<QString, QString> > CANON {
     { "^bass clarinet", "Bass Clarinet" }, { "^clarinet", "Clarinet" }, { "^(soprano sax|soprano saxophone|sop sax)", "Soprano Sax" },
     { "^(alto sax|alto saxophone)", "Alto Sax" }, { "^(tenor sax|tenor saxophone)", "Tenor Sax" },
     { "^(bari sax|baritone sax|baritone saxophone)", "Bari Sax" }, { "^flugel", "Flugelhorn" }, { "^(trumpet|tpt)", "Trumpet" },
-    { "^flute", "Flute" }, { "^sop.*recorder", "Recorder" }, { "^bass synth", "Bass Synth" },
+    { "^piccolo", "Piccolo" }, { "^flute", "Flute" }, { "^sop.*recorder", "Recorder" }, { "^bass synth", "Bass Synth" },
     { "^(bass guitar|4-string bass|6-string bass|electric bass)", "Bass" }, { "^(electric guitar|guitar)", "Guitar" },
     { "^(hammond organ|organ|electric piano|elec piano|e\\.? ?piano|epiano|rhodes|wurlitzer|keys|piano|keyboards?|clavinet|clav)\\b", "Keys" }, { "^(drums|drumset|drum set|drummer)", "Drums" }, { "^(percussion|percussionist)", "Percussion" },
     { "^(congas|bongos|timbales|cajon)", "Percussion" }, { "^violin", "Violin" }, { "^viola", "Viola" }, { "^cello", "Cello" }, { "^bassoon", "Bassoon" },
@@ -86,7 +86,7 @@ static QString family(const QString& i)
 static QString instrumentFromPdf(const QString& path)
 {
     static const QStringList SEARCH { "Soprano Saxophone", "Alto Saxophone", "Tenor Saxophone", "Baritone Saxophone", "Bari Sax",
-                                      "Bass Saxophone", "Bass Sax", "Bass Clarinet", "Clarinet", "Flute", "Flugelhorn", "Bass Trombone",
+                                      "Bass Saxophone", "Bass Sax", "Bass Clarinet", "Clarinet", "Piccolo", "Flute", "Flugelhorn", "Bass Trombone",
                                       "Trombone", "Trumpet", "Bass Guitar", "Electric Guitar", "Electric Piano", "Hammond Organ", "Keys",
                                       "Piano", "Drumset", "Drums", "Congas", "Percussion", "Violin", "Viola", "Cello", "Bassoon", "Strings",
                                       "Vocals", "Clavinet", "Synthesizer", "Guitar", "Organ" };

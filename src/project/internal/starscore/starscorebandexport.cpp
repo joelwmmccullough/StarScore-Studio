@@ -72,7 +72,7 @@ using namespace muse;
 
 // Order and short codes used in horn folder names ("5H 2Tpt Alt Ten Tbn")
 static const std::vector<std::pair<QString, QString> > STARSCORE_HORN_ORDER {
-    { "Trumpet", "Tpt" }, { "Flugelhorn", "Flg" }, { "Flute", "Flu" }, { "Clarinet", "Cla" }, { "Soprano Sax", "Sop" },
+    { "Trumpet", "Tpt" }, { "Flugelhorn", "Flg" }, { "Piccolo", "Pic" }, { "Flute", "Flu" }, { "Clarinet", "Cla" }, { "Soprano Sax", "Sop" },
     { "Alto Sax", "Alt" }, { "Tenor Sax", "Ten" }, { "Bari Sax", "Bar" }, { "Bass Sax", "Bsx" }, { "Bassoon", "Bsn" }, { "Bass Clarinet", "Bcl" },
     { "Contrabass Clarinet", "Cbcl" }, { "Contrabassoon", "Cbsn" },
     { "Trombone", "Tbn" }, { "Bass Trombone", "Btb" }, { "Tuba", "Tba" },
@@ -105,7 +105,11 @@ static QString starscoreHornName(const QString& id)
     if (id.contains("clarinet")) {
         return "Clarinet";
     }
-    if (id == "flute" || id == "c-flute" || id == "piccolo") {
+    // (a piccolo is its own horn, not a flute: until 1.17.1 it was labelled "Flute" on export)
+    if (id == "piccolo") {
+        return "Piccolo";
+    }
+    if (id == "flute" || id == "c-flute") {
         return "Flute";
     }
     if (id.contains("soprano-saxophone")) {
@@ -529,6 +533,7 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
 
     std::map<QString, QStringList> familyParts;   // "Big Band" etc: all instruments, for one score
     QStringList anyFolders;                        // "NH Any Horns" folders: older sheet names there get archived
+    std::map<QString, QString> renamedFolders;     // older horn folder name -> its name now (a Piccolo was a "Flute")
 
     for (const StarScoreSection& sec : data.sections) {
         if (sec.partIds.isEmpty()) {
@@ -733,6 +738,12 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
                 }
             }
             const QString folder = QString("%1H %2").arg(players).arg(codes.join(' '));
+            if (codes.contains("Pic") && !codes.contains("Flu")) {
+                // the folder's name before 1.17.1, when the piccolo was labelled a flute
+                QStringList old = codes;
+                old.replace(old.indexOf("Pic"), "Flu");
+                renamedFolders[QString("%1H %2").arg(players).arg(old.join(' '))] = folder;
+            }
             QStringList scoreParts;
             for (const QString& pid : sec.partIds) {
                 if (!sec.alternates.count(pid)) {
@@ -807,6 +818,7 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
     }
     plan.files = unique;
     plan.anyHornFolders = anyFolders;
+    plan.renamedFolders = renamedFolders;
 
     return RetVal<StarScoreBandExportPlan>::make_ok(plan);
 }
@@ -1890,6 +1902,22 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                 supersede(old);
             }
         }
+        // A horn folder under its older name ("3H Tpt Flu Ten" for a "3H Tpt Pic Ten" whose piccolo was labelled a
+        // flute before 1.17.1): its sheets are archived once the new folder's are written, and it goes when empty
+        for (const auto& [oldFolder, folder] : plan.renamedFolders) {
+            const QDir oldDir(songDir + "/" + oldFolder);
+            const bool newThere = std::any_of(current.begin(), current.end(), [&](const QString& rel) {
+                return rel.startsWith(folder + "/") && QFileInfo::exists(songDir + "/" + rel);
+            });
+            if (oldFolder == folder || !oldDir.exists() || !newThere) {
+                continue;
+            }
+            for (const QString& fileName : oldDir.entryList({ "*.pdf", "*.PDF" }, QDir::Files)) {
+                supersede(oldFolder + "/" + fileName);
+            }
+            // (anything else left in it keeps the folder, untouched)
+            QDir(songDir).rmdir(oldFolder);
+        }
         for (const QString& folder : plan.anyHornFolders) {
             // the folder's old name ("3H Any Horns", before 1.15.7): its sheets are archived once the new one is there
             const QString oldFolder = QString(folder).replace("Flexible", "Any Horns");
@@ -1947,6 +1975,21 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                 QString old = f.relativePath;
                 old.remove(STARSCORE_BASS_HORNS_FOLDER + "/");
                 before = sigs.value(old).toObject();
+            }
+            if (before.isEmpty()) {
+                // the same sheet in the folder's older name (the piccolo's sheet was "… - Flute.pdf" there)
+                for (const auto& [oldFolder, folder] : plan.renamedFolders) {
+                    // (the new Flute version is new, not the old folder's "Flute", which was the piccolo)
+                    if (!f.relativePath.startsWith(folder + "/") || f.relativePath.endsWith(" - Flute.pdf")) {
+                        continue;
+                    }
+                    QString old = oldFolder + "/" + f.relativePath.mid(folder.size() + 1);
+                    if (old.endsWith(" - Piccolo.pdf")) {
+                        old.replace(" - Piccolo.pdf", " - Flute.pdf");
+                    }
+                    before = sigs.value(old).toObject();
+                    break;
+                }
             }
             starscore::org::SheetChange c;
             c.relativePath = f.relativePath;

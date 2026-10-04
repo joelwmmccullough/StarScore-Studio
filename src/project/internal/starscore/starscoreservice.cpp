@@ -1586,6 +1586,29 @@ std::vector<StarScoreHornChoice> StarScoreService::lowVersionsFor(const QString&
     return result;
 }
 
+std::vector<StarScoreHornChoice> StarScoreService::versionsFor(const QString& mainInstrumentId, const QString& sectionTemplateKey) const
+{
+    const QString key = sectionTemplateKey;
+    if (key == "lead-sheet" || key == "rhythm" || key.endsWith("-any") || key.startsWith("bigband-") || key.startsWith("orch-")
+        || key.startsWith("marching-")) {
+        return {};
+    }
+    if (key == "7-horn" && !lowHornName(mainInstrumentId).isEmpty()) {
+        return lowVersionsFor(mainInstrumentId);
+    }
+    // A piccolo part: the band's flute player reads the same written notes an octave lower (Bet's flute part was a
+    // piccolo labelled "Flute" until 1.17.1)
+    if (starscore::bandHornName(mainInstrumentId) == "Piccolo") {
+        return { { "flute", "Flute", "Flute" } };
+    }
+    return {};
+}
+
+QString StarScoreService::versionMainName(const QString& instrumentId)
+{
+    return starscore::bandHornName(instrumentId);
+}
+
 std::vector<StarScoreInstrument> StarScoreService::templateInstrumentsFor(const StarScoreSectionTemplate& t,
                                                                           const QString& doublerInstrumentId,
                                                                           const QString& lowHornInstrumentId) const
@@ -2123,7 +2146,8 @@ void StarScoreService::removeSection(const QString& sectionId, bool deleteInstru
 //  Arrangements
 // ---------------------------------------------------------------------------
 
-RetVal<QString> StarScoreService::createArrangementFromTemplate(const QString& templateKey)
+RetVal<QString> StarScoreService::createArrangementFromTemplate(const QString& templateKey, const QString& doublerInstrumentId,
+                                                                const QString& lowHornInstrumentId)
 {
     if (!hasScore()) {
         return RetVal<QString>::make_ret(Ret::Code::InternalError);
@@ -2151,7 +2175,11 @@ RetVal<QString> StarScoreService::createArrangementFromTemplate(const QString& t
             }
         }
         if (existingId.isEmpty()) {
-            RetVal<QString> created = createSectionFromTemplate(sectionKey);
+            // the doubler and 7th horn choices are for the horn section ("3-horn"); the others take their template
+            static const QRegularExpression hornKey("^\\d+-horn$");
+            const bool horns = hornKey.match(sectionKey).hasMatch();
+            RetVal<QString> created = createSectionFromTemplate(sectionKey, horns ? doublerInstrumentId : QString(),
+                                                                horns ? lowHornInstrumentId : QString());
             if (!created.ret) {
                 LOGW() << "[starscore] could not create section " << sectionKey;
                 continue;

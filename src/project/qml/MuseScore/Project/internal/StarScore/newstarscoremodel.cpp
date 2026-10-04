@@ -183,3 +183,49 @@ bool NewStarScoreModel::create(const QVariantMap& o)
     }
     return true;
 }
+
+QString NewStarScoreModel::arrangementName(const QString& arrangementKey) const
+{
+    for (const StarScoreArrangementTemplate& t : starScore()->arrangementTemplates()) {
+        if (t.key == arrangementKey) {
+            return t.name;
+        }
+    }
+    return arrangementKey;
+}
+
+bool NewStarScoreModel::asksOnAdd(const QString& arrangementKey) const
+{
+    if (!hasDoubler(arrangementKey)) {
+        return false;   // 2-Horn, Flexible, Big Band, Orchestra, Marching Band: nothing to choose
+    }
+    // the horn section ("3-horn" of "3-horn-standard") is made only when the score hasn't got one
+    const QString hornKey = QString("%1-horn").arg(standardHorns(arrangementKey));
+    for (const StarScoreSection& s : starScore()->sections()) {
+        if (s.templateKey == hornKey) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool NewStarScoreModel::addArrangement(const QString& arrangementKey, const QString& doublerInstrumentId,
+                                       const QString& lowHornInstrumentId)
+{
+    const QString doubler = hasDoubler(arrangementKey) ? doublerInstrumentId : QString();
+    const QString low = hasLowHorn(arrangementKey) ? lowHornInstrumentId : QString();
+    const muse::RetVal<QString> ret = starScore()->createArrangementFromTemplate(arrangementKey, doubler, low);
+    if (!ret.ret) {
+        LOGE() << ret.ret.toString();
+        return false;
+    }
+    // remembered like the New StarScore choices
+    QSettings settings;
+    if (!doublerInstrumentId.isEmpty()) {
+        settings.setValue(SETTING_DOUBLER, doublerInstrumentId);
+    }
+    if (!lowHornInstrumentId.isEmpty()) {
+        settings.setValue(SETTING_LOW_HORN, lowHornInstrumentId);
+    }
+    return true;
+}

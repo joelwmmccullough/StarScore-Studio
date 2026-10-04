@@ -125,6 +125,7 @@ void ProjectModule::resolveImports()
         ir->registerQmlUri(Uri("musescore://project/upload/success"), "MuseScore.Project", "ProjectUploadedDialog");
         ir->registerQmlUri(Uri("musescore://project/audiogenerationsettings"), "MuseScore.Project", "AudioGenerationSettingsDialog");
         ir->registerQmlUri(Uri("musescore://starscore/new"), "MuseScore.Project", "NewStarScoreDialog");
+        ir->registerQmlUri(Uri("musescore://starscore/addarrangement"), "MuseScore.Project", "AddArrangementDialog");
         ir->registerQmlUri(Uri("musescore://starscore/edit"), "MuseScore.Project", "StarScoreEditDialog");
         ir->registerQmlUri(Uri("musescore://starscore/copylayout"), "MuseScore.Project", "CopyLayoutDialog");
         ir->registerQmlUri(Uri("musescore://starscore/styles"), "MuseScore.Project", "StarScoreStylesDialog");

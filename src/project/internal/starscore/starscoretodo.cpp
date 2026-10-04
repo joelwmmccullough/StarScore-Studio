@@ -370,7 +370,7 @@ QString StarScoreService::todoPdfHtml(const QString& title, const QString& code,
             QString standInText;
             if (standIn != sec.alternates.end()) {
                 const engraving::Part* mainPart = ms->partById(ID(standIn->second));
-                const QString mainName = mainPart ? lowHornName(mainPart->instrumentId().toQString()) : QString();
+                const QString mainName = mainPart ? versionMainName(mainPart->instrumentId().toQString()) : QString();
                 standInText = QString(" <span class=\"dim\">&middot; %1 version</span>")
                               .arg(esc(mainName.isEmpty() ? QString("Bass Trombone") : mainName));
             }

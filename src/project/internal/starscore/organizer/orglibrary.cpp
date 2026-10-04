@@ -20,7 +20,7 @@ namespace mu::project::starscore::org {
 const std::vector<std::pair<QString, QString> >& hornOrder()
 {
     static const std::vector<std::pair<QString, QString> > HORN_ORDER {
-        { "Trumpet", "Tpt" }, { "Flugelhorn", "Flg" }, { "Flute", "Flu" }, { "Clarinet", "Cla" }, { "Soprano Sax", "Sop" },
+        { "Trumpet", "Tpt" }, { "Flugelhorn", "Flg" }, { "Piccolo", "Pic" }, { "Flute", "Flu" }, { "Clarinet", "Cla" }, { "Soprano Sax", "Sop" },
         { "Alto Sax", "Alt" }, { "Tenor Sax", "Ten" }, { "Bari Sax", "Bar" }, { "Bass Sax", "Bsx" }, { "Bass Clarinet", "Bcl" },
         { "Trombone", "Tbn" }, { "Bass Trombone", "Btb" },
     };

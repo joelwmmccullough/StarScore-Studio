@@ -261,6 +261,9 @@ struct StarScoreBandExportPlan
     std::vector<StarScoreBandFile> files;
     QStringList notes;           // things that were skipped, and why
     QStringList anyHornFolders;  // "NH Any Horns" folders: sheets there with older names are archived after exporting
+    //! Horn folders under an older name -> the folder that replaces them ("3H Tpt Flu Ten" -> "3H Tpt Pic Ten", a
+    //! piccolo labelled "Flute" before 1.17.1): the old folder's sheets are archived once the new ones are written
+    std::map<QString, QString> renamedFolders;
 
     // The song isn't in Sheets and Demos yet: the dialog asks for its folder and code first (registerBandSong)
     bool newSong = false;
@@ -458,12 +461,15 @@ public:
     //! Completion tag of each part (instrument); parts without a tag are missing from the map
     virtual std::map<QString, StarScoreStatus> partStatuses() const = 0;
     virtual void setPartStatus(const QString& partId, int status) = 0;   // -1 = no tag
-    //! 7-Horn section: offers to make the stand-in versions its main low horn doesn't have yet. The main low horn is
-    //! the section's part on one of the eight low horns (Bass Trombone, Bari Sax, Bass Sax, Bassoon, Bass Clarinet,
-    //! Contrabass Clarinet, Contrabassoon, Tuba) that isn't itself a stand-in; the versions are the other seven.
+    //! Offers to make the stand-in versions the section's main parts don't have yet (see versionMains).
     virtual void makeBassHornVersions(const QString& sectionId) = 0;
-    //! The main low horn of a section (see makeBassHornVersions): its part id and the band's name for it ("Bass
-    //! Trombone", "Contrabass Clarinet"…); empty when the section has none
+    //! The parts of a section that get stand-in versions, each with the band's name for it: in a 7-Horn section its
+    //! main low horn (the part on one of the eight low horns — Bass Trombone, Bari Sax, Bass Sax, Bassoon, Bass
+    //! Clarinet, Contrabass Clarinet, Contrabassoon, Tuba — that isn't itself a stand-in; its versions are the other
+    //! seven), and in any horn section a Piccolo (its version is a Flute with the same written notes).
+    virtual std::vector<std::pair<QString, QString> > versionMains(const QString& sectionId) const = 0;
+    //! The main low horn of a 7-Horn section (see versionMains): its part id and the band's name for it; empty when
+    //! the section has none
     virtual std::pair<QString, QString> mainLowHorn(const QString& sectionId) const = 0;
     //! A part score's status (for its tab): the least-finished of its parts' tags, a part without a tag
     //! counting as Empty; -1 when none of its parts has a tag, or for the main score
@@ -480,8 +486,10 @@ public:
 
     // --- arrangements ---
     //! Uses sections that already exist (matched by template key, e.g. an existing "Rhythm Section"),
-    //! creates only the missing ones, then shows the new arrangement.
-    virtual muse::RetVal<QString> createArrangementFromTemplate(const QString& templateKey) = 0;
+    //! creates only the missing ones, then shows the new arrangement. doublerInstrumentId / lowHornInstrumentId as
+    //! in StarScoreNewOptions, for the horn section when it has to be made.
+    virtual muse::RetVal<QString> createArrangementFromTemplate(const QString& templateKey, const QString& doublerInstrumentId = {},
+                                                                const QString& lowHornInstrumentId = {}) = 0;
     virtual muse::RetVal<QString> createArrangement(const QString& name, const QStringList& sectionIds) = 0;
     virtual void renameArrangement(const QString& arrangementId, const QString& name) = 0;
     virtual void setArrangementSections(const QString& arrangementId, const QStringList& sectionIds) = 0;

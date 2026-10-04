@@ -107,7 +107,7 @@ static QString intervalName(int semitones)
 static int writtenOffset(const QString& instrument, const QString& key)
 {
     static const QMap<QString, int> BY_INSTRUMENT { { "trumpet", 2 }, { "flugelhorn", 2 }, { "soprano sax", 2 }, { "clarinet", 2 },
-        { "tenor sax", 14 }, { "bass clarinet", 14 }, { "alto sax", 9 }, { "bari sax", 21 }, { "trombone", 0 }, { "flute", 0 } };
+        { "tenor sax", 14 }, { "bass clarinet", 14 }, { "alto sax", 9 }, { "bari sax", 21 }, { "trombone", 0 }, { "flute", 0 }, { "piccolo", -12 } };
     if (BY_INSTRUMENT.contains(instrument.toLower())) {
         return BY_INSTRUMENT.value(instrument.toLower());
     }
@@ -281,7 +281,7 @@ static std::vector<GuidePart> partsForPlayer(const QJsonObject& analysis, const 
         byFolder[f].push_back(p);
     }
     static const QMap<QString, QString> TRANS { { "Trumpet", "Bb" }, { "Flugelhorn", "Bb" }, { "Tenor Sax", "Bb" }, { "Soprano Sax", "Bb" },
-        { "Clarinet", "Bb" }, { "Bass Clarinet", "Bb" }, { "Alto Sax", "Eb" }, { "Bari Sax", "Eb" }, { "Flute", "C" }, { "Trombone", "C" },
+        { "Clarinet", "Bb" }, { "Bass Clarinet", "Bb" }, { "Alto Sax", "Eb" }, { "Bari Sax", "Eb" }, { "Piccolo", "C" }, { "Flute", "C" }, { "Trombone", "C" },
         { "Bass Trombone", "C" } };
     static const QRegularExpression num("\\s+\\d$");
     for (const QString& folder : folderOrder) {
