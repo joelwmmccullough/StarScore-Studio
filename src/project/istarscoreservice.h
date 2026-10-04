@@ -11,6 +11,7 @@
 
 #include <map>
 #include <optional>
+#include <utility>
 #include <vector>
 
 #include <QJsonObject>
@@ -123,6 +124,21 @@ struct StarScoreNewOptions
     int tempoBpm = 120;
     int measures = 32;
     QString arrangementTemplateKey = "3-horn-standard";
+    //! Standard sections of 3 or more horns: what the woodwind doubler plays (a doublerChoices() instrument id).
+    //! It takes the alto saxophone chair in the 3/4/5-Horn sections and the soprano saxophone chair in 6/7-Horn.
+    //! Empty = the template's own instrument.
+    QString doublerInstrumentId;
+    //! 7-Horn Standard: the main low horn (a lowHornChoices() id), the 7th chair instead of the bass trombone.
+    //! Empty = bass trombone.
+    QString lowHornInstrumentId;
+};
+
+//! An instrument a New StarScore dropdown offers: its MuseScore id, the part name it gets, and the band's name for it
+struct StarScoreHornChoice
+{
+    QString instrumentId;        // "alto-saxophone"
+    QString partName;            // "Alto Saxophone"
+    QString bandName;            // "Alto Sax"
 };
 
 //! "Always give this part book this style": a MuseScore style file (.mss) applied to part books
@@ -420,10 +436,20 @@ public:
 
     //! Create a brand-new score holding the template arrangement (3-Horn Standard by default) and make it current.
     virtual muse::Ret newStarScore(const StarScoreNewOptions& options) = 0;
+    //! New StarScore dialog: the instruments the woodwind doubler can play (Soprano Sax … Flute), in menu order
+    virtual std::vector<StarScoreHornChoice> doublerChoices() const = 0;
+    //! New StarScore dialog: the low horns the 7-Horn section's 7th chair can be (Bass Trombone first), in menu order
+    virtual std::vector<StarScoreHornChoice> lowHornChoices() const = 0;
+    //! The band's woodwind doubler, from the roster in Sheets and Demos (6 Inbox/.organizer/roster.json): the current
+    //! horn player whose 3-horn chair is the alto sax, else one who lists both Alto Sax and Soprano Sax. "" when the
+    //! roster has none or can't be read. Names live in the roster only, never in the program.
+    virtual QString rosterDoublerName() const = 0;
 
     // --- sections ---
     //! Add the template's instruments (empty, following the score's bars and structure) as a new section.
-    virtual muse::RetVal<QString> createSectionFromTemplate(const QString& templateKey) = 0;
+    //! doublerInstrumentId / lowHornInstrumentId as in StarScoreNewOptions (empty = the template's instruments).
+    virtual muse::RetVal<QString> createSectionFromTemplate(const QString& templateKey, const QString& doublerInstrumentId = {},
+                                                            const QString& lowHornInstrumentId = {}) = 0;
     virtual muse::RetVal<QString> createSection(const QString& templateKey, const QString& name,
                                                 const std::vector<StarScoreInstrument>& instruments) = 0;
     virtual muse::RetVal<QString> createSectionFromParts(const QString& name, const QStringList& partIds) = 0;
@@ -432,9 +458,13 @@ public:
     //! Completion tag of each part (instrument); parts without a tag are missing from the map
     virtual std::map<QString, StarScoreStatus> partStatuses() const = 0;
     virtual void setPartStatus(const QString& partId, int status) = 0;   // -1 = no tag
-    //! 7-Horn section: offers to make the Bass Trombone's stand-in versions it doesn't have yet (Bari Sax, Bass Sax,
-    //! Bassoon, Bass Clarinet, Contrabass Clarinet, Contrabassoon, Tuba)
+    //! 7-Horn section: offers to make the stand-in versions its main low horn doesn't have yet. The main low horn is
+    //! the section's part on one of the eight low horns (Bass Trombone, Bari Sax, Bass Sax, Bassoon, Bass Clarinet,
+    //! Contrabass Clarinet, Contrabassoon, Tuba) that isn't itself a stand-in; the versions are the other seven.
     virtual void makeBassHornVersions(const QString& sectionId) = 0;
+    //! The main low horn of a section (see makeBassHornVersions): its part id and the band's name for it ("Bass
+    //! Trombone", "Contrabass Clarinet"…); empty when the section has none
+    virtual std::pair<QString, QString> mainLowHorn(const QString& sectionId) const = 0;
     //! A part score's status (for its tab): the least-finished of its parts' tags, a part without a tag
     //! counting as Empty; -1 when none of its parts has a tag, or for the main score
     virtual int partScoreStatus(const mu::engraving::Score* score) const = 0;

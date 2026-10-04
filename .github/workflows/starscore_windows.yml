@@ -1,0 +1,263 @@
+name: 'StarScore Studio: Windows build'
+
+# Builds StarScore Studio for Windows (x86_64) and publishes an .msi installer. It runs after the macOS workflow has
+# finished successfully for a commit whose message contains [dmg] (the owner wants the Mac .dmg published first), and
+# adds the installer to the release that run created ("build-<mac run number>", title "StarScore Studio X.Y.Z").
+# When no such release exists (for example when run by hand), it publishes its own "windows-<run number>" release.
+#
+# GitHub only fires workflow_run for workflow files on the repository's default branch (main), so until `starscore`
+# is the default branch this workflow also starts on every [dmg] push and waits for that commit's macOS run to finish
+# (the "Wait for the macOS build" step) before building. The concurrency group keeps the two triggers from building
+# the same commit twice.
+
+on:
+  workflow_run:
+    workflows: ['StarScore Studio: macOS build']
+    types: [completed]
+    branches: [ starscore ]
+  push:
+    branches: [ starscore ]
+  workflow_dispatch:
+
+concurrency:
+  group: starscore-windows-${{ github.event.workflow_run.head_sha || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  windows_x64:
+    # The macOS workflow packages and publishes when it was run by hand or the commit message contains [dmg];
+    # the Windows build follows the same rule, and only after the Mac build succeeded.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && contains(github.event.head_commit.message, '[dmg]')) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+      (contains(github.event.workflow_run.head_commit.message, '[dmg]') ||
+      github.event.workflow_run.event == 'workflow_dispatch'))
+    runs-on: windows-2025
+    timeout-minutes: 300
+    env:
+      # The commit to build: the one the macOS run built, or the branch head when run by hand.
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      # The macOS run number is the N in its release tag "build-N" (empty when run by hand).
+      MAC_RUN_NUMBER: ${{ github.event.workflow_run.run_number }}
+      # WiX UpgradeCode shared by every StarScore Studio installer, so a newer installer replaces an older one.
+      # It is deliberately not MuseScore Studio's, so installing StarScore never uninstalls MuseScore.
+      STARSCORE_WIX_UPGRADE_GUID: FBDD3CFF-EF5C-4476-8952-3BD6687957CF
+    steps:
+    - name: Clone repository
+      uses: actions/checkout@v6
+      with:
+        ref: ${{ env.HEAD_SHA }}
+
+    # On a push both workflows start together: the Windows build waits until the macOS run for this commit has
+    # finished (the owner wants the dmg first), and stops if that run failed. Idle polling costs nothing on a public
+    # repository's runners. A workflow_run trigger has already waited by definition.
+    - name: Wait for the macOS build
+      if: github.event_name == 'push'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        for i in $(seq 1 180); do
+          RUNS=$(gh api "repos/${{ github.repository }}/actions/runs?head_sha=$HEAD_SHA&per_page=20" \
+                 --jq '.workflow_runs[] | select(.name == "StarScore Studio: macOS build") | "\(.status) \(.conclusion) \(.run_number)"')
+          if [ -n "$RUNS" ]; then
+            STATUS=$(echo "$RUNS" | head -n 1 | awk '{print $1}')
+            CONCLUSION=$(echo "$RUNS" | head -n 1 | awk '{print $2}')
+            NUMBER=$(echo "$RUNS" | head -n 1 | awk '{print $3}')
+            if [ "$STATUS" = "completed" ]; then
+              if [ "$CONCLUSION" != "success" ]; then
+                echo "The macOS build for $HEAD_SHA ended with '$CONCLUSION'; not building Windows."
+                exit 1
+              fi
+              echo "MAC_RUN_NUMBER=$NUMBER" | tee -a $GITHUB_ENV
+              exit 0
+            fi
+          fi
+          sleep 30
+        done
+        echo "The macOS build for $HEAD_SHA did not finish within 90 minutes."
+        exit 1
+
+    - name: Configure workflow
+      shell: bash
+      run: |
+        bash ./buildscripts/ci/tools/make_build_mode_env.sh -e workflow_dispatch -m stable
+        bash ./buildscripts/ci/tools/make_build_number.sh
+        BUILD_NUMBER=$(cat ./build.artifacts/env/build_number.env)
+        echo "BUILD_NUMBER=$BUILD_NUMBER" | tee -a $GITHUB_ENV
+        echo "NINJA_EXTRA_ARGS=-k 0" | tee -a $GITHUB_ENV
+        echo "Building commit $HEAD_SHA (macOS run number: ${MAC_RUN_NUMBER:-none})"
+
+    - name: Restore ccache files
+      id: restore-ccache
+      uses: actions/cache/restore@v5
+      with:
+        path: ${{ github.workspace }}/.ccache
+        key: starscore-${{runner.os}}-${{runner.arch}}-ccache-
+        restore-keys: starscore-${{runner.os}}-${{runner.arch}}-ccache-
+
+    - name: Setup ccache
+      run: |
+        choco install -y ccache
+        bash ./buildscripts/ci/tools/setup_ccache_config.sh
+
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: 6.10.2
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_msvc2022_64'
+        modules: 'qt5compat qtnetworkauth qtshadertools qtwebsockets'
+        cache: true
+
+    - name: Setup environment
+      run: |
+        buildscripts\ci\windows\setup.bat
+
+    - name: Generate _en.ts files
+      shell: bash
+      env:
+        LUPDATE_ARGS: ""
+        POSTPROCESS_ARGS: "--warn-only"
+        POSTPROCESS_LAUNCHER: "python3 -X utf8"
+      run: |
+        bash ./tools/translations/run_lupdate.sh
+
+    - name: Register msvc problem matcher
+      run: echo "::add-matcher::.github/problem_matchers/msvc.json"
+
+    - name: Build
+      shell: bash
+      run: |
+        set -o pipefail
+        # build.bat is MuseScore's own Windows build script (it sets up the Visual Studio environment and runs
+        # ninja_build.sh). No --crash_log_url: that keeps the crashpad client off, so the app reports nothing.
+        # Run through cmd from bash so the whole log is kept for the error report below.
+        cmd //c "buildscripts\\ci\\windows\\build.bat -n ${BUILD_NUMBER}" 2>&1 | tee build.log
+        # build.bat does not always propagate ninja's failure, so check for the result ourselves.
+        if [ ! -f build.install/bin/MuseScore4.exe ]; then
+          echo "Build failed: build.install/bin/MuseScore4.exe was not produced"
+          exit 1
+        fi
+
+    - name: Publish build errors to the ci-logs-windows branch
+      if: failure()
+      shell: bash
+      run: |
+        mkdir -p /tmp/ci-logs
+        { echo "run ${{ github.run_number }} commit $HEAD_SHA"; grep -n -E "error C[0-9]+|error LNK|error:|Error |FAILED:|undefined|cannot find|No such file" build.log | head -300; echo; echo "---- tail ----"; tail -150 build.log; } > /tmp/ci-logs/build-errors.txt || true
+        cd /tmp/ci-logs
+        git init -q
+        git config user.name "StarScore CI"
+        git config user.email "ci@users.noreply.github.com"
+        git add build-errors.txt
+        git commit -q -m "windows build errors for run ${{ github.run_number }}"
+        git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:ci-logs-windows
+
+    - name: Show ccache stats
+      if: always()
+      run: ccache -sv
+
+    - name: Package
+      shell: cmd
+      run: |
+        REM Build mode "stable" makes package.bat produce an .msi (WiX, preinstalled on the runner). No --signkey /
+        REM --signsecret: StarScore has no Windows code-signing certificate, so package.bat skips signing.
+        buildscripts\ci\windows\package.bat --guid %STARSCORE_WIX_UPGRADE_GUID%
+
+    - name: Publish the installer
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        REPO="${{ github.repository }}"
+        MSI=$(ls build.artifacts/*.msi | head -n 1)
+        if [ -z "$MSI" ]; then
+          echo "No .msi in build.artifacts"
+          exit 1
+        fi
+        cp "$MSI" StarScore-Studio-Windows.msi
+
+        VERSION=$(sed -nE 's/^set\(STARSCORE_VERSION "([0-9]+\.[0-9]+\.[0-9]+)"\).*/\1/p' version.cmake | head -n 1)
+        if [ -z "$VERSION" ]; then
+          echo "STARSCORE_VERSION not found in version.cmake"
+          exit 1
+        fi
+
+        # Every release as "<tag> <target_commitish>". The StarScore workflows create releases with --target <sha>,
+        # so target_commitish is the commit they were built from.
+        RELEASES=$(gh api --paginate "repos/$REPO/releases?per_page=100" --jq '.[] | "\(.tag_name) \(.target_commitish)"')
+
+        # Find the release the macOS workflow made for this commit: first the run that started this workflow
+        # ("build-<its run number>"), then any mac release built from this commit.
+        TAG=""
+        if [ -n "$MAC_RUN_NUMBER" ] && grep -q "^build-$MAC_RUN_NUMBER " <<<"$RELEASES"; then
+          TAG="build-$MAC_RUN_NUMBER"
+        fi
+        if [ -z "$TAG" ]; then
+          TAG=$(awk -v sha="$HEAD_SHA" '$1 ~ /^build-/ && $2 == sha { print $1; exit }' <<<"$RELEASES")
+        fi
+        if [ -z "$TAG" ]; then
+          # A release made by hand may have a branch name as its target; compare the tags' commits as well.
+          for t in $(awk '$1 ~ /^build-/ { print $1 }' <<<"$RELEASES" | head -n 20); do
+            TAG_SHA=$(gh api "repos/$REPO/git/ref/tags/$t" --jq '.object.sha' 2>/dev/null || true)
+            if [ "$TAG_SHA" == "$HEAD_SHA" ]; then
+              TAG="$t"
+              break
+            fi
+          done
+        fi
+
+        if [ -n "$TAG" ]; then
+          echo "Adding the installer to release $TAG"
+          gh release upload "$TAG" StarScore-Studio-Windows.msi --repo "$REPO" --clobber
+
+          # The Linux workflow adds its AppImage to the mac release itself when that release already exists by the
+          # time it finishes. When the Linux build finished first, copy the AppImage over from its own
+          # "linux-<run>" release, so the one release carries dmg + Windows installer + AppImage.
+          ASSETS=$(gh release view "$TAG" --repo "$REPO" --json assets --jq '.assets[].name')
+          if ! grep -qx "StarScore-Studio-x86_64.AppImage" <<<"$ASSETS"; then
+            LINUX_TAG=$(awk -v sha="$HEAD_SHA" '$1 ~ /^linux-/ && $2 == sha { print $1; exit }' <<<"$RELEASES")
+            if [ -n "$LINUX_TAG" ]; then
+              echo "Copying the AppImage from release $LINUX_TAG to $TAG"
+              gh release download "$LINUX_TAG" --repo "$REPO" --pattern 'StarScore-Studio-x86_64.AppImage' --dir linux_release
+              gh release upload "$TAG" linux_release/StarScore-Studio-x86_64.AppImage --repo "$REPO" --clobber
+            else
+              echo "No Linux release for $HEAD_SHA yet; the Linux workflow adds its AppImage when it finishes."
+            fi
+          fi
+        else
+          TAG="windows-${{ github.run_number }}"
+          echo "No macOS release for $HEAD_SHA; creating $TAG"
+          printf 'Windows build from commit %s.\n\n_Build %s._\n' "$(echo "$HEAD_SHA" | cut -c1-7)" "${{ github.run_number }}" > release_notes.md
+          gh release create "$TAG" StarScore-Studio-Windows.msi --repo "$REPO" --target "$HEAD_SHA" \
+            --title "StarScore Studio $VERSION Windows build ${{ github.run_number }}" --notes-file release_notes.md --prerelease
+        fi
+        echo "RELEASE_TAG=$TAG" | tee -a $GITHUB_ENV
+
+    - name: Upload artifacts on GitHub
+      uses: actions/upload-artifact@v6
+      with:
+        name: StarScore-Studio-win-x64-${{ github.run_number }}
+        path: StarScore-Studio-Windows.msi
+        retention-days: 30
+
+    - name: Prepare ccache files for saving
+      id: prepare-save-ccache
+      if: always()
+      shell: bash
+      run: |
+        ccache --recompress 10
+        echo "CCACHE_TIMESTAMP=$(date -u +"%F-%T")" | tee -a $GITHUB_OUTPUT
+
+    - name: Save ccache files
+      if: always()
+      uses: actions/cache/save@v5
+      with:
+        key: ${{ steps.restore-ccache.outputs.cache-primary-key }}${{ steps.prepare-save-ccache.outputs.CCACHE_TIMESTAMP }}
+        path: ${{ github.workspace }}/.ccache

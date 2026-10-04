@@ -850,10 +850,11 @@ void ProjectActionsController::newProject(bool museScoreWizard)
         return;
     }
 
-    // StarScore Studio: File → New makes a StarScore; MuseScore's own wizard is "file-new-musescore"
+    // StarScore Studio: File → New opens the New Score dialog, which first asks "Starsign Score" or "Non-Starsign
+    // Score". Non-Starsign closes it with the value "musescore-wizard", and MuseScore's own wizard opens instead
+    // (the same wizard "file-new-musescore" opens directly).
     static const muse::Uri NEW_STARSCORE_URI("musescore://starscore/new");
-    auto promise = interactive()->open(museScoreWizard ? NEW_SCORE_URI : NEW_STARSCORE_URI);
-    promise.onResolve(this, [this](const Val&) {
+    auto finishNew = [this](const Val&) {
         extensionsProvider()->performPointAsync(EXEC_ONPOST_PROJECT_CREATED);
 
         Ret ret = doFinishOpenProject();
@@ -861,6 +862,17 @@ void ProjectActionsController::newProject(bool museScoreWizard)
         if (!ret) {
             LOGE() << ret.toString();
         }
+    };
+    if (museScoreWizard) {
+        interactive()->open(NEW_SCORE_URI).onResolve(this, finishNew);
+        return;
+    }
+    interactive()->open(NEW_STARSCORE_URI).onResolve(this, [this, finishNew](const Val& val) {
+        if (val.toString() == "musescore-wizard") {
+            interactive()->open(NEW_SCORE_URI).onResolve(this, finishNew);
+            return;
+        }
+        finishNew(val);
     });
 }
 

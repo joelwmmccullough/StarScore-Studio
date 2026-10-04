@@ -2,6 +2,8 @@ name: 'StarScore Studio: macOS build'
 
 # Every push to the starscore branch compiles StarScore Studio (Apple Silicon) to catch errors.
 # A .dmg is packaged and published only when the workflow is run by hand, or the commit message contains [dmg].
+# The Windows workflow (starscore_windows.yml) starts when this one finishes and adds its installer to the same
+# release, so keep this workflow's name: it is what that workflow's workflow_run trigger listens for.
 
 on:
   push:

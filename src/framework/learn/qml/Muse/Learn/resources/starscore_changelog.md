@@ -4,6 +4,15 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.17.0
+
+- **Chord charts in Export to Sheets and Demos.** When the Lead Sheet is Finished (and the song isn't in Works In Progress), the export also writes a "Chord Charts" folder with "CODE - Chord Chart.pdf" (one tall phone-width page, sections mirroring the rehearsal marks, repeats and endings written out where they help) and "CODE - iReal Pro.html" (the iReal Pro import link, split into parts when the song is too long for one chart). Both end with a small note giving the export's version number. Replaced charts go to Version History like sheets; unchanged ones are left alone. Made from the lead sheet's chords; a text's "Visible on chord chart" box (1.15.7) decides whether it appears.
+- **New score: Starsign or not.** File › New first asks "Starsign Score" or "Non-Starsign Score"; Non-Starsign opens MuseScore's own new-score wizard. The Starsign page lists the starting arrangements in order: 2-Horn Standard, 2-Horn Flexible, 3-Horn Standard (recommended, the default), 3-Horn Flexible, 4-, 5-, 6- and 7-Horn Standard. Big Band, Marching Band and Orchestra are no longer starting points (the templates still exist).
+- **Which horn the doubler plays.** For 3- to 7-Horn Standard a second dropdown picks the saxophone chair's instrument: Soprano Sax, Alto Sax, Tenor Sax, Clarinet, Bass Clarinet, Piccolo or Flute. The player's name comes from the band roster on this computer ("<name> on Alto Sax"), never from the app itself. Alto Sax is recommended for 3- to 5-Horn; 6- and 7-Horn start on Soprano Sax.
+- **Preferred 7th horn.** 7-Horn Standard gets a third dropdown: Bass Trombone (recommended) or Bari Sax, Bass Sax, Bassoon, Bass Clarinet, Contrabass Clarinet, Contrabassoon or Tuba. The chosen instrument is the section's main 7th horn: its sheet is the one in the arrangement, and marking it Finished offers the other seven versions (Bass Trombone included) made from its music, just as the Bass Trombone's versions were. The export puts the main low horn and its versions in the "Bass Horns (Horn #7)" folder whichever instrument it is.
+- The dialog remembers the last arrangement, doubler and 7th-horn choices.
+- **Windows build.** Every "[dmg]" build now also produces a Windows installer (StarScore-Studio-Windows.msi, unsigned, so SmartScreen will warn once) after the Mac dmg is published, and the Linux AppImage is added to the same release. The Windows installer installs into its own "StarScore Studio" folder and never touches an installed MuseScore Studio.
+
 ## 1.16.0
 
 A maintenance release from a full review of the StarScore code: four reviews, about 110 findings, the ones below fixed. Exported sheets are unchanged (every Balkan Wedding and Bumper Cars PDF was compared page by page with the previous build).

@@ -30,12 +30,17 @@ bool setFinderColour(const QString& folder, const QString& colour);
 QString finderColour(const QString& folder);
 
 //! HTML -> PDF. Must be called on the main (GUI) thread; done() is called on the main thread.
-//! Pages are US Letter; margins in points (top, right, bottom, left) come from the caller,
-//! because WebKit's print path ignores @page margins.
+//! Pages are US Letter unless the job says otherwise; margins in points (top, right, bottom, left) come from the
+//! caller, because WebKit's print path ignores @page margins.
 struct RenderJob {
     QString html;
     QString pdfPath;
     double marginTop = 40, marginRight = 42, marginBottom = 37, marginLeft = 42;
+    //! Paper size in points. The chord charts print one tall phone-width page: with pageHeightFromHtml the page's
+    //! own script reports the height it needs in document.body.dataset.height (points, as Chromium printed the
+    //! prototype: CSS px × 0.75) after it has laid itself out, and the paper becomes max(pageHeight, that + 2).
+    double pageWidth = 612, pageHeight = 792;
+    bool pageHeightFromHtml = false;
 };
 bool canRenderPdf();
 void renderPdfs(const std::vector<RenderJob>& jobs, std::function<void(int index, bool ok)> eachDone,

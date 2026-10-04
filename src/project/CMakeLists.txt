@@ -114,6 +114,8 @@ target_sources(project PRIVATE
     internal/starscore/starscorepdf.cpp
     internal/starscore/starscorepdf.h
     internal/starscore/starscoreengraving.h
+    internal/starscore/starscorechordchart.cpp
+    internal/starscore/starscorechordchart.h
 
     internal/starscore/organizer/orgcore.cpp
     internal/starscore/organizer/orgcore.h
@@ -167,6 +169,8 @@ set_source_files_properties(internal/starscore/starscoreaudit.cpp PROPERTIES SKI
 set_source_files_properties(internal/starscore/starscoresheetrecord.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 set_source_files_properties(internal/starscore/starscoretodo.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 set_source_files_properties(internal/starscore/starscoreautotest.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+# StarScore chord charts: its own translation unit (file-local helper types named like the audit's)
+set_source_files_properties(internal/starscore/starscorechordchart.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 # the StarScore version, for the automatic test run's log
 target_compile_definitions(project PRIVATE STARSCORE_VERSION_STR="${STARSCORE_VERSION}")
 

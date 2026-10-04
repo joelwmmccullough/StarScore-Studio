@@ -14,15 +14,24 @@
  *                 whether the composer credit meets the arrangement label), barlines that differ between staves;
  *                 and parts-N/<part score>.pdf, each part score as StarScore shows it
  *   view          shows every part score in turn (what opening a part score does)
- *   bassversions  makes the 7-Horn Bass Trombone's missing stand-in versions (no questions asked)
- *   section:KEY   adds a section from a template (section:2-horn-any is a 2-Horn Flexible section)
+ *   bassversions  makes the 7-Horn section's main low horn's missing stand-in versions (no questions asked);
+ *   lowversions   the same name for the same step, for a section whose main low horn isn't the bass trombone
+ *   section:KEY[:DOUBLER[:LOW]]   adds a section from a template (section:2-horn-any is a 2-Horn Flexible section),
+ *                 with the New StarScore doubler / 7th-horn instrument ids (section:7-horn:bb-clarinet:tuba)
+ *   new:KEY[:DOUBLER[:LOW]]   makes a new StarScore from an arrangement template, replacing the open song, and logs
+ *                 its parts and sections (new:7-horn-standard:bb-clarinet:contrabass-clarinet)
  *   styles        applies the part styles to everything
  *   export        Export to Sheets and Demos into STARSCORE_AUTOTEST_BAND (a copy, never the real folder)
+ *   chords        the chord charts' three outputs: chords.json (the lead sheet's form and chords, extract.py's
+ *                 JSON), chart.html (the PDF page, without the version footer, as pdfchart.py writes it),
+ *                 ireal.html (the iReal Pro page); plus CODE - Chord Chart.html with the footer. The page's font
+ *                 URLs come from STARSCORE_AUTOTEST_FONTS ("modernoir;jost;bravura"), else the app's embedded ones.
  *   save          saves a copy of the song as saved.starscore
  * Everything is logged to log.txt.
  */
 #include "starscoreservice.h"
 #include "starscoreengraving.h"
+#include "starscorechordchart.h"
 
 #include <QCoreApplication>
 #include <QGuiApplication>
@@ -30,6 +39,7 @@
 #include <QQuickWindow>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -189,43 +199,84 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         }
         globalContext()->setCurrentNotation(master->notation());
         autotestLog(QString("  switched to %1 part scores").arg(master->excerpts().size()));
-    } else if (step == "bassversions") {
-        static const QStringList VERSIONS { "baritone-saxophone", "bass-saxophone", "bassoon", "bb-bass-clarinet",
-                                            "contrabass-clarinet", "contrabassoon", "tuba" };
+    } else if (step == "bassversions" || step == "lowversions") {
+        // The 7-Horn section's main low horn (bass trombone or whatever the 7th chair is) gets its missing versions on
+        // the other low horns, as "Make the other versions…" does without asking
         for (const StarScoreSection& s : load().sections) {
             if (s.templateKey != "7-horn") {
                 continue;
             }
-            for (const QString& pid : s.partIds) {
-                const engraving::Part* p = ms->partById(ID(pid));
-                if (!p || !p->instrumentId().toQString().contains("bass-trombone") || s.alternates.count(pid)) {
-                    continue;
+            const auto [pid, mainName] = mainLowHorn(s.id);
+            const engraving::Part* p = pid.isEmpty() ? nullptr : ms->partById(ID(pid));
+            if (!p) {
+                autotestLog("  no main low horn in " + s.id);
+                continue;
+            }
+            autotestLog(QString("  main low horn: %1 (%2, %3)").arg(p->partName().toQString(), p->instrumentId().toQString(), mainName));
+            QStringList have;
+            for (const QString& other : s.partIds) {
+                if (const engraving::Part* a = ms->partById(ID(other))) {
+                    have << lowHornName(a->instrumentId().toQString());
                 }
-                QStringList have;
-                for (const QString& other : s.partIds) {
-                    if (const engraving::Part* a = ms->partById(ID(other))) {
-                        have << a->instrumentId().toQString();
-                    }
+            }
+            QStringList missing;
+            for (const StarScoreHornChoice& c : lowVersionsFor(p->instrumentId().toQString())) {
+                if (!have.contains(c.bandName)) {
+                    missing << c.instrumentId;
                 }
-                QStringList missing;
-                for (const QString& v : VERSIONS) {
-                    if (!have.contains(v)) {
-                        missing << v;
-                    }
-                }
-                autotestLog("  missing: " + missing.join(", "));
-                if (!missing.isEmpty()) {
-                    const RetVal<QStringList> made = createLowAlternates(s.id, pid, missing);
-                    autotestLog(QString("  made: %1 (%2)").arg(made.ret ? made.val.join(", ") : QString("failed"),
-                                                               QString::fromStdString(made.ret.toString())));
-                }
+            }
+            autotestLog("  missing: " + missing.join(", "));
+            if (!missing.isEmpty()) {
+                const RetVal<QStringList> made = createLowAlternates(s.id, pid, missing);
+                autotestLog(QString("  made: %1 (%2)").arg(made.ret ? made.val.join(", ") : QString("failed"),
+                                                           QString::fromStdString(made.ret.toString())));
             }
         }
     } else if (step.startsWith("section:")) {
-        // section:<template key>, e.g. section:2-horn-any (a 2-Horn Flexible section), as from the Add section menu
-        const QString key = step.mid(QString("section:").size());
-        const RetVal<QString> made = createSectionFromTemplate(key);
+        // section:<template key>[:<doubler id>[:<low horn id>]], e.g. section:2-horn-any (a 2-Horn Flexible section) or
+        // section:7-horn:bb-clarinet:tuba, as from the Add section menu / the New StarScore choices
+        const QStringList a = step.mid(QString("section:").size()).split(':');
+        const QString key = a.value(0);
+        const RetVal<QString> made = createSectionFromTemplate(key, a.value(1), a.value(2));
         autotestLog(QString("  %1: %2").arg(key, made.ret ? made.val : QString::fromStdString(made.ret.toString())));
+    } else if (step.startsWith("new:")) {
+        // new:<arrangement key>[:<doubler id>[:<low horn id>]]: a new StarScore as File › New makes it (title "Autotest"),
+        // which replaces the open song; its parts and sections are logged
+        const QStringList a = step.mid(QString("new:").size()).split(':');
+        StarScoreNewOptions o;
+        o.title = "Autotest";
+        o.arrangementTemplateKey = a.value(0);
+        o.doublerInstrumentId = a.value(1);
+        o.lowHornInstrumentId = a.value(2);
+        // The app makes a new score in a window with no project open. Here the open song is let go first, but kept
+        // alive until the new one is current: the status bar still points at its notation and disconnects from it
+        // when the project changes, which crashed when the song had already been destroyed.
+        const INotationProjectPtr old = globalContext()->currentProject();
+        globalContext()->setCurrentProject(nullptr);
+        for (int i = 0; i < 20; ++i) {
+            QCoreApplication::processEvents();
+        }
+        const Ret r = newStarScore(o);
+        for (int i = 0; i < 20; ++i) {
+            QCoreApplication::processEvents();
+        }
+        (void)old;
+        autotestLog(QString("  new %1: %2").arg(a.value(0), r ? "ok" : QString::fromStdString(r.toString())));
+        // the dialog's doubler label takes the player's name from the band folder's roster (logged as found or not,
+        // never the name)
+        const QString band = qEnvironmentVariable("STARSCORE_AUTOTEST_BAND");
+        if (!band.isEmpty() && QDir(band).exists()) {
+            setBandFolder(band);
+        }
+        autotestLog(QString("  roster doubler: %1").arg(rosterDoublerName().isEmpty() ? "(none)" : "(found)"));
+        if (engraving::MasterScore* nms = masterScore()) {
+            for (const engraving::Part* p : nms->parts()) {
+                autotestLog(QString("  part %1: %2 (%3)").arg(idText(p), p->partName().toQString(), p->instrumentId().toQString()));
+            }
+            for (const StarScoreSection& s : load().sections) {
+                autotestLog(QString("  section %1 (%2): %3").arg(s.id, s.templateKey, s.partIds.join(", ")));
+            }
+        }
     } else if (step == "styles") {
         autotestLog(QString("  restyled %1").arg(applyStyles()));
     } else if (step == "export") {
@@ -238,6 +289,41 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             QString text = r.ret ? r.val : QString::fromStdString(r.ret.toString());
             text.replace("\n", "\n  ");
             autotestLog("  " + text);
+        }
+    } else if (step == "chords") {
+        INotationProjectPtr project = globalContext()->currentProject();
+        const QString path = project ? project->path().toQString() : QString();
+        const starscore::ChordChartData data = starscore::extractChordChart(ms);
+        QFile json(autotestDir() + "/chords.json");
+        if (json.open(QIODevice::WriteOnly)) {
+            json.write(QJsonDocument(data.toJson()).toJson(QJsonDocument::Indented));
+        }
+        QString why;
+        if (!starscore::chordChartPossible(data, &why)) {
+            autotestLog("  no chart: " + why);
+        } else {
+            // the title and code the prototype's render.py took from the file name
+            const QString title = starscore::chordChartTitleFromFileName(path);
+            const QRegularExpressionMatch codeMatch = QRegularExpression("^([A-Z]{4}) - ").match(QFileInfo(path).fileName());
+            QString code = codeMatch.hasMatch() ? codeMatch.captured(1) : QString(title).remove(QRegularExpression("\\W")).left(4).toUpper();
+            starscore::ChordChartFonts fonts = starscore::chordChartEmbeddedFonts();
+            const QStringList urls = qEnvironmentVariable("STARSCORE_AUTOTEST_FONTS").split(';');
+            if (urls.size() == 3) {
+                fonts.modernoir = urls[0];
+                fonts.jost = urls[1];
+                fonts.bravura = urls[2];
+            }
+            auto write = [&](const QString& name, const QString& text) {
+                QFile f(autotestDir() + "/" + name);
+                if (f.open(QIODevice::WriteOnly)) {
+                    f.write(text.toUtf8());
+                }
+            };
+            write("chart.html", starscore::chordChartHtml(data, title, fonts, QString()));
+            write("ireal.html", starscore::chordChartIRealHtml(data, title, QString()));
+            write(code + " - Chord Chart.html", starscore::chordChartHtml(data, title, fonts, scoreVersion()));
+            autotestLog(QString("  wrote chords.json, chart.html, ireal.html (%1 bars, lead %2, status %3)")
+                        .arg(data.measures.size()).arg(data.lead, data.leadStatus.value_or("none")));
         }
     } else if (step == "save") {
         INotationProjectPtr project = globalContext()->currentProject();

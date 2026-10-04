@@ -76,8 +76,12 @@ public:
     std::vector<StarScoreSectionTemplate> sectionTemplates() const override;
     std::vector<StarScoreArrangementTemplate> arrangementTemplates() const override;
     muse::Ret newStarScore(const StarScoreNewOptions& options) override;
+    std::vector<StarScoreHornChoice> doublerChoices() const override;
+    std::vector<StarScoreHornChoice> lowHornChoices() const override;
+    QString rosterDoublerName() const override;
 
-    muse::RetVal<QString> createSectionFromTemplate(const QString& templateKey) override;
+    muse::RetVal<QString> createSectionFromTemplate(const QString& templateKey, const QString& doublerInstrumentId = {},
+                                                    const QString& lowHornInstrumentId = {}) override;
     muse::RetVal<QString> createSection(const QString& templateKey, const QString& name,
                                         const std::vector<StarScoreInstrument>& instruments) override;
     muse::RetVal<QString> createSectionFromParts(const QString& name, const QStringList& partIds) override;
@@ -148,6 +152,10 @@ public:
     void setSongRecordings(const QJsonObject& recordings) override;
     muse::RetVal<StarScoreBandExportPlan> planBandExport() const override;
     void makeBassHornVersions(const QString& sectionId) override;
+    std::pair<QString, QString> mainLowHorn(const QString& sectionId) const override;
+    //! The band's name for a low horn ("Bass Trombone", "Bari Sax", …, "Tuba"), or "" when the instrument isn't one
+    //! of the eight. The low horn a 7-Horn section is built on and its stand-in versions are all told apart this way.
+    static QString lowHornName(const QString& instrumentId);
     muse::Ret registerBandSong(const QString& title, int category, const QString& code) override;
     muse::RetVal<QString> exportArrangementsAsMscz(const QString& folder) override;
     muse::RetVal<QString> exportToBandFolder(const QStringList& onlyPaths) override;
@@ -317,12 +325,20 @@ private:
     void standardizeImported();
     //! A new "N-Horn Any" section starts with the music of the "N-Horn" section, chair by chair
     void fillAnyHornsFromStandard(const StarScoreSection& anySection);
-    //! A 7-Horn Bass Trombone part marked Finished: offer the Baritone Sax, Bass Sax and Bassoon versions it lacks
+    //! A 7-Horn section's main low horn (Bass Trombone, or whatever the 7th chair is) marked Finished: offer the
+    //! stand-in versions on the other low horns it lacks
     void offerLowAlternates(const QStringList& partIds, bool asked = false);
     //! Legacy audit: marks (or unmarks) these sheets as no longer needing auditing, with a fingerprint of their music
     void markPartsAudited(Data& data, const mu::engraving::MasterScore* ms, const QStringList& partIds, bool audited) const;
-    //! instrumentIds: which of "baritone-saxophone", "bass-saxophone", "bassoon" to make
+    //! instrumentIds: which of the low horns (lowHornChoices() ids other than the main part's) to make
     muse::RetVal<QStringList> createLowAlternates(const QString& sectionId, const QString& mainPartId, const QStringList& instrumentIds);
+    //! The low horns a 7-Horn main part's stand-in versions can be made on: everything in lowHornChoices() except
+    //! the main part's own instrument (the versions are made in this order)
+    std::vector<StarScoreHornChoice> lowVersionsFor(const QString& mainInstrumentId) const;
+    //! A template's instruments with the New StarScore choices applied: the doubler takes the alto sax chair of a
+    //! 3/4/5-Horn section or the soprano sax chair of a 6/7-Horn one; the low horn takes the 7-Horn bass trombone
+    std::vector<StarScoreInstrument> templateInstrumentsFor(const StarScoreSectionTemplate& t, const QString& doublerInstrumentId,
+                                                            const QString& lowHornInstrumentId) const;
     //! Name the new parts, hide default-hidden parts/staves, make part books; returns the new section
     StarScoreSection finishNewParts(const std::vector<mu::engraving::Part*>& newParts,
                                     const std::vector<StarScoreInstrument>& instruments);

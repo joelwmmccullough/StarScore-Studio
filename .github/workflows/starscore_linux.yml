@@ -1,7 +1,8 @@
 name: 'StarScore Studio: Linux test build'
 
 # Every push to the starscore branch also builds StarScore Studio for Linux (x86_64 AppImage), so changes can be run
-# and tested headless (QT_QPA_PLATFORM=offscreen) before a Mac .dmg is made. Published as a release "linux-<run>".
+# and tested headless (QT_QPA_PLATFORM=offscreen) before a Mac .dmg is made. Published as a release "linux-<run>";
+# for a [dmg] commit the AppImage is also added to the macOS release of that commit (see the last publish step).
 
 on:
   push:
@@ -99,6 +100,24 @@ jobs:
         TAG="linux-${{ github.run_number }}"
         gh release create "$TAG" StarScore-Studio-x86_64.AppImage --repo "${{ github.repository }}" --target "${{ github.sha }}" \
           --title "StarScore Studio Linux test build ${{ github.run_number }}" --notes "Linux test build from ${{ github.sha }}" --prerelease
+
+    - name: Add the AppImage to the macOS release for this commit
+      if: contains(github.event.head_commit.message, '[dmg]')
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        # For a [dmg] commit the macOS workflow publishes release "build-<its run number>" (--target <sha>) and the
+        # Windows workflow adds its installer to it. Put the AppImage there too, so one release carries all three.
+        # If the Mac build is still running there is no release yet; the Windows workflow (which runs after the Mac
+        # build) then copies the AppImage over from the linux-<run> release made above.
+        TAG=$(gh api --paginate "repos/${{ github.repository }}/releases?per_page=100" \
+          --jq '.[] | select(.target_commitish == "${{ github.sha }}") | select(.tag_name | startswith("build-")) | .tag_name' | head -n 1)
+        if [ -z "$TAG" ]; then
+          echo "No macOS release for ${{ github.sha }} yet; the Windows workflow will add the AppImage to it."
+          exit 0
+        fi
+        echo "Adding the AppImage to release $TAG"
+        gh release upload "$TAG" StarScore-Studio-x86_64.AppImage --repo "${{ github.repository }}" --clobber
 
     - name: Prepare ccache files for saving
       id: prepare-save-ccache

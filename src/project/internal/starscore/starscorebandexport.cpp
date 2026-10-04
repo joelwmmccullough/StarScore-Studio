@@ -57,6 +57,7 @@
 #include "starscoreengraving.h"
 #include "engraving/editing/editpart.h"
 #include "starscorehouse.h"
+#include "starscorechordchart.h"
 #include "starscorepdf.h"
 #include "organizer/orgplatform.h"
 
@@ -740,7 +741,9 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
             }
             addFile(folder, "Score", scoreParts, true);
 
-            // 7-Horn: the Bass Trombone and its stand-in versions (Bari Sax, Bass Sax, Bassoon…) in a folder of their own
+            // 7-Horn: the main low horn (Bass Trombone unless the song chose another 7th horn) and its stand-in versions
+            // (Bari Sax, Bass Sax, Bassoon…) in a folder of their own. Any of the eight low horns goes there, so the
+            // main sheet sits in the same folder before and after its versions are made.
             std::set<QString> bassHorns;
             if (sec.templateKey == "7-horn" || players == 7) {
                 for (const auto& [alt, main] : sec.alternates) {
@@ -748,7 +751,8 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
                     bassHorns.insert(main);
                 }
                 for (const auto& [pid, horn] : horns) {
-                    if (horn == "Bass Trombone") {
+                    const engraving::Part* p = ms->partById(ID(pid));
+                    if (horn == "Bass Trombone" || (p && !StarScoreService::lowHornName(p->instrumentId().toQString()).isEmpty())) {
                         bassHorns.insert(pid);
                     }
                 }
@@ -1744,9 +1748,11 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         }
         QString archived = songDir + "/Version History/Superseded " + today + "/" + rel;
         QDir().mkpath(QFileInfo(archived).absolutePath());
-        const QString base = archived.left(archived.length() - 4);
+        // (the suffix is kept: the chord charts archive .html files through here too)
+        const QString suffix = "." + QFileInfo(archived).suffix();
+        const QString base = archived.left(archived.length() - suffix.length());
         for (int i = 2; QFileInfo::exists(archived); ++i) {
-            archived = QString("%1 (%2).pdf").arg(base).arg(i);
+            archived = QString("%1 (%2)%3").arg(base).arg(i).arg(suffix);
         }
         bool moved = QFile::rename(target, archived);
         if (!moved) {
@@ -2006,6 +2012,31 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         writeSheetRecord(ms, data, full, written + unchanged);
     }
 
+    // --- the chord charts (starscorechordchart.cpp): the lead sheet's chords as a phone-sized PDF and as iReal Pro
+    // links, in "Chord Charts/". Only once the Lead Sheet is finished (before that the chords are still moving), and
+    // not for Works In Progress (not gig-ready, so nobody should learn them yet). Replaced files go to Version
+    // History like the sheets; a file that would come out the same is left as it is. The chord chart files stay
+    // out of the sheet record on purpose: they aren't sheets.
+    starscore::ChordChartResult charts;
+    bool chartsTried = false;
+    {
+        const Data data = loadFrom(ms);
+        bool hasLeadSheet = false;
+        StarScoreStatus leadStatus = StarScoreStatus::Finished;
+        for (const StarScoreSection& s : data.sections) {
+            if (s.templateKey == "lead-sheet") {
+                hasLeadSheet = true;
+                leadStatus = std::min(leadStatus, s.status);
+            }
+        }
+        const bool wip = plan.songFolder.startsWith("4 ");
+        if (hasLeadSheet && leadStatus == StarScoreStatus::Finished && !wip) {
+            chartsTried = true;
+            charts = starscore::writeChordCharts(ms, songDir, plan.code, starscoreSongTitle(project), scoreVersion(),
+                                                 supersede, &starscoreSamePdf, problems);
+        }
+    }
+
     // shown again once, with everything this export changed in them
     if (masterChanged) {
         master->notation()->notationChanged().notify();
@@ -2047,6 +2078,17 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     if (!written.isEmpty() && !unchanged.isEmpty()) {
         summary += " " + muse::qtrc("starscore", "%1 sheet(s) came out the same as before, so those files were left as they were.")
                    .arg(unchanged.size());
+    }
+    if (chartsTried) {
+        QStringList names;
+        for (const QString& rel : charts.written) {
+            names << QFileInfo(rel).fileName();
+        }
+        if (!names.isEmpty()) {
+            summary += " " + muse::qtrc("starscore", "+ chord charts: %1.").arg(names.join(", "));
+        } else if (!charts.unchanged.isEmpty()) {
+            summary += " " + muse::qtrc("starscore", "+ chord charts: the same as before.");
+        }
     }
     if (!renumberNote.isEmpty()) {
         summary += "\n\n" + renumberNote;

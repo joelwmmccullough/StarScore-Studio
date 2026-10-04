@@ -225,20 +225,35 @@ std::vector<StarScoreTodoItem> StarScoreService::todoList(const Data& data) cons
         out.push_back(i);
     }
 
-    // 11–13. 5-, 6- and 7-Horn Sections (the 7-Horn Bass Trombone also as Bari Sax, Bass Sax and Bassoon)
+    // 11–13. 5-, 6- and 7-Horn Sections (the 7-Horn main low horn — the bass trombone, or whatever the 7th chair is —
+    // also as Bass Trombone / Bari Sax / Bass Sax / Bassoon versions)
     out.push_back(sectionItem("5-horn", muse::qtrc("starscore", "5-Horn Section"), "5-horn"));
     out.push_back(sectionItem("6-horn", muse::qtrc("starscore", "6-Horn Section"), "6-horn"));
     {
         StarScoreTodoItem i = sectionItem("7-horn", muse::qtrc("starscore", "7-Horn Section"), "7-horn");
         if (i.status >= 0) {
-            QStringList have;
-            for (const QString& pid : sectionParts("7-horn", false)) {
-                have << instrumentOf(pid);
+            QString mainName;   // the band's name for the main low horn
+            for (const StarScoreSection& sec : data.sections) {
+                if (sec.templateKey != "7-horn" || !mainName.isEmpty()) {
+                    continue;
+                }
+                for (const QString& pid : sec.partIds) {
+                    if (!sec.alternates.count(pid)) {
+                        const QString n = lowHornName(instrumentOf(pid));
+                        if (!n.isEmpty()) {
+                            mainName = n;
+                            break;
+                        }
+                    }
+                }
             }
-            for (const auto& [id, name] : std::vector<std::pair<QString, QString> > {
-                    { "baritone-saxophone", "Bari Sax" }, { "bass-saxophone", "Bass Sax" }, { "bassoon", "Bassoon" } }) {
-                if (!have.contains(id)) {
-                    finishMissing(i, muse::qtrc("starscore", "no %1 version of the Bass Trombone").arg(name));
+            QStringList have;   // low horns in the section, by the band's name
+            for (const QString& pid : sectionParts("7-horn", false)) {
+                have << lowHornName(instrumentOf(pid));
+            }
+            for (const QString& name : { QString("Bass Trombone"), QString("Bari Sax"), QString("Bass Sax"), QString("Bassoon") }) {
+                if (name != mainName && !mainName.isEmpty() && !have.contains(name)) {
+                    finishMissing(i, muse::qtrc("starscore", "no %1 version of the %2").arg(name, mainName));
                 }
             }
         }
@@ -350,11 +365,17 @@ QString StarScoreService::todoPdfHtml(const QString& title, const QString& code,
                 ++secDone;
                 ++partsDone;
             }
-            const bool standIn = sec.alternates.count(pid) > 0;
+            // a stand-in version: "· Bass Trombone version" (named after the part it stands in for)
+            const auto standIn = sec.alternates.find(pid);
+            QString standInText;
+            if (standIn != sec.alternates.end()) {
+                const engraving::Part* mainPart = ms->partById(ID(standIn->second));
+                const QString mainName = mainPart ? lowHornName(mainPart->instrumentId().toQString()) : QString();
+                standInText = QString(" <span class=\"dim\">&middot; %1 version</span>")
+                              .arg(esc(mainName.isEmpty() ? QString("Bass Trombone") : mainName));
+            }
             rows += QString("<tr><td>%1%2</td><td class=\"r\">%3</td></tr>")
-                    .arg(esc(bare(p->partName().toQString())),
-                         standIn ? QString(" <span class=\"dim\">&middot; Bass Trombone version</span>") : QString(),
-                         todoPill(st));
+                    .arg(esc(bare(p->partName().toQString())), standInText, todoPill(st));
         }
         if (secParts == 0) {
             continue;

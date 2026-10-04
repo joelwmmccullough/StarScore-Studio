@@ -8,6 +8,8 @@
 #include "starscorehouse.h"
 #include "starscorepdf.h"
 #include "starscoreengraving.h"
+#include "organizer/orgcore.h"
+#include "organizer/orgstores.h"
 
 #include <algorithm>
 #include <map>
@@ -1525,13 +1527,133 @@ RetVal<QString> StarScoreService::createSection(const QString& templateKey, cons
     return RetVal<QString>::make_ok(section.id);
 }
 
-RetVal<QString> StarScoreService::createSectionFromTemplate(const QString& templateKey)
+RetVal<QString> StarScoreService::createSectionFromTemplate(const QString& templateKey, const QString& doublerInstrumentId,
+                                                            const QString& lowHornInstrumentId)
 {
     const std::optional<StarScoreSectionTemplate> t = sectionTemplate(templateKey);
     if (!t) {
         return RetVal<QString>::make_ret(Ret::Code::UnknownError);
     }
-    return createSection(t->key, t->name, t->instruments);
+    return createSection(t->key, t->name, templateInstrumentsFor(*t, doublerInstrumentId, lowHornInstrumentId));
+}
+
+std::vector<StarScoreHornChoice> StarScoreService::doublerChoices() const
+{
+    return {
+        { "soprano-saxophone", "Soprano Saxophone", "Soprano Sax" },
+        { "alto-saxophone", "Alto Saxophone", "Alto Sax" },
+        { "tenor-saxophone", "Tenor Saxophone", "Tenor Sax" },
+        { "bb-clarinet", "Clarinet", "Clarinet" },
+        { "bb-bass-clarinet", "Bass Clarinet", "Bass Clarinet" },
+        { "piccolo", "Piccolo", "Piccolo" },
+        { "flute", "Flute", "Flute" },
+    };
+}
+
+std::vector<StarScoreHornChoice> StarScoreService::lowHornChoices() const
+{
+    // The bass trombone first (the usual 7th horn), then the stand-in versions in the order they're made
+    return {
+        { "bass-trombone", "Bass Trombone", "Bass Trombone" },
+        { "baritone-saxophone", "Baritone Saxophone", "Bari Sax" },
+        { "bass-saxophone", "Bass Saxophone", "Bass Sax" },
+        { "bassoon", "Bassoon", "Bassoon" },
+        { "bb-bass-clarinet", "Bass Clarinet", "Bass Clarinet" },
+        { "contrabass-clarinet", "Contrabass Clarinet", "Contrabass Clarinet" },
+        { "contrabassoon", "Contrabassoon", "Contrabassoon" },
+        { "tuba", "Tuba", "Tuba" },
+    };
+}
+
+QString StarScoreService::lowHornName(const QString& instrumentId)
+{
+    // By the band's name rather than the id, so a bass clarinet in bass clef or an E♭ tuba counts as the same horn
+    static const QStringList LOW_HORNS { "Bass Trombone", "Bari Sax", "Bass Sax", "Bassoon", "Bass Clarinet",
+                                         "Contrabass Clarinet", "Contrabassoon", "Tuba" };
+    const QString name = starscore::bandHornName(instrumentId);
+    return LOW_HORNS.contains(name) ? name : QString();
+}
+
+std::vector<StarScoreHornChoice> StarScoreService::lowVersionsFor(const QString& mainInstrumentId) const
+{
+    const QString mainName = lowHornName(mainInstrumentId);
+    std::vector<StarScoreHornChoice> result;
+    for (const StarScoreHornChoice& c : lowHornChoices()) {
+        if (c.bandName != mainName) {
+            result.push_back(c);
+        }
+    }
+    return result;
+}
+
+std::vector<StarScoreInstrument> StarScoreService::templateInstrumentsFor(const StarScoreSectionTemplate& t,
+                                                                          const QString& doublerInstrumentId,
+                                                                          const QString& lowHornInstrumentId) const
+{
+    std::vector<StarScoreInstrument> instruments = t.instruments;
+    // Which chair the doubler takes: the alto in 3/4/5-Horn, the soprano in 6/7-Horn (the alto is a player of its own there)
+    QString doublerChair;
+    if (t.key == "3-horn" || t.key == "4-horn" || t.key == "5-horn") {
+        doublerChair = "alto-saxophone";
+    } else if (t.key == "6-horn" || t.key == "7-horn") {
+        doublerChair = "soprano-saxophone";
+    }
+    auto replaceChair = [&](const QString& chairId, const QString& withId, const std::vector<StarScoreHornChoice>& choices) {
+        if (withId.isEmpty() || withId == chairId) {
+            return;
+        }
+        for (const StarScoreHornChoice& c : choices) {
+            if (c.instrumentId != withId) {
+                continue;
+            }
+            for (StarScoreInstrument& inst : instruments) {
+                if (inst.instrumentId == chairId) {
+                    inst.instrumentId = c.instrumentId;
+                    inst.partName = c.partName;
+                    inst.shortName.clear();
+                    return;   // one chair only
+                }
+            }
+        }
+    };
+    if (!doublerChair.isEmpty()) {
+        replaceChair(doublerChair, doublerInstrumentId, doublerChoices());
+    }
+    if (t.key == "7-horn") {
+        replaceChair("bass-trombone", lowHornInstrumentId, lowHornChoices());
+    }
+    return instruments;
+}
+
+QString StarScoreService::rosterDoublerName() const
+{
+    const QString band = bandFolder();
+    if (band.isEmpty()) {
+        return QString();
+    }
+    starscore::org::Roster roster;
+    if (!roster.load(starscore::org::Paths::make(band, QString())).isEmpty()) {
+        return QString();   // there but unreadable: the label does without the name
+    }
+    // The 3-horn alto chair's player is the doubler
+    for (const starscore::org::Player* p : roster.currentHorns()) {
+        auto it = p->chairs.find(3);
+        if (it != p->chairs.end() && it->second.instrument.trimmed().compare("alto sax", Qt::CaseInsensitive) == 0) {
+            return p->name;
+        }
+    }
+    // Else whoever reads both the alto and the soprano
+    for (const starscore::org::Player* p : roster.currentHorns()) {
+        bool alto = false, soprano = false;
+        for (const QString& inst : p->instruments) {
+            alto |= inst.compare("Alto Sax", Qt::CaseInsensitive) == 0;
+            soprano |= inst.compare("Soprano Sax", Qt::CaseInsensitive) == 0;
+        }
+        if (alto && soprano) {
+            return p->name;
+        }
+    }
+    return QString();
 }
 
 RetVal<QString> StarScoreService::createSectionFromParts(const QString& name, const QStringList& partIds)
@@ -1606,7 +1728,8 @@ Ret StarScoreService::newStarScore(const StarScoreNewOptions& options)
             if (t.key != sectionKey) {
                 continue;
             }
-            for (const StarScoreInstrument& inst : t.instruments) {
+            // the dialog's doubler and 7th-horn choices take their chairs in the horn section
+            for (const StarScoreInstrument& inst : templateInstrumentsFor(t, options.doublerInstrumentId, options.lowHornInstrumentId)) {
                 const InstrumentTemplate& tpl = instrumentsRepository()->instrumentTemplate(String::fromQString(inst.instrumentId));
                 if (tpl.id.isEmpty()) {
                     LOGW() << "[starscore] unknown instrument: " << inst.instrumentId;

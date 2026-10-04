@@ -17,6 +17,18 @@ set(CPACK_PACKAGE_VERSION_MINOR "${MUSE_APP_VERSION_MINOR}")
 set(CPACK_PACKAGE_VERSION_PATCH "${MUSE_APP_VERSION_PATCH}")
 set(CPACK_PACKAGE_VERSION_BUILD "${CMAKE_BUILD_NUMBER}")
 set(CPACK_PACKAGE_VERSION "${MUSE_APP_VERSION_MAJOR}.${MUSE_APP_VERSION_MINOR}.${MUSE_APP_VERSION_PATCH}.${CPACK_PACKAGE_VERSION_BUILD}")
+
+# StarScore: the installer carries StarScore Studio's own version (STARSCORE_VERSION in version.cmake), not the
+# MuseScore version it is based on. With MuseScore's 4.7.5 every StarScore installer would have had the same
+# product version, and Windows could not tell a newer one from an older one. The major version also goes into
+# the ProgId suffix of the file-type registry keys (WIX.template.in), which keeps them apart from MuseScore Studio 4's.
+if(STARSCORE_VERSION)
+    string(REPLACE "." ";" STARSCORE_VERSION_PARTS "${STARSCORE_VERSION}")
+    list(GET STARSCORE_VERSION_PARTS 0 CPACK_PACKAGE_VERSION_MAJOR)
+    list(GET STARSCORE_VERSION_PARTS 1 CPACK_PACKAGE_VERSION_MINOR)
+    list(GET STARSCORE_VERSION_PARTS 2 CPACK_PACKAGE_VERSION_PATCH)
+    set(CPACK_PACKAGE_VERSION "${STARSCORE_VERSION}.${CPACK_PACKAGE_VERSION_BUILD}")
+endif()
 message("CPACK_PACKAGE_VERSION: ${CPACK_PACKAGE_VERSION}")
 
 set(git_date_string "")
@@ -39,7 +51,9 @@ if(MUSE_APP_UNSTABLE)
 endif(MUSE_APP_UNSTABLE)
 
 set(CPACK_PACKAGE_FILE_NAME "${MUSE_APP_NAME}-${MUSE_APP_VERSION}${git_date_string}")
-set(CPACK_PACKAGE_INSTALL_DIRECTORY ${MUSE_APP_NAME_VERSION})
+# StarScore: install into "Program Files\StarScore Studio". MUSE_APP_NAME_VERSION is "MuseScore 4" (kept for
+# compatibility), and installing there would overwrite a MuseScore Studio 4 installation on the same machine.
+set(CPACK_PACKAGE_INSTALL_DIRECTORY "${MUSE_APP_TITLE}")
 
 set(MUSESCORE_EXECUTABLE_NAME ${MUSE_APP_NAME}${MUSE_APP_VERSION_MAJOR})
 set(CPACK_PACKAGE_EXECUTABLES "${MUSESCORE_EXECUTABLE_NAME}" "${MUSE_APP_TITLE_VERSION}") # exe name, label

@@ -391,9 +391,12 @@ QVariantList StarScoreBarModel::sectionMenu(const QString& id) const
                       { "enabled", true } },
     };
     if (sevenHorn) {
-        // the Bass Trombone's other versions (Bari Sax, Bass Sax, Bassoon…): only the ones the section doesn't have
+        // the main low horn's other versions (Bari Sax, Bass Sax, Bassoon…): only the ones the section doesn't have.
+        // Named after the main low horn: the bass trombone, or whatever 7th horn the song was made with.
+        const QString mainName = starScore()->mainLowHorn(id).second;
         items.insert(4, QVariantMap { { "id", "sec-bass-versions:" + id },
-                                      { "title", muse::qtrc("starscore", "Make the Bass Trombone's other versions…") },
+                                      { "title", muse::qtrc("starscore", "Make the %1's other versions…")
+                                        .arg(mainName.isEmpty() ? QString("Bass Trombone") : mainName) },
                                       { "enabled", true } });
     }
     return items;

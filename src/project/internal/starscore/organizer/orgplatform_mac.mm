@@ -15,6 +15,8 @@
 #import <PDFKit/PDFKit.h>
 #import <WebKit/WebKit.h>
 
+#include <algorithm>
+
 #include <QFileInfo>
 
 namespace mu::project::starscore::org {
@@ -224,28 +226,51 @@ using mu::project::starscore::org::RenderJob;
             return;
         }
         const RenderJob& job = self->_jobs[self.index];
-        NSPrintInfo* pi = [[NSPrintInfo alloc] initWithDictionary:@{
-            NSPrintJobDisposition: NSPrintSaveJob,
-            NSPrintJobSavingURL: [NSURL fileURLWithPath:job.pdfPath.toNSString()] }];
-        pi.paperSize = NSMakeSize(612, 792);
-        pi.topMargin = job.marginTop;
-        pi.rightMargin = job.marginRight;
-        pi.bottomMargin = job.marginBottom;
-        pi.leftMargin = job.marginLeft;
-        pi.horizontalPagination = NSPrintingPaginationModeFit;
-        pi.verticalPagination = NSPrintingPaginationModeAutomatic;
-        pi.horizontallyCentered = NO;
-        pi.verticallyCentered = NO;
-        pi.orientation = NSPaperOrientationPortrait;
-        [pi.dictionary setObject:@NO forKey:NSPrintHeaderAndFooter];
-        NSPrintOperation* op = [self.view printOperationWithPrintInfo:pi];
-        op.showsPrintPanel = NO;
-        op.showsProgressPanel = NO;
-        op.view.frame = self.view.bounds;
-        [op runOperationModalForWindow:self.window delegate:self
-                        didRunSelector:@selector(printOperationDidRun:success:contextInfo:)
-                           contextInfo:(void*)(intptr_t)gen];
+        if (!job.pageHeightFromHtml) {
+            [self printJob:gen paperHeight:job.pageHeight];
+            return;
+        }
+        // StarScore chord charts: one page as tall as the page's script says (data-height, in points). The page is
+        // 480 CSS px wide and the paper 360 pt, so WebKit's print path scales it by 0.75 pt per px — the same scale
+        // Chromium printed the prototype at, which is what data-height was measured for.
+        [self.view evaluateJavaScript:@"document.body.dataset.height" completionHandler:^(id result, NSError* err) {
+            if (gen != self.generation) {
+                return;
+            }
+            double h = 0;
+            if ([result respondsToSelector:@selector(doubleValue)]) {
+                h = [result doubleValue];
+            }
+            const RenderJob& j = self->_jobs[self.index];
+            [self printJob:gen paperHeight:std::max(j.pageHeight, h > 0 ? h + 2 : 0.0)];
+        }];
     });
+}
+
+- (void)printJob:(int)gen paperHeight:(double)paperHeight
+{
+    const RenderJob& job = self->_jobs[self.index];
+    NSPrintInfo* pi = [[NSPrintInfo alloc] initWithDictionary:@{
+        NSPrintJobDisposition: NSPrintSaveJob,
+        NSPrintJobSavingURL: [NSURL fileURLWithPath:job.pdfPath.toNSString()] }];
+    pi.paperSize = NSMakeSize(job.pageWidth, paperHeight);
+    pi.topMargin = job.marginTop;
+    pi.rightMargin = job.marginRight;
+    pi.bottomMargin = job.marginBottom;
+    pi.leftMargin = job.marginLeft;
+    pi.horizontalPagination = NSPrintingPaginationModeFit;
+    pi.verticalPagination = NSPrintingPaginationModeAutomatic;
+    pi.horizontallyCentered = NO;
+    pi.verticallyCentered = NO;
+    pi.orientation = NSPaperOrientationPortrait;
+    [pi.dictionary setObject:@NO forKey:NSPrintHeaderAndFooter];
+    NSPrintOperation* op = [self.view printOperationWithPrintInfo:pi];
+    op.showsPrintPanel = NO;
+    op.showsProgressPanel = NO;
+    op.view.frame = self.view.bounds;
+    [op runOperationModalForWindow:self.window delegate:self
+                    didRunSelector:@selector(printOperationDidRun:success:contextInfo:)
+                       contextInfo:(void*)(intptr_t)gen];
 }
 
 - (void)printOperationDidRun:(NSPrintOperation*)op success:(BOOL)ok contextInfo:(void*)ctx
