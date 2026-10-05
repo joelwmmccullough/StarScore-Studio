@@ -123,12 +123,8 @@ SongColours songColours(const Paths& paths, const QString& songRoot, const QJson
         QStringList why = strings(t.value("missing"));
         for (const QString& p : strings(t.value("paths"))) {
             const int s = check.status(p);
-            // as for the folder colour: an empty chair in a Flexible folder (the 3-Horn's optional flute) doesn't
-            // hold the song back
-            const QString folderOfSheet = p.section('/', 0, -2);
-            if (s == 0 && (folderOfSheet.contains("Flexible") || folderOfSheet.contains("Any Horns"))) {
-                continue;
-            }
+            // (until 1.18.5 an empty sheet in a Flexible folder was skipped, for the old optional flute staff; an
+            // untagged chair counts as empty, so a Flexible folder whose Horn 3 had no tag came out Green)
             if (s < need) {
                 why << (s < 0 ? (check.exists(p) ? QString("%1: not exported from StarScore as it is now").arg(p)
                                  : QString("%1: missing").arg(p))
@@ -179,15 +175,9 @@ SongColours songColours(const Paths& paths, const QString& songRoot, const QJson
         int least = 4;
         int counted = 0;
         const QStringList files = QDir(abs).entryList({ "*.pdf", "*.PDF" }, QDir::Files, QDir::Name);
-        // In a Flexible ("Any Horns") folder, a chair's sheet with nothing in it (the 3-Horn's optional flute) doesn't
-        // hold the folder back
-        const bool flexible = folder.contains("Flexible") || folder.contains("Any Horns");
         for (const QString& f : files) {
             if (!f.startsWith('.') && !percussion.match(f).hasMatch()) {
                 const int st = check.status(folder + "/" + f);
-                if (flexible && st == 0) {
-                    continue;
-                }
                 least = std::min(least, st);
                 ++counted;
             }

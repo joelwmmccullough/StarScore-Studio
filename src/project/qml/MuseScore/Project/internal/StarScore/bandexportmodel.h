@@ -13,6 +13,8 @@
 #include "modularity/ioc.h"
 #include "iinteractive.h"
 #include "project/istarscoreservice.h"
+#include "project/iprojectfilescontroller.h"
+#include "context/iglobalcontext.h"
 
 namespace mu::project {
 //! "Export to Sheets and Demos": every planned sheet with a tick box, grouped under a header row per folder.
@@ -43,6 +45,8 @@ class BandExportModel : public QAbstractListModel, public muse::Contextable
 
     muse::ContextInject<IStarScoreService> starScore = { this };
     muse::ContextInject<muse::IInteractive> interactive = { this };
+    muse::ContextInject<IProjectFilesController> projectFilesController = { this };
+    muse::ContextInject<context::IGlobalContext> globalContext = { this };
 
 public:
     explicit BandExportModel(QObject* parent = nullptr);
@@ -82,6 +86,8 @@ public:
 
     //! Remembers the ticks, writes the ticked sheets and returns a summary (also kept in `result`)
     Q_INVOKABLE QString exportNow();
+    //! Whether the last exportNow() exported (false: cancelled at the save question, or the save failed)
+    Q_INVOKABLE bool lastExportRan() const { return m_exportRan; }
 
 signals:
     void loaded();
@@ -118,6 +124,7 @@ private:
     std::vector<Item> m_items;
     QString m_version;
     int m_bump = 0;
+    bool m_exportRan = false;
     int m_suggestedBump = 0;
     QString m_suggestionText;
     bool m_newSong = false;

@@ -730,6 +730,23 @@ void StarScoreService::fillAnyHornsFromStandard(const StarScoreSection& anySecti
 //  versionsFor() says which versions a part gets; versionMains() lists a section's parts that get any.
 // ---------------------------------------------------------------------------
 
+//! A 7-Horn section's 7th chair: its last low horn that isn't a stand-in version (a Bass Clarinet doubler earlier in
+//! the section is a low horn too, but not the 7th chair). Empty for other sections.
+static QString starscoreSeventhChair(const mu::engraving::MasterScore* ms, const StarScoreSection& s)
+{
+    QString last;
+    if (!ms || s.templateKey != "7-horn") {
+        return last;
+    }
+    for (const QString& pid : s.partIds) {
+        const mu::engraving::Part* p = ms->partById(muse::ID(pid));
+        if (p && !s.alternates.count(pid) && !StarScoreService::lowHornName(p->instrumentId().toQString()).isEmpty()) {
+            last = pid;
+        }
+    }
+    return last;
+}
+
 std::vector<std::pair<QString, QString> > StarScoreService::versionMains(const QString& sectionId) const
 {
     std::vector<std::pair<QString, QString> > out;
@@ -741,9 +758,10 @@ std::vector<std::pair<QString, QString> > StarScoreService::versionMains(const Q
         if (s.id != sectionId) {
             continue;
         }
+        const QString seventh = starscoreSeventhChair(ms, s);
         for (const QString& pid : s.partIds) {
             const engraving::Part* p = ms->partById(ID(pid));
-            if (!p || s.alternates.count(pid)) {
+            if (!p || s.alternates.count(pid) || (!seventh.isEmpty() && pid != seventh && !lowHornName(p->instrumentId().toQString()).isEmpty())) {
                 continue;
             }
             const QString inst = p->instrumentId().toQString();
@@ -765,15 +783,9 @@ std::pair<QString, QString> StarScoreService::mainLowHorn(const QString& section
         if (s.id != sectionId) {
             continue;
         }
-        for (const QString& pid : s.partIds) {
-            const engraving::Part* p = ms->partById(ID(pid));
-            if (!p || s.alternates.count(pid)) {
-                continue;
-            }
-            const QString name = lowHornName(p->instrumentId().toQString());
-            if (!name.isEmpty()) {
-                return { pid, name };
-            }
+        const QString seventh = starscoreSeventhChair(ms, s);
+        if (!seventh.isEmpty()) {
+            return { seventh, lowHornName(ms->partById(ID(seventh))->instrumentId().toQString()) };
         }
     }
     return {};
@@ -807,12 +819,17 @@ void StarScoreService::offerLowAlternates(const QStringList& partIds, bool asked
     QStringList missing;   // instrument ids of the versions the line doesn't have yet
     std::vector<StarScoreHornChoice> all;   // every version the main part can have, in order
     for (const StarScoreSection& s : data.sections) {
+        const QString seventh = starscoreSeventhChair(ms, s);
         for (const QString& pid : partIds) {
             const engraving::Part* p = ms->partById(ID(pid));
             if (!p || !s.partIds.contains(pid) || s.alternates.count(pid)) {
                 continue;
             }
             const QString mainInstrument = p->instrumentId().toQString();
+            // in a 7-Horn section only the 7th chair has low-horn versions (not a Bass Clarinet doubler)
+            if (!seventh.isEmpty() && pid != seventh && !lowHornName(mainInstrument).isEmpty()) {
+                continue;
+            }
             const std::vector<StarScoreHornChoice> versions = versionsFor(mainInstrument, s.templateKey);
             if (versions.empty()) {
                 continue;
@@ -828,8 +845,11 @@ void StarScoreService::offerLowAlternates(const QStringList& partIds, bool asked
                     }
                 }
             }
-            for (const QString& other : s.partIds) {
-                if (other != pid) {
+            // (in a 7-Horn section only parts after the 7th chair: a Bass Clarinet doubler before it is no version)
+            const int from = seventh.isEmpty() ? 0 : int(s.partIds.indexOf(seventh));
+            for (int i = 0; i < s.partIds.size(); ++i) {
+                const QString& other = s.partIds.at(i);
+                if (other != pid && i >= from) {
                     if (const engraving::Part* a = ms->partById(ID(other))) {
                         have << starscore::bandHornName(a->instrumentId().toQString());
                     }

@@ -4,6 +4,22 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.5
+
+- **Horn section Scores in the house order, with brackets.** Each exported Score lists and brackets its staves as follows (whatever order the instruments are in the song):
+  - Flexible: Horn 1, Horn 2 (, Horn 3), all bracketed.
+  - 2- to 4-Horn Standard: all bracketed. The doubler takes its place: Flute and Piccolo at the top, Clarinet and Soprano Sax after the trumpet, Bass Clarinet after the tenor (and the trombone). Two tenors are Tenor Sax 1 and 2.
+  - 5-Horn: trumpets bracketed, saxes and clarinet bracketed, trombone alone. With Flute or Bass Clarinet: all bracketed. With Piccolo: piccolo and flute bracketed, trumpets bracketed, tenor and trombone alone.
+  - 6- and 7-Horn: trumpets bracketed, saxes and clarinet bracketed, trombone alone, the 7th horn alone. With Flute: flute alone. With Bass Clarinet: bass clarinet alone in 6-Horn, bracketed with the 7th horn in 7-Horn. With Piccolo: piccolo and flute bracketed.
+  - Piccolo: the Score also shows its Flute version (the flute is what's usually played), and the piccolo's staff is a small staff. In 2- to 4-Horn, piccolo and flute also get a curly brace, left of the bracket.
+  - Big Band, Orchestra and Marching Band: section by section (saxes, trumpets, trombones, rhythm; woodwinds, brass, percussion, strings; woodwinds, brass, front ensemble, battery), each bracketed except the big band's rhythm section; a piano keeps its brace.
+- **Flexible Scores name the chairs H1, H2, H3** on every system after the first (the chairs used to show their instrument's short name, "Tpt. 1", "Tbn. 1"). New Flexible sections get these short names in the song too.
+- **Save before exporting.** Export to Sheets and Demos now asks "Exporting can occasionally cause StarScore to crash. Would you like to save first?" Yes saves and exports only once the save has worked; No exports without saving; Cancel Export goes back to the list.
+- **Flexible folder colours count every chair.** A Flexible folder whose chair had no status tag (Top Hat's Horn 3) came out Green: sheets with an "empty" status were skipped there, a rule meant for the old optional flute staff, and an untagged chair counts as empty. Flexible folders now colour like any other.
+- **Add arrangement only lists arrangements the song doesn't have yet.**
+- **A Tenor Sax doubler is Tenor Sax 2.** New Standard sections with the doubler on Tenor Sax put the doubler after the section's own tenor, so it is numbered 2.
+- **7-Horn with a Bass Clarinet doubler:** only the 7th chair gets the low-horn versions and goes in the "Bass Horns (Horn #7)" folder. Before, the Bass Clarinet doubler could be taken for the 7th horn, and the 7th horn's own Bass Clarinet version wasn't made.
+
 ## 1.18.4
 
 - **The Flexible Flute sheet stays in a flute's range.** On export, the Horn 1 Flute sheet is printed as the chair is when every note is between C4 and C7; if even one note is outside, the whole sheet is printed an octave up. Bet's Horn 1 goes down to E3 (87 notes below a flute's low C), so its Flute sheet is now an octave up. A Flute sheet made into its own part ("Edit one sheet by hand") starts the same way.

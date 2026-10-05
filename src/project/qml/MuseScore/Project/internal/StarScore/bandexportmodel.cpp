@@ -316,6 +316,7 @@ void BandExportModel::saveTicks()
 
 QString BandExportModel::exportNow()
 {
+    m_exportRan = false;
     saveTicks();
 
     QStringList paths;
@@ -329,6 +330,35 @@ QString BandExportModel::exportNow()
         return m_result;
     }
 
+    // Exporting can occasionally crash StarScore: offered a save first. Yes saves and goes on only once the save has
+    // worked (the score has nothing unsaved left); No exports without saving; Cancel Export stops.
+    {
+        constexpr int Yes = static_cast<int>(muse::IInteractive::Button::CustomButton) + 1;
+        constexpr int No = static_cast<int>(muse::IInteractive::Button::CustomButton) + 2;
+        constexpr int Cancel = static_cast<int>(muse::IInteractive::Button::CustomButton) + 3;
+        const muse::IInteractive::Result answer = interactive()->questionSync(
+            muse::trc("starscore", "Save first?"),
+            muse::trc("starscore", "Exporting can occasionally cause StarScore to crash. Would you like to save first?"), {
+            muse::IInteractive::ButtonData(Cancel, muse::trc("starscore", "Cancel Export")),
+            muse::IInteractive::ButtonData(No, muse::trc("starscore", "No")),
+            muse::IInteractive::ButtonData(Yes, muse::trc("starscore", "Yes"), true),
+        }, Yes);
+        if (answer.button() == Yes) {
+            INotationProjectPtr project = globalContext()->currentProject();
+            const bool saved = project && projectFilesController()->saveProject() && !project->needSave().val;
+            if (!saved) {
+                interactive()->error(muse::trc("starscore", "Not saved"),
+                                     muse::trc("starscore", "The score couldn't be saved, so nothing was exported. Save it "
+                                                            "(File › Save), then export again."));
+                setResult(muse::qtrc("starscore", "Not exported: the score couldn't be saved first."));
+                return m_result;
+            }
+        } else if (answer.button() != No) {
+            setResult(muse::qtrc("starscore", "Export cancelled."));
+            return m_result;
+        }
+    }
+
     // The version printed on these sheets (and kept in the score for next time)
     const QString version = exportVersion();
     starScore()->setScoreVersion(version);
@@ -337,6 +367,7 @@ QString BandExportModel::exportNow()
     emit loaded();
     emit bumpChanged();
 
+    m_exportRan = true;
     muse::RetVal<QString> summary = starScore()->exportToBandFolder(paths);
     if (!summary.ret) {
         setResult(muse::qtrc("starscore", "Export failed: %1").arg(QString::fromStdString(summary.ret.toString())));

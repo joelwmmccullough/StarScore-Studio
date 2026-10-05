@@ -214,10 +214,13 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
                 }
                 autotestLog(QString("  main part: %1 (%2, %3) in %4").arg(p->partName().toQString(), p->instrumentId().toQString(),
                                                                          mainName, s.templateKey));
-                QStringList have;
-                for (const QString& other : s.partIds) {
-                    if (const engraving::Part* a = ms->partById(ID(other))) {
-                        have << starscore::bandHornName(a->instrumentId().toQString());
+                QStringList have;   // (as offerLowAlternates: in a 7-Horn section, only parts from the main one on)
+                const int from = s.templateKey == "7-horn" ? int(s.partIds.indexOf(pid)) : 0;
+                for (int i = std::max(0, from); i < s.partIds.size(); ++i) {
+                    if (const engraving::Part* a = ms->partById(ID(s.partIds.at(i)))) {
+                        if (s.partIds.at(i) != pid) {
+                            have << starscore::bandHornName(a->instrumentId().toQString());
+                        }
                     }
                 }
                 QStringList missing;

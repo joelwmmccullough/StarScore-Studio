@@ -1185,6 +1185,12 @@ std::vector<StarScoreSectionTemplate> StarScoreService::sectionTemplates() const
         i.maxPitchA = maxA;
         i.minPitchP = minP;
         i.maxPitchP = maxP;
+        // a chair's short name, on the score's systems after the first: "H1", not the instrument's "Tpt. 1"
+        static const QRegularExpression hornRe("^Horn (\\d+)$");
+        const QRegularExpressionMatch m = hornRe.match(QString::fromUtf8(name));
+        if (m.hasMatch()) {
+            i.shortName = "H" + m.captured(1);
+        }
         return i;
     };
 
@@ -1657,6 +1663,18 @@ std::vector<StarScoreInstrument> StarScoreService::templateInstrumentsFor(const 
     };
     if (!doublerChair.isEmpty()) {
         replaceChair(doublerChair, doublerInstrumentId, doublerChoices());
+        // a tenor doubler is Tenor Sax 2, never 1: it goes after the section's own tenor (names are numbered in order)
+        if (doublerInstrumentId == "tenor-saxophone") {
+            auto first = std::find_if(instruments.begin(), instruments.end(),
+                                      [](const StarScoreInstrument& i) { return i.instrumentId == "tenor-saxophone"; });
+            auto second = first == instruments.end() ? first
+                          : std::find_if(first + 1, instruments.end(),
+                                         [](const StarScoreInstrument& i) { return i.instrumentId == "tenor-saxophone"; });
+            if (second != instruments.end()) {
+                // the doubler sits in the earlier (alto or soprano) chair: moved to just after the tenor chair
+                std::rotate(first, first + 1, second + 1);
+            }
+        }
     }
     if (t.key == "7-horn") {
         replaceChair("bass-trombone", lowHornInstrumentId, lowHornChoices());

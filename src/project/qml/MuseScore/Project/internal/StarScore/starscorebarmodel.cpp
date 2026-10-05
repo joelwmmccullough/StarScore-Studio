@@ -426,7 +426,12 @@ QVariantList StarScoreBarModel::addArrangementMenu() const
     const std::vector<StarScoreSection> existing = starScore()->sections();
     std::vector<StarScoreSectionTemplate> sectionTpls = starScore()->sectionTemplates();
 
+    const std::vector<StarScoreArrangement> have = starScore()->arrangements();
     for (const StarScoreArrangementTemplate& t : starScore()->arrangementTemplates()) {
+        // an arrangement the song already has isn't offered again
+        if (std::any_of(have.begin(), have.end(), [&](const StarScoreArrangement& a) { return a.templateKey == t.key; })) {
+            continue;
+        }
         QStringList toCreate;
         for (const QString& key : t.sectionKeys) {
             const bool exists = std::any_of(existing.begin(), existing.end(), [&](const StarScoreSection& s) {

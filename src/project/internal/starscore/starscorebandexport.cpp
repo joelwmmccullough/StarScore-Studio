@@ -772,7 +772,11 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
             }
             QStringList scoreParts;
             for (const QString& pid : sec.partIds) {
-                if (!sec.alternates.count(pid)) {
+                // stand-in versions aren't on the Score, except a piccolo's Flute: that's what's usually played
+                const auto alt = sec.alternates.find(pid);
+                const engraving::Part* mainPart = alt != sec.alternates.end() ? partById(alt->second) : nullptr;
+                if (alt == sec.alternates.end()
+                    || (mainPart && starscoreHornName(mainPart->instrumentId().toQString()) == "Piccolo")) {
                     scoreParts << pid;
                 }
             }
@@ -787,11 +791,16 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
                     bassHorns.insert(alt);
                     bassHorns.insert(main);
                 }
+                // the 7th chair: the last low horn that isn't a stand-in (a Bass Clarinet doubler stays in the main folder)
+                QString seventh;
                 for (const auto& [pid, horn] : horns) {
                     const engraving::Part* p = ms->partById(ID(pid));
-                    if (horn == "Bass Trombone" || (p && !StarScoreService::lowHornName(p->instrumentId().toQString()).isEmpty())) {
-                        bassHorns.insert(pid);
+                    if (!sec.alternates.count(pid) && p && !StarScoreService::lowHornName(p->instrumentId().toQString()).isEmpty()) {
+                        seventh = pid;
                     }
+                }
+                if (!seventh.isEmpty()) {
+                    bassHorns.insert(seventh);
                 }
             }
 
@@ -1366,6 +1375,273 @@ static Ret starscorePdfBytes(const INotationWriterPtr& writer, const INotationPt
     return ret;
 }
 
+//! How a horn-section Score is laid out: its staves top to bottom, the brackets, and the small staves (Joel's list,
+//! 5 Oct 2026). valid false: the Score keeps the song's own order and brackets (custom sections).
+struct StarScoreScoreLayout {
+    bool valid = false;
+    QStringList order;                    // part ids, top to bottom
+    struct Group {
+        QStringList partIds;              // consecutive in order
+        mu::engraving::BracketType type = mu::engraving::BracketType::NORMAL;
+        size_t column = 0;                // 0 next to the staves; a higher column is further left
+    };
+    std::vector<Group> groups;            // added in this order
+    QStringList small;                    // parts on small staves (the piccolo)
+    std::map<QString, QString> shortNames;   // part id -> short name on the systems after the first (Flexible: "H1")
+};
+
+static StarScoreScoreLayout starscoreScoreLayout(const mu::engraving::MasterScore* ms, const std::vector<StarScoreSection>& sections,
+                                                 const QStringList& partIds)
+{
+    using mu::engraving::BracketType;
+    StarScoreScoreLayout out;
+    std::map<QString, const StarScoreSection*> secOf;
+    for (const StarScoreSection& s : sections) {
+        for (const QString& pid : s.partIds) {
+            if (partIds.contains(pid) && !secOf.count(pid)) {
+                secOf[pid] = &s;
+            }
+        }
+    }
+    if (!ms || partIds.isEmpty() || secOf.size() != size_t(partIds.size())) {
+        return out;
+    }
+    auto partOf = [&](const QString& pid) { return ms->partById(muse::ID(pid)); };
+    auto numberOf = [&](const QString& pid) {
+        static const QRegularExpression numRe("(\\d+)\\s*$");
+        const mu::engraving::Part* p = partOf(pid);
+        const QRegularExpressionMatch m = numRe.match(p ? p->partName().toQString() : QString());
+        return m.hasMatch() ? m.captured(1).toInt() : 0;
+    };
+    auto bracket = [&](const QStringList& pids, BracketType type = BracketType::NORMAL, size_t column = 0) {
+        if (pids.size() >= 2) {
+            out.groups.push_back({ pids, type, column });
+        }
+    };
+    const StarScoreSection* first = secOf[partIds.front()];
+    const QString key = first->templateKey;
+
+    // Big Band, Orchestra, Marching Band: section by section, each bracketed (the big band's rhythm section isn't)
+    static const std::map<QString, QStringList> FAMILY {
+        { "bigband", { "bigband-saxes", "bigband-trumpets", "bigband-trombones", "bigband-rhythm" } },
+        { "orch", { "orch-woodwinds", "orch-brass", "orch-percussion", "orch-strings" } },
+        { "marching", { "marching-woodwinds", "marching-brass", "marching-front", "marching-battery" } },
+    };
+    const auto family = FAMILY.find(key.section('-', 0, 0));
+    if (family != FAMILY.end()) {
+        for (const QString& sk : family->second) {
+            QStringList group;
+            for (const StarScoreSection& s : sections) {
+                if (s.templateKey != sk) {
+                    continue;
+                }
+                for (const QString& pid : s.partIds) {
+                    if (partIds.contains(pid) && !out.order.contains(pid)) {
+                        group << pid;
+                    }
+                }
+            }
+            out.order << group;
+            if (sk != "bigband-rhythm") {
+                bracket(group);
+            }
+        }
+        for (const QString& pid : partIds) {
+            if (!out.order.contains(pid)) {
+                out.order << pid;
+            }
+        }
+        out.valid = true;
+        return out;
+    }
+
+    // Flexible: Horn 1, Horn 2 (, Horn 3), all bracketed
+    static const QRegularExpression anyRe("^\\d+-horn-any$");
+    if (anyRe.match(key).hasMatch()) {
+        for (const auto& [pid, number] : starscoreFlexibleChairs(ms, *first)) {
+            if (partIds.contains(pid)) {
+                out.order << pid;
+                out.shortNames[pid] = QString("H%1").arg(number);   // a chair, not an instrument: not "Tpt. 1"
+            }
+        }
+        for (const QString& pid : partIds) {
+            if (!out.order.contains(pid)) {
+                out.order << pid;
+            }
+        }
+        bracket(out.order);
+        out.valid = true;
+        return out;
+    }
+
+    // Standard 2- to 7-Horn
+    static const QRegularExpression stdRe("^([2-7])-horn$");
+    const QRegularExpressionMatch sm = stdRe.match(key);
+    if (!sm.hasMatch()) {
+        return out;
+    }
+    const int horns = sm.captured(1).toInt();
+    // the 7th chair ("bass inst."): the section's last low horn that isn't a stand-in version
+    QString bassPid;
+    if (horns == 7) {
+        for (const QString& pid : first->partIds) {
+            const mu::engraving::Part* p = partOf(pid);
+            if (p && partIds.contains(pid) && !first->alternates.count(pid)
+                && !StarScoreService::lowHornName(p->instrumentId().toQString()).isEmpty()) {
+                bassPid = pid;
+            }
+        }
+    }
+    auto nameOf = [&](const QString& pid) {
+        const mu::engraving::Part* p = partOf(pid);
+        return pid == bassPid ? QString("bass") : p ? starscoreHornName(p->instrumentId().toQString()) : QString();
+    };
+    static const std::map<QString, int> RANK {
+        { "Piccolo", 0 }, { "Flute", 1 }, { "Trumpet", 2 }, { "Flugelhorn", 3 }, { "Clarinet", 4 }, { "Soprano Sax", 5 },
+        { "Alto Sax", 6 }, { "Tenor Sax", 7 }, { "Bari Sax", 8 }, { "Trombone", 9 }, { "Bass Trombone", 10 },
+        { "Bass Clarinet", 11 }, { "bass", 30 },
+    };
+    out.order = partIds;
+    std::stable_sort(out.order.begin(), out.order.end(), [&](const QString& a, const QString& b) {
+        const auto ra = RANK.find(nameOf(a)), rb = RANK.find(nameOf(b));
+        const int ka = ra != RANK.end() ? ra->second : 20, kb = rb != RANK.end() ? rb->second : 20;
+        return ka != kb ? ka < kb : numberOf(a) < numberOf(b);
+    });
+    QMap<QString, int> count;
+    for (const QString& pid : out.order) {
+        count[nameOf(pid)]++;
+    }
+    QString doubler;
+    if (count.value("Piccolo")) {
+        doubler = "pic";
+    } else if (count.value("Flute")) {
+        doubler = "flu";
+    } else if (count.value("Clarinet")) {
+        doubler = "cla";
+    } else if (count.value("Bass Clarinet")) {
+        doubler = "bcl";
+    } else if (count.value("Tenor Sax") >= 2) {
+        doubler = "ten";
+    } else {
+        doubler = "sax";   // alto (3-5H) or soprano (6-7H)
+    }
+    auto of = [&](const QStringList& names) {
+        QStringList pids;
+        for (const QString& pid : out.order) {
+            if (names.contains(nameOf(pid))) {
+                pids << pid;
+            }
+        }
+        return pids;
+    };
+    const QStringList trumpets = of({ "Trumpet", "Flugelhorn" });
+    const QStringList reeds = of({ "Clarinet", "Soprano Sax", "Alto Sax", "Tenor Sax", "Bari Sax" });
+    const QStringList flutes = of({ "Piccolo", "Flute" });
+    if (horns <= 4) {
+        // all in one bracket; a piccolo and its flute also in a brace, left of the bracket
+        bracket(out.order);
+        if (doubler == "pic") {
+            bracket(flutes, BracketType::BRACE, 1);
+        }
+    } else if (horns == 5 && (doubler == "flu" || doubler == "bcl")) {
+        bracket(out.order);
+    } else if (horns == 5 && doubler == "pic") {
+        bracket(flutes);
+        bracket(trumpets);
+    } else {
+        if (doubler == "pic") {
+            bracket(flutes);
+        }
+        bracket(trumpets);
+        bracket(reeds);
+        if (horns == 7 && doubler == "bcl") {
+            bracket(of({ "Bass Clarinet", "bass" }));
+        }
+    }
+    out.small = of({ "Piccolo" });
+    out.valid = true;
+    return out;
+}
+
+//! Lays a Score copy out as `layout` says: the parts in that order at the top (the others after them, hidden), every
+//! bracket replaced (a part of several staves keeps its brace), the small staves. A throwaway copy: nothing is undone.
+static void starscoreApplyScoreLayout(const IMasterNotationPtr& m, const StarScoreScoreLayout& layout)
+{
+    using namespace mu::engraving;
+    MasterScore* cs = m->masterScore();
+    // order
+    PartInstrumentList list;
+    std::vector<const Part*> rest;
+    for (const QString& pid : layout.order) {
+        if (const Part* p = cs->partById(muse::ID(pid))) {
+            PartInstrument pi;
+            pi.isExistingPart = true;
+            pi.partId = p->id();
+            list << pi;
+        }
+    }
+    for (const Part* p : cs->parts()) {
+        if (!layout.order.contains(p->id().toQString())) {
+            PartInstrument pi;
+            pi.isExistingPart = true;
+            pi.partId = p->id();
+            list << pi;
+        }
+    }
+    ScoreOrder order = m->parts()->scoreOrder();
+    order.customized = true;
+    m->parts()->setParts(list, order);
+
+    // brackets
+    for (Staff* st : cs->staves()) {
+        for (size_t c = 0; c < st->bracketLevels(); ++c) {
+            st->setBracketType(c, BracketType::NO_BRACKET);
+        }
+    }
+    auto setBracket = [&](Staff* top, size_t column, BracketType type, size_t span) {
+        top->setBracketType(column, type);
+        top->setBracketSpan(column, span);
+    };
+    bool braced = false;   // a piano's brace takes column 0; section brackets go outside it
+    for (const QString& pid : layout.order) {
+        const Part* p = cs->partById(muse::ID(pid));
+        if (p && p->nstaves() > 1) {
+            setBracket(p->staves().front(), 0, BracketType::BRACE, p->nstaves());
+            braced = true;
+        }
+    }
+    for (const StarScoreScoreLayout::Group& g : layout.groups) {
+        Staff* top = nullptr;
+        size_t span = 0;
+        for (const QString& pid : g.partIds) {
+            if (const Part* p = cs->partById(muse::ID(pid))) {
+                if (!top && !p->staves().empty()) {
+                    top = p->staves().front();
+                }
+                span += p->nstaves();
+            }
+        }
+        if (top && span >= 2) {
+            setBracket(top, g.column + (braced && g.type == BracketType::NORMAL ? 1 : 0), g.type, span);
+        }
+    }
+    // short names
+    for (const auto& [pid, name] : layout.shortNames) {
+        if (Part* p = cs->partById(muse::ID(pid))) {
+            p->setShortNameAll(muse::String::fromQString(name));
+        }
+    }
+    // small staves
+    for (const QString& pid : layout.small) {
+        if (const Part* p = cs->partById(muse::ID(pid))) {
+            for (Staff* st : p->staves()) {
+                st->setProperty(Pid::SMALL, true);
+            }
+        }
+    }
+    cs->setLayoutAll();
+}
+
 //! A sheet as the export prints it, in ONE full layout. Inside a command and in page view: the title texts (the
 //! instrument name top left, the arrangement top right) are set, the sheet is laid out once, the arrangement label is
 //! levelled with the instrument name and the composer credit moved clear of it (both measure that layout; each lays
@@ -1818,11 +2094,17 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
 
     // A Score: the scratch copy with only the score's instruments showing
     auto writeScore = [&](const StarScoreBandFile& file, QByteArray& pdf) -> Ret {
-        INotationProjectPtr p = scratchProject();
+        // A horn section's Score in the house order and brackets (Joel's list): on a copy of its own, as it reorders
+        // the parts; any other Score as the song has it, on the shared copy
+        const StarScoreScoreLayout layout = starscoreScoreLayout(ms, loadFrom(ms).sections, file.partIds);
+        INotationProjectPtr p = layout.valid ? loadStripped() : scratchProject();
         if (!p) {
             return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "couldn't make the score copy"));
         }
         engraving::MasterScore* cs = p->masterNotation()->masterScore();
+        if (layout.valid) {
+            starscoreApplyScoreLayout(p->masterNotation(), layout);
+        }
         std::vector<std::pair<muse::ID, bool> > vis;
         for (const engraving::Part* part : cs->parts()) {
             vis.emplace_back(part->id(), file.partIds.contains(idText(part)));

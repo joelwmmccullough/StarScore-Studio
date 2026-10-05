@@ -262,8 +262,12 @@ StyledDialogView {
                 buttonRole: ButtonBoxModel.ApplyRole
                 buttonId: ButtonBoxModel.CustomButton + 1
                 onClicked: {
-                    root.done = true
                     exportModel.exportNow()    // its summary shows through exportModel.result
+                    // cancelled at "Save first?" (or the save failed): the list stays, nothing else happens
+                    if (!exportModel.lastExportRan()) {
+                        return
+                    }
+                    root.done = true
                     if (exportModel.runOrganizer) {
                         exportModel.openOrganizer()
                         root.hide()
