@@ -89,8 +89,8 @@ Item {
 
             model: [
                 { "name": "dashboard", "title": qsTrc("starscore", "Dashboard"), "iconCode": IconCode.STAR },
-                { "name": "songbooks", "title": qsTrc("starscore", "Songbooks"), "iconCode": IconCode.SCORE },
-                { "name": "scores", "title": qsTrc("appshell", "Scores"), "iconCode": IconCode.MUSIC_NOTES },
+                // (the Scores page is the left half of the Dashboard since 1.18.3)
+                { "name": "songbooks", "title": qsTrc("starscore", "Joel's Secrets"), "iconCode": IconCode.LOCK_CLOSED },
                 { "name": "extensions", "title": qsTrc("appshell", "Plugins"), "iconCode":  IconCode.PLUGIN },
                 { "name": "musesounds", "title": qsTrc("appshell", "MuseSounds"), "iconCode": IconCode.PLAY },
                 { "name": "learn", "title": qsTrc("appshell", "Learn"), "iconCode":  IconCode.MORTAR_BOARD },

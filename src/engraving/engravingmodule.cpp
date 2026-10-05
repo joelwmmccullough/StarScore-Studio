@@ -21,6 +21,9 @@
  */
 #include "engravingmodule.h"
 
+#include <QFont>
+#include <QFontDatabase>
+
 #include "modularity/ioc.h"
 #include "global/allocator.h"
 
@@ -179,6 +182,13 @@ void EngravingModule::onInit(const IApplication::RunMode&)
         fdb->addFont(FontDataKey(u"Edwin", true, true), ":/fonts/edwin/Edwin-BdIta.otf");
         // StarScore: Jost SemiBold (OFL), renamed, for chord symbols
         fdb->addFont(FontDataKey(u"StarScore Jost", false, false), ":/fonts/starscorejost/StarScoreJost.ttf");
+        // StarScore: Jost (SIL OFL), shipped so the house style looks the same on every computer (fonts/starsign/README.md):
+        // italics, and Futura's stand-in where Futura isn't installed (Futura comes with macOS only)
+        fdb->addFont(FontDataKey(u"Jost", false, false), ":/fonts/starsign/Jost-VariableFont_wght.ttf");
+        fdb->addFont(FontDataKey(u"Jost", false, true), ":/fonts/starsign/Jost-Italic-VariableFont_wght.ttf");
+        if (!QFontDatabase::hasFamily("Futura")) {
+            QFont::insertSubstitution("Futura", "Jost");
+        }
 
         // MusicSymbol[Text]
         auto addMusicFont = [this, fdb](const std::string& name, const FontDataKey& fontDataKey, const muse::io::path_t& filePath){

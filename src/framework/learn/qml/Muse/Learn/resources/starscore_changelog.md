@@ -4,6 +4,13 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.3
+
+- **One home page.** The Dashboard now shows your recent scores on the left and the Starsign dashboard on the right (drag the line between them to resize). The separate Scores page is gone, and so are "My online scores" and the "Score manager (online)" button. The dashboard's buttons wrap under its text when its half is narrow, and Next up / By priority stack when there isn't room side by side.
+- **Joel's Secrets.** The Songbooks page is now called Joel's Secrets and asks for a password. The first time it's opened you choose the password; after that it's asked for once each time StarScore starts (the lock button top right closes it again). The password is kept as a hash in this computer's settings. It stops the page being opened by accident or by someone else at this computer; the songbook files themselves aren't encrypted.
+- **New songs start at version 0.0.0.** The first export of a new song suggests Major version, making it 1.0.0; tick Minor version (0.1.0) or Patch (0.0.1) instead for a work-in-progress export.
+- **Jost ships with StarScore.** Jost (free licence) is built into the app for italic texts, and it stands in for Futura on computers that don't have Futura (Windows, Linux). Macs keep using their own Futura. TT Modernoir is not bundled: its trial licence allows internal testing and evaluation only and doesn't allow passing the font on.
+
 ## 1.18.2
 
 - **Horn 1's Flute sheet is made from Horn 1.** The 3-Horn Flexible "Horn 1 - Flute" sheet is now made from the Horn 1 part score like Horn 1's other sheets, with its formatting. Until now it came from a hidden "Horn 1 (Flute)" staff with a part score of its own that had to be formatted by hand (Bet's Flute sheet had the old title style and the wide pickup bar). New 3-Horn Flexible sections no longer get that staff; in existing songs it stays in the file but isn't used.

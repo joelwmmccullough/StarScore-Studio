@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/">
+        <file alias="fonts/starsign/Jost-VariableFont_wght.ttf">../../../../fonts/starsign/Jost-VariableFont_wght.ttf</file>
+        <file alias="fonts/starsign/Jost-Italic-VariableFont_wght.ttf">../../../../fonts/starsign/Jost-Italic-VariableFont_wght.ttf</file>
+    </qresource>
+</RCC>

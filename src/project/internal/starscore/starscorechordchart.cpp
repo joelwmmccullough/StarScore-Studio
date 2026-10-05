@@ -2120,7 +2120,7 @@ ChordChartFonts chordChartEmbeddedFonts()
                                   { "StarScoreJost.ttf" }), "font/ttf");
     fonts.bravura = dataUrl(fontFile({ ":/fonts/bravura/BravuraText.otf", appFonts + "BravuraText.otf" },
                                      { "BravuraText.otf" }), "font/otf");
-    // TT Modernoir is installed on the Mac, not shipped
+    // TT Modernoir is installed on the Mac, not shipped (its trial licence doesn't allow passing the font on)
     QByteArray modernoir = fontFile({}, { "*Modernoir*Regular*.ttf", "*Modernoir*Regular*.otf" });
     if (modernoir.isEmpty()) {
         modernoir = fontFile({}, { "*Modernoir*.ttf", "*Modernoir*.otf" });

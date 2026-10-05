@@ -2278,7 +2278,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
 // ---------------------------------------------------------------------------
 
 //! Songs in "1 Starsign Originals" and "2 Starsign Covers" on 27 Sep 2026: they start at 4.0.0.
-//! Any other song (new ones) starts at 1.0.0.
+//! Any other song (new ones) starts at 0.0.0, so its first export is 1.0.0 (or 0.1.0 / 0.0.1 for a work in progress).
 static const std::set<QString> STARSCORE_V4_CODES {
     "AMPL", "BRAN", "CIAO", "CUMU", "DEEP", "DEIM", "DBLE", "MUSH", "EVPR", "FEBR", "FYKB", "FISH", "GIJO", "HTLS",
     "IPDW", "INTN", "PINT", "MXTR", "OKAN", "PORC", "ROYL", "SEAG", "SHTR", "TYFT", "COUR", "UPDG",
@@ -2334,6 +2334,12 @@ StarScoreVersionSuggestion StarScoreService::suggestVersionBump(const StarScoreB
     engraving::MasterScore* ms = project->masterNotation()->masterScore();
     const Data data = loadFrom(ms);
     const QJsonObject sigs = data.exportSignatures;
+    // a new song (0.0.0): its first export is its first release, 1.0.0 (0.1.0 or 0.0.1 can be picked for a work in progress)
+    if (scoreVersion() == "0.0.0") {
+        out.bump = 1;
+        out.reasons << muse::qtrc("starscore", "first export of this song (pick Minor version or Patch for a work in progress)");
+        return out;
+    }
     if (sigs.isEmpty()) {
         out.reasons << muse::qtrc("starscore", "First export with change tracking: the version stays as it is.");
         return out;
@@ -2488,7 +2494,7 @@ QString StarScoreService::scoreVersion() const
     const QString code = m.hasMatch() ? m.captured(1) : QString();
     const QString title = starscoreSongTitle(project);
     const bool existingSong = STARSCORE_V4_CODES.count(code) || STARSCORE_V4_TITLES.count(title.toLower());
-    return existingSong ? QString("4.0.0") : QString("1.0.0");
+    return existingSong ? QString("4.0.0") : QString("0.0.0");
 }
 
 void StarScoreService::setScoreVersion(const QString& version)

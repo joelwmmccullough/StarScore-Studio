@@ -274,6 +274,18 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
                 autotestLog(QString("  %1: %2").arg(sheet, made.ret ? made.val : QString::fromStdString(made.ret.toString())));
             }
         }
+    } else if (step.startsWith("home")) {
+        // home or home:<section>: the Home page (for a screenshot)
+        const QString section = step.section(':', 1);
+        interactive()->open(UriQuery(section.isEmpty() ? std::string("musescore://home")
+                                     : ("musescore://home?section=" + section.toStdString())));
+        autotestLog("  home " + section);
+    } else if (step.startsWith("home")) {
+        // home or home:<section>: the Home page (for a screenshot)
+        const QString section = step.section(':', 1);
+        interactive()->open(UriQuery(section.isEmpty() ? std::string("musescore://home")
+                                     : ("musescore://home?section=" + section.toStdString())));
+        autotestLog("  home " + section);
     } else if (step == "suggest") {
         // the version number the export dialog would tick, and why
         const RetVal<StarScoreBandExportPlan> plan = planBandExport();

@@ -60,60 +60,61 @@ Rectangle {
             spacing: 18
 
             // ---------------- Header ----------------
-            RowLayout {
+            // (text above, buttons below and wrapping: the dashboard is the right half of Home since 1.18.3)
+            ColumnLayout {
                 Layout.fillWidth: true
-                spacing: 10
+                spacing: 8
 
-                ColumnLayout {
+                StyledTextLabel {
                     Layout.fillWidth: true
-                    spacing: 2
-                    StyledTextLabel {
-                        Layout.fillWidth: true
-                        horizontalAlignment: Text.AlignLeft
-                        text: qsTrc("starscore", "Starsign dashboard")
-                        font: ui.theme.headerBoldFont
+                    horizontalAlignment: Text.AlignLeft
+                    text: qsTrc("starscore", "Starsign dashboard")
+                    font: ui.theme.headerBoldFont
+                }
+                StyledTextLabel {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignLeft
+                    wrapMode: Text.WordWrap
+                    text: dash.status
+                    opacity: 0.8
+                }
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: 10
+                    FlatButton {
+                        text: qsTrc("starscore", "Refresh")
+                        toolTipTitle: qsTrc("starscore", "Refresh")
+                        toolTipDescription: qsTrc("starscore", "Reads the songs that changed since they were last read")
+                        accentButton: dash.unscanned > 0
+                        visible: !dash.scanning
+                        enabled: dash.folder !== ""
+                        onClicked: dash.scan(false)
                     }
-                    StyledTextLabel {
-                        Layout.fillWidth: true
-                        horizontalAlignment: Text.AlignLeft
-                        wrapMode: Text.WordWrap
-                        text: dash.status
-                        opacity: 0.8
+                    FlatButton {
+                        text: qsTrc("starscore", "Read all again")
+                        visible: !dash.scanning
+                        enabled: dash.folder !== ""
+                        onClicked: dash.scan(true)
                     }
-                }
-                FlatButton {
-                    text: qsTrc("starscore", "Refresh")
-                    toolTipTitle: qsTrc("starscore", "Refresh")
-                    toolTipDescription: qsTrc("starscore", "Reads the songs that changed since they were last read")
-                    accentButton: dash.unscanned > 0
-                    visible: !dash.scanning
-                    enabled: dash.folder !== ""
-                    onClicked: dash.scan(false)
-                }
-                FlatButton {
-                    text: qsTrc("starscore", "Read all again")
-                    visible: !dash.scanning
-                    enabled: dash.folder !== ""
-                    onClicked: dash.scan(true)
-                }
-                FlatButton {
-                    text: qsTrc("starscore", "Stop")
-                    visible: dash.scanning
-                    onClicked: dash.cancel()
-                }
-                FlatButton {
-                    text: qsTrc("starscore", "Folder…")
-                    toolTipTitle: qsTrc("starscore", "Songs folder")
-                    toolTipDescription: dash.folder
-                    enabled: !dash.scanning
-                    onClicked: dash.chooseFolder()
+                    FlatButton {
+                        text: qsTrc("starscore", "Stop")
+                        visible: dash.scanning
+                        onClicked: dash.cancel()
+                    }
+                    FlatButton {
+                        text: qsTrc("starscore", "Folder…")
+                        toolTipTitle: qsTrc("starscore", "Songs folder")
+                        toolTipDescription: dash.folder
+                        enabled: !dash.scanning
+                        onClicked: dash.chooseFolder()
+                    }
                 }
             }
 
             // ---------------- Keeping the folders in order ----------------
-            RowLayout {
+            ColumnLayout {
                 Layout.fillWidth: true
-                spacing: 10
+                spacing: 8
                 StyledTextLabel {
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignLeft
@@ -122,19 +123,23 @@ Rectangle {
                     text: qsTrc("starscore", "Sheets and Demos and Projects and Sheets are tidied after every export. "
                                 + "Run it on its own after dropping files into an Inbox.")
                 }
-                FlatButton {
-                    text: qsTrc("starscore", "Run folder organization")
-                    onClicked: dash.runAction("starscore-organize")
-                }
-                FlatButton {
-                    text: qsTrc("starscore", "Rebuild everything")
-                    toolTipTitle: qsTrc("starscore", "Rebuild everything")
-                    toolTipDescription: qsTrc("starscore", "Rebuilds every generated PDF in both folders")
-                    onClicked: dash.runAction("starscore-rebuild-all")
-                }
-                FlatButton {
-                    text: qsTrc("starscore", "Band roster…")
-                    onClicked: dash.runAction("starscore-band-roster")
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: 10
+                    FlatButton {
+                        text: qsTrc("starscore", "Run folder organization")
+                        onClicked: dash.runAction("starscore-organize")
+                    }
+                    FlatButton {
+                        text: qsTrc("starscore", "Rebuild everything")
+                        toolTipTitle: qsTrc("starscore", "Rebuild everything")
+                        toolTipDescription: qsTrc("starscore", "Rebuilds every generated PDF in both folders")
+                        onClicked: dash.runAction("starscore-rebuild-all")
+                    }
+                    FlatButton {
+                        text: qsTrc("starscore", "Band roster…")
+                        onClicked: dash.runAction("starscore-band-roster")
+                    }
                 }
             }
 
@@ -171,9 +176,12 @@ Rectangle {
             }
 
             // ---------------- Next up + priorities ----------------
-            RowLayout {
+            // side by side when there's room, one above the other in a narrow dashboard
+            GridLayout {
                 Layout.fillWidth: true
-                spacing: 18
+                columns: content.width >= 640 ? 2 : 1
+                columnSpacing: 18
+                rowSpacing: 18
 
                 // Next up
                 Rectangle {

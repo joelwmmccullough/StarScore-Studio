@@ -23,6 +23,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQuick.Controls
 
 import Muse.Ui
 import Muse.UiComponents
@@ -59,6 +60,10 @@ DockPage {
     }
 
     function setCurrentCentral(name) {
+        // the recent scores are the left half of the Dashboard (StarScore 1.18.3)
+        if (name === "scores") {
+            name = "dashboard"
+        }
         if (section === name || !Boolean(name)) {
             return
         }
@@ -68,7 +73,6 @@ DockPage {
         switch (name) {
         case "dashboard": root.central = dashboardComp; break
         case "songbooks": root.central = songbooksComp; break
-        case "scores": root.central = scoresComp; break
         case "plugins": root.central = extensionsComp; break // backward compatibility
         case "extensions": root.central = extensionsComp; break
         case "musesounds": root.central = museSoundsComp; break
@@ -120,19 +124,32 @@ DockPage {
     Component {
         id: songbooksComp
 
-        StarScoreSongbooks {}
+        // "Joel's Secrets": the Songbooks page behind a password
+        StarScoreSecretsPage {}
     }
 
     Component {
         id: dashboardComp
 
-        StarScoreDashboard {}
-    }
+        // StarScore: the recent scores on the left, the Starsign dashboard on the right (the handle between them moves)
+        SplitView {
+            orientation: Qt.Horizontal
 
-    Component {
-        id: scoresComp
+            handle: Rectangle {
+                implicitWidth: 2
+                color: ui.theme.strokeColor
+            }
 
-        ScoresPage {}
+            ScoresPage {
+                SplitView.preferredWidth: parent ? parent.width / 2 : 600
+                SplitView.minimumWidth: 300
+            }
+
+            StarScoreDashboard {
+                SplitView.fillWidth: true
+                SplitView.minimumWidth: 300
+            }
+        }
     }
 
     Component {
