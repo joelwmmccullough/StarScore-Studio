@@ -4,6 +4,15 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.8
+
+- **Export Audio Demos.** Export to Sheets and Demos has a new "Export Audio Demos" checkbox (off each time the window opens). When it's ticked, the export also writes a 48 kHz, 24-bit WAV of each 2- to 7-Horn Standard, Big Band, Orchestra and Marching Band arrangement the song has, into the song's Demos folder: "CODE - 3-Horn Arrangement Demo.wav" and so on. Flexible arrangements get no demo.
+  - Each demo plays the arrangement's own score with the Lead Sheet muted, the rhythm section and the arrangement's horns playing, and every chord-symbol track muted except on keys and guitar.
+  - Stand-in versions stay muted: in 7-Horn only the main bass horn plays, and with a piccolo the piccolo plays and its flute version is muted.
+  - A demo with the same name is replaced and the old one deleted (not archived).
+  - With no sheets ticked, the button exports just the demos.
+- **No second bass clarinet in 7-Horn.** When the woodwind doubler plays Bass Clarinet, Bass Clarinet is no longer offered as the 7th horn, and "Make the other versions…" doesn't make a Bass Clarinet version of the 7th horn. A Bass Clarinet version a song already has is left alone; delete the part to remove it.
+
 ## 1.18.7
 
 - **Four Flexible Scores.** Each Flexible section now exports four Scores:

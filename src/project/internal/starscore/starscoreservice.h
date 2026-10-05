@@ -23,6 +23,7 @@
 #include "inotationproject.h"
 #include "inotationwritersregister.h"
 #include "playback/iplaybackcontroller.h"
+#include "importexport/audioexport/iaudioexportconfiguration.h"
 #include "global/iglobalconfiguration.h"
 #include "dockwindow/idockwindowprovider.h"
 #include "dockwindow/idockwindow.h"
@@ -41,6 +42,7 @@ class StarScoreService : public IStarScoreService, public muse::Contextable, pub
 {
     muse::GlobalInject<IProjectCreator> projectCreator;
     muse::GlobalInject<muse::IGlobalConfiguration> globalConfiguration;
+    muse::GlobalInject<iex::audioexport::IAudioExportConfiguration> audioExportConfiguration;
     muse::ContextInject<context::IGlobalContext> globalContext = { this };
     muse::ContextInject<notation::IInstrumentsRepository> instrumentsRepository = { this };
     muse::ContextInject<playback::IPlaybackController> playbackController = { this };
@@ -165,6 +167,7 @@ public:
     muse::Ret registerBandSong(const QString& title, int category, const QString& code) override;
     muse::RetVal<QString> exportArrangementsAsMscz(const QString& folder) override;
     muse::RetVal<QString> exportToBandFolder(const QStringList& onlyPaths) override;
+    muse::RetVal<QString> exportAudioDemos() override;
     QStringList bandExportUnticked(const QString& code) const override;
     void setBandExportUnticked(const QString& code, const QStringList& paths) override;
 

@@ -300,6 +300,14 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         // uri:<uri>: opens it (uri:muse://preferences); not waited for
         interactive()->open(UriQuery(step.mid(4).toStdString()));
         autotestLog("  opened " + step.mid(4));
+    } else if (step == "demos") {
+        // Export Audio Demos, as the export window's checkbox does
+        const QString band = qEnvironmentVariable("STARSCORE_AUTOTEST_BAND");
+        if (!band.isEmpty() && QDir(band).exists()) {
+            setBandFolder(band);
+        }
+        const RetVal<QString> r = exportAudioDemos();
+        autotestLog("  " + (r.ret ? r.val : QString::fromStdString(r.ret.toString())));
     } else if (step.startsWith("songbooks:")) {
         // songbooks:1 / songbooks:0: Preferences › General › "Show the Songbooks page on Home"
         settings()->setSharedValue(Settings::Key("project", "starscore/showSongbooks"), Val(step.endsWith("1")));

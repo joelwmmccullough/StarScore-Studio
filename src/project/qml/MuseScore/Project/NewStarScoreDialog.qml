@@ -42,6 +42,12 @@ StyledDialogView {
     property string arrangementKey: newModel.lastArrangementKey
     property string doublerId: newModel.lastDoublerId
     property string lowHornId: newModel.lastLowHornId
+    // with Ben on Bass Clarinet, the 7th horn can't be a second bass clarinet
+    onDoublerIdChanged: {
+        if (root.doublerId === "bb-bass-clarinet" && root.lowHornId === "bb-bass-clarinet") {
+            root.lowHornId = "bass-trombone"
+        }
+    }
 
     property bool showDoubler: newModel.hasDoubler(root.arrangementKey)
     property bool showLowHorn: newModel.hasLowHorn(root.arrangementKey)
@@ -204,7 +210,7 @@ StyledDialogView {
         StyledDropdown {
             visible: root.showLowHorn
             Layout.fillWidth: true
-            model: newModel.lowHornChoices()
+            model: newModel.lowHornChoices(root.doublerId)
             currentIndex: indexOfValue(root.lowHornId)
             onActivated: function(index, value) { root.lowHornId = value }
         }

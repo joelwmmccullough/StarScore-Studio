@@ -325,7 +325,7 @@ QString BandExportModel::exportNow()
             paths << item.path;
         }
     }
-    if (paths.isEmpty()) {
+    if (paths.isEmpty() && !m_exportDemos) {
         setResult(muse::qtrc("starscore", "Nothing is ticked."));
         return m_result;
     }
@@ -368,14 +368,32 @@ QString BandExportModel::exportNow()
     emit bumpChanged();
 
     m_exportRan = true;
-    muse::RetVal<QString> summary = starScore()->exportToBandFolder(paths);
-    if (!summary.ret) {
-        setResult(muse::qtrc("starscore", "Export failed: %1").arg(QString::fromStdString(summary.ret.toString())));
-        return m_result;
+    QString text;
+    if (!paths.isEmpty()) {   // (no sheets ticked: only the demos; an empty list would mean every sheet)
+        muse::RetVal<QString> summary = starScore()->exportToBandFolder(paths);
+        if (!summary.ret) {
+            setResult(muse::qtrc("starscore", "Export failed: %1").arg(QString::fromStdString(summary.ret.toString())));
+            return m_result;
+        }
+        text = summary.val + "\n\n"
+               + muse::qtrc("starscore", "Sheets are marked Version %1. Save the .starscore to keep this version number.").arg(version);
     }
-    setResult(summary.val + "\n\n"
-              + muse::qtrc("starscore", "Sheets are marked Version %1. Save the .starscore to keep this version number.").arg(version));
+    if (m_exportDemos) {
+        muse::RetVal<QString> demos = starScore()->exportAudioDemos();
+        const QString line = demos.ret ? demos.val
+                             : muse::qtrc("starscore", "Audio demos failed: %1").arg(QString::fromStdString(demos.ret.toString()));
+        text = text.isEmpty() ? line : text + "\n\n" + line;
+    }
+    setResult(text);
     return m_result;
+}
+
+void BandExportModel::setExportDemos(bool on)
+{
+    if (m_exportDemos != on) {
+        m_exportDemos = on;
+        emit exportDemosChanged();
+    }
 }
 
 bool BandExportModel::runOrganizer() const

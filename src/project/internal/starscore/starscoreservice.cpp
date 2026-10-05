@@ -1646,6 +1646,9 @@ std::vector<StarScoreInstrument> StarScoreService::templateInstrumentsFor(const 
                                                                           const QString& lowHornInstrumentId) const
 {
     std::vector<StarScoreInstrument> instruments = t.instruments;
+    // the doubler (Ben) on Bass Clarinet: the 7th horn is never a second bass clarinet (Joel, 5 Oct 2026)
+    const QString low = doublerInstrumentId == "bb-bass-clarinet" && lowHornInstrumentId == "bb-bass-clarinet"
+                        ? QString("bass-trombone") : lowHornInstrumentId;
     // Which chair the doubler takes: the alto in 3/4/5-Horn, the soprano in 6/7-Horn (the alto is a player of its own there)
     QString doublerChair;
     if (t.key == "3-horn" || t.key == "4-horn" || t.key == "5-horn") {
@@ -1687,7 +1690,7 @@ std::vector<StarScoreInstrument> StarScoreService::templateInstrumentsFor(const 
         }
     }
     if (t.key == "7-horn") {
-        replaceChair("bass-trombone", lowHornInstrumentId, lowHornChoices());
+        replaceChair("bass-trombone", low, lowHornChoices());
     }
     return instruments;
 }

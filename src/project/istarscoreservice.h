@@ -616,6 +616,12 @@ public:
     //! Returns a summary.
     //! Exports the planned sheets whose relative paths are in onlyPaths (all of them when onlyPaths is empty)
     virtual muse::RetVal<QString> exportToBandFolder(const QStringList& onlyPaths) = 0;
+    //! Audio demos (Export to Sheets and Demos › "Export Audio Demos"): one 48 kHz 24-bit WAV per Standard 2- to 7-Horn,
+    //! Big Band, Orchestra and Marching Band arrangement the song has, in the song's Demos folder as
+    //! "CODE - <N>-Horn Arrangement Demo.wav" (an older one of the same name is deleted, not archived). Each plays the
+    //! arrangement's sections except the Lead Sheet; stand-in versions (a 7th horn's Bari Sax…, a piccolo's flute)
+    //! and every chord-symbol track except on keys and guitar are muted. Flexible arrangements get none.
+    virtual muse::RetVal<QString> exportAudioDemos() = 0;
 
     // --- Version number ("Version 4.0.1" in the copyright text, printed at the bottom of every page)
     virtual QString scoreVersion() const = 0;                 // from the score, or the starting version for this song

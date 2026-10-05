@@ -230,6 +230,23 @@ StyledDialogView {
 
         CheckBox {
             visible: root.listMode && !root.done
+            text: qsTrc("starscore", "Export Audio Demos")
+            checked: exportModel.exportDemos
+            onClicked: exportModel.exportDemos = !checked
+        }
+
+        StyledTextLabel {
+            Layout.fillWidth: true
+            visible: root.listMode && !root.done && exportModel.exportDemos
+            horizontalAlignment: Text.AlignLeft
+            wrapMode: Text.WordWrap
+            color: ui.theme.fontSecondaryColor
+            text: qsTrc("starscore", "A 48 kHz, 24-bit WAV of each 2- to 7-Horn Standard, Big Band, Orchestra and Marching Band "
+                        + "arrangement, in the song's Demos folder (older demos of the same name are replaced). This can take a while.")
+        }
+
+        CheckBox {
+            visible: root.listMode && !root.done
             text: qsTrc("starscore", "Run organization process")
             checked: exportModel.runOrganizer
             onClicked: exportModel.runOrganizer = !checked
@@ -256,8 +273,9 @@ StyledDialogView {
 
             FlatButton {
                 visible: root.listMode
-                enabled: exportModel.checkedCount > 0
-                text: qsTrc("starscore", "Export %n sheet(s)", "", exportModel.checkedCount)
+                enabled: exportModel.checkedCount > 0 || exportModel.exportDemos
+                text: exportModel.checkedCount > 0 ? qsTrc("starscore", "Export %n sheet(s)", "", exportModel.checkedCount)
+                                                   : qsTrc("starscore", "Export audio demos")
                 accentButton: true
                 buttonRole: ButtonBoxModel.ApplyRole
                 buttonId: ButtonBoxModel.CustomButton + 1

@@ -39,6 +39,8 @@ class BandExportModel : public QAbstractListModel, public muse::Contextable
     Q_PROPERTY(QString songTitle READ songTitle NOTIFY loaded)
     Q_PROPERTY(QString suggestedCode READ suggestedCode NOTIFY loaded)
     Q_PROPERTY(bool runOrganizer READ runOrganizer WRITE setRunOrganizer NOTIFY runOrganizerChanged)
+    //! "Export Audio Demos": off each time the window opens
+    Q_PROPERTY(bool exportDemos READ exportDemos WRITE setExportDemos NOTIFY exportDemosChanged)
     Q_PROPERTY(QString result READ result NOTIFY resultChanged)         // what exportNow() reported
 
     QML_ELEMENT
@@ -70,6 +72,8 @@ public:
     QString suggestedCode() const;
     bool runOrganizer() const;
     void setRunOrganizer(bool on);
+    bool exportDemos() const { return m_exportDemos; }
+    void setExportDemos(bool on);
     QString result() const;
 
     //! After an export: opens the organizer window, which runs the folder organization for this export
@@ -94,6 +98,7 @@ signals:
     void checkedCountChanged();
     void bumpChanged();
     void runOrganizerChanged();
+    void exportDemosChanged();
     void resultChanged();
 
 private:
@@ -125,6 +130,7 @@ private:
     QString m_version;
     int m_bump = 0;
     bool m_exportRan = false;
+    bool m_exportDemos = false;
     int m_suggestedBump = 0;
     QString m_suggestionText;
     bool m_newSong = false;

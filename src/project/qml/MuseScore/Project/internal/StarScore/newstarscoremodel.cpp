@@ -133,10 +133,13 @@ QVariantList NewStarScoreModel::doublerChoices(const QString& arrangementKey) co
     return list;
 }
 
-QVariantList NewStarScoreModel::lowHornChoices() const
+QVariantList NewStarScoreModel::lowHornChoices(const QString& doublerInstrumentId) const
 {
     QVariantList list;
     for (const StarScoreHornChoice& c : starScore()->lowHornChoices()) {
+        if (doublerInstrumentId == "bb-bass-clarinet" && c.instrumentId == "bb-bass-clarinet") {
+            continue;
+        }
         QString text = c.bandName;
         if (c.instrumentId == "bass-trombone") {
             text += muse::qtrc("starscore", " (recommended)");

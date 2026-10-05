@@ -976,7 +976,21 @@ void StarScoreService::offerLowAlternates(const QStringList& partIds, bool asked
             if (!seventh.isEmpty() && pid != seventh && !lowHornName(mainInstrument).isEmpty()) {
                 continue;
             }
-            const std::vector<StarScoreHornChoice> versions = versionsFor(mainInstrument, s.templateKey);
+            std::vector<StarScoreHornChoice> versions = versionsFor(mainInstrument, s.templateKey);
+            // the doubler (Ben) on Bass Clarinet: the 7th horn gets no Bass Clarinet version, two bass clarinets in
+            // the band makes no sense (Joel, 5 Oct 2026)
+            if (!seventh.isEmpty()) {
+                bool doublerBassClarinet = false;
+                for (const QString& other : s.partIds) {
+                    const engraving::Part* o = other == seventh || s.alternates.count(other) ? nullptr : ms->partById(ID(other));
+                    doublerBassClarinet |= o && starscore::bandHornName(o->instrumentId().toQString()) == "Bass Clarinet";
+                }
+                if (doublerBassClarinet) {
+                    versions.erase(std::remove_if(versions.begin(), versions.end(),
+                                                  [](const StarScoreHornChoice& c) { return c.bandName == "Bass Clarinet"; }),
+                                   versions.end());
+                }
+            }
             if (versions.empty()) {
                 continue;
             }
