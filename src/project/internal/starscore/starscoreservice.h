@@ -157,6 +157,8 @@ public:
     std::pair<QString, QString> mainLowHorn(const QString& sectionId) const override;
     std::vector<StarScoreFlexibleSheet> flexibleSheets(const QString& sectionId) const override;
     muse::RetVal<QString> makeFlexibleSheetPart(const QString& sectionId, const QString& sheetName) override;
+    bool flexibleShownAsStandard(const QString& sectionId) const override;
+    void setFlexibleShownAsStandard(const QString& sectionId, bool standard) override;
     //! The band's name for a low horn ("Bass Trombone", "Bari Sax", …, "Tuba"), or "" when the instrument isn't one
     //! of the eight. The low horn a 7-Horn section is built on and its stand-in versions are all told apart this way.
     static QString lowHornName(const QString& instrumentId);
@@ -233,6 +235,9 @@ public:
         // Stand-in versions made before 1.15.3 got their barlines matched to the line they stand in for once; after
         // that their formatting is left to Joel
         bool alternateBarlinesMatched = false;
+        // The Flexible chairs' working clefs (treble / soprano / alto, 1.18.7) set once in a file from before that;
+        // after that a clef Joel picks for a chair is kept
+        bool flexibleClefsSet = false;
         QString fileId;    // permanent id of this .starscore (kept when the file is moved or renamed)
         // StarScore Deco switched on: score ("" = main score, else the part book's name) -> its fonts before
         // (music symbols, music text, dynamics)
@@ -330,6 +335,10 @@ private:
     void standardizeImported();
     //! A new "N-Horn Any" section starts with the music of the "N-Horn" section, chair by chair
     void fillAnyHornsFromStandard(const StarScoreSection& anySection);
+    //! A Flexible section's chairs written in the clefs that keep their range on the staff: Horn 1 treble, the
+    //! 3-Horn's Horn 2 soprano clef, the bottom chair alto clef. Only a chair still in its old clef (treble, the
+    //! bottom chair bass) changes. Returns how many chairs changed. The exported sheets have their own clefs.
+    int setFlexibleWorkingClefs(const StarScoreSection& section);
     //! A part with stand-in versions (a 7-Horn section's main low horn, a Piccolo) marked Finished: offer the versions
     //! it lacks (versionsFor)
     void offerLowAlternates(const QStringList& partIds, bool asked = false);

@@ -687,9 +687,14 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
                 scoreParts << c.first;
             }
             const QString right = QString("Flexible %1-Horn Arrangement").arg(horns);
-            // (no transposing score: the chairs are written at concert pitch)
-            addFile(folder, "Score", scoreParts, true);
-            plan.files.back().sheetRight = right;
+            // Four Scores (Joel, 5 Oct 2026): concert, for B♭ horns, for E♭ horns, and in bass clef; each prints the
+            // chairs in its own clefs, whatever clefs the chairs are written in
+            for (const auto& [name, key] : std::vector<std::pair<QString, QString> > {
+                    { "Score", "C" }, { "Score (Bb)", "Bb" }, { "Score (Eb)", "Eb" }, { "Score (Bass Clef)", "Bass" } }) {
+                addFile(folder, name, scoreParts, true);
+                plan.files.back().sheetRight = right;
+                plan.files.back().flexibleScoreKey = key;
+            }
             for (const auto& [pid, number] : chairs) {
                 for (const StarScoreSeat& seat : starscoreFlexibleSeats(horns, number)) {
                     StarScoreBandFile f;
@@ -1808,13 +1813,19 @@ static void starscoreRewritePartInstrument(const IMasterNotationPtr& vm, mu::eng
     instrument.setTranspose(mu::engraving::Interval(diatonic, chromatic));
     const mu::engraving::ClefType clef = clefKind == 1 ? mu::engraving::ClefType::F
                                      : clefKind == 2 ? mu::engraving::ClefType::C3
-                                     : clefKind == 3 ? mu::engraving::ClefType::C4 : mu::engraving::ClefType::G;
+                                     : clefKind == 3 ? mu::engraving::ClefType::C4
+                                     : clefKind == 4 ? mu::engraving::ClefType::G8_VB
+                                     : clefKind == 5 ? mu::engraving::ClefType::F_8VA : mu::engraving::ClefType::G;
     instrument.setClefType(0, mu::engraving::ClefTypeList(clef, clef));
     // The part's main instrument sits at Part::MAIN_INSTRUMENT_TICK (-1), not at tick 0: a key at tick 0 made
     // replaceInstrument look for an instrument change there, find none, and do nothing, so every Flexible version
     // sheet came out in the chair's own concert pitch and clef (1.9.0 to 1.17.1).
     const InstrumentKey key { part->instrumentId(), part->id(), mu::engraving::Part::MAIN_INSTRUMENT_TICK };
     vm->parts()->replaceInstrument(key, instrument);
+    // and the clef saved at the start (a chair written in alto clef kept it on the first system)
+    vm->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("First clef"));
+    starscore::setFirstClefs(part, int(clef), int(clef));
+    vm->notation()->undoStack()->commitChanges();
 }
 
 //! The part's book made fresh (the one MuseScore would make for the part), named `bookName` like the part itself,
@@ -2341,8 +2352,25 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         // brackets' hooks (Bumper Cars' bar 6 ran into the bracket)
         {
             INotationPtr n = p->masterNotation()->notation();
+            // a Flexible Score's version: each chair's transposition and clef (the bottom chair is the last)
+            if (!file.flexibleScoreKey.isEmpty()) {
+                const QString& key = file.flexibleScoreKey;
+                const int dia = key == "Bb" ? -1 : key == "Eb" ? -5 : 0;
+                const int chrom = key == "Bb" ? -2 : key == "Eb" ? -9 : 0;
+                for (int i = 0; i < file.partIds.size(); ++i) {
+                    engraving::Part* part = cs->partById(ID(file.partIds.at(i)));
+                    if (!part) {
+                        continue;
+                    }
+                    const bool bottom = i == file.partIds.size() - 1;
+                    const int clef = key == "Bass" ? (bottom ? 1 : 5)
+                                     : key == "C" ? (bottom ? 1 : 0)
+                                     : (bottom ? 4 : 0);
+                    starscoreRewritePartInstrument(p->masterNotation(), part, dia, chrom, clef, false);
+                }
+            }
             n->undoStack()->prepareChanges(TranslatableString::untranslatable("Score pitch"));
-            n->style()->setStyleValue(StyleId::concertPitch, !file.transposingScore);
+            n->style()->setStyleValue(StyleId::concertPitch, !file.transposingScore && file.flexibleScoreKey.isEmpty());
             n->undoStack()->commitChanges();
             if (layout.valid) {
                 const PointF pos = cs->style().styleV(engraving::Sid::measureNumberPosAbove).value<PointF>();

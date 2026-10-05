@@ -28,8 +28,26 @@ log() {
     printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOG"
 }
 
+# While the new app is copied in, a window says StarScore is installing, so nobody opens the old app (or a
+# half-copied one) in the meantime. It closes by itself when the install is done or fails.
+WINDOW_PID=""
+show_installing_window() {
+    osascript >/dev/null 2>&1 <<'OSA' &
+activate
+display dialog "StarScore Studio is installing an update." & return & return & "Please don't open StarScore yet. It will open by itself when the install is done (usually within a minute)." with title "Installing StarScore Studio" buttons {"OK"} default button "OK" with icon note giving up after 900
+OSA
+    WINDOW_PID=$!
+}
+close_installing_window() {
+    if [ -n "$WINDOW_PID" ]; then
+        kill "$WINDOW_PID" 2>/dev/null
+        WINDOW_PID=""
+    fi
+}
+
 # The script is a temp file; remove it once done, whatever happened.
 cleanup_self() {
+    close_installing_window
     rm -f -- "$0" 2>/dev/null
 }
 trap cleanup_self EXIT
@@ -98,6 +116,7 @@ if [ -n "$PID" ]; then
     done
 fi
 sleep 1
+show_installing_window
 
 ATTACH_OUTPUT=$(hdiutil attach -nobrowse -readonly -noverify "$DMG" 2>> "$LOG")
 if [ $? -ne 0 ] || [ -z "$ATTACH_OUTPUT" ]; then
@@ -166,6 +185,7 @@ detach_dmg
 xattr -dr com.apple.quarantine "$APP" >> "$LOG" 2>&1 || true
 
 log "installed $APP from $DMG"
+close_installing_window
 
 if ! open "$APP" >> "$LOG" 2>&1; then
     log "open failed for $APP"

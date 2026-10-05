@@ -4,6 +4,19 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.7
+
+- **Four Flexible Scores.** Each Flexible section now exports four Scores:
+  - "Score": concert pitch; treble clef, the bottom horn in bass clef.
+  - "Score (Bb)": written for B♭ horns; treble clef, the bottom horn in treble clef an octave down.
+  - "Score (Eb)": written for E♭ horns; same clefs as the B♭ Score.
+  - "Score (Bass Clef)": concert pitch; bass clef an octave up, the bottom horn in bass clef.
+- **New clefs for writing Flexible parts.** The chairs are now written in the clefs that keep most of their range on the staff: Horn 1 in treble clef, the 3-Horn's Horn 2 in soprano clef (middle C on the bottom line), and the bottom chair (2-Horn Horn 2, 3-Horn Horn 3) in alto clef. Songs already made switch once when opened (only a chair still in its old treble or bass clef changes; Undo puts it back). The exported sheets don't change.
+- **Show the Flexible chairs as Standard horns.** Right-click a Flexible section › Show the chairs › "As B♭ Trumpet, Tenor Sax" (2-Horn) or "As B♭ Trumpet, Alto Sax, Tenor Sax" (3-Horn) shows the chairs with those horns' transpositions and clefs (turn Concert Pitch off to see the written notes). The chairs keep their Flexible ranges. "Flexible clefs" switches back. The exported sheets are the same either way.
+- **Songbooks is back, hidden by default.** The password on "Joel's Secrets" is gone and the page is called Songbooks again. It only shows on Home when it's turned on in Preferences › General › Songbooks › "Show the Songbooks page on Home". It's off by default, so people you give StarScore to don't see it.
+- **"Installing" window during updates (Mac).** While an update replaces the app, a window says StarScore is installing and not to open it until it opens by itself. This starts with the next update after this one (the window comes from the version doing the installing).
+- The first clef of a staff now follows a clef change everywhere: an exported sheet made from a chair written in another clef used to keep the chair's clef on its first system.
+
 ## 1.18.6
 
 - **Two Scores per horn section: concert and transposing.** Each Standard section (and Big Band, Orchestra, Marching Band) now also exports "Score (Transposing)", with every horn at written pitch. The Flexible sections keep one Score.

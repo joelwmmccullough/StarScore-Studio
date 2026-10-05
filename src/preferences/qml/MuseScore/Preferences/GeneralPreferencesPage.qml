@@ -24,6 +24,7 @@ import QtQuick
 import Muse.Ui
 import Muse.UiComponents
 import MuseScore.Preferences
+import MuseScore.Project
 
 import "internal"
 
@@ -81,6 +82,38 @@ PreferencesPage {
 
             navigation.section: root.navigationSection
             navigation.order: root.navigationOrderStart + 3
+        }
+
+        SeparatorLine { }
+
+        // StarScore: the Songbooks page on Home, hidden unless turned on here (off for bandmates by default)
+        BaseSection {
+            id: songbooksSection
+
+            title: qsTrc("starscore", "Songbooks")
+
+            navigation.section: root.navigationSection
+            navigation.order: root.navigationOrderStart + 3
+
+            SongbooksVisibilityModel {
+                id: songbooksVisibility
+            }
+
+            CheckBox {
+                id: songbooksCheckbox
+
+                width: parent.width
+
+                text: qsTrc("starscore", "Show the Songbooks page on Home")
+                checked: songbooksVisibility.shown
+
+                navigation.name: songbooksCheckbox.text
+                navigation.panel: songbooksSection.navigation
+
+                onClicked: {
+                    songbooksVisibility.shown = !songbooksVisibility.shown
+                }
+            }
         }
 
         /*

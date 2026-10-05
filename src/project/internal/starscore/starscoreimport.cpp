@@ -31,6 +31,8 @@
 #include "engraving/dom/box.h"
 #include "engraving/dom/text.h"
 #include "engraving/editing/editpart.h"
+#include "engraving/editing/editstaff.h"
+#include "engraving/editing/transpose.h"
 
 #include "notation/inotationparts.h"
 #include "notation/iexcerptnotation.h"
@@ -604,6 +606,145 @@ void StarScoreService::saveAsNewStarScore()
         project->setPath(dir.appendingComponent(base).appendingSuffix("starscore"));
     }
     scheduleChanged();
+}
+
+//! A Flexible section's chairs in score order: not stand-ins, not sheets made into parts to edit by hand, not the
+//! old hidden "Horn 1 (Flute)" staff
+static std::vector<mu::engraving::Part*> starscoreChairParts(mu::engraving::MasterScore* ms, const StarScoreSection& section)
+{
+    std::vector<mu::engraving::Part*> chairs;
+    for (mu::engraving::Part* p : ms->parts()) {
+        const QString pid = p->id().toQString();
+        if (section.partIds.contains(pid) && !section.alternates.count(pid)
+            && !p->partName().toQString().contains("flute", Qt::CaseInsensitive)) {
+            chairs.push_back(p);
+        }
+    }
+    return chairs;
+}
+
+//! One chair shown with this transposition and clef, in the score and in its part score. The music stays the same
+//! (its concert pitches); the written notes and key follow the transposition. The chair's name and ranges are kept.
+static void starscoreSetChairDisplay(mu::engraving::MasterScore* ms, mu::engraving::Part* part, const mu::engraving::Interval& transpose,
+                                     const mu::engraving::ClefTypeList& clef)
+{
+    if (part->staves().empty()) {
+        return;
+    }
+    const mu::engraving::Interval old = part->instrument()->transpose();
+    for (mu::engraving::Staff* st : part->staves().front()->staffList()) {
+        mu::engraving::Part* lp = st->part();
+        mu::engraving::Instrument* instrument = new mu::engraving::Instrument(*lp->instrument());
+        instrument->setTranspose(transpose);
+        instrument->setClefType(0, clef);
+        ms->undo(new mu::engraving::ChangePart(lp, instrument, lp->partName()));
+        ms->undo(new mu::engraving::ChangeStaff(st, st->visible(), clef, st->userDist(), st->cutaway(), st->hideSystemBarLine(),
+                                            st->mergeMatchingRests(), st->reflectTranspositionInLinkedTab()));
+    }
+    mu::project::starscore::setFirstClefs(part, int(clef.concertClef), int(clef.transposingClef));
+    if (!(old == transpose)) {
+        mu::engraving::Transpose::transpositionChanged(ms, part, mu::engraving::Part::MAIN_INSTRUMENT_TICK, old);
+    }
+}
+
+int StarScoreService::setFlexibleWorkingClefs(const StarScoreSection& section)
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    engraving::MasterScore* ms = masterScore();
+    if (!master || !ms || !section.templateKey.endsWith("-horn-any")) {
+        return 0;
+    }
+    const std::vector<engraving::Part*> chairs = starscoreChairParts(ms, section);
+    const int n = int(chairs.size());
+    int changed = 0;
+    master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Flexible clefs"));
+    for (int i = 1; i < n; ++i) {
+        engraving::Part* part = chairs[size_t(i)];
+        engraving::Staff* staff = part->staves().empty() ? nullptr : part->staves().front();
+        // (a chair shown as a Standard horn is left as it is)
+        if (!staff || part->instrument()->transpose().chromatic != 0) {
+            continue;
+        }
+        const bool bottom = i == n - 1;
+        const engraving::ClefType from = bottom ? engraving::ClefType::F : engraving::ClefType::G;
+        const engraving::ClefType to = bottom ? engraving::ClefType::C3 : engraving::ClefType::C1;
+        if (staff->defaultClefType().concertClef != from) {
+            continue;
+        }
+        starscoreSetChairDisplay(ms, part, engraving::Interval(0, 0), engraving::ClefTypeList(to, to));
+        ++changed;
+    }
+    master->notation()->undoStack()->commitChanges();
+    if (changed) {
+        master->notation()->notationChanged().notify();
+    }
+    return changed;
+}
+
+bool StarScoreService::flexibleShownAsStandard(const QString& sectionId) const
+{
+    engraving::MasterScore* ms = masterScore();
+    if (!ms) {
+        return false;
+    }
+    for (const StarScoreSection& s : load().sections) {
+        if (s.id == sectionId) {
+            const std::vector<engraving::Part*> chairs = starscoreChairParts(ms, s);
+            return !chairs.empty() && chairs.front()->instrument()->transpose().chromatic != 0;
+        }
+    }
+    return false;
+}
+
+void StarScoreService::setFlexibleShownAsStandard(const QString& sectionId, bool standard)
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    engraving::MasterScore* ms = masterScore();
+    if (!master || !ms) {
+        return;
+    }
+    const Data d = load();
+    const StarScoreSection* section = nullptr;
+    for (const StarScoreSection& s : d.sections) {
+        if (s.id == sectionId && s.templateKey.endsWith("-horn-any")) {
+            section = &s;
+        }
+    }
+    if (!section) {
+        return;
+    }
+    const std::vector<engraving::Part*> chairs = starscoreChairParts(ms, *section);
+    const int n = int(chairs.size());
+    if (n < 2) {
+        return;
+    }
+    using engraving::ClefType;
+    using engraving::ClefTypeList;
+    master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable(
+                                                        standard ? "Show as Standard horns" : "Show in Flexible clefs"));
+    for (int i = 0; i < n; ++i) {
+        const bool bottom = i == n - 1;
+        engraving::Interval transpose(0, 0);
+        ClefTypeList clef(ClefType::G, ClefType::G);
+        if (standard) {
+            // B♭ Trumpet on top, Tenor Sax at the bottom, Alto Sax between (3-Horn)
+            if (i == 0) {
+                transpose = engraving::Interval(-1, -2);
+            } else if (bottom) {
+                transpose = engraving::Interval(-8, -14);
+                clef = ClefTypeList(ClefType::G8_VB, ClefType::G);
+            } else {
+                transpose = engraving::Interval(-5, -9);
+            }
+        } else if (bottom) {
+            clef = ClefTypeList(ClefType::C3, ClefType::C3);
+        } else if (i > 0) {
+            clef = ClefTypeList(ClefType::C1, ClefType::C1);
+        }
+        starscoreSetChairDisplay(ms, chairs[size_t(i)], transpose, clef);
+    }
+    master->notation()->undoStack()->commitChanges();
+    master->notation()->notationChanged().notify();
 }
 
 void StarScoreService::fillAnyHornsFromStandard(const StarScoreSection& anySection)
@@ -1619,6 +1760,18 @@ void StarScoreService::tidyOpenedScore()
             d.alternateBarlinesMatched = true;
             store(d);
         }
+    }
+
+    // The Flexible chairs' working clefs (treble / soprano / alto, 1.18.7): once per file
+    const bool anyFlexible = std::any_of(d.sections.begin(), d.sections.end(),
+                                         [](const StarScoreSection& s) { return s.templateKey.endsWith("-horn-any"); });
+    if (!d.flexibleClefsSet && anyFlexible) {
+        for (const StarScoreSection& s : d.sections) {
+            setFlexibleWorkingClefs(s);
+        }
+        d = load();
+        d.flexibleClefsSet = true;
+        store(d);
     }
 
     // Tempo marks in the text style's font, title frames of a fixed height

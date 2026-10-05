@@ -64,6 +64,10 @@ DockPage {
         if (name === "scores") {
             name = "dashboard"
         }
+        // the Songbooks page only when it's turned on in Preferences (StarScore 1.18.6)
+        if (name === "songbooks" && !songbooksVisibility.shown) {
+            name = "dashboard"
+        }
         if (section === name || !Boolean(name)) {
             return
         }
@@ -104,6 +108,7 @@ DockPage {
 
             HomeMenu {
                 currentPageName: root.section
+                songbooksShown: songbooksVisibility.shown
                 iconsOnly: menuPanel.iconsOnly
 
                 onSelected: function(name) {
@@ -115,6 +120,17 @@ DockPage {
 
     central: dashboardComp
 
+    // Songbooks is hidden unless turned on in Preferences › General; turning it off while it's open goes to the Dashboard
+    SongbooksVisibilityModel {
+        id: songbooksVisibility
+
+        onShownChanged: {
+            if (!shown && root.section === "songbooks") {
+                root.setCurrentCentral("dashboard")
+            }
+        }
+    }
+
     Component {
         id: accountComp
 
@@ -124,8 +140,7 @@ DockPage {
     Component {
         id: songbooksComp
 
-        // "Joel's Secrets": the Songbooks page behind a password
-        StarScoreSecretsPage {}
+        StarScoreSongbooks {}
     }
 
     Component {

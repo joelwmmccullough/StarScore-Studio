@@ -5,6 +5,8 @@
  */
 #include "starscorebarmodel.h"
 
+#include <set>
+
 #include <QFileInfo>
 #include <QUrl>
 
@@ -401,6 +403,24 @@ QVariantList StarScoreBarModel::sectionMenu(const QString& id) const
     if (!flexItems.isEmpty()) {
         items.insert(4, QVariantMap { { "title", muse::qtrc("starscore", "Edit one sheet by hand") }, { "subitems", flexItems },
                                       { "enabled", true } });
+        // how the chairs are shown while writing (the exported sheets don't change)
+        std::set<QString> chairIds;
+        for (const StarScoreFlexibleSheet& sheet : starScore()->flexibleSheets(id)) {
+            chairIds.insert(sheet.chairPartId);
+        }
+        const bool asStandard = starScore()->flexibleShownAsStandard(id);
+        const QVariantList viewItems {
+            QVariantMap { { "id", "sec-flexview:" + id + ":0" },
+                          { "title", chairIds.size() == 3 ? muse::qtrc("starscore", "Flexible clefs (treble, soprano, alto)")
+                            : muse::qtrc("starscore", "Flexible clefs (treble, alto)") },
+                          { "checkable", true }, { "checked", !asStandard }, { "enabled", true } },
+            QVariantMap { { "id", "sec-flexview:" + id + ":1" },
+                          { "title", chairIds.size() == 3 ? muse::qtrc("starscore", "As B♭ Trumpet, Alto Sax, Tenor Sax")
+                            : muse::qtrc("starscore", "As B♭ Trumpet, Tenor Sax") },
+                          { "checkable", true }, { "checked", asStandard }, { "enabled", true } },
+        };
+        items.insert(5, QVariantMap { { "title", muse::qtrc("starscore", "Show the chairs") }, { "subitems", viewItems },
+                                      { "enabled", true } });
     }
     if (!versionMains.isEmpty()) {
         // the other versions (Bari Sax, Bass Sax, Bassoon… of the low horn; a Flute of a piccolo): only the ones the
@@ -668,6 +688,10 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
                 interactive()->error(muse::trc("starscore", "Couldn't create the arrangement"), ret.ret.toString());
             }
         }
+    } else if (action == "sec-flexview") {
+        // "<section id>:0|1"
+        const int colon = arg.lastIndexOf(':');
+        starScore()->setFlexibleShownAsStandard(arg.left(colon), arg.mid(colon + 1) == "1");
     } else if (action == "sec-flexsheet") {
         const int bar = arg.indexOf('|');
         const QString sectionId = arg.left(bar);

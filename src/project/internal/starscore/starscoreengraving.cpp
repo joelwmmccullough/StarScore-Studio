@@ -27,6 +27,7 @@
 #include "engraving/dom/system.h"
 #include "engraving/dom/instrument.h"
 #include "engraving/dom/accidental.h"
+#include "engraving/dom/clef.h"
 #include "engraving/dom/notedot.h"
 #include "engraving/dom/select.h"
 #include "engraving/dom/timesig.h"
@@ -776,6 +777,39 @@ bool mu::project::starscore::pitchesWithin(const Part* part, int lowest, int hig
         }
     }
     return true;
+}
+
+int mu::project::starscore::setFirstClefs(Part* part, int concert, int transposing)
+{
+    if (!part || part->staves().empty()) {
+        return 0;
+    }
+    int changed = 0;
+    for (Staff* st : part->staves().front()->staffList()) {
+        Measure* first = st->score()->firstMeasure();
+        // the first bar, and the multimeasure rest that stands for it when the song starts with rests (it has
+        // its own copy of the clef)
+        for (Measure* m : { first, first ? first->mmRest() : nullptr }) {
+            Segment* seg = m ? m->findFirstR(SegmentType::HeaderClef, Fraction(0, 1)) : nullptr;
+            Clef* clef = seg ? toClef(seg->element(st->idx() * VOICES)) : nullptr;
+            if (!clef) {
+                continue;
+            }
+            if (clef->generated()) {
+                clef->setClefType(ClefTypeList(ClefType(concert), ClefType(transposing)));   // (layout keeps it in step)
+                continue;
+            }
+            if (int(clef->clefTypeList().concertClef) != concert) {
+                clef->undoChangeProperty(Pid::CLEF_TYPE_CONCERT, PropertyValue(ClefType(concert)));
+                ++changed;
+            }
+            if (int(clef->clefTypeList().transposingClef) != transposing) {
+                clef->undoChangeProperty(Pid::CLEF_TYPE_TRANSPOSING, PropertyValue(ClefType(transposing)));
+                ++changed;
+            }
+        }
+    }
+    return changed;
 }
 
 int mu::project::starscore::copyMeasureWidths(const Score* source, Score* target)

@@ -68,8 +68,8 @@ qt_add_qml_module(project_qml
         internal/StarScore/copylayoutmodel.h
         internal/StarScore/newstarscoremodel.cpp
         internal/StarScore/newstarscoremodel.h
-        internal/StarScore/secretslockmodel.cpp
-        internal/StarScore/secretslockmodel.h
+        internal/StarScore/songbooksvisibilitymodel.cpp
+        internal/StarScore/songbooksvisibilitymodel.h
         internal/StarScore/starscorestylesmodel.cpp
         internal/StarScore/starscorestylesmodel.h
         internal/StarScore/addsolomodel.cpp
@@ -187,7 +187,6 @@ qt_add_qml_module(project_qml
         StarScoreEditDialog.qml
         CopyLayoutDialog.qml
         NewStarScoreDialog.qml
-        StarScoreSecretsPage.qml
         AddArrangementDialog.qml
         StarScoreStylesDialog.qml
         AddSoloDialog.qml

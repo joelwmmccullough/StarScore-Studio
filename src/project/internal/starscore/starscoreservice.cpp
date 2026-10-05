@@ -314,6 +314,7 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
     }
     data.alternatesInSection = root.value("alternatesInSection").toBool();
     data.alternateBarlinesMatched = root.value("alternateBarlinesMatched").toBool();
+    data.flexibleClefsSet = root.value("flexibleClefsSet").toBool();
 
     const QJsonObject audit = root.value("audit").toObject();
     data.auditReferenceSectionId = audit.value("reference").toString();
@@ -473,6 +474,9 @@ QString StarScoreService::toJson(const Data& data)
     }
     if (data.alternateBarlinesMatched) {
         root["alternateBarlinesMatched"] = true;
+    }
+    if (data.flexibleClefsSet) {
+        root["flexibleClefsSet"] = true;
     }
     QJsonObject audit;
     if (!data.auditReferenceSectionId.isEmpty()) {
@@ -1537,6 +1541,12 @@ RetVal<QString> StarScoreService::createSection(const QString& templateKey, cons
 
     if (section.templateKey.endsWith("-horn-any")) {
         fillAnyHornsFromStandard(section);
+        setFlexibleWorkingClefs(section);
+        Data withClefs = load();
+        if (!withClefs.flexibleClefsSet) {
+            withClefs.flexibleClefsSet = true;   // (so opening the file doesn't set them again)
+            store(withClefs);
+        }
     }
     // the new part scores open, with their sheet titles (after the Flexible chairs took the Standard parts' style)
     labelPartBooks();

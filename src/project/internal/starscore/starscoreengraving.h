@@ -56,6 +56,12 @@ int copyTextPositions(const mu::engraving::Score* source, mu::engraving::Score* 
 //! Each bar's width ("stretch", Format › Stretch) from one score to another, bars matched by position in the song.
 //! Undoable (inside a command). Returns how many bars changed.
 int copyMeasureWidths(const mu::engraving::Score* source, mu::engraving::Score* target);
+
+//! The clef saved at the very start of a part's staff (and of every staff linked to it, as in its part score) set to
+//! `concert`/`transposing`. A file keeps that first clef as an element of its own, which the staff's default clef
+//! (what an instrument change sets) doesn't change, so after a clef change only the first system kept the old clef.
+//! Undoable: call inside a command. Returns how many clefs changed.
+int setFirstClefs(mu::engraving::Part* part, int concert, int transposing);
 //! Whether a sheet's instrument name ("Trumpet in B♭", "Alto Saxophone") is a brass instrument, the only ones with a mute
 bool isBrassSheet(const QString& sheetName);
 //! Whether every note of a part (grace notes too) sounds within [lowest, highest] (MIDI pitches)

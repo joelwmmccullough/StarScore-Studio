@@ -49,9 +49,11 @@
 #include <cstdio>
 #include <cstdlib>
 
+#include "settings.h"
 #include "engraving/dom/masterscore.h"
 #include "engraving/dom/excerpt.h"
 #include "engraving/dom/part.h"
+#include "engraving/dom/instrument.h"
 #include "engraving/dom/staff.h"
 #include "engraving/dom/text.h"
 #include "engraving/dom/box.h"
@@ -149,6 +151,17 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         }
         globalContext()->setCurrentNotation(master->notation());
         autotestLog(QString("  viewed %1 part scores").arg(master->excerpts().size()));
+    } else if (step.startsWith("shotdialog:")) {
+        // shotdialog:NAME: a picture of each open window other than the main one, as NAME-1.png, NAME-2.png…
+        int k = 0;
+        for (QWindow* w : QGuiApplication::topLevelWindows()) {
+            auto* q = qobject_cast<QQuickWindow*>(w);
+            if (q && q->isVisible() && q->objectName() != "ApplicationWindow") {
+                const QString path = QString("%1/%2-%3.png").arg(autotestDir(), step.mid(11)).arg(++k);
+                q->grabWindow().save(path);
+                autotestLog(QString("  %1: %2 x %3").arg(path).arg(q->width()).arg(q->height()));
+            }
+        }
     } else if (step.startsWith("window:") || step.startsWith("shot:")) {
         // the app window: "window:W:H" resizes it, "shot:NAME" saves a picture of it as NAME.png
         QQuickWindow* win = nullptr;
@@ -283,12 +296,58 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         interactive()->open(UriQuery(section.isEmpty() ? std::string("musescore://home")
                                      : ("musescore://home?section=" + section.toStdString())));
         autotestLog("  home " + section);
-    } else if (step.startsWith("home")) {
-        // home or home:<section>: the Home page (for a screenshot)
-        const QString section = step.section(':', 1);
-        interactive()->open(UriQuery(section.isEmpty() ? std::string("musescore://home")
-                                     : ("musescore://home?section=" + section.toStdString())));
-        autotestLog("  home " + section);
+    } else if (step.startsWith("uri:")) {
+        // uri:<uri>: opens it (uri:muse://preferences); not waited for
+        interactive()->open(UriQuery(step.mid(4).toStdString()));
+        autotestLog("  opened " + step.mid(4));
+    } else if (step.startsWith("songbooks:")) {
+        // songbooks:1 / songbooks:0: Preferences › General › "Show the Songbooks page on Home"
+        settings()->setSharedValue(Settings::Key("project", "starscore/showSongbooks"), Val(step.endsWith("1")));
+        autotestLog("  songbooks shown: " + step.section(':', 1));
+    } else if (step.startsWith("open:")) {
+        // open:<part score name>: that part score shown (the first whose name contains the text)
+        const QString name = step.mid(5);
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            if (INotationPtr n = e->notation(); n && e->name().contains(name)) {
+                master->setExcerptIsOpen(n, true);
+                globalContext()->setCurrentNotation(n);
+                QCoreApplication::processEvents();
+                autotestLog("  opened " + e->name());
+                break;
+            }
+        }
+    } else if (step.startsWith("flexview:")) {
+        // flexview:<section template key>:<0|1>: the chairs in the Flexible clefs (0) or as the Standard horns (1)
+        const QString key = step.section(':', 1, 1);
+        for (const StarScoreSection& s : load().sections) {
+            if (s.templateKey == key) {
+                setFlexibleShownAsStandard(s.id, step.section(':', 2) == "1");
+                autotestLog(QString("  %1 shown as standard: %2").arg(key).arg(flexibleShownAsStandard(s.id)));
+            }
+        }
+    } else if (step.startsWith("clefs:")) {
+        // clefs:<section template key>: each part's clef (concert/transposing), transposition and first written note
+        const QString key = step.section(':', 1, 1);
+        engraving::MasterScore* ms = masterScore();
+        for (const StarScoreSection& s : load().sections) {
+            if (s.templateKey != key || !ms) {
+                continue;
+            }
+            for (const QString& pid : s.partIds) {
+                const engraving::Part* p = ms->partById(ID(pid));
+                if (!p || p->staves().empty()) {
+                    continue;
+                }
+                const engraving::Staff* st = p->staves().front();
+                QStringList linked;
+                for (const engraving::Staff* ls : st->staffList()) {
+                    linked << QString("%1/%2").arg(int(ls->defaultClefType().concertClef)).arg(int(ls->defaultClefType().transposingClef));
+                }
+                const engraving::Interval v = p->instrument()->transpose();
+                autotestLog(QString("  %1: transpose %2/%3, clefs (concert/written, per linked staff) %4")
+                            .arg(p->partName().toQString()).arg(v.diatonic).arg(v.chromatic).arg(linked.join(" ")));
+            }
+        }
     } else if (step == "suggest") {
         // the version number the export dialog would tick, and why
         const RetVal<StarScoreBandExportPlan> plan = planBandExport();

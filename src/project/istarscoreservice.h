@@ -258,7 +258,7 @@ struct StarScoreBandFile
     bool isVersion = false;
     int transposeDiatonic = 0;   // sounding relative to written, as MuseScore stores it (Bb trumpet = -1/-2)
     int transposeChromatic = 0;
-    int clef = 0;                // 0 = treble, 1 = bass, 2 = alto, 3 = tenor
+    int clef = 0;                // 0 = treble, 1 = bass, 2 = alto, 3 = tenor, 4 = treble 8vb, 5 = bass 8va
     QString header;              // part name printed on the sheet, e.g. "3-Horn Arr: Horn 2 in Bb"
     // Title frame on the printed sheet (horn sheets): the horn's name top left, the arrangement top right,
     // e.g. "Trumpet in B♭" / "2-Horn Arrangement". Applied only while printing; the score isn't changed.
@@ -266,6 +266,10 @@ struct StarScoreBandFile
     QString sheetRight;
     //! A Score printed at written pitch (the transposing score); other Scores are printed at concert pitch
     bool transposingScore = false;
+    //! A Flexible section's Score, in one of its four versions: "C" (concert; treble, the bottom horn in bass clef),
+    //! "Bb" and "Eb" (written for B♭ or E♭ horns; treble, the bottom horn in treble clef an octave down) or "Bass"
+    //! (concert; bass clef an octave up, the bottom horn in bass clef). Empty for every other file.
+    QString flexibleScoreKey;
 };
 
 //! Export to Sheets and Demos: which version number to raise for this export, judged from what changed in the music
@@ -499,6 +503,12 @@ public:
     //! instrument (hidden in the score, with its own part score, opened), printed as it is from then on. Opens the
     //! part score when the sheet already has one. Returns the part id.
     virtual muse::RetVal<QString> makeFlexibleSheetPart(const QString& sectionId, const QString& sheetName) = 0;
+    //! How a Flexible section's chairs are shown while writing: in the Flexible clefs at concert pitch (treble, the
+    //! 3-Horn's Horn 2 soprano clef, the bottom chair alto clef), or as the Standard horns (B♭ Trumpet, Tenor Sax;
+    //! 3-Horn: B♭ Trumpet, Alto Sax, Tenor Sax) with their transpositions and clefs. The chairs keep their Flexible
+    //! ranges, and the exported sheets are the same either way.
+    virtual bool flexibleShownAsStandard(const QString& sectionId) const = 0;
+    virtual void setFlexibleShownAsStandard(const QString& sectionId, bool standard) = 0;
     //! A part score's status (for its tab): the least-finished of its parts' tags, a part without a tag
     //! counting as Empty; -1 when none of its parts has a tag, or for the main score
     virtual int partScoreStatus(const mu::engraving::Score* score) const = 0;

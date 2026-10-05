@@ -35,6 +35,8 @@ Item {
 
     property string currentPageName: ""
     property bool iconsOnly: false
+    // StarScore: the Songbooks entry shows only when it's turned on in Preferences › General
+    property bool songbooksShown: false
 
     signal selected(string name)
 
@@ -87,15 +89,19 @@ Item {
             orientation: ListView.Vertical
             spacing: 0
 
-            model: [
-                { "name": "dashboard", "title": qsTrc("starscore", "Dashboard"), "iconCode": IconCode.STAR },
+            model: {
+                var pages = [ { "name": "dashboard", "title": qsTrc("starscore", "Dashboard"), "iconCode": IconCode.STAR } ]
                 // (the Scores page is the left half of the Dashboard since 1.18.3)
-                { "name": "songbooks", "title": qsTrc("starscore", "Joel's Secrets"), "iconCode": IconCode.LOCK_CLOSED },
-                { "name": "extensions", "title": qsTrc("appshell", "Plugins"), "iconCode":  IconCode.PLUGIN },
-                { "name": "musesounds", "title": qsTrc("appshell", "MuseSounds"), "iconCode": IconCode.PLAY },
-                { "name": "learn", "title": qsTrc("appshell", "Learn"), "iconCode":  IconCode.MORTAR_BOARD },
-                { "name": "changelog", "title": qsTrc("starscore", "Changelog"), "iconCode": IconCode.NEW_FILE }
-            ]
+                if (root.songbooksShown) {
+                    pages.push({ "name": "songbooks", "title": qsTrc("starscore", "Songbooks"), "iconCode": IconCode.SCORE })
+                }
+                return pages.concat([
+                    { "name": "extensions", "title": qsTrc("appshell", "Plugins"), "iconCode":  IconCode.PLUGIN },
+                    { "name": "musesounds", "title": qsTrc("appshell", "MuseSounds"), "iconCode": IconCode.PLAY },
+                    { "name": "learn", "title": qsTrc("appshell", "Learn"), "iconCode":  IconCode.MORTAR_BOARD },
+                    { "name": "changelog", "title": qsTrc("starscore", "Changelog"), "iconCode": IconCode.NEW_FILE }
+                ])
+            }
 
             currentIndex: 0
 
