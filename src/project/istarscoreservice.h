@@ -81,6 +81,7 @@ struct StarScoreFlexibleSheet {
     QString name;           // "Horn 1 - Alto Sax"
     QString chairPartId;    // the chair it is made from
     QString instrumentId;   // "alto-saxophone"
+    int clef = 0;           // 0 treble, 1 bass, 2 alto, 3 tenor (the Trombone (Tenor Clef) sheet)
     QString partId;         // the part it was made into to edit by hand, or empty
 };
 
@@ -257,12 +258,14 @@ struct StarScoreBandFile
     bool isVersion = false;
     int transposeDiatonic = 0;   // sounding relative to written, as MuseScore stores it (Bb trumpet = -1/-2)
     int transposeChromatic = 0;
-    int clef = 0;                // 0 = treble, 1 = bass, 2 = alto
+    int clef = 0;                // 0 = treble, 1 = bass, 2 = alto, 3 = tenor
     QString header;              // part name printed on the sheet, e.g. "3-Horn Arr: Horn 2 in Bb"
     // Title frame on the printed sheet (horn sheets): the horn's name top left, the arrangement top right,
     // e.g. "Trumpet in B♭" / "2-Horn Arrangement". Applied only while printing; the score isn't changed.
     QString sheetLeft;
     QString sheetRight;
+    //! A Score printed at written pitch (the transposing score); other Scores are printed at concert pitch
+    bool transposingScore = false;
 };
 
 //! Export to Sheets and Demos: which version number to raise for this export, judged from what changed in the music

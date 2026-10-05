@@ -25,6 +25,7 @@
 #include "engraving/dom/measure.h"
 #include "engraving/dom/segment.h"
 #include "engraving/dom/chord.h"
+#include "engraving/dom/clef.h"
 #include "engraving/rw/xmlreader.h"
 #include "engraving/dom/select.h"
 #include "engraving/dom/box.h"
@@ -709,6 +710,10 @@ void StarScoreService::fillAnyHornsFromStandard(const StarScoreSection& anySecti
         if (srcScore && dstScore) {
             dst->undoStack()->prepareChanges(TranslatableString::untranslatable("Copy layout from the standard part"));
             starscore::copyLayout(srcScore, { dstScore }, starscore::LayoutCopyOptions());
+            // and everything else set in the standard part score: where its texts, dynamics and chord symbols sit,
+            // which are hidden, and its bar widths
+            starscore::copyTextPositions(srcScore, dstScore);
+            starscore::copyMeasureWidths(srcScore, dstScore);
             dst->undoStack()->commitChanges();
             dst->notationChanged().notify();
         }
@@ -1366,6 +1371,10 @@ RetVal<QString> StarScoreService::makeFlexibleSheetPart(const QString& sectionId
         ms->pasteStaff(reader, start, made->staves().front()->idx());
     }
     starscore::copyEndBarlines(ms, chair, newParts);
+    // the Trombone (Tenor Clef) sheet: tenor clef from the start
+    if (sheet.clef == 3 && start) {
+        ms->undoChangeClef(made->staves().front(), start, engraving::ClefType::C4);
+    }
     // a Flute sheet, as the export makes it: an octave up when any note is out of a flute's range
     if (sheet.instrumentId == "flute" && !starscore::pitchesWithin(made, starscore::FLUTE_LOWEST, starscore::FLUTE_HIGHEST)) {
         std::vector<engraving::Note*> notes;

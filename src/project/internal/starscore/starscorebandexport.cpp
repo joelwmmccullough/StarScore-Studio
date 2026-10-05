@@ -39,6 +39,9 @@
 #include "engraving/dom/instrument.h"
 #include "engraving/dom/interval.h"
 #include "engraving/dom/clef.h"
+#include "engraving/editing/editsystemlocks.h"
+#include "engraving/dom/page.h"
+#include "engraving/dom/system.h"
 #include "engraving/dom/box.h"
 #include "engraving/dom/text.h"
 #include "engraving/dom/factory.h"
@@ -87,7 +90,7 @@ struct StarScoreSeat {
     const char* sheet;          // printed name
     int dia;                    // transposition, sounding relative to written
     int chrom;
-    int clef;                   // 0 treble, 1 bass, 2 alto
+    int clef;                   // 0 treble, 1 bass, 2 alto, 3 tenor
     const char* instrumentId;   // the instrument, for a sheet made into a part of its own
 };
 
@@ -105,13 +108,15 @@ static std::vector<StarScoreSeat> starscoreFlexibleSeats(int horns, int number)
     static const StarScoreSeat VLA { "Viola", "Viola", 0, 0, 2, "viola" };
     static const StarScoreSeat BAR { "Bari Sax", "Baritone Saxophone", -12, -21, 0, "baritone-saxophone" };
     static const StarScoreSeat TBN { "Trombone", "Trombone", 0, 0, 1, "trombone" };
+    // also in tenor clef: most jazz trombonists read bass clef, a sizeable minority prefer tenor clef
+    static const StarScoreSeat TBN_TENOR { "Trombone (Tenor Clef)", "Trombone", 0, 0, 3, "trombone" };
     static const StarScoreSeat BCL { "Bass Clarinet in Bb", "Bass Clarinet in B\u266D", -8, -14, 0, "bb-bass-clarinet" };
     static const StarScoreSeat VC { "Cello", "Cello", 0, 0, 1, "violoncello" };
     if (number == 1 && horns > 1) {
         return horns >= 3 ? std::vector<StarScoreSeat> { CLA, SOP, TPT, ALT, VLN, FLU } : std::vector<StarScoreSeat> { SOP, CLA, TPT, ALT, VLN };
     }
     if (number >= horns && horns > 1) {
-        return { TEN, BAR, TBN, BCL, VC };
+        return { TEN, BAR, TBN, TBN_TENOR, BCL, VC };
     }
     return { TPT, CLA, ALT, TEN, VLA };
 }
@@ -681,9 +686,10 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
             for (const auto& c : chairs) {
                 scoreParts << c.first;
             }
-            addFile(folder, "Score", scoreParts, true);
-
             const QString right = QString("Flexible %1-Horn Arrangement").arg(horns);
+            // (no transposing score: the chairs are written at concert pitch)
+            addFile(folder, "Score", scoreParts, true);
+            plan.files.back().sheetRight = right;
             for (const auto& [pid, number] : chairs) {
                 for (const StarScoreSeat& seat : starscoreFlexibleSeats(horns, number)) {
                     StarScoreBandFile f;
@@ -780,7 +786,12 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
                     scoreParts << pid;
                 }
             }
+            // the concert score and the transposing score, the arrangement top right as on the parts
             addFile(folder, "Score", scoreParts, true);
+            plan.files.back().sheetRight = QString("%1-Horn Arrangement").arg(players);
+            addFile(folder, "Score (Transposing)", scoreParts, true);
+            plan.files.back().sheetRight = QString("%1-Horn Arrangement").arg(players);
+            plan.files.back().transposingScore = true;
 
             // 7-Horn: the main low horn (Bass Trombone unless the song chose another 7th horn) and its stand-in versions
             // (Bari Sax, Bass Sax, Bassoon…) in a folder of their own. Any of the eight low horns goes there, so the
@@ -826,7 +837,12 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
     }
 
     for (const auto& [folder, parts] : familyParts) {
+        const QString right = (folder == "Full Orchestra" ? QString("Orchestra") : folder) + " Arrangement";
         addFile(folder, "Score", parts, true);
+        plan.files.back().sheetRight = right;
+        addFile(folder, "Score (Transposing)", parts, true);
+        plan.files.back().sheetRight = right;
+        plan.files.back().transposingScore = true;
     }
 
     if (!solos().empty()) {
@@ -1642,6 +1658,71 @@ static void starscoreApplyScoreLayout(const IMasterNotationPtr& m, const StarSco
     cs->setLayoutAll();
 }
 
+//! A Score's repeated sections (start repeat to end repeat; from the top when there is no start repeat) on one page
+//! where they fit: a section running onto the next page gets a page break before it, kept only when the whole
+//! section then fits on its page. Lays the score out in page view after each try. Returns how many breaks were kept.
+static int starscoreKeepRepeatsOnOnePage(const INotationPtr& n)
+{
+    mu::engraving::Score* score = n && n->elements() ? n->elements()->msScore() : nullptr;
+    if (!score) {
+        return 0;
+    }
+    if (n->painting()->viewMode() != ViewMode::PAGE) {
+        n->painting()->setViewMode(ViewMode::PAGE);
+    }
+    score->doLayout();
+    auto pageOf = [](const mu::engraving::Measure* m) -> const mu::engraving::Page* {
+        const mu::engraving::Measure* shown = m ? m->coveringMMRestOrThis() : nullptr;
+        return shown && shown->system() ? shown->system()->page() : nullptr;
+    };
+    // how far down its usable height a page's music reaches (0 = empty, 1 = full)
+    auto pageFill = [](const mu::engraving::Page* p) -> double {
+        if (!p || p->systems().empty()) {
+            return 0.0;
+        }
+        const mu::engraving::System* s = p->systems().back();
+        const double usable = p->height() - p->tm() - p->bm();
+        return usable > 0 ? (s->y() + s->height() - p->tm()) / usable : 1.0;
+    };
+    // the ranges, by first and last measure
+    std::vector<std::pair<mu::engraving::Measure*, mu::engraving::Measure*> > ranges;
+    mu::engraving::Measure* start = score->firstMeasure();
+    for (mu::engraving::Measure* m = score->firstMeasure(); m; m = m->nextMeasure()) {
+        if (m->repeatStart()) {
+            start = m;
+        }
+        if (m->repeatEnd() && start) {
+            ranges.emplace_back(start, m);
+            start = m->nextMeasure();
+        }
+    }
+    int kept = 0;
+    for (const auto& [first, last] : ranges) {
+        const mu::engraving::Page* a = pageOf(first);
+        const mu::engraving::Page* b = pageOf(last);
+        mu::engraving::Measure* before = first->prevMeasure();
+        if (!a || !b || a == b || !before || before->pageBreak()) {
+            continue;
+        }
+        n->undoStack()->prepareChanges(TranslatableString::untranslatable("Repeat on one page"));
+        before->undoSetBreak(true, mu::engraving::LayoutBreakType::PAGE);
+        n->undoStack()->commitChanges();
+        score->doLayout();
+        // kept only when the range now fits on one page AND the page it left stays at least half full (Top Hat's
+        // first page would otherwise hold only the title and the intro)
+        if (pageOf(first) == pageOf(last) && pageFill(pageOf(before)) >= 0.5) {
+            ++kept;
+            continue;
+        }
+        // longer than a page, or too much of a page left empty: as it was
+        n->undoStack()->prepareChanges(TranslatableString::untranslatable("Repeat on one page"));
+        before->undoSetBreak(false, mu::engraving::LayoutBreakType::PAGE);
+        n->undoStack()->commitChanges();
+        score->doLayout();
+    }
+    return kept;
+}
+
 //! A sheet as the export prints it, in ONE full layout. Inside a command and in page view: the title texts (the
 //! instrument name top left, the arrangement top right) are set, the sheet is laid out once, the arrangement label is
 //! levelled with the instrument name and the composer credit moved clear of it (both measure that layout; each lays
@@ -1726,7 +1807,8 @@ static void starscoreRewritePartInstrument(const IMasterNotationPtr& vm, mu::eng
     mu::engraving::Instrument instrument = *part->instrument();
     instrument.setTranspose(mu::engraving::Interval(diatonic, chromatic));
     const mu::engraving::ClefType clef = clefKind == 1 ? mu::engraving::ClefType::F
-                                     : clefKind == 2 ? mu::engraving::ClefType::C3 : mu::engraving::ClefType::G;
+                                     : clefKind == 2 ? mu::engraving::ClefType::C3
+                                     : clefKind == 3 ? mu::engraving::ClefType::C4 : mu::engraving::ClefType::G;
     instrument.setClefType(0, mu::engraving::ClefTypeList(clef, clef));
     // The part's main instrument sits at Part::MAIN_INSTRUMENT_TICK (-1), not at tick 0: a key at tick 0 made
     // replaceInstrument look for an instrument change there, find none, and do nothing, so every Flexible version
@@ -2104,6 +2186,122 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         engraving::MasterScore* cs = p->masterNotation()->masterScore();
         if (layout.valid) {
             starscoreApplyScoreLayout(p->masterNotation(), layout);
+
+            // Its systems (Joel, 5 Oct 2026): the arrangement's own score in the song when it was formatted by hand
+            // (it has system or page breaks or system locks); otherwise the system breaks of the part on this Score
+            // with the most of them (page breaks and locks aren't counted or copied), and that part's bars per system
+            const Data d = loadFrom(ms);
+            const engraving::Score* arrScore = nullptr;
+            for (const StarScoreArrangement& a : d.arrangements) {
+                bool holds = false;
+                for (const StarScoreSection& s : d.sections) {
+                    holds |= a.sectionIds.contains(s.id) && s.partIds.contains(file.partIds.value(0));
+                }
+                if (!holds || a.scoreName.isEmpty()) {
+                    continue;
+                }
+                for (const IExcerptNotationPtr& e : master->excerpts()) {
+                    if (e->name() == a.scoreName && e->notation()) {
+                        arrScore = e->notation()->elements()->msScore();
+                    }
+                }
+                if (arrScore) {
+                    break;
+                }
+            }
+            auto formatted = [](const engraving::Score* sc) {
+                if (!sc->systemLocks()->allLocks().empty()) {
+                    return true;
+                }
+                for (const engraving::Measure* m = sc->firstMeasure(); m; m = m->nextMeasure()) {
+                    if (m->lineBreak() || m->pageBreak()) {
+                        return true;
+                    }
+                }
+                return false;
+            };
+            // breaks identical to another part score's were copied from it, not made for this Score: Top Hat's 3-Horn
+            // Score carries the Lead Sheet's breaks (one intro system on page 1), so it counts as not formatted
+            auto breaksOf = [](const engraving::Score* sc) {
+                QStringList out;
+                for (const engraving::Measure* m = sc->firstMeasure(); m; m = m->nextMeasure()) {
+                    if (m->lineBreak() || m->pageBreak()) {
+                        out << QString("%1%2").arg(m->tick().ticks()).arg(m->pageBreak() ? "p" : "l");
+                    }
+                }
+                return out;
+            };
+            auto copiedFromAnother = [&](const engraving::Score* sc) {
+                const QStringList mine = breaksOf(sc);
+                if (mine.isEmpty()) {
+                    return false;
+                }
+                for (const IExcerptNotationPtr& e : master->excerpts()) {
+                    const engraving::Score* other = e->notation() ? e->notation()->elements()->msScore() : nullptr;
+                    if (other && other != sc && breaksOf(other) == mine) {
+                        return true;
+                    }
+                }
+                return false;
+            };
+            const engraving::Score* from = nullptr;
+            INotationPtr fromBook;
+            starscore::LayoutCopyOptions options;
+            if (arrScore && formatted(arrScore) && !copiedFromAnother(arrScore)) {
+                from = arrScore;
+            } else {
+                int most = 0;
+                for (const QString& pid : file.partIds) {
+                    auto b = bookForPart.find(pid);
+                    const engraving::Score* es = b != bookForPart.end() && b->second->notation()
+                                                 ? b->second->notation()->elements()->msScore() : nullptr;
+                    int breaks = 0;
+                    for (const engraving::Measure* m = es ? es->firstMeasure() : nullptr; m; m = m->nextMeasure()) {
+                        breaks += m->lineBreak() ? 1 : 0;
+                    }
+                    if (breaks > most) {
+                        most = breaks;
+                        from = es;
+                        fromBook = b->second->notation();
+                    }
+                }
+                options.pageBreaks = false;
+                options.keepTogether = false;
+                options.systemLocks = false;
+            }
+            if (from) {
+                p->masterNotation()->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Score systems"));
+                if (from != arrScore && !cs->systemLocks()->allLocks().empty()) {
+                    engraving::EditSystemLocks::undoRemoveAllLocks(cs);   // only the part's system breaks decide
+                }
+                starscore::copyLayout(from, { cs }, options);
+                // ... and the same bars on each system as that part (Joel, 5 Oct 2026): the Score ends a system
+                // wherever the part's laid-out page does, including systems the part makes with system locks or by
+                // itself (Top Hat's Trumpet from J on: four bars a system, set with locks)
+                if (fromBook) {
+                    engraving::Score* fs = fromBook->elements()->msScore();
+                    if (fromBook->painting()->viewMode() != ViewMode::PAGE) {
+                        fromBook->painting()->setViewMode(ViewMode::PAGE);
+                    } else {
+                        fs->doLayout();
+                    }
+                    std::set<int> systemEnds;
+                    for (const engraving::Page* page : fs->pages()) {
+                        for (const engraving::System* sys : page->systems()) {
+                            const engraving::Measure* last = sys->lastMeasure();
+                            if (last) {
+                                systemEnds.insert(last->endTick().ticks());
+                            }
+                        }
+                    }
+                    for (engraving::Measure* m = cs->firstMeasure(); m && m->nextMeasure(); m = m->nextMeasure()) {
+                        if (systemEnds.count(m->endTick().ticks()) && !m->lineBreak() && !m->pageBreak()) {
+                            m->undoSetBreak(true, engraving::LayoutBreakType::LINE);
+                        }
+                    }
+                }
+                p->masterNotation()->notation()->undoStack()->commitChanges();
+            }
         }
         std::vector<std::pair<muse::ID, bool> > vis;
         for (const engraving::Part* part : cs->parts()) {
@@ -2139,11 +2337,34 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                 }
             }
         }
+        // Concert pitch, or written pitch for the transposing score; measure numbers a space higher, clear of the
+        // brackets' hooks (Bumper Cars' bar 6 ran into the bracket)
+        {
+            INotationPtr n = p->masterNotation()->notation();
+            n->undoStack()->prepareChanges(TranslatableString::untranslatable("Score pitch"));
+            n->style()->setStyleValue(StyleId::concertPitch, !file.transposingScore);
+            n->undoStack()->commitChanges();
+            if (layout.valid) {
+                const PointF pos = cs->style().styleV(engraving::Sid::measureNumberPosAbove).value<PointF>();
+                n->undoStack()->prepareChanges(TranslatableString::untranslatable("Measure numbers"));
+                cs->undoChangeStyleVal(engraving::Sid::measureNumberPosAbove, PointF(pos.x(), pos.y() - 1.0));
+                n->undoStack()->commitChanges();
+            }
+        }
+        // Repeated sections kept on one page where they fit (titled first: the label can move the composer credit)
+        if (layout.valid) {
+            INotationPtr n = p->masterNotation()->notation();
+            n->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
+            starscoreRetitleTexts(cs, QString(), file.sheetRight);
+            n->undoStack()->commitChanges();
+            starscoreKeepRepeatsOnOnePage(n);
+        }
         // The composer credit at its house position (last line on the subtitle's baseline), measured in page
         // view: the main score's style can carry a credit moved too far (1.15.7's Apply Styles measured it in
-        // continuous view and printed Bumper Cars' credit in the music)
+        // continuous view and printed Bumper Cars' credit in the music). The arrangement top right, as on the parts.
         p->masterNotation()->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Composer credit"));
-        const Ret ret = starscorePrintSheet(writer, p->masterNotation()->notation(), QString(), QString(), false, pdf);
+        const Ret ret = starscorePrintSheet(writer, p->masterNotation()->notation(), QString(), file.sheetRight,
+                                            !file.sheetRight.isEmpty(), pdf);
         p->masterNotation()->notation()->undoStack()->commitChanges();
         return ret;
     };
@@ -2602,6 +2823,7 @@ std::vector<StarScoreFlexibleSheet> StarScoreService::flexibleSheets(const QStri
                 sheet.name = starscoreSeatSheetName(number, seat);
                 sheet.chairPartId = pid;
                 sheet.instrumentId = QString::fromUtf8(seat.instrumentId);
+                sheet.clef = seat.clef;
                 auto own = s.sheetParts.find(sheet.name);
                 if (own != s.sheetParts.end() && ms->partById(ID(own->second))) {
                     sheet.partId = own->second;

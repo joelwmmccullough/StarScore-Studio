@@ -4,6 +4,16 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.6
+
+- **Two Scores per horn section: concert and transposing.** Each Standard section (and Big Band, Orchestra, Marching Band) now also exports "Score (Transposing)", with every horn at written pitch. The Flexible sections keep one Score.
+- **Scores carry the arrangement top right**, like the parts: "3-Horn Arrangement", "Flexible 3-Horn Arrangement", "Orchestra Arrangement"…
+- **Score systems from the parts.** When a section's Score in the song hasn't been formatted by hand, the exported Score takes the system breaks of the part with the most system breaks (page breaks and system locks aren't counted or copied), and puts the same bars on each system as that part's page. A Score whose breaks are all the same as another part score's (Top Hat's 3-Horn Score had the Lead Sheet's breaks, with only the intro on page 1) counts as not formatted.
+- **Repeated sections on one page.** On Scores, a section between repeat signs that runs onto the next page gets a page break before it, when the whole section then fits on one page and the page before stays at least half full. With the Trumpet part's systems, Bumper Cars' bars 34–50 take six systems of three staves, one more than a page holds, so that section still runs over two pages (it now starts at the foot of page 2 instead of leaving bars 49–50 alone on the next page).
+- **Measure numbers on Scores sit higher**, clear of the brackets (Bumper Cars' bar 6).
+- **Trombone sheets in tenor clef too.** Every Flexible sheet for Trombone is exported twice: "Trombone" (bass clef) and "Trombone (Tenor Clef)".
+- **Making a Flexible section from a Standard one copies everything** from the Standard part scores: breaks and system locks as before, and now also where texts, dynamics and chord symbols sit, which ones are hidden, and the bar widths.
+
 ## 1.18.5
 
 - **Horn section Scores in the house order, with brackets.** Each exported Score lists and brackets its staves as follows (whatever order the instruments are in the song):

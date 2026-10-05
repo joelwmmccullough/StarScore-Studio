@@ -671,7 +671,7 @@ int mu::project::starscore::copyTextPositions(const Score* source, Score* target
     }
     auto movable = [](const EngravingItem* e) {
         return e && (e->isStaffText() || e->isSystemText() || e->isTempoText() || e->isRehearsalMark() || e->isExpression()
-                     || e->isPlayTechAnnotation());
+                     || e->isPlayTechAnnotation() || e->isDynamic() || e->isHarmony());
     };
     // the target's texts by place in the song and words
     std::multimap<std::pair<int, QString>, EngravingItem*> targetTexts;
