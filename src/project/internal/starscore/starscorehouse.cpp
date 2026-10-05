@@ -471,6 +471,85 @@ bool levelArrangementLabel(Score* score)
     return moved;
 }
 
+QStringList arrangementLabelVariants(const QString& label)
+{
+    QStringList out { label };
+    static const QRegularExpression horns("\\b(\\d+)-Horn\\b");
+    QString shortForm = QString(label).replace(horns, "\\1H");
+    QStringList words = shortForm.split(' ', Qt::SkipEmptyParts);
+    auto add = [&](const QString& v) {
+        if (!v.isEmpty() && !out.contains(v)) {
+            out << v;
+        }
+    };
+    add(shortForm);
+    if (words.size() >= 2) {
+        add(words.first() + "\n" + words.mid(1).join(' '));
+        add(words.mid(0, words.size() - 1).join(' ') + "\n" + words.last());
+    }
+    return out;
+}
+
+bool fitArrangementLabel(Score* score)
+{
+    MeasureBase* frame = nullptr;
+    for (MeasureBase* mb = score ? score->first() : nullptr; mb && !mb->isMeasure(); mb = mb->next()) {
+        if (mb->isVBox()) {
+            frame = mb;
+            break;
+        }
+    }
+    if (!frame) {
+        return false;
+    }
+    Text* label = nullptr;
+    std::vector<const Text*> titles;
+    for (EngravingItem* e : frame->el()) {
+        if (!e || !e->isText()) {
+            continue;
+        }
+        Text* t = toText(e);
+        if (t->textStyleType() == TextStyleType::INSTRUMENT_EXCERPT && t->position() == AlignH::RIGHT) {
+            if (!label) {
+                label = t;
+            }
+        } else if (t->textStyleType() == TextStyleType::TITLE || t->textStyleType() == TextStyleType::SUBTITLE) {
+            titles.push_back(t);
+        }
+    }
+    if (!label || titles.empty()) {
+        return false;
+    }
+    const double gap = 0.5 * score->style().spatium();
+    auto overlaps = [&]() {
+        if (!label->ldata() || label->plainText().isEmpty()) {
+            return false;
+        }
+        const RectF l = label->pageBoundingRect().adjusted(-gap, 0.0, 0.0, 0.0);
+        for (const Text* t : titles) {
+            if (t->ldata() && !t->plainText().isEmpty() && l.intersects(t->pageBoundingRect())) {
+                return true;
+            }
+        }
+        return false;
+    };
+    if (!overlaps()) {
+        return false;
+    }
+    // the forms after the one shown now
+    const QString current = label->plainText().toQString();
+    const QStringList variants = arrangementLabelVariants(QString(current).replace('\n', ' ').simplified());
+    bool changed = false;
+    for (int i = std::max(1, int(variants.indexOf(current)) + 1); i < variants.size() && overlaps(); ++i) {
+        label->undoChangeProperty(Pid::TEXT, String::fromQString(variants[i].toHtmlEscaped()));
+        changed = true;
+        score->setLayoutAll();
+        score->doLayout();
+        levelArrangementLabel(score);
+    }
+    return changed;
+}
+
 QString versionFromCopyright(const QString& copyright)
 {
     static const QRegularExpression re("Version\\s+(\\d+)\\.(\\d+)\\.(\\d+)", QRegularExpression::CaseInsensitiveOption);

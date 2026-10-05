@@ -155,6 +155,8 @@ public:
     void makeBassHornVersions(const QString& sectionId) override;
     std::vector<std::pair<QString, QString> > versionMains(const QString& sectionId) const override;
     std::pair<QString, QString> mainLowHorn(const QString& sectionId) const override;
+    std::vector<StarScoreFlexibleSheet> flexibleSheets(const QString& sectionId) const override;
+    muse::RetVal<QString> makeFlexibleSheetPart(const QString& sectionId, const QString& sheetName) override;
     //! The band's name for a low horn ("Bass Trombone", "Bari Sax", …, "Tuba"), or "" when the instrument isn't one
     //! of the eight. The low horn a 7-Horn section is built on and its stand-in versions are all told apart this way.
     static QString lowHornName(const QString& instrumentId);

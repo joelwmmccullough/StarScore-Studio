@@ -4,6 +4,13 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.2
+
+- **Horn 1's Flute sheet is made from Horn 1.** The 3-Horn Flexible "Horn 1 - Flute" sheet is now made from the Horn 1 part score like Horn 1's other sheets, with its formatting. Until now it came from a hidden "Horn 1 (Flute)" staff with a part score of its own that had to be formatted by hand (Bet's Flute sheet had the old title style and the wide pickup bar). New 3-Horn Flexible sections no longer get that staff; in existing songs it stays in the file but isn't used.
+- **Edit one Flexible sheet by hand.** Right-click a Flexible section › Edit one sheet by hand › pick a sheet ("Horn 1 - Alto Sax"…). The sheet becomes a part of its own in the section: the chair's music on that instrument, hidden in the score, with its own part score, which opens with the chair part score's formatting. From then on the export prints that part as it is instead of making the sheet from the chair, and it no longer follows changes to the chair. Picking it again opens its part score. Delete the part to go back to the sheet made from the chair.
+- **Long arrangement labels make room for the title.** When the label at the top right of a sheet runs into the song title (Balkan Wedding's "Flexible 2-Horn Arrangement"), it is shortened to "Flexible 2H Arrangement"; if it still runs into the title, it goes on two lines, "Flexible / 2H Arrangement", then "Flexible 2H / Arrangement".
+- Version sheets made from a fresh part (a chair with no part score of its own) and the 7-Horn and Piccolo stand-in versions now also take the source part score's bar widths and hidden texts.
+
 ## 1.18.1
 
 - **Flexible version sheets keep all of the chair's formatting.** Each "Horn N - <instrument>" sheet is now printed from the chair's own part score ("3H Flexible: Horn 1"), re-pitched and re-clefed for the instrument, instead of from a fresh part that only got the chair's line breaks and text positions. Everything set in the chair's part score carries over: hidden texts stay hidden (Bet's hidden "test" text printed on every version), bar widths (Bet's narrowed pickup bar), text positions, spacers and the chair's own style. A chair with no part score of its own still gets the fresh part as before.

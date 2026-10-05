@@ -368,7 +368,11 @@ QString StarScoreService::todoPdfHtml(const QString& title, const QString& code,
             // a stand-in version: "· Bass Trombone version" (named after the part it stands in for)
             const auto standIn = sec.alternates.find(pid);
             QString standInText;
-            if (standIn != sec.alternates.end()) {
+            const bool ownSheet = std::any_of(sec.sheetParts.begin(), sec.sheetParts.end(),
+                                              [&](const auto& sp) { return sp.second == pid; });
+            if (ownSheet) {
+                standInText = QString(" <span class=\"dim\">&middot; sheet edited by hand</span>");
+            } else if (standIn != sec.alternates.end()) {
                 const engraving::Part* mainPart = ms->partById(ID(standIn->second));
                 const QString mainName = mainPart ? versionMainName(mainPart->instrumentId().toQString()) : QString();
                 standInText = QString(" <span class=\"dim\">&middot; %1 version</span>")

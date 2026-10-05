@@ -53,6 +53,14 @@ int lockSheetLayout(mu::engraving::Score* score);
 //! to another holding the same music: a text in the target at the same place in the song with the same words gets
 //! the source's position (offset and placement). Call inside a command. Returns how many texts moved.
 int copyTextPositions(const mu::engraving::Score* source, mu::engraving::Score* target);
+//! Each bar's width ("stretch", Format › Stretch) from one score to another, bars matched by position in the song.
+//! Undoable (inside a command). Returns how many bars changed.
+int copyMeasureWidths(const mu::engraving::Score* source, mu::engraving::Score* target);
+//! Whether a sheet's instrument name ("Trumpet in B♭", "Alto Saxophone") is a brass instrument, the only ones with a mute
+bool isBrassSheet(const QString& sheetName);
+//! Hides the texts that are only a mute or open marking ("mute", "(open)", "cup mute", "con sord."…), for a sheet on
+//! an instrument without a mute; "Open solos" stays. Undoable (inside a command). Returns how many were hidden.
+int hideMuteMarkings(mu::engraving::Score* score);
 
 //! Colour notes (noteheads, accidentals, dots) by pitch class using Joel's 12 colours, or reset them
 //! to the default colour. Works on the selected notes, or the whole score when nothing is selected.

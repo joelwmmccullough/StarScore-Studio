@@ -249,6 +249,10 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
         for (auto it = alts.begin(); it != alts.end(); ++it) {
             s.alternates[it.key()] = it.value().toString();
         }
+        const QJsonObject own = o.value("sheetParts").toObject();
+        for (auto it = own.begin(); it != own.end(); ++it) {
+            s.sheetParts[it.key()] = it.value().toString();
+        }
         // "N-Horn Any" is now called "N-Horn Flexible" (1.8.0)
         static const QRegularExpression anyRe("\\b(\\d+)-Horn Any\\b");
         s.name.replace(anyRe, "\\1-Horn Flexible");
@@ -372,6 +376,13 @@ QString StarScoreService::toJson(const Data& data)
                 alts[alt] = main;
             }
             o["alternates"] = alts;
+        }
+        if (!s.sheetParts.empty()) {
+            QJsonObject own;
+            for (const auto& [sheet, pid] : s.sheetParts) {
+                own[sheet] = pid;
+            }
+            o["sheetParts"] = own;
         }
         sections.append(o);
     }
@@ -585,6 +596,9 @@ StarScoreService::Data StarScoreService::loadFrom(const engraving::MasterScore* 
             } else {
                 it = s.alternates.erase(it);
             }
+        }
+        for (auto it = s.sheetParts.begin(); it != s.sheetParts.end();) {
+            it = existing.count(it->second) ? std::next(it) : s.sheetParts.erase(it);
         }
     }
 
@@ -1203,7 +1217,8 @@ std::vector<StarScoreSectionTemplate> StarScoreService::sectionTemplates() const
         // "Any Horns": one concert-pitch staff per chair, with the chair's ranges from the Starsign Band Guide.
         // Transposed versions for each instrument are made at export time.
         { "2-horn-any", "2-Horn Flexible", { chair("c-trumpet", "Horn 1", 56, 80, 52, 85), chair("trombone", "Horn 2", 44, 71, 44, 74) } },
-        { "3-horn-any", "3-Horn Flexible", { chair("c-trumpet", "Horn 1", 56, 80, 52, 85), chair("flute", "Horn 1 (Flute)", -1, -1, -1, -1, true),
+        // (until 1.18.2 the 3-Horn also had a hidden "Horn 1 (Flute)" staff; Horn 1's Flute sheet is now made from Horn 1)
+        { "3-horn-any", "3-Horn Flexible", { chair("c-trumpet", "Horn 1", 56, 80, 52, 85),
               chair("c-trumpet", "Horn 2", 52, 75, 52, 85), chair("trombone", "Horn 3", 44, 71, 44, 74) } },
 
         // --- Big band ---

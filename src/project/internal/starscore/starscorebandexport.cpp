@@ -81,6 +81,68 @@ static const std::vector<std::pair<QString, QString> > STARSCORE_HORN_ORDER {
 //! 7-Horn arrangement: the subfolder for the Bass Trombone and its stand-in versions
 static const QString STARSCORE_BASS_HORNS_FOLDER = QStringLiteral("Bass Horns (Horn #7)");
 
+//! A Flexible chair as one instrument can play it (Starsign Band Guide, page 3)
+struct StarScoreSeat {
+    const char* file;           // file name part, e.g. "Trumpet in Bb"
+    const char* sheet;          // printed name
+    int dia;                    // transposition, sounding relative to written
+    int chrom;
+    int clef;                   // 0 treble, 1 bass, 2 alto
+    const char* instrumentId;   // the instrument, for a sheet made into a part of its own
+};
+
+//! The instruments a Flexible chair is printed for: chair `number` of a `horns`-chair section. Horn 1 of 3 also on
+//! Flute (made from Horn 1 like the others since 1.18.2; before, from a hidden "Horn 1 (Flute)" staff of its own).
+static std::vector<StarScoreSeat> starscoreFlexibleSeats(int horns, int number)
+{
+    static const StarScoreSeat SOP { "Soprano Sax", "Soprano Saxophone", -1, -2, 0, "soprano-saxophone" };
+    static const StarScoreSeat CLA { "Clarinet in Bb", "Clarinet in B\u266D", -1, -2, 0, "bb-clarinet" };
+    static const StarScoreSeat TPT { "Trumpet in Bb", "Trumpet in B\u266D", -1, -2, 0, "bb-trumpet" };
+    static const StarScoreSeat ALT { "Alto Sax", "Alto Saxophone", -5, -9, 0, "alto-saxophone" };
+    static const StarScoreSeat VLN { "Violin", "Violin", 0, 0, 0, "violin" };
+    static const StarScoreSeat FLU { "Flute", "Flute", 0, 0, 0, "flute" };
+    static const StarScoreSeat TEN { "Tenor Sax", "Tenor Saxophone", -8, -14, 0, "tenor-saxophone" };
+    static const StarScoreSeat VLA { "Viola", "Viola", 0, 0, 2, "viola" };
+    static const StarScoreSeat BAR { "Bari Sax", "Baritone Saxophone", -12, -21, 0, "baritone-saxophone" };
+    static const StarScoreSeat TBN { "Trombone", "Trombone", 0, 0, 1, "trombone" };
+    static const StarScoreSeat BCL { "Bass Clarinet in Bb", "Bass Clarinet in B\u266D", -8, -14, 0, "bb-bass-clarinet" };
+    static const StarScoreSeat VC { "Cello", "Cello", 0, 0, 1, "violoncello" };
+    if (number == 1 && horns > 1) {
+        return horns >= 3 ? std::vector<StarScoreSeat> { CLA, SOP, TPT, ALT, VLN, FLU } : std::vector<StarScoreSeat> { SOP, CLA, TPT, ALT, VLN };
+    }
+    if (number >= horns && horns > 1) {
+        return { TEN, BAR, TBN, BCL, VC };
+    }
+    return { TPT, CLA, ALT, TEN, VLA };
+}
+
+//! "Horn 1 - Alto Sax": the sheet's name in its file name and in the section's menu
+static QString starscoreSeatSheetName(int number, const StarScoreSeat& seat)
+{
+    return QString("Horn %1 - %2").arg(number).arg(QString::fromUtf8(seat.file));
+}
+
+//! A Flexible section's chairs in score order with their numbers ("Horn N" in the part name). Left out: a hidden
+//! "Horn 1 (Flute)" staff from before 1.18.2, and parts made to edit one sheet by hand (stand-ins of a chair).
+static std::vector<std::pair<QString, int> > starscoreFlexibleChairs(const mu::engraving::MasterScore* ms, const StarScoreSection& sec)
+{
+    static const QRegularExpression chairRe("Horn\\s*(\\d+)", QRegularExpression::CaseInsensitiveOption);
+    std::vector<std::pair<QString, int> > chairs;
+    for (const mu::engraving::Part* p : ms->parts()) {
+        const QString pid = p->id().toQString();
+        if (!sec.partIds.contains(pid) || sec.alternates.count(pid)) {
+            continue;
+        }
+        const QString name = p->partName().toQString();
+        if (name.contains("flute", Qt::CaseInsensitive)) {
+            continue;
+        }
+        const QRegularExpressionMatch cm = chairRe.match(name);
+        chairs.emplace_back(pid, cm.hasMatch() ? cm.captured(1).toInt() : int(chairs.size()) + 1);
+    }
+    return chairs;
+}
+
 //! The band's name for a horn, or empty when the instrument is not a horn
 static QString starscoreHornName(const QString& id)
 {
@@ -607,23 +669,7 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
 
         static const QRegularExpression anyRe("^(\\d+)-horn-any$");
         if (anyRe.match(key).hasMatch()) {
-            // Chairs: "Horn N" staves (concert pitch); a staff with "Flute" in its name is Horn 1's flute variation
-            static const QRegularExpression chairRe("Horn\\s*(\\d+)", QRegularExpression::CaseInsensitiveOption);
-            std::vector<std::pair<QString, int> > chairs;   // (partId, chair number)
-            QString flutePid;
-            for (const QString& pid : sec.partIds) {
-                engraving::Part* p = partById(pid);
-                if (!p) {
-                    continue;
-                }
-                const QString name = p->partName().toQString();
-                if (name.contains("flute", Qt::CaseInsensitive)) {
-                    flutePid = pid;
-                    continue;
-                }
-                const QRegularExpressionMatch cm = chairRe.match(name);
-                chairs.emplace_back(pid, cm.hasMatch() ? cm.captured(1).toInt() : int(chairs.size()) + 1);
-            }
+            const std::vector<std::pair<QString, int> > chairs = starscoreFlexibleChairs(ms, sec);   // (partId, chair number)
             if (chairs.empty()) {
                 continue;
             }
@@ -637,54 +683,27 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
             }
             addFile(folder, "Score", scoreParts, true);
 
-            // Each chair as a sheet for every instrument that can sit in it (Starsign Band Guide, page 3)
-            struct Seat {
-                const char* file;    // file name part, e.g. "Trumpet in Bb"
-                const char* sheet;   // printed name
-                int dia;
-                int chrom;
-                int clef;            // 0 treble, 1 bass, 2 alto
-            };
-            static const Seat SOP { "Soprano Sax", "Soprano Saxophone", -1, -2, 0 };
-            static const Seat CLA { "Clarinet in Bb", "Clarinet in B\u266D", -1, -2, 0 };
-            static const Seat TPT { "Trumpet in Bb", "Trumpet in B\u266D", -1, -2, 0 };
-            static const Seat ALT { "Alto Sax", "Alto Saxophone", -5, -9, 0 };
-            static const Seat VLN { "Violin", "Violin", 0, 0, 0 };
-            static const Seat TEN { "Tenor Sax", "Tenor Saxophone", -8, -14, 0 };
-            static const Seat VLA { "Viola", "Viola", 0, 0, 2 };
-            static const Seat BAR { "Bari Sax", "Baritone Saxophone", -12, -21, 0 };
-            static const Seat TBN { "Trombone", "Trombone", 0, 0, 1 };
-            static const Seat BCL { "Bass Clarinet in Bb", "Bass Clarinet in B\u266D", -8, -14, 0 };
-            static const Seat VC { "Cello", "Cello", 0, 0, 1 };
-            const std::vector<Seat> HIGH2 { SOP, CLA, TPT, ALT, VLN };
-            const std::vector<Seat> HIGH3 { CLA, SOP, TPT, ALT, VLN };
-            const std::vector<Seat> MIDDLE { TPT, CLA, ALT, TEN, VLA };
-            const std::vector<Seat> LOW { TEN, BAR, TBN, BCL, VC };
             const QString right = QString("Flexible %1-Horn Arrangement").arg(horns);
-
-            auto addSeat = [&](const QString& pid, int number, const Seat& seat) {
-                StarScoreBandFile f;
-                const QString name = QString("Horn %1 - %2").arg(number).arg(QString::fromUtf8(seat.file));
-                f.relativePath = folder + "/" + code + " - " + starscoreSafeFileName(name) + ".pdf";
-                f.partIds = { pid };
-                f.isVersion = true;
-                f.transposeDiatonic = seat.dia;
-                f.transposeChromatic = seat.chrom;
-                f.clef = seat.clef;
-                f.header = arr + name;
-                f.sheetLeft = QString::fromUtf8(seat.sheet);
-                f.sheetRight = right;
-                plan.files.push_back(f);
-            };
-
             for (const auto& [pid, number] : chairs) {
-                const std::vector<Seat>& seats = (number == 1 && horns > 1) ? (horns >= 3 ? HIGH3 : HIGH2)
-                                                 : (number >= horns && horns > 1) ? LOW : MIDDLE;
-                for (const Seat& seat : seats) {
-                    addSeat(pid, number, seat);
-                }
-                if (number == 1 && !flutePid.isEmpty()) {
-                    addSeat(flutePid, 1, Seat { "Flute", "Flute", 0, 0, 0 });
+                for (const StarScoreSeat& seat : starscoreFlexibleSeats(horns, number)) {
+                    StarScoreBandFile f;
+                    const QString name = starscoreSeatSheetName(number, seat);
+                    f.relativePath = folder + "/" + code + " - " + starscoreSafeFileName(name) + ".pdf";
+                    f.header = arr + name;
+                    f.sheetLeft = QString::fromUtf8(seat.sheet);
+                    f.sheetRight = right;
+                    // a sheet made into a part of its own to edit by hand (the section's menu) prints as that part
+                    auto own = sec.sheetParts.find(name);
+                    if (own != sec.sheetParts.end() && partById(own->second)) {
+                        f.partIds = { own->second };
+                    } else {
+                        f.partIds = { pid };
+                        f.isVersion = true;
+                        f.transposeDiatonic = seat.dia;
+                        f.transposeChromatic = seat.chrom;
+                        f.clef = seat.clef;
+                    }
+                    plan.files.push_back(f);
                 }
             }
             anyFolders << folder;
@@ -842,7 +861,10 @@ static bool starscoreNeedsRetitle(const mu::engraving::Score* score, const QStri
         }
         const mu::engraving::Text* t = mu::engraving::toText(e);
         if (t->position() == mu::engraving::AlignH::RIGHT) {
-            rightOk |= t->xmlText() == r;
+            // the label as given, or as shortened to clear the title (fitArrangementLabel)
+            for (const QString& v : starscore::arrangementLabelVariants(right)) {
+                rightOk |= t->xmlText() == muse::String::fromQString(v.toHtmlEscaped());
+            }
         } else {
             leftOk |= t->xmlText() == l;
         }
@@ -912,8 +934,14 @@ static bool starscoreRetitleTexts(mu::engraving::Score* score, const QString& le
         }
     }
     if (!right.isEmpty()) {
+        bool fitted = false;   // already the label, or a shortened form of it (fitArrangementLabel)
         if (label) {
-            if (label->xmlText() != escape(right)) {
+            for (const QString& v : starscore::arrangementLabelVariants(right)) {
+                fitted |= label->xmlText() == escape(v);
+            }
+        }
+        if (label) {
+            if (!fitted) {
                 label->undoChangeProperty(mu::engraving::Pid::TEXT, escape(right));
                 changed = true;
             }
@@ -1358,6 +1386,8 @@ static Ret starscorePrintSheet(const INotationWriterPtr& writer, const INotation
     }
     if (partSheet) {
         starscore::levelArrangementLabel(score);
+        // a long label running into the title is shortened ("Flexible 2H Arrangement"), then broken over two lines
+        starscore::fitArrangementLabel(score);
     }
     starscore::clearComposerCredit(score);
     const Ret ret = starscorePdfBytes(writer, notation, pdf);
@@ -1422,43 +1452,6 @@ static void starscoreRewritePartInstrument(const IMasterNotationPtr& vm, mu::eng
     vm->parts()->replaceInstrument(key, instrument);
 }
 
-//! A version sheet for a brass instrument (the only ones that use a mute)
-static bool starscoreBrassSheet(const QString& sheetName)
-{
-    static const QRegularExpression brass("\\b(trumpet|trombone|flugelhorn|cornet|horn in f|french horn|tuba|euphonium|baritone horn)\\b",
-                                          QRegularExpression::CaseInsensitiveOption);
-    return brass.match(sheetName).hasMatch();
-}
-
-//! Hides the mute and open markings ("mute", "(open)", "cup mute", "con sord."…) in a sheet for an instrument that has
-//! no mute. Only texts that are nothing but such a marking: "Open solos" stays. In a throwaway copy.
-static int starscoreHideMuteMarkings(mu::engraving::Score* score)
-{
-    if (!score) {
-        return 0;
-    }
-    static const QRegularExpression mute("^\\(?\\s*((straight|cup|harmon|plunger|bucket|practice|wah)\\s+)?"
-                                         "(mute|muted|mutes|mute in|mute out|mute on|mute off|open|harmon|plunger|"
-                                         "con sord\\.?|senza sord\\.?|con sordino|senza sordino)\\s*\\)?[.!]?$",
-                                         QRegularExpression::CaseInsensitiveOption);
-    std::vector<mu::engraving::EngravingItem*> hide;
-    for (mu::engraving::Segment* seg = score->firstSegment(mu::engraving::SegmentType::ChordRest); seg;
-         seg = seg->next1(mu::engraving::SegmentType::ChordRest)) {
-        for (mu::engraving::EngravingItem* e : seg->annotations()) {
-            if (!e || !e->visible() || !(e->isStaffText() || e->isSystemText() || e->isExpression() || e->isPlayTechAnnotation())) {
-                continue;
-            }
-            if (mute.match(mu::engraving::toTextBase(e)->plainText().toQString().simplified()).hasMatch()) {
-                hide.push_back(e);
-            }
-        }
-    }
-    for (mu::engraving::EngravingItem* e : hide) {
-        e->undoChangeProperty(mu::engraving::Pid::VISIBLE, false);
-    }
-    return int(hide.size());
-}
-
 //! The part's book made fresh (the one MuseScore would make for the part), named `bookName` like the part itself,
 //! with the look and line breaks of `srcBook` (the chair's own part book; the default style when there is none),
 //! at written pitch. MuseScore may still list the book under the part's earlier name, `oldName` (see
@@ -1491,8 +1484,9 @@ static INotationPtr starscoreMakeVersionBook(const IMasterNotationPtr& vm, mu::e
         if (es && srcScore) {
             n->undoStack()->prepareChanges(TranslatableString::untranslatable("Copy layout"));
             starscore::copyLayout(srcScore, { es }, starscore::LayoutCopyOptions());
-            // and where the chair's texts were put by hand ("mute", "(open)", the tempo mark)
+            // and where the chair's texts were put by hand ("mute", "(open)", the tempo mark), and its bar widths
             starscore::copyTextPositions(srcScore, es);
+            starscore::copyMeasureWidths(srcScore, es);
             n->undoStack()->commitChanges();
         }
     } else if (!defaultStyle.isEmpty() && QFileInfo::exists(defaultStyle)) {
@@ -1758,7 +1752,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
 
     // A Flexible chair re-written for one transposition and clef, as a part book of its own
     auto writeVersion = [&](const StarScoreBandFile& file, QByteArray& pdf) -> Ret {
-        const bool brass = starscoreBrassSheet(file.sheetLeft);
+        const bool brass = starscore::isBrassSheet(file.sheetLeft);
         // From the chair's own part book: everything set in it carries over
         if (loadStripped() /* makes the copies */ && chairsSaved) {
             INotationProjectPtr p = loadProject(chairsPath);
@@ -1778,7 +1772,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                 starscoreRewritePartInstrument(vm, part, file.transposeDiatonic, file.transposeChromatic, file.clef, false);
                 n->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
                 if (!brass) {
-                    starscoreHideMuteMarkings(n->elements()->msScore());
+                    starscore::hideMuteMarkings(n->elements()->msScore());
                 }
                 const Ret ret = starscorePrintSheet(writer, n, file.sheetLeft, file.sheetRight, true, pdf);
                 n->undoStack()->commitChanges();
@@ -1808,7 +1802,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         // a copy of the song, so nothing of this is kept
         n->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
         if (!brass) {
-            starscoreHideMuteMarkings(n->elements()->msScore());
+            starscore::hideMuteMarkings(n->elements()->msScore());
         }
         const Ret ret = starscorePrintSheet(writer, n, file.sheetLeft, file.sheetRight, true, pdf);
         n->undoStack()->commitChanges();
@@ -2299,6 +2293,36 @@ static const std::set<QString> STARSCORE_V4_TITLES {
     "little louie", "live strong + strasbourg", "move on up", "peasant funk", "pick up the pieces", "playground", "semente",
     "shofukan", "standing next to you", "the chicken", "the essential", "two", "up from the south", "watermelon man",
 };
+
+std::vector<StarScoreFlexibleSheet> StarScoreService::flexibleSheets(const QString& sectionId) const
+{
+    std::vector<StarScoreFlexibleSheet> out;
+    const engraving::MasterScore* ms = masterScore();
+    if (!ms) {
+        return out;
+    }
+    for (const StarScoreSection& s : load().sections) {
+        static const QRegularExpression anyRe("^\\d+-horn-any$");
+        if (s.id != sectionId || !anyRe.match(s.templateKey).hasMatch()) {
+            continue;
+        }
+        const std::vector<std::pair<QString, int> > chairs = starscoreFlexibleChairs(ms, s);
+        for (const auto& [pid, number] : chairs) {
+            for (const StarScoreSeat& seat : starscoreFlexibleSeats(int(chairs.size()), number)) {
+                StarScoreFlexibleSheet sheet;
+                sheet.name = starscoreSeatSheetName(number, seat);
+                sheet.chairPartId = pid;
+                sheet.instrumentId = QString::fromUtf8(seat.instrumentId);
+                auto own = s.sheetParts.find(sheet.name);
+                if (own != s.sheetParts.end() && ms->partById(ID(own->second))) {
+                    sheet.partId = own->second;
+                }
+                out.push_back(sheet);
+            }
+        }
+    }
+    return out;
+}
 
 StarScoreVersionSuggestion StarScoreService::suggestVersionBump(const StarScoreBandExportPlan& plan) const
 {

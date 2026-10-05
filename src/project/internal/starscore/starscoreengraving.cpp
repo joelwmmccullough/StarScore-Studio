@@ -698,7 +698,8 @@ int mu::project::starscore::copyTextPositions(const Score* source, Score* target
                 }
                 used.insert(t);
                 bool changed = false;
-                for (Pid pid : { Pid::OFFSET, Pid::PLACEMENT, Pid::AUTOPLACE }) {
+                // where it sits, and whether it shows (a text hidden in the source stays hidden)
+                for (Pid pid : { Pid::OFFSET, Pid::PLACEMENT, Pid::AUTOPLACE, Pid::VISIBLE }) {
                     const PropertyValue v = e->getProperty(pid);
                     if (t->getProperty(pid) != v) {
                         t->undoChangeProperty(pid, v, e->propertyFlags(pid));
@@ -711,6 +712,70 @@ int mu::project::starscore::copyTextPositions(const Score* source, Score* target
         }
     }
     return moved;
+}
+
+//! A version sheet for a brass instrument (the only ones that use a mute)
+bool mu::project::starscore::isBrassSheet(const QString& sheetName)
+{
+    static const QRegularExpression brass("\\b(trumpet|trombone|flugelhorn|cornet|horn in f|french horn|tuba|euphonium|baritone horn)\\b",
+                                          QRegularExpression::CaseInsensitiveOption);
+    return brass.match(sheetName).hasMatch();
+}
+
+//! Hides the mute and open markings ("mute", "(open)", "cup mute", "con sord."…) in a sheet for an instrument that has
+//! no mute. Only texts that are nothing but such a marking: "Open solos" stays. In a throwaway copy.
+int mu::project::starscore::hideMuteMarkings(Score* score)
+{
+    if (!score) {
+        return 0;
+    }
+    static const QRegularExpression mute("^\\(?\\s*((straight|cup|harmon|plunger|bucket|practice|wah)\\s+)?"
+                                         "(mute|muted|mutes|mute in|mute out|mute on|mute off|open|harmon|plunger|"
+                                         "con sord\\.?|senza sord\\.?|con sordino|senza sordino)\\s*\\)?[.!]?$",
+                                         QRegularExpression::CaseInsensitiveOption);
+    std::vector<mu::engraving::EngravingItem*> hide;
+    for (mu::engraving::Segment* seg = score->firstSegment(mu::engraving::SegmentType::ChordRest); seg;
+         seg = seg->next1(mu::engraving::SegmentType::ChordRest)) {
+        for (mu::engraving::EngravingItem* e : seg->annotations()) {
+            if (!e || !e->visible() || !(e->isStaffText() || e->isSystemText() || e->isExpression() || e->isPlayTechAnnotation())) {
+                continue;
+            }
+            if (mute.match(mu::engraving::toTextBase(e)->plainText().toQString().simplified()).hasMatch()) {
+                hide.push_back(e);
+            }
+        }
+    }
+    for (mu::engraving::EngravingItem* e : hide) {
+        e->undoChangeProperty(mu::engraving::Pid::VISIBLE, false);
+    }
+    return int(hide.size());
+}
+
+int mu::project::starscore::copyMeasureWidths(const Score* source, Score* target)
+{
+    if (!source || !target) {
+        return 0;
+    }
+    std::map<int, const Measure*> byTick;
+    for (const Measure* m = source->firstMeasure(); m; m = m->nextMeasure()) {
+        byTick[m->tick().ticks()] = m;
+    }
+    int changed = 0;
+    for (Measure* m = target->firstMeasure(); m; m = m->nextMeasure()) {
+        auto it = byTick.find(m->tick().ticks());
+        if (it == byTick.end()) {
+            continue;
+        }
+        const PropertyValue want = it->second->getProperty(Pid::USER_STRETCH);
+        if (m->getProperty(Pid::USER_STRETCH) != want) {
+            m->undoChangeProperty(Pid::USER_STRETCH, want);
+            ++changed;
+        }
+    }
+    if (changed) {
+        target->setLayoutAll();
+    }
+    return changed;
 }
 
 int mu::project::starscore::tidyTempoAndFrames(MasterScore* master, bool apply)

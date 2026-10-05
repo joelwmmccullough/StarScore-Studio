@@ -70,6 +70,18 @@ struct StarScoreSection
     //! in its arrangement's score; they get their own part scores and sheets, and aren't counted as extra
     //! lines by the audit or the listen-through.
     std::map<QString, QString> alternates;
+    //! Flexible sections: sheets made into parts of their own to edit by hand ("Horn 1 - Alto Sax" -> part id). The
+    //! export prints such a part as it is instead of making that sheet from the chair. Each is also in alternates
+    //! (standing in for its chair) and hidden in the score.
+    std::map<QString, QString> sheetParts;
+};
+
+//! One sheet a Flexible section prints (see IStarScoreService::flexibleSheets)
+struct StarScoreFlexibleSheet {
+    QString name;           // "Horn 1 - Alto Sax"
+    QString chairPartId;    // the chair it is made from
+    QString instrumentId;   // "alto-saxophone"
+    QString partId;         // the part it was made into to edit by hand, or empty
 };
 
 //! An arrangement is a named set of sections, e.g. "3-Horn Standard" = Lead Sheet + 3-Horn Section + Rhythm Section.
@@ -478,6 +490,12 @@ public:
     //! The main low horn of a 7-Horn section (see versionMains): its part id and the band's name for it; empty when
     //! the section has none
     virtual std::pair<QString, QString> mainLowHorn(const QString& sectionId) const = 0;
+    //! A Flexible section's sheets, chair by chair, in the export's order
+    virtual std::vector<StarScoreFlexibleSheet> flexibleSheets(const QString& sectionId) const = 0;
+    //! Makes one of a Flexible section's sheets into a part of its own, to edit by hand: the chair's music on that
+    //! instrument (hidden in the score, with its own part score, opened), printed as it is from then on. Opens the
+    //! part score when the sheet already has one. Returns the part id.
+    virtual muse::RetVal<QString> makeFlexibleSheetPart(const QString& sectionId, const QString& sheetName) = 0;
     //! A part score's status (for its tab): the least-finished of its parts' tags, a part without a tag
     //! counting as Empty; -1 when none of its parts has a tag, or for the main score
     virtual int partScoreStatus(const mu::engraving::Score* score) const = 0;

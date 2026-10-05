@@ -27,6 +27,13 @@ void clearComposerCredit(mu::engraving::Score* score);
 
 //! Levels the arrangement label with the instrument name (laid out first; undoable). Returns whether it moved.
 bool levelArrangementLabel(mu::engraving::Score* score);
+//! The arrangement label and its shorter forms, in the order tried: "Flexible 2-Horn Arrangement", "Flexible 2H
+//! Arrangement", "Flexible\n2H Arrangement", "Flexible 2H\nArrangement" (no duplicates).
+QStringList arrangementLabelVariants(const QString& label);
+//! The arrangement label (top right) running into the title: replaced by its next shorter form until it clears the
+//! title (and subtitle), or the forms run out (the last one stays). Lays out after each change. Undoable. Returns
+//! whether it changed the label.
+bool fitArrangementLabel(mu::engraving::Score* score);
 
 //! Writes "Version x.y.z" into the footer text (Starsign 2.3 has "Version 1.0.0" in the right-hand box),
 //! replacing the version already there, or adding it to the right-hand box. Must be called inside a command.

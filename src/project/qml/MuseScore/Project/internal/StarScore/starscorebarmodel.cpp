@@ -390,6 +390,18 @@ QVariantList StarScoreBarModel::sectionMenu(const QString& id) const
         QVariantMap { { "id", "sec-delete-all:" + id }, { "title", muse::qtrc("starscore", "Delete section and its instruments") },
                       { "enabled", true } },
     };
+    // Flexible sections: any of their sheets made into a part of its own, to edit by hand
+    QVariantList flexItems;
+    for (const StarScoreFlexibleSheet& sheet : starScore()->flexibleSheets(id)) {
+        flexItems << QVariantMap { { "id", "sec-flexsheet:" + id + "|" + sheet.name },
+                                   { "title", sheet.partId.isEmpty() ? sheet.name
+                                     : muse::qtrc("starscore", "%1 (edited by hand: open)").arg(sheet.name) },
+                                   { "enabled", true } };
+    }
+    if (!flexItems.isEmpty()) {
+        items.insert(4, QVariantMap { { "title", muse::qtrc("starscore", "Edit one sheet by hand") }, { "subitems", flexItems },
+                                      { "enabled", true } });
+    }
     if (!versionMains.isEmpty()) {
         // the other versions (Bari Sax, Bass Sax, Bassoon… of the low horn; a Flute of a piccolo): only the ones the
         // section doesn't have
@@ -650,6 +662,30 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
             if (!ret.ret) {
                 interactive()->error(muse::trc("starscore", "Couldn't create the arrangement"), ret.ret.toString());
             }
+        }
+    } else if (action == "sec-flexsheet") {
+        const int bar = arg.indexOf('|');
+        const QString sectionId = arg.left(bar);
+        const QString sheet = arg.mid(bar + 1);
+        bool made = false;
+        for (const StarScoreFlexibleSheet& s : starScore()->flexibleSheets(sectionId)) {
+            made |= s.name == sheet && !s.partId.isEmpty();
+        }
+        if (!made) {
+            IInteractive::Result res = interactive()->questionSync(
+                muse::qtrc("starscore", "Edit %1 by hand?").arg(sheet).toStdString(),
+                muse::trc("starscore", "This sheet becomes a part of its own in the section, with the chair's music on its "
+                                       "instrument, hidden in the score. Its part score opens: edit it there. From then on the "
+                                       "export prints it as it is, and it no longer follows changes to the chair. Delete the "
+                                       "part to go back to the sheet made from the chair."),
+                { IInteractive::Button::Cancel, IInteractive::Button::Ok }, IInteractive::Button::Ok);
+            if (res.standardButton() != IInteractive::Button::Ok) {
+                return;
+            }
+        }
+        RetVal<QString> ret = starScore()->makeFlexibleSheetPart(sectionId, sheet);
+        if (!ret.ret) {
+            interactive()->error(muse::trc("starscore", "Couldn't make the part"), ret.ret.toString());
         }
     } else if (action == "sec-bass-versions") {
         starScore()->makeBassHornVersions(arg);

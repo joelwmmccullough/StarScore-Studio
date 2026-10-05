@@ -1230,6 +1230,199 @@ void StarScoreService::showOldAlternates()
 //! Horn parts are named by their section and the band's name for the horn: "7H: Trumpet 1", "7H: Bari Sax",
 //! "3H: Tenor Sax", "1H: Alto Sax", "3H Flexible: Horn 1". The part's name in the score and its part score's name
 //! follow. (The exported sheets have names of their own: "BALK - Trumpet 1.pdf", printed "Trumpet 1 in B♭".)
+// ---------------------------------------------------------------------------
+//  Flexible sections: one sheet made into a part of its own, to edit by hand (1.18.2)
+// ---------------------------------------------------------------------------
+
+RetVal<QString> StarScoreService::makeFlexibleSheetPart(const QString& sectionId, const QString& sheetName)
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    engraving::MasterScore* ms = masterScore();
+    if (!master || !ms || !ms->firstMeasure()) {
+        return RetVal<QString>::make_ret(Ret::Code::InternalError);
+    }
+    StarScoreFlexibleSheet sheet;
+    for (const StarScoreFlexibleSheet& s : flexibleSheets(sectionId)) {
+        if (s.name == sheetName) {
+            sheet = s;
+        }
+    }
+    if (sheet.name.isEmpty()) {
+        return RetVal<QString>::make_ret(Ret::Code::UnknownError);
+    }
+
+    // its part score, opened and shown
+    auto bookOf = [&](const engraving::Part* part) -> IExcerptNotationPtr {
+        IExcerptNotationPtr found;
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            engraving::Excerpt* ex = importExcerptOf(e);
+            if (!ex) {
+                continue;
+            }
+            const std::vector<engraving::Part*> ps = masterPartsOf(ex);
+            if (ps.size() == 1 && ps.front() == part && (!found || e->name() == part->partName().toQString())) {
+                found = e;
+            }
+        }
+        return found;
+    };
+    auto open = [&](const engraving::Part* part) {
+        if (IExcerptNotationPtr book = part ? bookOf(part) : nullptr) {
+            if (book->notation()) {
+                master->setExcerptIsOpen(book->notation(), true);
+                globalContext()->setCurrentNotation(book->notation());
+            }
+        }
+    };
+    if (!sheet.partId.isEmpty()) {
+        open(ms->partById(ID(sheet.partId)));
+        return RetVal<QString>::make_ok(sheet.partId);
+    }
+
+    engraving::Part* chair = ms->partById(ID(sheet.chairPartId));
+    const InstrumentTemplate& tpl = instrumentsRepository()->instrumentTemplate(String::fromQString(sheet.instrumentId));
+    if (!chair || chair->staves().empty() || tpl.id.isEmpty()) {
+        return RetVal<QString>::make_ret(Ret::Code::UnknownError);
+    }
+
+    // after the chair and any sheets already made from it
+    const Data before = load();
+    std::set<QString> afterOf { sheet.chairPartId };
+    for (const StarScoreSection& s : before.sections) {
+        if (s.id == sectionId) {
+            for (const auto& [alt, main] : s.alternates) {
+                if (main == sheet.chairPartId) {
+                    afterOf.insert(alt);
+                }
+            }
+        }
+    }
+    std::set<QString> had;
+    PartInstrumentList list;
+    int insertAt = -1;
+    for (const engraving::Part* p : ms->parts()) {
+        had.insert(idText(p));
+        PartInstrument pi;
+        pi.isExistingPart = true;
+        pi.partId = p->id();
+        list << pi;
+        if (afterOf.count(idText(p))) {
+            insertAt = int(list.size());
+        }
+    }
+    PartInstrument pi;
+    pi.isExistingPart = false;
+    pi.instrumentTemplate = tpl;
+    if (insertAt < 0 || insertAt > int(list.size())) {
+        list << pi;
+    } else {
+        list.insert(insertAt, pi);
+    }
+    engraving::ScoreOrder order = master->parts()->scoreOrder();
+    order.customized = true;
+    master->parts()->setParts(list, order);
+
+    std::vector<engraving::Part*> newParts;
+    for (engraving::Part* p : ms->parts()) {
+        if (!had.count(idText(p))) {
+            newParts.push_back(p);
+        }
+    }
+    if (newParts.size() != 1 || newParts.front()->staves().empty()) {
+        return RetVal<QString>::make_ret(Ret::Code::UnknownError);
+    }
+    engraving::Part* made = newParts.front();
+
+    // the chair's music (pasting keeps the sounding pitch: written for the instrument), and its double barlines
+    chair = ms->partById(ID(sheet.chairPartId));
+    engraving::Segment* start = ms->firstMeasure()->first(engraving::SegmentType::ChordRest);
+    const engraving::staff_idx_t src = chair->staves().front()->idx();
+    master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Flexible sheet as a part"));
+    engraving::Selection sel(ms);
+    sel.setRange(start, nullptr, src, src + 1);
+    const ByteArray mime = sel.mimeData();
+    if (!mime.empty()) {
+        engraving::XmlReader reader(mime);
+        ms->pasteStaff(reader, start, made->staves().front()->idx());
+    }
+    starscore::copyEndBarlines(ms, chair, newParts);
+    master->notation()->undoStack()->commitChanges();
+
+    StarScoreInstrument inst;
+    inst.instrumentId = sheet.instrumentId;
+    inst.partName = sheet.name;
+    inst.hidden = true;   // hidden in the score: the chair is what the score shows
+    const StarScoreSection madeSection = finishNewParts(newParts, { inst });
+    const QString pid = idText(made);
+
+    Data d = load();
+    for (StarScoreSection& s : d.sections) {
+        if (s.id != sectionId) {
+            continue;
+        }
+        if (!s.partIds.contains(pid)) {
+            s.partIds << pid;
+        }
+        s.shownPartIds.removeAll(pid);
+        s.alternates[pid] = sheet.chairPartId;
+        s.sheetParts[sheet.name] = pid;
+        // the chair's status, so the section's own status doesn't drop
+        auto st = d.partStatus.find(sheet.chairPartId);
+        if (st != d.partStatus.end()) {
+            d.partStatus[pid] = st->second;
+        }
+    }
+    d.alternatesInSection = true;
+    store(d);
+    standardizeHornNames();   // "3H Flexible: Horn 1 - Alto Sax"
+    syncArrangementScores();
+    applyStyles(madeSection.partIds);
+
+    // its part score starts as the export printed the sheet: the chair's part score's style, breaks, bar widths and
+    // text positions, and no mute markings on an instrument without a mute
+    made = ms->partById(ID(pid));
+    chair = ms->partById(ID(sheet.chairPartId));
+    IExcerptNotationPtr chairBook = chair ? bookOf(chair) : nullptr;
+    IExcerptNotationPtr book = made ? bookOf(made) : nullptr;
+    if (book && book->notation()) {
+        INotationPtr n = book->notation();
+        engraving::Score* es = n->elements()->msScore();
+        if (chairBook && chairBook->notation()) {
+            const QString mss = QDir::tempPath() + "/starscore-sheet-" + QUuid::createUuid().toString(QUuid::Id128) + ".mss";
+            if (chairBook->notation()->style()->saveStyle(io::path_t(mss))) {
+                n->style()->loadStyle(io::path_t(mss), true);
+            }
+            QFile::remove(mss);
+            const engraving::Score* from = chairBook->notation()->elements()->msScore();
+            master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Copy part formatting"));
+            starscore::copyLayout(from, { es }, starscore::LayoutCopyOptions());
+            starscore::copyTextPositions(from, es);
+            starscore::copyMeasureWidths(from, es);
+            master->notation()->undoStack()->commitChanges();
+        }
+        // written pitch
+        if (es->style().styleB(engraving::Sid::concertPitch)) {
+            master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Concert pitch"));
+            n->style()->setStyleValue(StyleId::concertPitch, false);
+            master->notation()->undoStack()->commitChanges();
+        }
+        // the mute markings, for an instrument without a mute
+        if (!starscore::isBrassSheet(sheet.name)) {
+            master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("No mute markings"));
+            starscore::hideMuteMarkings(es);
+            master->notation()->undoStack()->commitChanges();
+        }
+    }
+    labelPartBooks();
+    open(ms->partById(ID(pid)));
+
+    const QStringList ids { pid };
+    QTimer::singleShot(1500, &m_timerGuard, [this, ids]() { applyMixerDefaults(ids); });
+    master->notation()->notationChanged().notify();
+    scheduleChanged();
+    return RetVal<QString>::make_ok(pid);
+}
+
 int StarScoreService::standardizeHornNames()
 {
     IMasterNotationPtr master = globalContext()->currentMasterNotation();

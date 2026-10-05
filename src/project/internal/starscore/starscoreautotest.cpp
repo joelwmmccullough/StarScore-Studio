@@ -263,6 +263,17 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         const QString key = a.value(0);
         const RetVal<QString> made = createSectionFromTemplate(key, a.value(1), a.value(2));
         autotestLog(QString("  %1: %2").arg(key, made.ret ? made.val : QString::fromStdString(made.ret.toString())));
+    } else if (step.startsWith("flexsheet:")) {
+        // flexsheet:<section template key>|<sheet name>, e.g. flexsheet:3-horn-any|Horn 1 - Alto Sax: that sheet made
+        // into a part of its own, as the section menu's "Edit one sheet by hand" does
+        const QString arg = step.mid(QString("flexsheet:").size());
+        const QString key = arg.section('|', 0, 0), sheet = arg.section('|', 1);
+        for (const StarScoreSection& s : load().sections) {
+            if (s.templateKey == key) {
+                const RetVal<QString> made = makeFlexibleSheetPart(s.id, sheet);
+                autotestLog(QString("  %1: %2").arg(sheet, made.ret ? made.val : QString::fromStdString(made.ret.toString())));
+            }
+        }
     } else if (step == "suggest") {
         // the version number the export dialog would tick, and why
         const RetVal<StarScoreBandExportPlan> plan = planBandExport();
