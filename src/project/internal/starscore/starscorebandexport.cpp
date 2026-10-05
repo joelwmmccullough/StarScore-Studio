@@ -1402,9 +1402,11 @@ Ret StarScoreService::writePdf(const INotationPtr& notation, const QString& path
 //! transposition and clef (0 treble, 1 bass, 2 alto). The copy's own part books go first: there is nothing to keep
 //! in step with the change, and the version's book is made fresh from the part.
 static void starscoreRewritePartInstrument(const IMasterNotationPtr& vm, mu::engraving::Part* part, int diatonic, int chromatic,
-                                           int clefKind)
+                                           int clefKind, bool dropBooks = true)
 {
-    vm->setExcerpts({});
+    if (dropBooks) {
+        vm->setExcerpts({});
+    }
     if (!part->show()) {
         vm->parts()->setPartsVisible({ { part->id(), true } }, TranslatableString::untranslatable("Show"));
     }
@@ -1418,6 +1420,43 @@ static void starscoreRewritePartInstrument(const IMasterNotationPtr& vm, mu::eng
     // sheet came out in the chair's own concert pitch and clef (1.9.0 to 1.17.1).
     const InstrumentKey key { part->instrumentId(), part->id(), mu::engraving::Part::MAIN_INSTRUMENT_TICK };
     vm->parts()->replaceInstrument(key, instrument);
+}
+
+//! A version sheet for a brass instrument (the only ones that use a mute)
+static bool starscoreBrassSheet(const QString& sheetName)
+{
+    static const QRegularExpression brass("\\b(trumpet|trombone|flugelhorn|cornet|horn in f|french horn|tuba|euphonium|baritone horn)\\b",
+                                          QRegularExpression::CaseInsensitiveOption);
+    return brass.match(sheetName).hasMatch();
+}
+
+//! Hides the mute and open markings ("mute", "(open)", "cup mute", "con sord."…) in a sheet for an instrument that has
+//! no mute. Only texts that are nothing but such a marking: "Open solos" stays. In a throwaway copy.
+static int starscoreHideMuteMarkings(mu::engraving::Score* score)
+{
+    if (!score) {
+        return 0;
+    }
+    static const QRegularExpression mute("^\\(?\\s*((straight|cup|harmon|plunger|bucket|practice|wah)\\s+)?"
+                                         "(mute|muted|mutes|mute in|mute out|mute on|mute off|open|harmon|plunger|"
+                                         "con sord\\.?|senza sord\\.?|con sordino|senza sordino)\\s*\\)?[.!]?$",
+                                         QRegularExpression::CaseInsensitiveOption);
+    std::vector<mu::engraving::EngravingItem*> hide;
+    for (mu::engraving::Segment* seg = score->firstSegment(mu::engraving::SegmentType::ChordRest); seg;
+         seg = seg->next1(mu::engraving::SegmentType::ChordRest)) {
+        for (mu::engraving::EngravingItem* e : seg->annotations()) {
+            if (!e || !e->visible() || !(e->isStaffText() || e->isSystemText() || e->isExpression() || e->isPlayTechAnnotation())) {
+                continue;
+            }
+            if (mute.match(mu::engraving::toTextBase(e)->plainText().toQString().simplified()).hasMatch()) {
+                hide.push_back(e);
+            }
+        }
+    }
+    for (mu::engraving::EngravingItem* e : hide) {
+        e->undoChangeProperty(mu::engraving::Pid::VISIBLE, false);
+    }
+    return int(hide.size());
 }
 
 //! The part's book made fresh (the one MuseScore would make for the part), named `bookName` like the part itself,
@@ -1600,6 +1639,35 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     // one version sheet isn't reused for the next.
     const QString copyPath = tmpDir + "/copy.mscz";
     const QString strippedPath = tmpDir + "/copy-noparts.mscz";
+    // A Flexible version sheet is printed from the chair's own part book (its hidden texts, bar widths, text positions,
+    // spacers…), re-pitched for the instrument: a copy keeping only those books is saved alongside the stripped one
+    const QString chairsPath = tmpDir + "/copy-chairs.mscz";
+    bool chairsSaved = false;
+    std::set<QString> chairPids;
+    for (const StarScoreBandFile& f : plan.files) {
+        if (f.isVersion && !f.partIds.isEmpty()) {
+            chairPids.insert(f.partIds.front());
+        }
+    }
+    // the single-instrument part book of a part, preferring the one named like it (as bookForPart above)
+    auto bookOfPart = [](const IMasterNotationPtr& m, const QString& pid) -> IExcerptNotationPtr {
+        IExcerptNotationPtr found;
+        for (const IExcerptNotationPtr& e : m->excerpts()) {
+            INotationPtr n = e->notation();
+            engraving::Score* es = n && n->elements() ? n->elements()->msScore() : nullptr;
+            if (!es || es->parts().size() != 1 || es->parts().front()->staves().empty()) {
+                continue;
+            }
+            const engraving::Staff* linked = es->parts().front()->staves().front()->findLinkedInScore(m->masterScore());
+            if (!linked || idText(linked->part()) != pid) {
+                continue;
+            }
+            if (!found || e->name() == linked->part()->partName().toQString()) {
+                found = e;
+            }
+        }
+        return found;
+    };
     bool strippedSaved = false;
     bool strippedFailed = false;
     auto loadProject = [&](const QString& path) -> INotationProjectPtr {
@@ -1616,6 +1684,18 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         if (!strippedSaved) {
             INotationProjectPtr p = project->save(io::path_t(copyPath), SaveMode::SaveCopy, false) ? loadProject(copyPath) : nullptr;
             if (p) {
+                if (!chairPids.empty()) {
+                    ExcerptNotationList keep;
+                    for (const QString& pid : chairPids) {
+                        if (IExcerptNotationPtr b = bookOfPart(p->masterNotation(), pid)) {
+                            keep.push_back(b);
+                        }
+                    }
+                    if (!keep.empty()) {
+                        p->masterNotation()->setExcerpts(keep);
+                        chairsSaved = bool(p->save(io::path_t(chairsPath), SaveMode::SaveCopy, false));
+                    }
+                }
                 p->masterNotation()->setExcerpts({});
                 strippedSaved = bool(p->save(io::path_t(strippedPath), SaveMode::SaveCopy, false));
             }
@@ -1678,6 +1758,34 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
 
     // A Flexible chair re-written for one transposition and clef, as a part book of its own
     auto writeVersion = [&](const StarScoreBandFile& file, QByteArray& pdf) -> Ret {
+        const bool brass = starscoreBrassSheet(file.sheetLeft);
+        // From the chair's own part book: everything set in it carries over
+        if (loadStripped() /* makes the copies */ && chairsSaved) {
+            INotationProjectPtr p = loadProject(chairsPath);
+            IMasterNotationPtr vm = p ? p->masterNotation() : nullptr;
+            engraving::Part* part = vm ? vm->masterScore()->partById(ID(file.partIds.value(0))) : nullptr;
+            IExcerptNotationPtr book = part ? bookOfPart(vm, file.partIds.value(0)) : nullptr;
+            INotationPtr n = book ? book->notation() : nullptr;
+            if (n && part->instrument()) {
+                vm->setExcerpts({ book });
+                if (!part->show()) {
+                    vm->parts()->setPartsVisible({ { part->id(), true } }, TranslatableString::untranslatable("Show"));
+                }
+                // written pitch first, so the instrument change transposes the book's key signatures and chord symbols
+                n->undoStack()->prepareChanges(TranslatableString::untranslatable("Concert pitch"));
+                n->style()->setStyleValue(StyleId::concertPitch, false);
+                n->undoStack()->commitChanges();
+                starscoreRewritePartInstrument(vm, part, file.transposeDiatonic, file.transposeChromatic, file.clef, false);
+                n->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
+                if (!brass) {
+                    starscoreHideMuteMarkings(n->elements()->msScore());
+                }
+                const Ret ret = starscorePrintSheet(writer, n, file.sheetLeft, file.sheetRight, true, pdf);
+                n->undoStack()->commitChanges();
+                return ret;
+            }
+        }
+        // A chair without a part book of its own: the book MuseScore would make, with the look of the default style
         INotationProjectPtr p = loadStripped();
         if (!p) {
             return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "couldn't make a copy of the score"));
@@ -1699,6 +1807,9 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         }
         // a copy of the song, so nothing of this is kept
         n->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
+        if (!brass) {
+            starscoreHideMuteMarkings(n->elements()->msScore());
+        }
         const Ret ret = starscorePrintSheet(writer, n, file.sheetLeft, file.sheetRight, true, pdf);
         n->undoStack()->commitChanges();
         return ret;
@@ -2052,6 +2163,17 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
             info.hornAnalysis["scoreVersion"] = data.version;
         }
         info.recordings = data.recordings;
+        // sheets no longer in the plan (a folder renamed, a section deleted) are forgotten: until 1.18.1 they stayed and
+        // every later export was suggested as a major version ("exported before but not in this export")
+        {
+            std::set<QString> planned;
+            for (const StarScoreBandFile& f : full.files) {
+                planned.insert(f.relativePath);
+            }
+            for (auto it = sigs.begin(); it != sigs.end();) {
+                it = planned.count(it.key()) ? std::next(it) : sigs.erase(it);
+            }
+        }
         data.exportSignatures = sigs;
         storeTo(ms, data, project);
         m_lastExport = info;
@@ -2217,11 +2339,16 @@ StarScoreVersionSuggestion StarScoreService::suggestVersionBump(const StarScoreB
         }
         return rel.section('/', 0, -2) + " / " + name;
     };
+    // sheets the export dialog starts unticked (Percussion, ones unticked before) aren't part of this export
+    const QStringList unticked = bandExportUnticked(plan.code);
     for (const StarScoreBandFile& f : plan.files) {
         if (!f.sourceFile.isEmpty()) {
             continue;
         }
         seen.insert(f.relativePath);
+        if (f.defaultUnchecked || unticked.contains(f.relativePath)) {
+            continue;
+        }
         const QJsonObject before = sigs.value(f.relativePath).toObject();
         if (before.isEmpty()) {
             // the Flexible version sheets of one chair share its music: one "new" per chair
@@ -2265,9 +2392,12 @@ StarScoreVersionSuggestion StarScoreService::suggestVersionBump(const StarScoreB
             }
         }
     }
+    // A sheet exported before and not planned now counts only while its file is still in the song folder: one already
+    // archived (its folder renamed, as "3H Tpt Flu Ten" became "3H Tpt Pic Ten") went in an earlier version
     QStringList gone;
+    const QString songDir = plan.bandFolder + "/" + plan.songFolder;
     for (auto it = sigs.begin(); it != sigs.end(); ++it) {
-        if (!seen.count(it.key())) {
+        if (!seen.count(it.key()) && QFileInfo::exists(songDir + "/" + it.key())) {
             gone << sheetName(it.key());
         }
     }
