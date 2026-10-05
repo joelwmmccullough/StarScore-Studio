@@ -300,6 +300,15 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         // uri:<uri>: opens it (uri:muse://preferences); not waited for
         interactive()->open(UriQuery(step.mid(4).toStdString()));
         autotestLog("  opened " + step.mid(4));
+    } else if (step == "status") {
+        // each arrangement's status (0 Empty … 4 Finished) and each section's
+        const Data d = load();
+        for (const StarScoreSection& s : d.sections) {
+            autotestLog(QString("  section %1: %2 (skips %3)").arg(s.name).arg(int(s.status)).arg(s.autoSkipSheets.join(",")));
+        }
+        for (const StarScoreArrangement& a : d.arrangements) {
+            autotestLog(QString("  arrangement %1: %2").arg(a.name).arg(int(arrangementStatus(a.id))));
+        }
     } else if (step == "demos") {
         // Export Audio Demos, as the export window's checkbox does
         const QString band = qEnvironmentVariable("STARSCORE_AUTOTEST_BAND");

@@ -4,6 +4,14 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.9
+
+- **Keys, drums or percussion tagged Empty no longer make every arrangement grey.** In a Rhythm Section, a part tagged Empty now counts like one with no tag: its player reads the lead sheet. The Courier's Keys part was tagged Empty, which made its Rhythm Section Empty, and every arrangement includes the Rhythm Section.
+- **Warning right after an edit that damages the score.** A moment after any edit, StarScore checks that every bar has the right number of beats. If one doesn't, it says which bar, so you can undo the edit straight away. The Courier's bar 60 had an extra half rest on top of a whole note; saved like that, the file only opens as a damaged score.
+- **Repair when opening a damaged score.** Opening a damaged score ("Open anyway") offers to remove rests that sit on top of notes in the same voice, the damage The Courier had. The notes stay as they are.
+- **No more saving a damaged score without being asked.** Saving while a solo transcription was open saved the main score without MuseScore's "this score is corrupted" question. A damaged main score is no longer saved from there.
+- **A copy of the log in StarScore Studio/Logs.** On a computer with a "StarScore Studio" folder in the home folder, the app also writes its log there (the last 14 days are kept), so Claude can read it to find what damaged a score.
+
 ## 1.18.8
 
 - **Export Audio Demos.** Export to Sheets and Demos has a new "Export Audio Demos" checkbox (off each time the window opens). When it's ticked, the export also writes a 48 kHz, 24-bit WAV of each 2- to 7-Horn Standard, Big Band, Orchestra and Marching Band arrangement the song has, into the song's Demos folder: "CODE - 3-Horn Arrangement Demo.wav" and so on. Flexible arrangements get no demo.

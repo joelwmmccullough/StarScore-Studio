@@ -21,6 +21,9 @@
  */
 #include "globalmodule.h"
 
+#include <QDir>
+#include <QFileInfo>
+
 #include "muse_framework_config.h"
 
 #include "modularity/ioc.h"
@@ -202,6 +205,21 @@ void GlobalModule::onPreInit(const IApplication::RunMode& mode)
 
     logger->addDest(logFile);
     LOGI() << "log path: " << logFilePath;
+
+    //! StarScore: a second copy of the log in ~/StarScore Studio/Logs when that folder is there (Joel's computer), where
+    //! Claude can read it to find out what happened to a damaged score; macOS won't share the Library folder
+    if (mode != IApplication::RunMode::AudioPluginRegistration) {
+        const QString starscoreDir = QDir::homePath() + "/StarScore Studio";
+        if (QFileInfo(starscoreDir).isDir()) {
+            const io::path_t mirrorPath = io::path_t(starscoreDir + "/Logs");
+            fileSystem()->makePath(mirrorPath);
+            LogRemover::removeLogs(mirrorPath, 14, logFileNamePattern);
+            const io::path_t mirrorFile = mirrorPath + u"/" + io::filename(logFilePath);
+            logger->addDest(new FileLogDest(mirrorFile.toStdString(),
+                                            LogLayout("${datetime} | ${type|5} | ${thread|15} | ${tag|15} | ${message}")));
+            LOGI() << "log copy: " << mirrorFile;
+        }
+    }
 #endif // end of not MUSE_CONFIGURATION_IS_WEB
 
     if (m_loggerLevel) {

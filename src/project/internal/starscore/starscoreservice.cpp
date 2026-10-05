@@ -38,6 +38,8 @@
 #include "engraving/editing/editpart.h"
 #include "engraving/dom/measure.h"
 #include "engraving/dom/segment.h"
+#include "engraving/dom/rest.h"
+#include "engraving/dom/chordrest.h"
 #include "engraving/dom/select.h"
 #include "engraving/dom/text.h"
 #include "engraving/dom/measurebase.h"
@@ -129,7 +131,97 @@ void StarScoreService::listenCurrentProject()
 
     master->notation()->undoStack()->stackChanged().onNotify(this, [this]() {
         scheduleChanged();
+        scheduleIntegrityCheck();
     });
+}
+
+void StarScoreService::scheduleIntegrityCheck()
+{
+    const int generation = ++m_integrityGeneration;
+    QTimer::singleShot(1500, &m_timerGuard, [this, generation]() {
+        if (generation == m_integrityGeneration) {
+            checkIntegrity();
+        }
+    });
+}
+
+void StarScoreService::checkIntegrity()
+{
+    engraving::MasterScore* ms = masterScore();
+    if (!ms || autotestRequested()) {
+        return;
+    }
+    const Ret ret = ms->sanityCheck();
+    if (ret) {
+        m_integrityBroken = false;
+        return;
+    }
+    if (m_integrityBroken) {
+        return;   // (said once; again only after it has been fixed and breaks anew)
+    }
+    m_integrityBroken = true;
+    QString text = QString::fromStdString(ret.text());
+    static const QRegularExpression tags("<[^>]*>");
+    text.remove(tags);
+    QStringList lines = text.split('\n', Qt::SkipEmptyParts);
+    if (lines.size() > 4) {
+        const int more = int(lines.size()) - 3;
+        lines = lines.mid(0, 3);
+        lines << muse::qtrc("starscore", "…and %1 more").arg(more);
+    }
+    interactive()->warning(muse::trc("starscore", "The last edit damaged the score"),
+                           muse::qtrc("starscore", "A bar now has the wrong number of beats:\n\n%1\n\nUndo (⌘Z) until this "
+                                                   "message would no longer apply, then make the edit again another way. "
+                                                   "Saved like this, the file only opens as a damaged score.")
+                           .arg(lines.join("\n")).toStdString());
+}
+
+int StarScoreService::overlappingRests(engraving::MasterScore* ms, bool remove, QStringList* where) const
+{
+    if (!ms) {
+        return 0;
+    }
+    int found = 0;
+    // the main score first: removing a rest there removes its copies in the part scores too
+    for (engraving::Score* sc : ms->scoreList()) {
+        std::vector<engraving::Rest*> rests;
+        for (engraving::Measure* m = sc->firstMeasure(); m; m = m->nextMeasure()) {
+            for (size_t staffIdx = 0; staffIdx < sc->nstaves(); ++staffIdx) {
+                for (engraving::voice_idx_t v = 0; v < engraving::VOICES; ++v) {
+                    const engraving::track_idx_t track = staffIdx * engraving::VOICES + v;
+                    engraving::Fraction end = m->tick();
+                    for (engraving::Segment* seg = m->first(engraving::SegmentType::ChordRest); seg;
+                         seg = seg->next(engraving::SegmentType::ChordRest)) {
+                        engraving::EngravingItem* e = seg->element(track);
+                        if (!e || !e->isChordRest()) {
+                            continue;
+                        }
+                        engraving::ChordRest* cr = engraving::toChordRest(e);
+                        if (cr->isRest() && seg->tick() < end) {
+                            rests.push_back(engraving::toRest(cr));
+                            if (where) {
+                                const engraving::Staff* st = sc->staff(staffIdx);
+                                const QString name = st && st->part() ? st->part()->partName().toQString() : QString();
+                                const QString place = muse::qtrc("starscore", "%1, bar %2").arg(name).arg(m->no() + 1);
+                                if (!where->contains(place)) {
+                                    *where << place;
+                                }
+                            }
+                            continue;
+                        }
+                        end = std::max(end, seg->tick() + cr->actualTicks());
+                    }
+                }
+            }
+        }
+        found += int(rests.size());
+        if (remove) {
+            for (engraving::Rest* r : rests) {
+                sc->undoRemoveElement(r);
+            }
+        }
+    }
+    return found;
 }
 
 void StarScoreService::scheduleChanged()
@@ -638,7 +730,10 @@ StarScoreService::Data StarScoreService::loadFrom(const engraving::MasterScore* 
         int countedParts = 0;
         for (const QString& pid : counted) {
             auto it = data.partStatus.find(pid);
-            if (it == data.partStatus.end() && rhythm) {
+            // (tagged Empty counts the same as no tag: The Courier's Keys part was tagged Empty, which made its
+            // Rhythm Section, and so every arrangement, grey)
+            const bool untaggedOrEmpty = it == data.partStatus.end() || statusFromKey(it->second) == StarScoreStatus::Empty;
+            if (untaggedOrEmpty && rhythm) {
                 const engraving::Part* p = ms->partById(ID(pid));
                 const QString kind = p ? starscoreLeadSheetKind(p->instrumentId().toQString()) : QString();
                 if (!kind.isEmpty()) {
@@ -3967,6 +4062,14 @@ Ret StarScoreService::saveAll()
     }
 
     if (m_mainProject->needSave().val) {
+        // a damaged main score isn't saved over the file from here (Save from the main score asks first, as
+        // MuseScore does): this was the one way to save it without that question
+        const Ret canSave = m_mainProject->canSave();
+        if (!canSave) {
+            return Ret(static_cast<int>(Ret::Code::UnknownError),
+                       muse::trc("starscore", "The main score is damaged, so it wasn't saved. Switch to the main score and "
+                                              "save from there to see what's wrong.") + "\n\n" + canSave.text());
+        }
         // saving the main score triggers injectSolos() through saveComplited
         return m_mainProject->save(io::path_t(), SaveMode::Save, true);
     }

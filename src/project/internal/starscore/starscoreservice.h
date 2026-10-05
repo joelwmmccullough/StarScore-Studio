@@ -311,6 +311,15 @@ private:
     //! every listener re-reads everything when it fires
     void scheduleChanged();
     bool m_changedScheduled = false;
+    //! A score that has gone bad (a bar with the wrong number of beats, as The Courier's bar 60 got an extra half rest on
+    //! top of a whole note): checked a moment after each edit, so the warning comes while Undo can still fix it
+    void scheduleIntegrityCheck();
+    void checkIntegrity();
+    int m_integrityGeneration = 0;
+    bool m_integrityBroken = false;
+    //! Rests that start inside a note or rest of the same voice (nothing valid does): removed when `remove`,
+    //! otherwise only counted. `where` gets "Lead Sheet, bar 60" for each. Inside a command when removing.
+    int overlappingRests(mu::engraving::MasterScore* ms, bool remove, QStringList* where) const;
     //! Not a QObject itself: the context for its timers, so a pending timer is dropped with the service
     QObject m_timerGuard;
     std::vector<StarScoreFileArrangement> summarizeArrangements(const Data& data, const StarScoreAuditReport& report) const;

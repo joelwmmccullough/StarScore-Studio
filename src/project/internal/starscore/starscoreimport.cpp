@@ -1749,6 +1749,31 @@ void StarScoreService::tidyOpenedScore()
     }
     showOldAlternates();   // may store, so the data is read after it
 
+    // A damaged score (opened with "Open anyway"): rests on top of notes, as The Courier's bar 60 had, are taken out
+    if (!ms->sanityCheck()) {
+        QStringList where;
+        const int count = overlappingRests(ms, false, &where);
+        if (count > 0) {
+            const IInteractive::Result answer = interactive()->questionSync(
+                muse::trc("starscore", "Repair the score?"),
+                muse::qtrc("starscore", "This score is damaged: %n rest(s) sit on top of notes in the same voice, which "
+                                        "gives these bars too many beats:\n\n%1\n\nRemove those rests? The notes stay as they "
+                                        "are. Check the bars afterwards.", "", count).arg(where.mid(0, 8).join("\n"))
+                .toStdString(), { IInteractive::Button::No, IInteractive::Button::Yes }, IInteractive::Button::Yes);
+            if (answer.standardButton() == IInteractive::Button::Yes) {
+                master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Repair the score"));
+                overlappingRests(ms, true, nullptr);
+                master->notation()->undoStack()->commitChanges();
+                master->notation()->notationChanged().notify();
+                const Ret after = ms->sanityCheck();
+                interactive()->info(muse::trc("starscore", "Repaired"),
+                                    after ? muse::trc("starscore", "The rests are gone and the score checks out. Save it to keep the repair.")
+                                    : muse::trc("starscore", "The rests are gone, but the score still has other damage:") + "\n\n"
+                                    + after.text());
+            }
+        }
+    }
+
     // Stand-in versions made before 1.15.3 lost the double barlines of the line they stand in for: matched once per
     // file, then left alone (Joel adjusts stand-in parts by hand after they're made)
     Data d = load();
