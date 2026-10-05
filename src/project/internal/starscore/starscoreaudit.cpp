@@ -2403,6 +2403,16 @@ QJsonObject StarScoreService::organizerSignature(const MasterScore* ms, const QS
     }
     out["bars"] = hashes;
     out["marks"] = marks;
+    // The song's form apart from the notes: each bar's time signature and (concert) key signature, as one hash. A
+    // change here is a change to the song itself (suggestVersionBump: major).
+    QString form;
+    for (const Measure* m : measures) {
+        const Fraction ts = m->timesig();
+        const Staff* st = ms->staff(0);
+        const int key = st ? int(st->concertKey(m->tick())) : 0;
+        form += QString("%1/%2k%3;").arg(ts.numerator()).arg(ts.denominator()).arg(key);
+    }
+    out["form"] = auditHash(form).left(8);
     return out;
 }
 

@@ -165,6 +165,7 @@ public:
     void setBandExportUnticked(const QString& code, const QStringList& paths) override;
 
     QString scoreVersion() const override;
+    StarScoreVersionSuggestion suggestVersionBump(const StarScoreBandExportPlan& plan) const override;
     void setScoreVersion(const QString& version) override;
 
     void syncArrangementScores() override;

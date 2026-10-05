@@ -70,7 +70,9 @@ StyledDialogView {
                         + "Your ticks are remembered for this song.")
         }
 
-        // Version: keep it, or raise one of the three numbers for this export
+        // Version: keep it, or raise one of the three numbers for this export. StarScore ticks the one it suggests
+        // from what changed in the music since the last export (major: the song's form; minor: notes in some
+        // sheets, new sheets; patch: nothing in the music); untick or tick another to override.
         RowLayout {
             visible: root.listMode
             spacing: 12
@@ -80,17 +82,17 @@ StyledDialogView {
                 font: ui.theme.bodyBoldFont
             }
             CheckBox {
-                text: qsTrc("starscore", "+ first number")
+                text: qsTrc("starscore", "Major version")
                 checked: exportModel.bump === 1
                 onClicked: exportModel.bump = checked ? 0 : 1
             }
             CheckBox {
-                text: qsTrc("starscore", "+ second")
+                text: qsTrc("starscore", "Minor version")
                 checked: exportModel.bump === 2
                 onClicked: exportModel.bump = checked ? 0 : 2
             }
             CheckBox {
-                text: qsTrc("starscore", "+ third")
+                text: qsTrc("starscore", "Patch")
                 checked: exportModel.bump === 3
                 onClicked: exportModel.bump = checked ? 0 : 3
             }
@@ -98,6 +100,15 @@ StyledDialogView {
                 text: qsTrc("starscore", "Exports as Version %1").arg(exportModel.exportVersion)
                 color: ui.theme.fontSecondaryColor
             }
+        }
+
+        StyledTextLabel {
+            Layout.fillWidth: true
+            visible: root.listMode && exportModel.suggestionText !== ""
+            horizontalAlignment: Text.AlignLeft
+            wrapMode: Text.WordWrap
+            color: ui.theme.fontSecondaryColor
+            text: exportModel.suggestionText
         }
 
         RowLayout {

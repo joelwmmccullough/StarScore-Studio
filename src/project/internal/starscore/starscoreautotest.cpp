@@ -263,6 +263,15 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         const QString key = a.value(0);
         const RetVal<QString> made = createSectionFromTemplate(key, a.value(1), a.value(2));
         autotestLog(QString("  %1: %2").arg(key, made.ret ? made.val : QString::fromStdString(made.ret.toString())));
+    } else if (step == "suggest") {
+        // the version number the export dialog would tick, and why
+        const RetVal<StarScoreBandExportPlan> plan = planBandExport();
+        if (plan.ret) {
+            const StarScoreVersionSuggestion sg = suggestVersionBump(plan.val);
+            autotestLog(QString("  suggested bump %1: %2").arg(sg.bump).arg(sg.reasons.join(" | ")));
+        } else {
+            autotestLog("  no plan: " + QString::fromStdString(plan.ret.toString()));
+        }
     } else if (step.startsWith("arrangement:")) {
         // arrangement:<arrangement key>[:<doubler id>[:<low horn id>]], as the StarScore bar's Add arrangement menu makes
         // it (with the Add arrangement dialog's choices)

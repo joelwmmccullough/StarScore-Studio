@@ -30,6 +30,9 @@ class BandExportModel : public QAbstractListModel, public muse::Contextable
     Q_PROPERTY(QString currentVersion READ currentVersion NOTIFY loaded)
     Q_PROPERTY(int bump READ bump WRITE setBump NOTIFY bumpChanged)   // 0 none, 1 first number, 2 second, 3 third
     Q_PROPERTY(QString exportVersion READ exportVersion NOTIFY bumpChanged)
+    //! The number StarScore suggests raising (0 none, 1 major, 2 minor, 3 patch) and why; the bump starts there
+    Q_PROPERTY(int suggestedBump READ suggestedBump NOTIFY loaded)
+    Q_PROPERTY(QString suggestionText READ suggestionText NOTIFY loaded)
     Q_PROPERTY(bool newSong READ newSong NOTIFY loaded)                 // not in Sheets and Demos yet
     Q_PROPERTY(QString songTitle READ songTitle NOTIFY loaded)
     Q_PROPERTY(QString suggestedCode READ suggestedCode NOTIFY loaded)
@@ -56,6 +59,8 @@ public:
     int bump() const;
     void setBump(int bump);
     QString exportVersion() const;
+    int suggestedBump() const;
+    QString suggestionText() const;
     bool newSong() const;
     QString songTitle() const;
     QString suggestedCode() const;
@@ -113,6 +118,8 @@ private:
     std::vector<Item> m_items;
     QString m_version;
     int m_bump = 0;
+    int m_suggestedBump = 0;
+    QString m_suggestionText;
     bool m_newSong = false;
     QString m_songTitle;
     QString m_suggestedCode;

@@ -253,6 +253,13 @@ struct StarScoreBandFile
     QString sheetRight;
 };
 
+//! Export to Sheets and Demos: which version number to raise for this export, judged from what changed in the music
+//! since each sheet's last export (see IStarScoreService::suggestVersionBump)
+struct StarScoreVersionSuggestion {
+    int bump = 0;            // 0 keep the version, 1 major, 2 minor, 3 patch
+    QStringList reasons;     // why, one line each ("the song is 4 bars longer (52, was 48)")
+};
+
 struct StarScoreBandExportPlan
 {
     QString bandFolder;          // .../Sheets and Demos
@@ -581,6 +588,12 @@ public:
 
     // --- Version number ("Version 4.0.1" in the copyright text, printed at the bottom of every page)
     virtual QString scoreVersion() const = 0;                 // from the score, or the starting version for this song
+    //! Which number to raise for the next export, from the bar-by-bar signatures kept at the last export of each
+    //! sheet. Major: the song's form changed (bar count, rehearsal marks, key or time signatures), the lead sheet
+    //! changed in a quarter or more of its bars, or a sheet that was exported is gone. Minor: notes, chord symbols,
+    //! dynamics or slurs changed in some bars, or a sheet is new. Patch: nothing in the music changed (layout, text
+    //! and style fixes). Keep (0): the song has never been exported, or the plan can't be made.
+    virtual StarScoreVersionSuggestion suggestVersionBump(const StarScoreBandExportPlan& plan) const = 0;
     virtual void setScoreVersion(const QString& version) = 0; // main score and every part book
 
     // --- Each arrangement's own score

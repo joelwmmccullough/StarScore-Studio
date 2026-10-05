@@ -1413,7 +1413,10 @@ static void starscoreRewritePartInstrument(const IMasterNotationPtr& vm, mu::eng
     const mu::engraving::ClefType clef = clefKind == 1 ? mu::engraving::ClefType::F
                                      : clefKind == 2 ? mu::engraving::ClefType::C3 : mu::engraving::ClefType::G;
     instrument.setClefType(0, mu::engraving::ClefTypeList(clef, clef));
-    const InstrumentKey key { part->instrumentId(), part->id(), mu::engraving::Fraction(0, 1) };
+    // The part's main instrument sits at Part::MAIN_INSTRUMENT_TICK (-1), not at tick 0: a key at tick 0 made
+    // replaceInstrument look for an instrument change there, find none, and do nothing, so every Flexible version
+    // sheet came out in the chair's own concert pitch and clef (1.9.0 to 1.17.1).
+    const InstrumentKey key { part->instrumentId(), part->id(), mu::engraving::Part::MAIN_INSTRUMENT_TICK };
     vm->parts()->replaceInstrument(key, instrument);
 }
 
@@ -1425,7 +1428,7 @@ static INotationPtr starscoreMakeVersionBook(const IMasterNotationPtr& vm, mu::e
                                              const QString& oldName, const INotationPtr& srcBook, const QString& tmpDir,
                                              const QString& defaultStyle)
 {
-    vm->parts()->setInstrumentName(InstrumentKey { part->instrumentId(), part->id(), mu::engraving::Fraction(0, 1) }, bookName);
+    vm->parts()->setInstrumentName(InstrumentKey { part->instrumentId(), part->id(), mu::engraving::Part::MAIN_INSTRUMENT_TICK }, bookName);
     part->setPartName(String::fromQString(bookName));
 
     IExcerptNotationPtr book = starscorePotentialBook(vm, { bookName, oldName });
@@ -1449,6 +1452,8 @@ static INotationPtr starscoreMakeVersionBook(const IMasterNotationPtr& vm, mu::e
         if (es && srcScore) {
             n->undoStack()->prepareChanges(TranslatableString::untranslatable("Copy layout"));
             starscore::copyLayout(srcScore, { es }, starscore::LayoutCopyOptions());
+            // and where the chair's texts were put by hand ("mute", "(open)", the tempo mark)
+            starscore::copyTextPositions(srcScore, es);
             n->undoStack()->commitChanges();
         }
     } else if (!defaultStyle.isEmpty() && QFileInfo::exists(defaultStyle)) {
@@ -2172,6 +2177,140 @@ static const std::set<QString> STARSCORE_V4_TITLES {
     "little louie", "live strong + strasbourg", "move on up", "peasant funk", "pick up the pieces", "playground", "semente",
     "shofukan", "standing next to you", "the chicken", "the essential", "two", "up from the south", "watermelon man",
 };
+
+StarScoreVersionSuggestion StarScoreService::suggestVersionBump(const StarScoreBandExportPlan& plan) const
+{
+    StarScoreVersionSuggestion out;
+    INotationProjectPtr project = exportSourceProject();
+    if (!project || plan.newSong || plan.files.empty()) {
+        return out;
+    }
+    engraving::MasterScore* ms = project->masterNotation()->masterScore();
+    const Data data = loadFrom(ms);
+    const QJsonObject sigs = data.exportSignatures;
+    if (sigs.isEmpty()) {
+        out.reasons << muse::qtrc("starscore", "First export with change tracking: the version stays as it is.");
+        return out;
+    }
+
+    // the lead sheet's parts: its sheets count toward the "song changed" rule
+    QStringList leadParts;
+    for (const StarScoreSection& s : data.sections) {
+        if (s.templateKey == "lead-sheet") {
+            leadParts << s.partIds;
+        }
+    }
+
+    QStringList majorWhy, minorWhy;
+    QStringList newSheets, changedSheets;
+    int barsBefore = -1, barsNow = -1;
+    bool marksChanged = false, formChanged = false;
+    int leadChanged = 0, leadBars = 0;
+    std::set<QString> seen;   // signature keys the plan still has
+    auto sheetName = [&](const QString& rel) {
+        QString name = rel.section('/', -1);
+        if (name.startsWith(plan.code + " - ")) {
+            name.remove(0, plan.code.size() + 3);
+        }
+        if (name.endsWith(".pdf")) {
+            name.chop(4);
+        }
+        return rel.section('/', 0, -2) + " / " + name;
+    };
+    for (const StarScoreBandFile& f : plan.files) {
+        if (!f.sourceFile.isEmpty()) {
+            continue;
+        }
+        seen.insert(f.relativePath);
+        const QJsonObject before = sigs.value(f.relativePath).toObject();
+        if (before.isEmpty()) {
+            // the Flexible version sheets of one chair share its music: one "new" per chair
+            static const QRegularExpression chairRe("^(.* / Horn \\d+)");
+            QString name = sheetName(f.relativePath);
+            const QRegularExpressionMatch m = chairRe.match(name);
+            if (f.isVersion && m.hasMatch()) {
+                name = m.captured(1);
+            }
+            if (!newSheets.contains(name)) {
+                newSheets << name;
+            }
+            continue;
+        }
+        const QJsonObject now = organizerSignature(ms, f.partIds);
+        const QJsonArray a = before.value("bars").toArray(), b = now.value("bars").toArray();
+        if (barsNow < 0) {
+            barsNow = b.size();
+        }
+        if (barsBefore < 0 && a.size() != b.size()) {
+            barsBefore = a.size();
+        }
+        if (before.value("marks").toObject() != now.value("marks").toObject()) {
+            marksChanged = true;
+        }
+        if (before.contains("form") && before.value("form") != now.value("form")) {
+            formChanged = true;
+        }
+        int diff = 0;
+        const int n = std::max(a.size(), b.size());
+        for (int i = 0; i < n; ++i) {
+            if (i >= a.size() || i >= b.size() || a[i] != b[i]) {
+                ++diff;
+            }
+        }
+        if (diff > 0) {
+            changedSheets << sheetName(f.relativePath);
+            if (!f.isScore && std::all_of(f.partIds.begin(), f.partIds.end(), [&](const QString& pid) { return leadParts.contains(pid); })) {
+                leadChanged = std::max(leadChanged, diff);
+                leadBars = std::max(leadBars, n);
+            }
+        }
+    }
+    QStringList gone;
+    for (auto it = sigs.begin(); it != sigs.end(); ++it) {
+        if (!seen.count(it.key())) {
+            gone << sheetName(it.key());
+        }
+    }
+
+    if (barsBefore >= 0) {
+        majorWhy << (barsNow > barsBefore
+                     ? muse::qtrc("starscore", "the song is %n bar(s) longer (%1, was %2)", nullptr, barsNow - barsBefore).arg(barsNow).arg(barsBefore)
+                     : muse::qtrc("starscore", "the song is %n bar(s) shorter (%1, was %2)", nullptr, barsBefore - barsNow).arg(barsNow).arg(barsBefore));
+    }
+    if (marksChanged) {
+        majorWhy << muse::qtrc("starscore", "the rehearsal marks changed");
+    }
+    if (formChanged) {
+        majorWhy << muse::qtrc("starscore", "key or time signatures changed");
+    }
+    if (leadBars > 0 && leadChanged * 4 >= leadBars) {
+        majorWhy << muse::qtrc("starscore", "the lead sheet changed in %1 of its %2 bars").arg(leadChanged).arg(leadBars);
+    }
+    if (!gone.isEmpty()) {
+        majorWhy << muse::qtrc("starscore", "exported before but not in this export: %1").arg(gone.mid(0, 3).join(", ")
+                                                                                             + (gone.size() > 3 ? "…" : ""));
+    }
+    if (!changedSheets.isEmpty()) {
+        minorWhy << muse::qtrc("starscore", "notes, chords, dynamics or slurs changed in %n sheet(s): %1", nullptr, changedSheets.size())
+            .arg(changedSheets.mid(0, 4).join(", ") + (changedSheets.size() > 4 ? "…" : ""));
+    }
+    if (!newSheets.isEmpty()) {
+        minorWhy << muse::qtrc("starscore", "new: %1").arg(newSheets.mid(0, 4).join(", ") + (newSheets.size() > 4 ? "…" : ""));
+    }
+
+    if (!majorWhy.isEmpty()) {
+        out.bump = 1;
+        out.reasons = majorWhy + minorWhy;
+    } else if (!minorWhy.isEmpty()) {
+        out.bump = 2;
+        out.reasons = minorWhy;
+    } else {
+        out.bump = 3;
+        out.reasons << muse::qtrc("starscore", "no change to the music since the last export: layout, text and style fixes only "
+                                               "(untick to keep the version)");
+    }
+    return out;
+}
 
 QString StarScoreService::scoreVersion() const
 {

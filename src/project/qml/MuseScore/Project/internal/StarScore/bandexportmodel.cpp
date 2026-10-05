@@ -123,6 +123,16 @@ QString BandExportModel::exportVersion() const
     return QString("%1.%2.%3").arg(major).arg(minor).arg(patch);
 }
 
+int BandExportModel::suggestedBump() const
+{
+    return m_suggestedBump;
+}
+
+QString BandExportModel::suggestionText() const
+{
+    return m_suggestionText;
+}
+
 bool BandExportModel::newSong() const
 {
     return m_newSong;
@@ -152,7 +162,8 @@ void BandExportModel::load()
 {
     m_version = starScore()->scoreVersion();
     m_bump = 0;
-    emit bumpChanged();
+    m_suggestedBump = 0;
+    m_suggestionText.clear();
 
     beginResetModel();
     m_items.clear();
@@ -176,6 +187,15 @@ void BandExportModel::load()
         m_code = plan.val.code;
         m_heading = muse::qtrc("starscore", "Sheets and Demos / %1").arg(plan.val.songFolder);
         m_notes = plan.val.notes.join("\n");
+        // which version number this export should raise, from what changed since the last export
+        const StarScoreVersionSuggestion suggestion = starScore()->suggestVersionBump(plan.val);
+        m_suggestedBump = suggestion.bump;
+        m_bump = suggestion.bump;
+        static const QStringList KIND { QString(), muse::qtrc("starscore", "Major version"), muse::qtrc("starscore", "Minor version"),
+                                        muse::qtrc("starscore", "Patch") };
+        m_suggestionText = suggestion.bump > 0
+                           ? muse::qtrc("starscore", "Suggested: %1 — %2").arg(KIND.value(suggestion.bump), suggestion.reasons.join("; "))
+                           : suggestion.reasons.join("; ");
         const QStringList unticked = starScore()->bandExportUnticked(m_code);
         // Group by folder, keeping the plan's order of first appearance; a header row starts each folder
         QStringList folders;
@@ -204,6 +224,7 @@ void BandExportModel::load()
     endResetModel();
 
     emit loaded();
+    emit bumpChanged();
     emit checkedCountChanged();
 }
 
