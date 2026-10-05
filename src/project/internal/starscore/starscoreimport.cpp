@@ -1346,6 +1346,29 @@ RetVal<QString> StarScoreService::makeFlexibleSheetPart(const QString& sectionId
         ms->pasteStaff(reader, start, made->staves().front()->idx());
     }
     starscore::copyEndBarlines(ms, chair, newParts);
+    // a Flute sheet, as the export makes it: an octave up when any note is out of a flute's range
+    if (sheet.instrumentId == "flute" && !starscore::pitchesWithin(made, starscore::FLUTE_LOWEST, starscore::FLUTE_HIGHEST)) {
+        std::vector<engraving::Note*> notes;
+        for (engraving::Segment* s = ms->firstSegment(engraving::SegmentType::ChordRest); s;
+             s = s->next1(engraving::SegmentType::ChordRest)) {
+            for (engraving::track_idx_t t = made->startTrack(); t < made->endTrack(); ++t) {
+                engraving::EngravingItem* e = s->element(t);
+                if (!e || !e->isChord()) {
+                    continue;
+                }
+                engraving::Chord* c = engraving::toChord(e);
+                notes.insert(notes.end(), c->notes().begin(), c->notes().end());
+                for (engraving::Chord* g : c->graceNotes()) {
+                    notes.insert(notes.end(), g->notes().begin(), g->notes().end());
+                }
+            }
+        }
+        for (engraving::Note* n : notes) {
+            if (n->pitch() + 12 < 128) {
+                ms->undoChangePitch(n, n->pitch() + 12, n->tpc1(), n->tpc2());
+            }
+        }
+    }
     master->notation()->undoStack()->commitChanges();
 
     StarScoreInstrument inst;

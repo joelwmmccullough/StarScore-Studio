@@ -729,6 +729,38 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
             starScore()->removeSection(arg, true);
         }
     } else if (action == "sec-new-tpl") {
+        // A section whose arrangements aren't in the song yet (a 4-Horn Section with no 4-Horn Standard): probably
+        // meant as a new arrangement. Asked, never refused.
+        std::vector<StarScoreArrangementTemplate> owners;
+        for (const StarScoreArrangementTemplate& t : starScore()->arrangementTemplates()) {
+            if (t.sectionKeys.contains(arg)) {
+                owners.push_back(t);
+            }
+        }
+        bool haveOwner = false;
+        for (const StarScoreArrangement& a : starScore()->arrangements()) {
+            for (const StarScoreArrangementTemplate& t : owners) {
+                haveOwner |= a.templateKey == t.key;
+            }
+        }
+        if (!owners.empty() && !haveOwner) {
+            constexpr int Section = static_cast<int>(IInteractive::Button::CustomButton) + 1;
+            constexpr int Arrangement = static_cast<int>(IInteractive::Button::CustomButton) + 2;
+            std::vector<IInteractive::ButtonData> buttons;
+            if (owners.size() == 1) {
+                buttons.push_back(IInteractive::ButtonData(Arrangement, muse::qtrc("starscore", "Add the %1 arrangement")
+                                                           .arg(owners.front().name).toStdString()));
+            }
+            buttons.push_back(IInteractive::ButtonData(Section, muse::trc("starscore", "Add the section"), true));
+            const IInteractive::Result answer = interactive()->questionSync(
+                muse::trc("starscore", "Did you mean to create a new arrangement?"),
+                muse::trc("starscore", "This section only belongs to arrangements this song doesn't have yet."),
+                buttons, Section);
+            if (answer.button() == Arrangement) {
+                handleMenuItem("arr-new-tpl:" + owners.front().key);
+                return;
+            }
+        }
         RetVal<QString> ret = starScore()->createSectionFromTemplate(arg);
         if (!ret.ret) {
             interactive()->error(muse::trc("starscore", "Couldn't create the section"), ret.ret.toString());

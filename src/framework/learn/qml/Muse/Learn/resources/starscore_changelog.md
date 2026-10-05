@@ -4,6 +4,12 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.4
+
+- **The Flexible Flute sheet stays in a flute's range.** On export, the Horn 1 Flute sheet is printed as the chair is when every note is between C4 and C7; if even one note is outside, the whole sheet is printed an octave up. Bet's Horn 1 goes down to E3 (87 notes below a flute's low C), so its Flute sheet is now an octave up. A Flute sheet made into its own part ("Edit one sheet by hand") starts the same way.
+- **Add arrangement lists each Flexible after its Standard:** 2-Horn Standard, 2-Horn Flexible, 3-Horn Standard, 3-Horn Flexible, then 4- to 7-Horn Standard.
+- **Adding a section the song has no arrangement for** (a 4-Horn Section with no 4-Horn Standard arrangement) asks "Did you mean to create a new arrangement?" with a button to add that arrangement instead. "Add the section" (or closing the question) adds the section as before.
+
 ## 1.18.3
 
 - **One home page.** The Dashboard now shows your recent scores on the left and the Starsign dashboard on the right (drag the line between them to resize). The separate Scores page is gone, and so are "My online scores" and the "Score manager (online)" button. The dashboard's buttons wrap under its text when its half is narrow, and Next up / By priority stack when there isn't room side by side.

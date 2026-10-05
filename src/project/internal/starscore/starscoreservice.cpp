@@ -1273,15 +1273,16 @@ std::vector<StarScoreSectionTemplate> StarScoreService::sectionTemplates() const
 std::vector<StarScoreArrangementTemplate> StarScoreService::arrangementTemplates() const
 {
     return {
+        // in menu order: each Flexible right after its Standard (Joel, 5 Oct 2026)
         { "1-horn-standard", "1-Horn Standard", { "lead-sheet", "1-horn", "rhythm" } },
         { "2-horn-standard", "2-Horn Standard", { "lead-sheet", "2-horn", "rhythm" } },
+        { "2-horn-any", "2-Horn Flexible", { "lead-sheet", "2-horn-any", "rhythm" } },
         { "3-horn-standard", "3-Horn Standard", { "lead-sheet", "3-horn", "rhythm" } },
+        { "3-horn-any", "3-Horn Flexible", { "lead-sheet", "3-horn-any", "rhythm" } },
         { "4-horn-standard", "4-Horn Standard", { "lead-sheet", "4-horn", "rhythm" } },
         { "5-horn-standard", "5-Horn Standard", { "lead-sheet", "5-horn", "rhythm" } },
         { "6-horn-standard", "6-Horn Standard", { "lead-sheet", "6-horn", "rhythm" } },
         { "7-horn-standard", "7-Horn Standard", { "lead-sheet", "7-horn", "rhythm" } },
-        { "2-horn-any", "2-Horn Flexible", { "lead-sheet", "2-horn-any", "rhythm" } },
-        { "3-horn-any", "3-Horn Flexible", { "lead-sheet", "3-horn-any", "rhythm" } },
         { "big-band", "Big Band", { "bigband-saxes", "bigband-trumpets", "bigband-trombones", "bigband-rhythm" } },
         { "marching-band", "Marching Band", { "marching-woodwinds", "marching-brass", "marching-battery", "marching-front" } },
         { "orchestra", "Orchestra", { "orch-woodwinds", "orch-brass", "orch-percussion", "orch-strings" } },

@@ -751,6 +751,33 @@ int mu::project::starscore::hideMuteMarkings(Score* score)
     return int(hide.size());
 }
 
+bool mu::project::starscore::pitchesWithin(const Part* part, int lowest, int highest)
+{
+    if (!part || !part->score()) {
+        return true;
+    }
+    const Score* score = part->score();
+    for (const Segment* s = score->firstSegment(SegmentType::ChordRest); s; s = s->next1(SegmentType::ChordRest)) {
+        for (track_idx_t t = part->startTrack(); t < part->endTrack(); ++t) {
+            const EngravingItem* e = s->element(t);
+            if (!e || !e->isChord()) {
+                continue;
+            }
+            const Chord* c = toChord(e);
+            std::vector<const Note*> notes(c->notes().begin(), c->notes().end());
+            for (const Chord* g : c->graceNotes()) {
+                notes.insert(notes.end(), g->notes().begin(), g->notes().end());
+            }
+            for (const Note* n : notes) {
+                if (n->pitch() < lowest || n->pitch() > highest) {
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
+}
+
 int mu::project::starscore::copyMeasureWidths(const Score* source, Score* target)
 {
     if (!source || !target) {

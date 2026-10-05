@@ -58,6 +58,11 @@ int copyTextPositions(const mu::engraving::Score* source, mu::engraving::Score* 
 int copyMeasureWidths(const mu::engraving::Score* source, mu::engraving::Score* target);
 //! Whether a sheet's instrument name ("Trumpet in B♭", "Alto Saxophone") is a brass instrument, the only ones with a mute
 bool isBrassSheet(const QString& sheetName);
+//! Whether every note of a part (grace notes too) sounds within [lowest, highest] (MIDI pitches)
+bool pitchesWithin(const mu::engraving::Part* part, int lowest, int highest);
+//! A C flute's range, C4 to C7: the Flexible Flute sheet is written an octave up when any note falls outside it
+constexpr int FLUTE_LOWEST = 60;
+constexpr int FLUTE_HIGHEST = 96;
 //! Hides the texts that are only a mute or open marking ("mute", "(open)", "cup mute", "con sord."…), for a sheet on
 //! an instrument without a mute; "Open solos" stays. Undoable (inside a command). Returns how many were hidden.
 int hideMuteMarkings(mu::engraving::Score* score);

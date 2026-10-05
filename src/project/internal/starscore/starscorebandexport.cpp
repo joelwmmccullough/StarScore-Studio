@@ -702,6 +702,13 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
                         f.transposeDiatonic = seat.dia;
                         f.transposeChromatic = seat.chrom;
                         f.clef = seat.clef;
+                        // the Flute sheet: as the chair is when every note is in a flute's range, else all of it an
+                        // octave up (Bet's Horn 1 goes down to E3)
+                        if (QString::fromUtf8(seat.instrumentId) == "flute"
+                            && !starscore::pitchesWithin(partById(pid), starscore::FLUTE_LOWEST, starscore::FLUTE_HIGHEST)) {
+                            f.transposeDiatonic -= 7;
+                            f.transposeChromatic -= 12;
+                        }
                     }
                     plan.files.push_back(f);
                 }
