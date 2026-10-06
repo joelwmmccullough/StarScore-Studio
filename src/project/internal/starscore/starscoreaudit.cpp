@@ -1310,8 +1310,8 @@ StarScoreAuditReport StarScoreService::auditScore(const MasterScore* ms, const D
             arrOk = ait->second.second == fingerprint;
         }
 
-        // Or every sheet in it was marked Finished (itself, or with its section). A sheet marked Finished before
-        // this was kept counts too, without change tracking.
+        // Or every sheet in it was marked audited or Finished (itself, or with its section). A sheet marked Finished
+        // before this was kept counts too, without change tracking.
         std::set<QString> finishedBySection;
         for (const StarScoreSection& sec : data.sections) {
             if (!sec.autoStatus && sec.status == StarScoreStatus::Finished) {
@@ -1337,6 +1337,25 @@ StarScoreAuditReport StarScoreService::auditScore(const MasterScore* ms, const D
                 allSheets = false;
                 sheetsOk = false;
             }
+        }
+        // Or the arrangement is Finished, by the same rule as its status everywhere else, and that counts as done
+        // even when a sheet's older audit mark no longer matches its music (1.18.14: The Courier stayed on the to-do
+        // list with every arrangement Finished: its Keys part, tagged Empty, reads the lead sheet and doesn't count
+        // for the status, and the bar 60 repair had changed sheets audited earlier)
+        bool arrFinished = !arrParts.empty() && !arr.sectionIds.isEmpty();
+        for (const QString& sid : arr.sectionIds) {
+            for (const StarScoreSection& sec : data.sections) {
+                if (sec.id == sid && !sec.leadSheetFinish && sec.status != StarScoreStatus::Finished) {
+                    arrFinished = false;
+                }
+            }
+        }
+        if (arrFinished && hasOwnScoreStatus(arr.templateKey) && ownScoreStatus(data, arr) != StarScoreStatus::Finished) {
+            arrFinished = false;
+        }
+        if (arrFinished) {
+            allSheets = true;
+            sheetsOk = true;
         }
         if (allSheets) {
             st.audited = true;
@@ -1847,8 +1866,8 @@ static void auditUpdateCache(const QString& path, const QJsonObject& entry)
 }
 
 // Bumped whenever a cached summary would be read differently; entries with another version are audited again
-// (3: the dashboard's arrangement list, 1.8.0; 4: the reference check removed, 1.10.0)
-static const int AUDIT_CACHE_VERSION = 4;
+// (3: the dashboard's arrangement list, 1.8.0; 4: the reference check removed, 1.10.0; 5: Finished = audited, 1.18.14)
+static const int AUDIT_CACHE_VERSION = 5;
 
 static QJsonObject auditSummaryToJson(const StarScoreAuditFileSummary& s)
 {

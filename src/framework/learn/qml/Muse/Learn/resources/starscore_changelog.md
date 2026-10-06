@@ -4,6 +4,12 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.14
+
+- **Finished songs leave the Home to-do list.** For songs converted from older files (The Courier, Amplitudes and the rest of the audit list), an arrangement now counts as done once it's Finished by the same rule as everywhere else. Before, every sheet in it had to be Finished itself, including a Keys or percussion part tagged Empty, which only reads the lead sheet. So The Courier stayed on the list with every arrangement Finished. Sheets audited one by one still count as before.
+- **1- to 7-Horn sections always show all their chairs.** Turning a horn section on in the View panel now brings back every instrument in it; only stand-in versions are remembered as shown or hidden. An instrument shown by the Audit panel for an issue and still showing after the file was reopened could be remembered as the section's only instrument. That's how Amplitudes' 2-Horn ended up showing just the Tenor Sax (its 3-Horn just the Trumpet, its 7-Horn just the Tenor Sax).
+- **Hidden horn chairs count toward the status.** A 1- to 7-Horn section's status now counts every chair, hidden or not, since each one is exported. Amplitudes' 2-Horn Section read Finished from its Tenor Sax alone; its Trumpet isn't marked yet. G.I. Jorge, Shatter, Shofukan (Baritone Sax) and Meevin (Tenor Sax) had a hidden 7-Horn chair too.
+
 ## 1.18.13
 
 - **The 1-Horn sheets made from the Trumpet start as Needs review** (the E♭ Saxophone, B♭ Saxophone and Trombone), instead of Finished like the Trumpet.

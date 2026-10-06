@@ -430,6 +430,27 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         for (const StarScoreArrangement& a : d.arrangements) {
             autotestLog(QString("  arrangement %1: %2").arg(a.name).arg(int(arrangementStatus(a.id))));
         }
+    } else if (step.startsWith("sectionon:") || step.startsWith("sectionoff:")) {
+        // the View panel's switch for one section, then which instruments show
+        const QString id = step.section(':', 1);
+        setSectionOn(id, step.startsWith("sectionon:"));
+        QStringList showing;
+        for (const engraving::Part* p : ms->parts()) {
+            if (p->show()) {
+                showing << p->partName().toQString();
+            }
+        }
+        autotestLog(QString("  showing: %1").arg(showing.join(", ")));
+    } else if (step == "dashboard") {
+        // what Home › Dashboard reads for this file: each arrangement's column, status, audited
+        const QString path = globalContext()->currentProject() ? globalContext()->currentProject()->path().toQString() : QString();
+        const StarScoreAuditFileSummary s = auditFile(path, true);
+        autotestLog(QString("  %1 error '%2'").arg(path, s.error));
+        for (const StarScoreFileArrangement& a : s.arrangementList) {
+            autotestLog(QString("  arr %1 [%2]: status %3 audited %4 changed %5 issues %6 unfinished %7")
+                        .arg(a.name, a.column).arg(a.status).arg(a.audited).arg(a.changedSinceAudit).arg(a.openIssues)
+                        .arg(a.unfinished.join("; ")));
+        }
     } else if (step == "demos") {
         // Export Audio Demos, as the export window's checkbox does
         const QString band = qEnvironmentVariable("STARSCORE_AUTOTEST_BAND");

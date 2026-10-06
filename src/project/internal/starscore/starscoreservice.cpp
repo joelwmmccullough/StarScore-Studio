@@ -724,7 +724,11 @@ StarScoreService::Data StarScoreService::loadFrom(const engraving::MasterScore* 
             continue;
         }
         const bool rhythm = s.templateKey == "rhythm" || s.templateKey == "bigband-rhythm";
-        QStringList counted = s.shownPartIds.isEmpty() ? s.partIds : s.shownPartIds;
+        // A 1- to 7-Horn section counts every chair, hidden or not: each one is exported (1.18.14: Amplitudes' 2-Horn
+        // Section read Finished from its Tenor Sax alone, its Trumpet left hidden by the audit)
+        static const QRegularExpression hornSection("^[1-7]-horn$");
+        QStringList counted = (s.shownPartIds.isEmpty() || hornSection.match(s.templateKey).hasMatch()) ? s.partIds
+                              : s.shownPartIds;
         for (const auto& [alt, main] : s.alternates) {   // stand-in versions count even when left out of the shown list
             if (!counted.contains(alt)) {
                 counted << alt;
@@ -1082,6 +1086,17 @@ void StarScoreService::applyOnSections(const QStringList& onIds, const QString& 
                                          ? s.partIds : s.shownPartIds;
             for (const QString& id : restore) {
                 shown.insert(id);
+            }
+            // A 1- to 7-Horn section always comes back with every chair; only its stand-in versions are remembered
+            // (1.18.14: an instrument the audit showed for an issue, still showing after the file was reopened,
+            // was remembered as the 2-Horn Section's only instrument, and Amplitudes' 2-Horn lost its Trumpet)
+            static const QRegularExpression hornSection("^[1-7]-horn$");
+            if (hornSection.match(s.templateKey).hasMatch()) {
+                for (const QString& id : s.partIds) {
+                    if (!s.alternates.count(id)) {
+                        shown.insert(id);
+                    }
+                }
             }
         } else if (wasOn) {
             // turning off: remember which instruments were showing
