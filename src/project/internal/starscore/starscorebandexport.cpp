@@ -2239,7 +2239,7 @@ static bool starscoreSetMinMajNote(mu::engraving::Score* score)
                                 const String footerFace = score->style().styleSt(Sid::footerFontFace);
                                 score->setMetaTag(u"starscoreFooterNote",
                                                   u"The <font face=\"" + face + u"\"/>" + String(Char(c))
-                                                  + u"<font face=\"" + footerFace + u"\"/> symbol indicates a minor-major 7 chord.");
+                                                  + u"<font face=\"" + footerFace + u"\"/> symbol denotes a minor-major 7 chord.");
                                 score->setMetaTag(u"starscoreFooterNotePage", String::number(int(pi)));
                                 score->setLayoutAll();
                                 score->doLayout();

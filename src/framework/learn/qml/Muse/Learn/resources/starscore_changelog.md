@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.20
+
+- **Minor-major 7 footnote** now reads "The [symbol] symbol denotes a minor-major 7 chord." (was "indicates"). "Update all sheets" makes again only the sheets that have the footnote, each with its version's last number raised.
+
 ## 1.18.19
 
 - **Scores renamed** to CODE - Section Score (Concert), Section Score (Transposing), Section Score (Bb), Section Score (Eb), Section Score (Treble Clef) and Section Score (Bass Clef), in every section folder (the Flexible ones have Concert, Bb, Eb and Bass Clef; the String sections have Concert). The page still says "Concert Score", "B♭ Score"… top left. Scores already exported under 1.18.18's names ("CODE - Concert Score.pdf"…) are renamed in place the next time the song is exported or "Update all sheets" reaches it: same file, same version, nothing archived.

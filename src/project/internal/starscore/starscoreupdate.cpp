@@ -157,11 +157,6 @@ RetVal<QString> StarScoreService::updateCurrentSongSheets()
         }
     };
     const QString renamedNote = renamed > 0 ? muse::qtrc("starscore", " %1 Score(s) renamed.").arg(renamed) : QString();
-    // Sheets made with format 2 (1.18.18) come out the same now; only the Scores' names changed
-    if (record.value("sheetFormat").toInt(1) == 2) {
-        markCurrent();
-        return RetVal<QString>::make_ok(muse::qtrc("starscore", "%1: no sheet changed.%2").arg(plan.code, renamedNote));
-    }
     const Data data = load();
 
     // The sheets to make again, by the version printed on them: exported while Finished, and still Finished now (a
