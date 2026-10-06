@@ -208,6 +208,18 @@ static QString starscoreHornName(const QString& id)
 }
 
 //! The band's name for a horn (shared with the rest of StarScore), or empty when the instrument is not a horn
+QString mu::project::starscore::oneHornName(const QString& instrumentId)
+{
+    const QString name = bandHornName(instrumentId);
+    if (name == "Alto Sax") {
+        return "Eb Saxophone";
+    }
+    if (name == "Tenor Sax") {
+        return "Bb Saxophone";
+    }
+    return name;
+}
+
 QString mu::project::starscore::bandHornName(const QString& instrumentId)
 {
     return starscoreHornName(instrumentId);
@@ -734,12 +746,20 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
             for (const QString& pid : sec.partIds) {
                 engraving::Part* p = partById(pid);
                 const QString horn = p ? starscoreHornName(p->instrumentId().toQString()) : QString();
-                const QString name = horn.isEmpty() && p ? p->partName().toQString() : horn;
+                QString name = horn.isEmpty() && p ? p->partName().toQString() : horn;
                 if (name.isEmpty()) {
                     continue;
                 }
+                // "Eb Saxophone" and "Bb Saxophone" (Joel, 5 Oct 2026)
+                const QString one = p ? starscore::oneHornName(p->instrumentId().toQString()) : QString();
+                const bool sax = one.endsWith("Saxophone");
+                if (sax) {
+                    name = one;
+                }
                 addFile("1H", name, { pid }, false);
-                plan.files.back().sheetLeft = starscoreSheetHornName(name);
+                plan.files.back().sheetLeft = sax ? QString(name).replace("Eb ", QString::fromUtf8("E\u266D "))
+                                                    .replace("Bb ", QString::fromUtf8("B\u266D "))
+                                                  : starscoreSheetHornName(name);
                 plan.files.back().sheetRight = QString("1-Horn Arrangement");
                 // the Trombone sheet in tenor clef too (Joel, 5 Oct 2026), as the Flexible trombone sheets
                 if (name == "Trombone") {
@@ -753,6 +773,8 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
                     f.clef = 3;
                 }
             }
+            // sheets under the names from before 1.18.11 ("Alto Sax", "Tenor Sax") are archived once these are written
+            anyFolders << "1H";
             continue;
         }
 
@@ -2746,7 +2768,9 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                 QDir(songDir).rmdir(oldFolder);
             }
             const QDir dir(songDir + "/" + folder);
-            for (const QString& fileName : dir.entryList({ plan.code + " - Horn *.pdf" }, QDir::Files)) {
+            // (1H: every sheet, as the saxophones' names changed in 1.18.11)
+            const QString pattern = folder == "1H" ? plan.code + " - *.pdf" : plan.code + " - Horn *.pdf";
+            for (const QString& fileName : dir.entryList({ pattern }, QDir::Files)) {
                 const QString rel = folder + "/" + fileName;
                 if (!current.contains(rel)) {
                     supersede(rel);

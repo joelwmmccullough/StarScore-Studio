@@ -4,6 +4,11 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.12
+
+- **1-Horn starts with the Trumpet only.** A new 1-Horn arrangement has just the Trumpet sheet. When the Trumpet is marked Finished, StarScore makes the other three sheets from it without asking: the same music, the part score's style, system and page breaks, system locks, bar widths and text positions (hidden texts stay hidden), marked Finished like the Trumpet. The B♭ Saxophone and the Trombone are an octave lower; the E♭ Saxophone plays the Trumpet's pitches. They're made again if one is deleted and the Trumpet is marked Finished again. Changing the Trumpet afterwards doesn't change them.
+- **1-Horn saxophones renamed.** The 1-Horn Alto Sax and Tenor Sax are now "E♭ Saxophone" and "B♭ Saxophone": "1H: Eb Saxophone" in the score, "CODE - Eb Saxophone.pdf" in Sheets and Demos. Sheets exported under the old names are moved to Version History at the next export.
+
 ## 1.18.11
 
 - **1-Horn Trombone in tenor clef too.** The 1-Horn export now also writes "1H/CODE - Trombone (Tenor Clef).pdf" next to the bass-clef Trombone sheet, made from the same part, like the Flexible trombone sheets.

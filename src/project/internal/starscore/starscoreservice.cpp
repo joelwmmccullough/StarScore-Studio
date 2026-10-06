@@ -1308,8 +1308,8 @@ std::vector<StarScoreSectionTemplate> StarScoreService::sectionTemplates() const
               inst("piano", "Piano"), inst("electric-guitar", "Electric Guitar"), inst("electric-bass", "Electric Bass"),
               inst("drumset", "Drum Kit"), inst("congas", "Congas", true) } },
         // 1-Horn: the melody written out for each horn we make songbooks for, one sheet per instrument
-        { "1-horn", "1-Horn Section", { inst("bb-trumpet", "Trumpet"), inst("alto-saxophone", "Alto Saxophone"),
-              inst("tenor-saxophone", "Tenor Saxophone"), inst("trombone", "Trombone") } },
+        // (only the Trumpet to start: the E♭ and B♭ Saxophone and Trombone sheets are made from it when it's Finished)
+        { "1-horn", "1-Horn Section", { inst("bb-trumpet", "Trumpet") } },
         { "2-horn", "2-Horn Section", { inst("bb-trumpet", "Trumpet"), inst("tenor-saxophone", "Tenor Saxophone") } },
         { "3-horn", "3-Horn Section", { inst("bb-trumpet", "Trumpet"), inst("alto-saxophone", "Alto Saxophone"),
               inst("tenor-saxophone", "Tenor Saxophone") } },
@@ -1726,6 +1726,11 @@ std::vector<StarScoreHornChoice> StarScoreService::versionsFor(const QString& ma
     }
     if (key == "7-horn" && !lowHornName(mainInstrumentId).isEmpty()) {
         return lowVersionsFor(mainInstrumentId);
+    }
+    // 1-Horn (Joel, 5 Oct 2026): the Trumpet sheet is written; the other three are made from it once it's Finished
+    if (key == "1-horn" && starscore::bandHornName(mainInstrumentId) == "Trumpet") {
+        return { { "alto-saxophone", "Alto Saxophone", "Eb Saxophone" }, { "tenor-saxophone", "Tenor Saxophone", "Bb Saxophone" },
+                 { "trombone", "Trombone", "Trombone" } };
     }
     // A piccolo part: the band's flute player reads the same written notes an octave lower (Bet's flute part was a
     // piccolo labelled "Flute" until 1.17.1)

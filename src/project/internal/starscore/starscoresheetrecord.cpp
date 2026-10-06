@@ -358,7 +358,7 @@ void StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, const 
         return tpl;
     };
     // 1-Horn: the four horns there are songbooks for
-    static const QStringList ONE_HORN { "Trumpet", "Alto Sax", "Tenor Sax", "Trombone" };
+    static const QStringList ONE_HORN { "Trumpet", "Eb Saxophone", "Bb Saxophone", "Trombone" };
 
     // --- the colour tiers. Each colour also needs everything the colours below it need (the organizer checks that).
     Tier red, orange, yellow, green, blue, purple;
@@ -382,8 +382,9 @@ void StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, const 
             green.missing << QString("no %1 arrangement").arg(nameOf(tpl));
             continue;
         }
-        // (stand-in versions — a Flute made from a Piccolo — don't hold the song back, as the 7-Horn bass horns don't)
-        const QStringList files = hornSheets(*a, false, nullptr);
+        // (stand-in versions — a Flute made from a Piccolo — don't hold the song back, as the 7-Horn bass horns don't;
+        // the 1-Horn sheets made from the Trumpet are stand-ins too, and they count)
+        const QStringList files = hornSheets(*a, tpl == "1-horn-standard", nullptr);
         if (files.isEmpty()) {
             green.missing << QString("no horn sheets in %1").arg(nameOf(tpl));
         }

@@ -106,6 +106,9 @@ int applyKeysStaffRules(mu::engraving::MasterScore* master);
 //! The band's name for a horn ("Trumpet", "Tenor Sax", "Bari Sax", "Bass Trombone"…), or empty when the instrument
 //! is not a horn
 QString bandHornName(const QString& instrumentId);
+//! The 1-Horn sheets' names (Joel, 5 Oct 2026): "Eb Saxophone" and "Bb Saxophone" for the alto and tenor sax; every
+//! other horn as bandHornName ("Trumpet", "Trombone")
+QString oneHornName(const QString& instrumentId);
 
 //! Every staff gets the same end barline in each bar: where some staves have a double, final or other special
 //! barline and the rest have a plain one, the plain ones get it too (in the score and every part book). Bars whose

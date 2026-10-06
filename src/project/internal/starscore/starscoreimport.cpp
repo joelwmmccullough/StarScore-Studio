@@ -964,6 +964,7 @@ void StarScoreService::offerLowAlternates(const QStringList& partIds, bool asked
     QString mainName;      // the band's name for the main part, for the texts ("Bass Trombone", "Contrabass Clarinet", "Piccolo")
     QStringList missing;   // instrument ids of the versions the line doesn't have yet
     std::vector<StarScoreHornChoice> all;   // every version the main part can have, in order
+    bool oneHorn = false;   // the 1-Horn Trumpet: its three other sheets are made without asking
     for (const StarScoreSection& s : data.sections) {
         const QString seventh = starscoreSeventhChair(ms, s);
         for (const QString& pid : partIds) {
@@ -998,10 +999,12 @@ void StarScoreService::offerLowAlternates(const QStringList& partIds, bool asked
             // (a deleted part is gone from both, so it's made again). Compared by the band's name for the horn, so a
             // bass clarinet in bass clef counts as the Bass Clarinet version.
             QStringList have;
+            QStringList haveIds;   // (the 1-Horn versions' names aren't the band's names for the horns)
             for (const auto& [alt, main] : s.alternates) {
                 if (main == pid) {
                     if (const engraving::Part* a = ms->partById(ID(alt))) {
                         have << starscore::bandHornName(a->instrumentId().toQString());
+                        haveIds << a->instrumentId().toQString();
                     }
                 }
             }
@@ -1012,16 +1015,18 @@ void StarScoreService::offerLowAlternates(const QStringList& partIds, bool asked
                 if (other != pid && i >= from) {
                     if (const engraving::Part* a = ms->partById(ID(other))) {
                         have << starscore::bandHornName(a->instrumentId().toQString());
+                        haveIds << a->instrumentId().toQString();
                     }
                 }
             }
             QStringList want;
             for (const StarScoreHornChoice& c : versions) {
-                if (!have.contains(c.bandName)) {
+                if (!have.contains(c.bandName) && !haveIds.contains(c.instrumentId)) {
                     want << c.instrumentId;
                 }
             }
             if (!want.isEmpty()) {
+                oneHorn = s.templateKey == "1-horn";
                 sectionId = s.id;
                 mainId = pid;
                 mainName = versionMainName(mainInstrument);
@@ -1060,6 +1065,24 @@ void StarScoreService::offerLowAlternates(const QStringList& partIds, bool asked
                          : names.mid(0, names.size() - 1).join(", ") + muse::qtrc("starscore", " and ") + names.last();
     const bool one = names.size() == 1;
     const bool piccolo = mainName == "Piccolo";
+
+    // 1-Horn (Joel, 5 Oct 2026): the Trumpet sheet marked Finished makes the other three, the same music and
+    // formatting, without asking
+    if (oneHorn) {
+        QTimer::singleShot(0, &m_timerGuard, [this, sectionId, mainId, missing, list]() {
+            const RetVal<QStringList> made = createLowAlternates(sectionId, mainId, missing);
+            if (!made.ret) {
+                interactive()->error(muse::trc("starscore", "Couldn't make the 1-Horn sheets"), made.ret.toString());
+                return;
+            }
+            interactive()->info(muse::trc("starscore", "1-Horn sheets made"),
+                                muse::qtrc("starscore", "%1 now have the Trumpet's music, formatting and text positions, "
+                                                        "marked Finished like the Trumpet. The B\u266D Saxophone and the "
+                                                        "Trombone are an octave lower. Notes outside an instrument's range "
+                                                        "are colored.").arg(list).toStdString());
+        });
+        return;
+    }
 
     // After the menu that set the status has closed
     QTimer::singleShot(0, &m_timerGuard, [this, sectionId, mainId, mainName, missing, list, one, piccolo]() {
@@ -1222,11 +1245,14 @@ RetVal<QStringList> StarScoreService::createLowAlternates(const QString& section
             }
             engraving::XmlReader reader(mime);
             ms->pasteStaff(reader, start, to->staves().front()->idx());
-            if (sameWrittenNotes) {
-                // pasted at sounding pitch, so written an octave above the piccolo's notes: back down by an octave,
-                // same spelling (the written notes of both parts match)
-                const int octaves = (mainPart->instrument()->transpose().chromatic
-                                     - to->instrument()->transpose().chromatic) / 12;
+            // 1-Horn: the B♭ Saxophone and the Trombone play the Trumpet's melody an octave lower (Joel, 5 Oct 2026)
+            const QString toName = starscore::bandHornName(to->instrumentId().toQString());
+            const bool oneHornLower = templateKey == "1-horn" && (toName == "Tenor Sax" || toName == "Trombone");
+            if (sameWrittenNotes || oneHornLower) {
+                // the piccolo's Flute: pasted at sounding pitch, so written an octave above the piccolo's notes: back
+                // down by an octave, same spelling (the written notes of both parts match)
+                const int octaves = oneHornLower ? 1 : (mainPart->instrument()->transpose().chromatic
+                                                        - to->instrument()->transpose().chromatic) / 12;
                 if (octaves != 0) {
                     const engraving::staff_idx_t dst = to->staves().front()->idx();
                     std::vector<engraving::Note*> notes;
@@ -1281,7 +1307,10 @@ RetVal<QStringList> StarScoreService::createLowAlternates(const QString& section
                 s.shownPartIds << pid;
             }
             s.alternates[pid] = mainPartId;
-            d.partStatus[pid] = statusKey(StarScoreStatus::NeedsReview);
+            // (1-Horn sheets are the Trumpet's music as it was marked: they take its status)
+            auto mainStatus = d.partStatus.find(mainPartId);
+            d.partStatus[pid] = templateKey == "1-horn" && mainStatus != d.partStatus.end()
+                                ? mainStatus->second : statusKey(StarScoreStatus::NeedsReview);
         }
     }
     d.alternatesInSection = true;
@@ -1328,11 +1357,21 @@ RetVal<QStringList> StarScoreService::createLowAlternates(const QString& section
             }
         }
         if (src && !targets.empty()) {
+            // the main part score's style first (spacing, sizes, fonts: everything set in it)
+            const QString mss = QDir::tempPath() + "/starscore-version-" + QUuid::createUuid().toString(QUuid::Id128) + ".mss";
+            if (mainBook->notation()->style()->saveStyle(io::path_t(mss))) {
+                for (const INotationPtr& n : newBooks) {
+                    n->style()->loadStyle(io::path_t(mss), true);
+                }
+            }
+            QFile::remove(mss);
             master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Copy part formatting"));
             starscore::copyLayout(src, targets, starscore::LayoutCopyOptions());
-            // and where the texts sit ("Final soloist continues playing", "End solo", the tempo mark)
+            // and where the texts sit ("Final soloist continues playing", "End solo", the tempo mark), which are
+            // hidden, and the bar widths
             for (engraving::Score* t : targets) {
                 starscore::copyTextPositions(src, t);
+                starscore::copyMeasureWidths(src, t);
             }
             master->notation()->undoStack()->commitChanges();
         }
@@ -1663,7 +1702,9 @@ int StarScoreService::standardizeHornNames()
         std::vector<bool> numbered;
         std::map<QString, int> counts;
         for (engraving::Part* p : parts) {
-            QString base = flexible ? QString() : starscore::bandHornName(p->instrumentId().toQString());
+            QString base = flexible ? QString()
+                           : s.templateKey == "1-horn" ? starscore::oneHornName(p->instrumentId().toQString())
+                           : starscore::bandHornName(p->instrumentId().toQString());
             const bool byHorn = !base.isEmpty();
             if (!byHorn) {
                 base = bare(p->partName().toQString());   // "Horn 1", "Horn 1 (Flute)", or a name set by hand

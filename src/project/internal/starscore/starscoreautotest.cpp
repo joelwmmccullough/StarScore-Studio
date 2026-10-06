@@ -51,6 +51,8 @@
 
 #include "settings.h"
 #include "engraving/dom/masterscore.h"
+#include "engraving/rw/xmlreader.h"
+#include "engraving/dom/select.h"
 #include "engraving/dom/excerpt.h"
 #include "engraving/dom/part.h"
 #include "engraving/dom/instrument.h"
@@ -300,6 +302,39 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         // uri:<uri>: opens it (uri:muse://preferences); not waited for
         interactive()->open(UriQuery(step.mid(4).toStdString()));
         autotestLog("  opened " + step.mid(4));
+    } else if (step.startsWith("finish:")) {
+        // finish:<part name>: that part marked Finished, as the status menu does (1-Horn Trumpet: makes the others)
+        const QString name = step.mid(7);
+        for (const engraving::Part* p : ms->parts()) {
+            if (p->partName().toQString() == name) {
+                setPartStatus(p->id().toQString(), int(StarScoreStatus::Finished));
+                autotestLog("  finished " + name);
+            }
+        }
+    } else if (step.startsWith("copypart:")) {
+        // copypart:<from part>|<to part>: the music of one part pasted into another (to test with real music)
+        const QString from = step.mid(9).section('|', 0, 0), to = step.mid(9).section('|', 1);
+        engraving::Part* a = nullptr;
+        engraving::Part* b = nullptr;
+        for (engraving::Part* p : ms->parts()) {
+            a = p->partName().toQString() == from ? p : a;
+            b = p->partName().toQString() == to ? p : b;
+        }
+        if (a && b) {
+            engraving::Segment* start = ms->firstMeasure()->first(engraving::SegmentType::ChordRest);
+            engraving::Selection sel(ms);
+            sel.setRange(start, nullptr, a->staves().front()->idx(), a->staves().front()->idx() + 1);
+            const ByteArray mime = sel.mimeData();
+            master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Copy part"));
+            engraving::XmlReader reader(mime);
+            ms->pasteStaff(reader, start, b->staves().front()->idx());
+            master->notation()->undoStack()->commitChanges();
+            autotestLog("  copied " + from + " to " + to);
+        }
+    } else if (step == "parts") {
+        for (const engraving::Part* p : ms->parts()) {
+            autotestLog(QString("  %1 (%2)").arg(p->partName().toQString(), p->instrumentId().toQString()));
+        }
     } else if (step == "status") {
         // each arrangement's status (0 Empty … 4 Finished) and each section's
         const Data d = load();
