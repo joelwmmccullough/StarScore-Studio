@@ -300,6 +300,10 @@ public:
     static std::vector<mu::engraving::Part*> masterPartsOf(const mu::engraving::Score* score, const mu::engraving::MasterScore* ms);
 
 private:
+    //! Scores under their 1.18.18 names ("CODE - Concert Score.pdf"…) renamed to "CODE - Section Score (Concert).pdf"…,
+    //! with their sheet record entries; how many were renamed
+    int renameScoresToSectionNames(const StarScoreBandExportPlan& plan);
+
     //! Organizer: per-bar signatures of a sheet ({bars: [...], marks: {bar: "A"}}), and the 1-3 horn parts analysed
     //! for the Horn Part Guides (starscoreaudit.cpp)
     QJsonObject organizerSignature(const mu::engraving::MasterScore* ms, const QStringList& partIds) const;

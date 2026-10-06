@@ -277,8 +277,24 @@ static QString starscoreRhythmName(const QString& id, const QString& partName)
     if (id == "congas" || id.contains("conga")) {
         return "Percussion";
     }
-    if (id.contains("percussion") || id == "bongos" || id == "timbales" || id == "cajon" || id == "shaker") {
+    if (id.contains("percussion") || id == "bongos" || id == "timbales" || id == "cajon" || id.contains("shaker")
+        || id.contains("tambourine") || id.contains("cowbell")) {
         return "Percussion";
+    }
+    // Anything else in the rhythm section is the keyboard player's sheet: "Keys" (Joel, 6 Oct 2026: Last Pint's accordion
+    // came out as "PINT - Accordion"), as the sheet record and the songbooks already counted it
+    Q_UNUSED(partName);
+    return "Keys";
+}
+
+//! The name StarScore gave a rhythm-section sheet before 1.18.19: the part's own name for an instrument it didn't know
+static QString starscoreRhythmNameBefore11819(const QString& id, const QString& partName)
+{
+    if (id == "electric-piano" || id.contains("organ") || id == "clavinet" || id.contains("piano") || id.contains("keyboard")
+        || id.contains("synth") || id == "harpsichord" || id == "celesta" || id.contains("drum") || id.contains("conga")
+        || id.contains("percussion") || id == "bongos" || id == "timbales" || id == "cajon" || id == "shaker"
+        || id.contains("guitar") || id.contains("bass") || id == "contrabass") {
+        return QString();
     }
     return partName;
 }
@@ -287,6 +303,21 @@ static QString starscoreRhythmName(const QString& id, const QString& partName)
 static QString starscoreScoreLabel(const QString& name)
 {
     return QString(name).replace("Bb ", QString::fromUtf8("B\u266D ")).replace("Eb ", QString::fromUtf8("E\u266D "));
+}
+
+//! A section's Score file (Joel, 6 Oct 2026, 1.18.19): "CODE - Section Score (Concert).pdf", "(Transposing)", "(Bb)",
+//! "(Eb)", "(Treble Clef)", "(Bass Clef)". The page still says "Concert Score", "B♭ Score"… top left.
+static QString starscoreSectionScoreName(const QString& type)
+{
+    return "Section Score (" + type + ")";
+}
+
+//! The same Score under its 1.18.18 name ("CODE - Concert Score.pdf"…), or empty when rel isn't a section Score
+static QString starscoreScoreNameBefore11819(const QString& rel)
+{
+    static const QRegularExpression re("^(.*) - Section Score \\((Concert|Transposing|Bb|Eb|Treble Clef|Bass Clef)\\)\\.pdf$");
+    const QRegularExpressionMatch m = re.match(rel);
+    return m.hasMatch() ? m.captured(1) + " - " + m.captured(2) + " Score.pdf" : QString();
 }
 
 static QString starscoreSafeFileName(QString s)
@@ -627,11 +658,11 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
     // A section's six Scores (Joel, 6 Oct 2026): concert, transposing, every instrument in B♭ or in E♭, and every
     // instrument in treble or in bass clef
     auto addScores = [&](const QString& folder, const QStringList& parts, const QString& right) {
-        for (const auto& [name, key] : std::vector<std::pair<QString, QString> > {
-                { "Concert Score", QString() }, { "Transposing Score", "T" }, { "Bb Score", "Bb" }, { "Eb Score", "Eb" },
-                { "Treble Clef Score", "Treble" }, { "Bass Clef Score", "Bass" } }) {
-            addFile(folder, name, parts, true);
-            plan.files.back().sheetLeft = starscoreScoreLabel(name);
+        for (const auto& [type, key] : std::vector<std::pair<QString, QString> > {
+                { "Concert", QString() }, { "Transposing", "T" }, { "Bb", "Bb" }, { "Eb", "Eb" },
+                { "Treble Clef", "Treble" }, { "Bass Clef", "Bass" } }) {
+            addFile(folder, starscoreSectionScoreName(type), parts, true);
+            plan.files.back().sheetLeft = starscoreScoreLabel(type + " Score");
             plan.files.back().sheetRight = right;
             plan.files.back().transposingScore = key == "T";
             plan.files.back().scoreKey = key == "T" ? QString() : key;
@@ -678,6 +709,10 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
                     name += " (" + p->partName().toQString() + ")";
                 }
                 addFile("1 Rhythm", name, { pid }, false);
+                const QString former = starscoreRhythmNameBefore11819(p->instrumentId().toQString(), p->partName().toQString());
+                if (!former.isEmpty() && starscoreSafeFileName(former) != starscoreSafeFileName(name)) {
+                    plan.files.back().formerPath = "1 Rhythm/" + code + " - " + starscoreSafeFileName(former) + ".pdf";
+                }
                 // Finished rhythm section with "No Drums / Percussion / Keys Sheet": that player reads the lead
                 // sheet, so the sheet starts unticked
                 const QStringList& skipSheets = sec.autoStatus ? sec.autoSkipSheets : sec.skipSheets;
@@ -728,10 +763,10 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
             const QString right = QString("Flexible %1-Horn Arrangement").arg(horns);
             // Four Scores (Joel, 5 Oct 2026): concert, for B♭ horns, for E♭ horns, and in bass clef; each prints the
             // chairs in its own clefs, whatever clefs the chairs are written in
-            for (const auto& [name, key] : std::vector<std::pair<QString, QString> > {
-                    { "Concert Score", "C" }, { "Bb Score", "Bb" }, { "Eb Score", "Eb" }, { "Bass Clef Score", "Bass" } }) {
-                addFile(folder, name, scoreParts, true);
-                plan.files.back().sheetLeft = starscoreScoreLabel(name);
+            for (const auto& [type, key] : std::vector<std::pair<QString, QString> > {
+                    { "Concert", "C" }, { "Bb", "Bb" }, { "Eb", "Eb" }, { "Bass Clef", "Bass" } }) {
+                addFile(folder, starscoreSectionScoreName(type), scoreParts, true);
+                plan.files.back().sheetLeft = starscoreScoreLabel(type + " Score");
                 plan.files.back().sheetRight = right;
                 plan.files.back().flexibleScoreKey = key;
             }
@@ -783,7 +818,7 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
                 plan.files.back().sheetRight = sec.name;
             }
             if (scoreParts.size() > 1) {
-                addFile(folder, "Concert Score", scoreParts, true);
+                addFile(folder, starscoreSectionScoreName("Concert"), scoreParts, true);
                 plan.files.back().sheetLeft = starscoreScoreLabel("Concert Score");
                 plan.files.back().sheetRight = sec.name;
             }
@@ -2529,6 +2564,10 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     }
 
     const QString songDir = plan.bandFolder + "/" + plan.songFolder;
+    // Scores under their 1.18.18 names take their new names first (not made again for that)
+    if (!m_exportDryRun) {
+        renameScoresToSectionNames(plan);
+    }
     const QString today = QDate::currentDate().toString(Qt::ISODate);
     const QString tmpDir = QDir::tempPath() + "/StarScoreExport-" + QUuid::createUuid().toString(QUuid::Id128);
     QDir().mkpath(tmpDir);
@@ -3298,6 +3337,14 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                 }
             }
         }
+        // sheets StarScore renamed (Last Pint's "PINT - Accordion.pdf", now "PINT - Keys.pdf"): the old one archived once
+        // the new one is written
+        for (const StarScoreBandFile& f : full.files) {
+            if (!f.formerPath.isEmpty() && !current.contains(f.formerPath) && QFileInfo::exists(songDir + "/" + f.relativePath)
+                && QFileInfo::exists(songDir + "/" + f.formerPath)) {
+                supersede(f.formerPath);
+            }
+        }
         // Scores under their names from before 1.18.17 ("CODE - Score.pdf", "CODE - Score (Transposing).pdf", the Flexible
         // "CODE - Score (Bb).pdf"…): archived once the folder's new Scores ("Concert Score"…) are written
         {
@@ -3309,7 +3356,12 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
             }
             for (const QString& folder : scoreFolders) {
                 const QDir dir(songDir + "/" + folder);
-                for (const QString& fileName : dir.entryList({ plan.code + " - Score.pdf", plan.code + " - Score (*).pdf" }, QDir::Files)) {
+                // (and the 1.18.18 names, "CODE - Concert Score.pdf"…, left over when the renamed one was already there)
+                QStringList names { plan.code + " - Score.pdf", plan.code + " - Score (*).pdf" };
+                for (const QString& type : { "Concert", "Transposing", "Bb", "Eb", "Treble Clef", "Bass Clef" }) {
+                    names << plan.code + " - " + type + " Score.pdf";
+                }
+                for (const QString& fileName : dir.entryList(names, QDir::Files)) {
                     const QString rel = folder + "/" + fileName;
                     if (!current.contains(rel)) {
                         supersede(rel);
@@ -3593,6 +3645,59 @@ std::vector<StarScoreFlexibleSheet> StarScoreService::flexibleSheets(const QStri
         }
     }
     return out;
+}
+
+//! 1.18.19 (Joel, 6 Oct 2026): a section's Scores went from "CODE - Concert Score.pdf"… to "CODE - Section Score
+//! (Concert).pdf"…. Only the name changed, so the file is renamed rather than made again (no new version, nothing
+//! archived), and its sheet record entry and the folder colours' lists follow it.
+int StarScoreService::renameScoresToSectionNames(const StarScoreBandExportPlan& plan)
+{
+    if (plan.bandFolder.isEmpty() || plan.songFolder.isEmpty()) {
+        return 0;
+    }
+    const QString songDir = plan.bandFolder + "/" + plan.songFolder;
+    std::vector<std::pair<QString, QString> > renamed;   // old -> new, relative to the song folder
+    for (const StarScoreBandFile& f : plan.files) {
+        if (!f.isScore) {
+            continue;
+        }
+        const QString old = starscoreScoreNameBefore11819(f.relativePath);
+        if (old.isEmpty()) {
+            continue;
+        }
+        const QString from = songDir + "/" + old;
+        const QString to = songDir + "/" + f.relativePath;
+        if (!QFileInfo::exists(from) || QFileInfo::exists(to)) {
+            continue;   // nothing to rename, or the new one is there already (the old one is archived after the export)
+        }
+        if (QFile::rename(from, to)) {
+            renamed.push_back({ old, f.relativePath });
+            LOGI() << "[starscore] renamed " << old << " -> " << f.relativePath;
+        } else {
+            LOGW() << "[starscore] couldn't rename " << old << " -> " << f.relativePath;
+        }
+    }
+    if (renamed.empty()) {
+        return 0;
+    }
+    // the sheet record: every mention of the old path (its entry, and the lists of sheets each folder colour needs)
+    const QString recordPath = plan.bandFolder + "/6 Inbox/.organizer/sheets/" + plan.code + ".json";
+    QFile in(recordPath);
+    if (in.open(QIODevice::ReadOnly)) {
+        QString text = QString::fromUtf8(in.readAll());
+        in.close();
+        for (const auto& [old, now] : renamed) {
+            text.replace("\"" + old + "\"", "\"" + now + "\"");
+        }
+        if (!QJsonDocument::fromJson(text.toUtf8()).isNull()) {
+            QSaveFile out(recordPath);
+            if (out.open(QIODevice::WriteOnly)) {
+                out.write(text.toUtf8());
+                out.commit();
+            }
+        }
+    }
+    return int(renamed.size());
 }
 
 StarScoreVersionSuggestion StarScoreService::suggestVersionBump(const StarScoreBandExportPlan& plan) const

@@ -36,7 +36,8 @@ class INotationProject;
 //! Bumped whenever a change in StarScore makes exported sheets come out differently, so "Update all sheets" knows
 //! which songs to look at (each song's sheet record keeps the number its sheets were made with; none means 1).
 //! 2: 1.18.18, the six Scores, their names top left, multimeasure rests, the minor-major 7 footnote.
-inline constexpr int STARSCORE_SHEET_FORMAT = 2;
+//! 3: 1.18.19, the Scores renamed "CODE - Section Score (Concert).pdf"… (renamed in place, not made again).
+inline constexpr int STARSCORE_SHEET_FORMAT = 3;
 
 //! A song whose sheets were made before the sheet format last changed ("Update all sheets")
 struct StarScoreOutdatedSong {
@@ -321,6 +322,9 @@ struct StarScoreBandFile
     //! the octave that suits its notes). Drums, percussion and instruments of two staves stay as they are. Empty for
     //! every other file.
     QString scoreKey;
+    //! The same sheet's name before StarScore renamed it ("1 Rhythm/PINT - Accordion.pdf" for "1 Rhythm/PINT - Keys.pdf"):
+    //! archived once the sheet is written under its new name
+    QString formerPath;
 };
 
 //! Export to Sheets and Demos: which version number to raise for this export, judged from what changed in the music

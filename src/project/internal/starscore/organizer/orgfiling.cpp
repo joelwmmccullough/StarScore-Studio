@@ -257,7 +257,7 @@ struct BandFiler {
             tail.remove(tailEdge);
             if (tail.isEmpty() || QStringList { "horns", "score", "full score" }.contains(tail.trimmed().toLower())) {
                 const QString f = existingHornFolder(song, n, QString());
-                return place(rel, song, f.isEmpty() ? QString("%1H Flexible").arg(n) : f, code + " - Concert Score.pdf");
+                return place(rel, song, f.isEmpty() ? QString("%1H Flexible").arg(n) : f, code + " - Section Score (Concert).pdf");
             }
             static const QRegularExpression chair("Horn[_ ](\\d)[_ ](?:in|for)[_ ](.+)$", QRegularExpression::CaseInsensitiveOption);
             const QRegularExpressionMatch g = chair.match(tail);

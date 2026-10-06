@@ -64,10 +64,12 @@ QJsonObject readJson(const QString& path)
 }
 
 //! A Score under its name from before 1.18.18 ("CODE - Score.pdf", "CODE - Score (Transposing).pdf", "CODE - Score (Bb).pdf")
+//! or a 1.18.18 one ("CODE - Concert Score.pdf"…) not renamed yet
 bool isOldScoreName(const QString& rel)
 {
+    static const QRegularExpression v11818(" - (Concert|Transposing|Bb|Eb|Treble Clef|Bass Clef) Score\\.pdf$");
     const QString file = rel.section('/', -1);
-    return file.endsWith(" - Score.pdf") || file.contains(" - Score (");
+    return file.endsWith(" - Score.pdf") || file.contains(" - Score (") || v11818.match(file).hasMatch();
 }
 }
 
@@ -136,9 +138,29 @@ RetVal<QString> StarScoreService::updateCurrentSongSheets()
         return RetVal<QString>::make_ret(Ret::Code::UnknownError, muse::trc("starscore", "not in Sheets and Demos yet"));
     }
     const QString recordPath = plan.bandFolder + "/6 Inbox/.organizer/sheets/" + plan.code + ".json";
+    // Scores under their 1.18.18 names take their new names (sheet format 2 -> 3 changed nothing else)
+    const int renamed = renameScoresToSectionNames(plan);
     QJsonObject record = readJson(recordPath);
     if (record.isEmpty()) {
         return RetVal<QString>::make_ret(Ret::Code::UnknownError, muse::trc("starscore", "no sheet record (never exported)"));
+    }
+    auto markCurrent = [&]() {
+        QJsonObject r = readJson(recordPath);
+        r["sheetFormat"] = STARSCORE_SHEET_FORMAT;
+#ifdef STARSCORE_VERSION_STR
+        r["exportedWith"] = QString::fromUtf8(STARSCORE_VERSION_STR);
+#endif
+        QSaveFile out(recordPath);
+        if (out.open(QIODevice::WriteOnly)) {
+            out.write(QJsonDocument(r).toJson(QJsonDocument::Indented));
+            out.commit();
+        }
+    };
+    const QString renamedNote = renamed > 0 ? muse::qtrc("starscore", " %1 Score(s) renamed.").arg(renamed) : QString();
+    // Sheets made with format 2 (1.18.18) come out the same now; only the Scores' names changed
+    if (record.value("sheetFormat").toInt(1) == 2) {
+        markCurrent();
+        return RetVal<QString>::make_ok(muse::qtrc("starscore", "%1: no sheet changed.%2").arg(plan.code, renamedNote));
     }
     const Data data = load();
 
@@ -158,7 +180,7 @@ RetVal<QString> StarScoreService::updateCurrentSongSheets()
             if (!f.sourceFile.isEmpty()) {
                 continue;   // reference PDFs are copied, not made
             }
-            const bool same = f.relativePath == rel;
+            const bool same = f.relativePath == rel || f.formerPath == rel;   // (or the same sheet under its old name)
             const bool renamedScore = f.isScore && isOldScoreName(rel) && f.relativePath.section('/', 0, -2) == folder;
             if (!same && !renamedScore) {
                 continue;
@@ -223,22 +245,14 @@ RetVal<QString> StarScoreService::updateCurrentSongSheets()
     endExportProgress();
 
     // 3. the record marked as made with this StarScore (an export already did that; nothing written: done here)
-    record = readJson(recordPath);
-    record["sheetFormat"] = STARSCORE_SHEET_FORMAT;
-#ifdef STARSCORE_VERSION_STR
-    record["exportedWith"] = QString::fromUtf8(STARSCORE_VERSION_STR);
-#endif
-    QSaveFile out(recordPath);
-    if (out.open(QIODevice::WriteOnly)) {
-        out.write(QJsonDocument(record).toJson(QJsonDocument::Indented));
-        out.commit();
-    }
+    markCurrent();
 
     if (written.isEmpty()) {
-        return RetVal<QString>::make_ok(muse::qtrc("starscore", "%1: no sheet changed (%2 checked).").arg(plan.code).arg(same));
+        return RetVal<QString>::make_ok(muse::qtrc("starscore", "%1: no sheet changed (%2 checked).%3").arg(plan.code).arg(same)
+                                        .arg(renamedNote));
     }
-    return RetVal<QString>::make_ok(muse::qtrc("starscore", "%1: %2 sheet(s) updated, now up to version %3; %4 unchanged.")
-                                    .arg(plan.code).arg(written.size()).arg(highest).arg(same));
+    return RetVal<QString>::make_ok(muse::qtrc("starscore", "%1: %2 sheet(s) updated, now up to version %3; %4 unchanged.%5")
+                                    .arg(plan.code).arg(written.size()).arg(highest).arg(same).arg(renamedNote));
 }
 
 // ---------------------------------------------------------------------------

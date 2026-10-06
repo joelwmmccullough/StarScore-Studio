@@ -4,6 +4,11 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.19
+
+- **Scores renamed** to CODE - Section Score (Concert), Section Score (Transposing), Section Score (Bb), Section Score (Eb), Section Score (Treble Clef) and Section Score (Bass Clef), in every section folder (the Flexible ones have Concert, Bb, Eb and Bass Clef; the String sections have Concert). The page still says "Concert Score", "B♭ Score"… top left. Scores already exported under 1.18.18's names ("CODE - Concert Score.pdf"…) are renamed in place the next time the song is exported or "Update all sheets" reaches it: same file, same version, nothing archived.
+- **The keyboard player's sheet is always "Keys".** Any rhythm-section instrument that isn't guitar, bass, drums or percussion (accordion, vibraphone…) now exports as CODE - Keys (Last Pint's came out as "PINT - Accordion"). A sheet under the old name goes to Version History once the Keys sheet is written. Tambourine and cowbell count as Percussion.
+
 ## 1.18.18
 
 - **Six Scores for every section.** Each 2- to 7-Horn, Big Band, Orchestra and Marching Band folder now gets CODE - Concert Score, Transposing Score, Bb Score (every instrument written in its nearest B♭ transposition, all in treble clef), Eb Score (the same for E♭), Treble Clef Score and Bass Clef Score (every instrument in that clef, at the octave that suits its notes). Drums, percussion and two-staff instruments (piano, marimba) stay as they are. The Flexible Scores are renamed to match: Concert Score, Bb Score, Eb Score, Bass Clef Score. Scores under the old names ("CODE - Score.pdf", "CODE - Score (Transposing).pdf"…) go to Version History once the new ones are written. A folder's six Scores share their systems. The String sections' Score is now "Concert Score".
