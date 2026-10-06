@@ -137,6 +137,19 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         std::_Exit(0);   // no "save changes?" question, no shutdown work
     }
     const QString step = steps.takeFirst().trimmed();
+    // waitupdate: until "Update all sheets" has finished (it opens and closes songs, so no score check here)
+    if (step == "waitupdate") {
+        const StarScoreUpdateAllStatus st = updateAllStatus();
+        if (st.running) {
+            steps.prepend(step);
+            QTimer::singleShot(2000, &m_timerGuard, [this, steps, reportNumber]() { runAutotestSteps(steps, reportNumber); });
+            return;
+        }
+        autotestLog("step: waitupdate");
+        autotestLog("  " + st.results.join("\n  "));
+        QTimer::singleShot(500, &m_timerGuard, [this, steps, reportNumber]() { runAutotestSteps(steps, reportNumber); });
+        return;
+    }
     autotestLog("step: " + step);
     IMasterNotationPtr master = globalContext()->currentMasterNotation();
     engraving::MasterScore* ms = masterScore();
@@ -609,6 +622,43 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             text.replace("\n", "\n  ");
             autotestLog("  " + text);
         }
+    } else if (step.startsWith("updateall:")) {
+        // updateall:<Projects and Sheets folder>: "Update all sheets" on every song it offers (then waitupdate)
+        const QString band = qEnvironmentVariable("STARSCORE_AUTOTEST_BAND");
+        if (!band.isEmpty()) {
+            setBandFolder(band);
+        }
+        setAuditLibraryFolder(step.mid(10));
+        QStringList paths;
+        for (const StarScoreOutdatedSong& o : outdatedSongs()) {
+            paths << o.path;
+        }
+        autotestLog(QString("  %1 song(s): %2").arg(paths.size()).arg(paths.join(", ")));
+        startUpdateAllSheets(paths);
+    } else if (step.startsWith("exportonly:") || step == "updatesong" || step.startsWith("outdated:")) {
+        // exportonly:<path>+<path>: only those sheets; updatesong: "Update all sheets" for the open song;
+        // outdated:<Projects and Sheets folder>: the songs Update all sheets would offer
+        const QString band = qEnvironmentVariable("STARSCORE_AUTOTEST_BAND");
+        if (!band.isEmpty()) {
+            setBandFolder(band);
+        }
+        RetVal<QString> r;
+        if (step.startsWith("exportonly:")) {
+            r = exportToBandFolder(step.mid(11).split('+'));
+        } else if (step == "updatesong") {
+            r = updateCurrentSongSheets();
+        } else {
+            setAuditLibraryFolder(step.mid(9));
+            QStringList lines;
+            for (const StarScoreOutdatedSong& o : outdatedSongs()) {
+                lines << QString("%1 %2 format %3 with %4: %5 finished").arg(o.code, o.title).arg(o.sheetFormat)
+                         .arg(o.exportedWith).arg(o.finishedSheets);
+            }
+            r = RetVal<QString>::make_ok(QString("%1 outdated\n").arg(lines.size()) + lines.join("\n"));
+        }
+        QString text = r.ret ? r.val : QString::fromStdString(r.ret.toString());
+        text.replace("\n", "\n  ");
+        autotestLog("  " + text);
     } else if (step == "chords") {
         INotationProjectPtr project = globalContext()->currentProject();
         const QString path = project ? project->path().toQString() : QString();

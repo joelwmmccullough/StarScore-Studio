@@ -4,6 +4,16 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.18
+
+- **Six Scores for every section.** Each 2- to 7-Horn, Big Band, Orchestra and Marching Band folder now gets CODE - Concert Score, Transposing Score, Bb Score (every instrument written in its nearest B♭ transposition, all in treble clef), Eb Score (the same for E♭), Treble Clef Score and Bass Clef Score (every instrument in that clef, at the octave that suits its notes). Drums, percussion and two-staff instruments (piano, marimba) stay as they are. The Flexible Scores are renamed to match: Concert Score, Bb Score, Eb Score, Bass Clef Score. Scores under the old names ("CODE - Score.pdf", "CODE - Score (Transposing).pdf"…) go to Version History once the new ones are written. A folder's six Scores share their systems. The String sections' Score is now "Concert Score".
+- **Scores have their name top left** ("Concert Score", "B♭ Score"…) and **multimeasure rests**.
+- **Minor-major 7 footnote.** A sheet that uses the minor-major 7 symbol says, in the left footer of the first page where it appears: "The [symbol] symbol indicates a minor-major 7 chord.", in the symbol the sheet uses. Only on exported sheets; the score in StarScore doesn't show it.
+- **Export progress.** The Export to Sheets and Demos window shows what's being made while it exports: sheet (or demo) N of M, a progress bar and the file name. The window stays responsive; clicks wait until the export is done.
+- **Update all sheets** (Home › Dashboard). After a StarScore update that changes how sheets are made, it opens each song whose sheets were made before that change, one at a time, and makes again every sheet that was exported while Finished and is still Finished. Only the sheets that come out differently are written: the old file goes to Version History and the version on the sheet goes up by its last number (1.2.0 becomes 1.2.1). Sheets that aren't Finished are never touched, and each song is saved afterwards. The window shows the song, the sheet being made and a line per song when it's done; it can stop after the current song. Each song's sheet record now keeps the StarScore version and sheet format it was exported with.
+- **The diminished circle matches the ø.** It's now the chord font's own small o, raised and sized like the half-diminished ø (Last Pint's A°/C♯ sat too high and too far from the A).
+- **Scores export faster.** A folder's six Scores share one prepared copy of the song, and the tighter-spacing pass tries every run of bars in one go.
+
 ## 1.18.17
 
 - **Windows build fixed.** 1.18.16's new crash report used a Mac and Linux function, so the Windows version didn't build. Mac and Linux are unchanged.

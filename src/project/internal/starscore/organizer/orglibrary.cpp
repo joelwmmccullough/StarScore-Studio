@@ -392,7 +392,7 @@ Library buildLibrary(const ScanResult& scan, const std::map<QString, QString>& c
                 a.generic = generic;
                 a.solo = n == 1;
                 a.files = files;
-                a.scoreOnly = std::all_of(files.begin(), files.end(), [](const QString& f) { return f.endsWith("- Score.pdf") || f.contains("- Score ("); });
+                a.scoreOnly = std::all_of(files.begin(), files.end(), [](const QString& f) { return f.endsWith("- Score.pdf") || f.contains("- Score (") || f.endsWith(" Score.pdf"); });
                 for (const QString& f : files) {
                     a.quality[f] = qualityOf(folder, f);
                     if (f.contains("Score")) {

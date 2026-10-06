@@ -57,6 +57,7 @@ public:
     Q_INVOKABLE void load();
     //! "starscore-organize", "starscore-rebuild-all", "starscore-band-roster"
     Q_INVOKABLE void runAction(const QString& action);
+    Q_INVOKABLE void openUpdateAllSheets();
     Q_INVOKABLE void chooseFolder();
     //! Reads every song that changed since it was last read (all of them with force)
     Q_INVOKABLE void scan(bool force);

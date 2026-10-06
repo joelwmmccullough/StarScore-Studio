@@ -1,3 +1,4 @@
+#include <QVariantMap>
 /*
  * SPDX-License-Identifier: GPL-3.0-only
  *
@@ -92,6 +93,9 @@ public:
     Q_INVOKABLE QString exportNow();
     //! Whether the last exportNow() exported (false: cancelled at the save question, or the save failed)
     Q_INVOKABLE bool lastExportRan() const { return m_exportRan; }
+
+    //! Where the running export is: running, phase, done, total, step (the window polls it while exporting)
+    Q_INVOKABLE QVariantMap progress() const;
 
 signals:
     void loaded();

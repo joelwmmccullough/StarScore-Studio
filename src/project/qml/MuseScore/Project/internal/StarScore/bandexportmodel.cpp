@@ -388,6 +388,12 @@ QString BandExportModel::exportNow()
     return m_result;
 }
 
+QVariantMap BandExportModel::progress() const
+{
+    const StarScoreExportProgress p = starScore()->exportProgress();
+    return { { "running", p.running }, { "phase", p.phase }, { "done", p.done }, { "total", p.total }, { "step", p.step } };
+}
+
 void BandExportModel::setExportDemos(bool on)
 {
     if (m_exportDemos != on) {

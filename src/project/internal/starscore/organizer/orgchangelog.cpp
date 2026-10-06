@@ -57,7 +57,7 @@ static QStringList readersOfSheet(const QString& relInSong, const QString& code,
 {
     const QString folder = relInSong.section('/', 0, 0);
     const QString file = relInSong.section('/', -1);
-    if (file.contains(" - Score.pdf") || file.contains(" - Score (") || folder == "Reference PDFs") {
+    if (file.contains(" - Score.pdf") || file.contains(" - Score (") || file.endsWith(" Score.pdf") || folder == "Reference PDFs") {
         return {};
     }
     if (folder == "1 Lead Sheet") {

@@ -8,7 +8,7 @@
       at 0.71 of the root, raised half a cap height (quality set here; extensions and
       alterations through the style's extension/modifier size and offset);
       minor (typed "-", "m", "mi", "min" or "minor") as a larger hyphen, major seventh as a triangle, half-diminished as ø,
-      diminished as a raised small circle (StarScore Jost U+E040, in Jost's line weight); slash bass full size.
+      diminished as the chord font's small o, raised like the ø; slash bass full size.
     Units: 1 = cap height of the root font; negative y is up.
 -->
 <museScore version="4.60">
@@ -22,6 +22,9 @@
     <sym class="german_B" code="0x266d" name="b"/>
     <sym value="-" name="minus"/>
     <sym code="0x00f8" name="halfdim"/>
+    <!-- the diminished circle: the chord font's own small o, so it sits and spaces exactly like the ø (1.18.18; the
+         separate raised circle U+E040 stood higher and further from the root) -->
+    <sym code="0x006f" name="dimo"/>
   </font>
 
   <font family="Bravura Text">
@@ -205,7 +208,7 @@
     </token>
   <token class="quality">
     <name>o</name>
-    <render>m:0.05:0 sc:0.71 m:0:-0.5 dimc m:0:0.5 sc:1.408451</render>
+    <render>m:0.05:0 sc:0.71 m:0:-0.5 dimo m:0:0.5 sc:1.408451</render>
     </token>
   <token class="quality">
     <name>0</name>

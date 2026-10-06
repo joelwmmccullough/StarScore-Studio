@@ -485,6 +485,11 @@ void DashboardModel::auditInOrder()
     });
 }
 
+void DashboardModel::openUpdateAllSheets()
+{
+    interactive()->open(muse::UriQuery("musescore://starscore/updateallsheets"));
+}
+
 void DashboardModel::runAction(const QString& action)
 {
     dispatcher()->dispatch(action.toStdString());

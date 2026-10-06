@@ -54,11 +54,22 @@ void HeaderFooterLayout::layoutHeaderFooter(LayoutContext& ctx, Page* page)
         }
     }
 
-    if (ctx.conf().styleB(Sid::showFooter) && (page->pageNumber() || ctx.conf().styleB(Sid::footerFirstPage))) {
+    // StarScore: a note for one page's footer, on the left (score meta tags "starscoreFooterNote" and
+    // "starscoreFooterNotePage", the page index), set only while a sheet is exported (the minor-major 7 symbol, 1.18.17)
+    String note;
+    if (page->score()->metaTag(u"starscoreFooterNotePage") == String::number(int(page->pageNumber()))) {
+        note = page->score()->metaTag(u"starscoreFooterNote");
+    }
+    const bool footer = ctx.conf().styleB(Sid::showFooter) && (page->pageNumber() || ctx.conf().styleB(Sid::footerFirstPage));
+    if (footer || !note.empty()) {
         const bool odd = (n & 1) || !ctx.conf().styleB(Sid::footerOddEven);
-        createUpdateFooterText(ctx, page, 0, ctx.conf().styleSt(odd ? Sid::oddFooterL : Sid::evenFooterL));
-        createUpdateFooterText(ctx, page, 1, ctx.conf().styleSt(odd ? Sid::oddFooterC : Sid::evenFooterC));
-        createUpdateFooterText(ctx, page, 2, ctx.conf().styleSt(odd ? Sid::oddFooterR : Sid::evenFooterR));
+        String left = footer ? ctx.conf().styleSt(odd ? Sid::oddFooterL : Sid::evenFooterL) : String();
+        if (!note.empty()) {
+            left = left.empty() ? note : note + u"\n" + left;
+        }
+        createUpdateFooterText(ctx, page, 0, left);
+        createUpdateFooterText(ctx, page, 1, footer ? ctx.conf().styleSt(odd ? Sid::oddFooterC : Sid::evenFooterC) : String());
+        createUpdateFooterText(ctx, page, 2, footer ? ctx.conf().styleSt(odd ? Sid::oddFooterR : Sid::evenFooterR) : String());
     } else {
         for (int area = 0; area < MAX_FOOTERS; ++area) {
             removeFooterText(page, area);

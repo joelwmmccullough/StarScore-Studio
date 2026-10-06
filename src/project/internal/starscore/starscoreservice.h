@@ -29,6 +29,7 @@
 #include "dockwindow/idockwindow.h"
 #include "actions/iactionsdispatcher.h"
 #include "iinteractive.h"
+#include "../../iprojectfilescontroller.h"
 
 namespace mu::engraving {
 class MasterScore;
@@ -50,6 +51,7 @@ class StarScoreService : public IStarScoreService, public muse::Contextable, pub
     muse::ContextInject<muse::dock::IDockWindowProvider> dockWindowProvider = { this };
     muse::ContextInject<muse::actions::IActionsDispatcher> dispatcher = { this };
     muse::ContextInject<muse::IInteractive> interactive = { this };
+    muse::ContextInject<IProjectFilesController> projectFilesController = { this };
 
 public:
     explicit StarScoreService(const muse::modularity::ContextPtr& iocCtx);
@@ -160,6 +162,15 @@ public:
     std::pair<QString, QString> mainLowHorn(const QString& sectionId) const override;
     std::vector<StarScoreFlexibleSheet> flexibleSheets(const QString& sectionId) const override;
     muse::RetVal<QString> makeFlexibleSheetPart(const QString& sectionId, const QString& sheetName) override;
+    StarScoreExportProgress exportProgress() const override;
+    std::vector<StarScoreOutdatedSong> outdatedSongs() const override;
+    muse::RetVal<QString> updateCurrentSongSheets() override;
+    void startUpdateAllSheets(const QStringList& paths) override;
+    void cancelUpdateAllSheets() override;
+    StarScoreUpdateAllStatus updateAllStatus() const override;
+    //! Records where the export is, logs it, and lets the windows repaint
+    void reportExportProgress(const QString& phase, int done, int total, const QString& step);
+    void endExportProgress() override;
     int flexibleViewMode() const override;
     void setFlexibleViewMode(int mode) override;
     bool hasFlexibleSections() const override;
@@ -268,6 +279,8 @@ public:
         std::map<QString, std::pair<QString, QString> > auditPartAudited;
         QStringList auditListened;                // approved listen steps
     };
+    //! A sheet's status as the sheet record keeps it: the least finished of its parts (and a full score's own)
+    static StarScoreStatus exportedSheetStatus(const Data& data, const StarScoreBandFile& f);
 
     // (de)serialisation of the "starscore" meta tag; public for tests
     static Data fromJson(const QString& json);
@@ -449,6 +462,15 @@ private:
     std::vector<StarScoreVoiceSection> checkVoiceOrderIn(const mu::engraving::MasterScore* ms, const Data& data) const;
     void onPlaybackPosition(int tick);
     muse::async::Notification m_listeningChanged;
+    StarScoreExportProgress m_exportProgress;
+    // "Update all sheets"
+    bool m_exportDryRun = false;          // the export writes nothing; m_dryRunChanged gets the sheets that would change
+    QStringList m_dryRunChanged;
+    QStringList m_updateQueue;
+    StarScoreUpdateAllStatus m_updateStatus;
+    int m_updateWaits = 0;
+    void updateAllNext();
+    void updateAllWhenOpen(const QString& path);
     std::map<QString, bool> m_listenVisibility;   // every part's visibility before listening
     // instruments shown only to show an audit issue: they don't count toward a section being on, aren't
     // remembered as part of a section, and are hidden again when another issue is shown

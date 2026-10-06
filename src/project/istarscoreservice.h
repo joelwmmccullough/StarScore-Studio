@@ -33,6 +33,41 @@ class Score;
 namespace mu::project {
 class INotationProject;
 
+//! Bumped whenever a change in StarScore makes exported sheets come out differently, so "Update all sheets" knows
+//! which songs to look at (each song's sheet record keeps the number its sheets were made with; none means 1).
+//! 2: 1.18.18, the six Scores, their names top left, multimeasure rests, the minor-major 7 footnote.
+inline constexpr int STARSCORE_SHEET_FORMAT = 2;
+
+//! A song whose sheets were made before the sheet format last changed ("Update all sheets")
+struct StarScoreOutdatedSong {
+    QString path;           // the .starscore
+    QString title;
+    QString code;
+    int sheetFormat = 1;    // what its sheets were made with
+    QString exportedWith;   // the StarScore version of its last export, when known
+    int finishedSheets = 0; // sheets exported while Finished (the ones that can be updated)
+};
+
+//! Where "Update all sheets" is
+struct StarScoreUpdateAllStatus {
+    bool running = false;
+    bool finished = false;
+    int songIndex = 0;      // the song being updated (0-based)
+    int songCount = 0;
+    QString song;
+    QString phase;          // "Opening", "Comparing", "Exporting", "Saving"
+    QStringList results;    // one line per song done
+};
+
+//! Where a running export is (Joel, 6 Oct 2026: a window shows it live instead of a beachball)
+struct StarScoreExportProgress {
+    bool running = false;
+    QString phase;   // "Sheets", "Audio demos", "Chord charts"…
+    int done = 0;    // steps finished in this phase
+    int total = 0;
+    QString step;    // what's being made now ("4H Tpt Alt Ten Tbn/COUR - Bb Score.pdf")
+};
+
 //! How the Flexible chairs are shown while writing (Joel, 6 Oct 2026); Reference is the default
 enum class StarScoreFlexibleView {
     Reference = 0,   // B♭ Trumpet, (Alto Sax), Tenor Sax
@@ -281,6 +316,11 @@ struct StarScoreBandFile
     //! "Bb" and "Eb" (written for B♭ or E♭ horns; treble, the bottom horn in treble clef an octave down) or "Bass"
     //! (concert; bass clef an octave up, the bottom horn in bass clef). Empty for every other file.
     QString flexibleScoreKey;
+    //! A section Score in one of its four extra versions (Joel, 6 Oct 2026): "Bb" and "Eb" (each instrument written in
+    //! the nearest B♭ or E♭ transposition, all in treble clef), "Treble" and "Bass" (each instrument in that clef, at
+    //! the octave that suits its notes). Drums, percussion and instruments of two staves stay as they are. Empty for
+    //! every other file.
+    QString scoreKey;
 };
 
 //! Export to Sheets and Demos: which version number to raise for this export, judged from what changed in the music
@@ -521,6 +561,20 @@ public:
     //! How every Flexible section's chairs are shown while writing (one setting for all scores, the status bar's
     //! "Show Flexible horns as"): StarScoreFlexibleView. The chairs keep their Flexible ranges, and the exported sheets
     //! are the same whatever the view. Setting it shows the current score's chairs that way at once.
+    //! Where a running export is; the export lets the windows repaint (not take clicks) between its steps
+    virtual StarScoreExportProgress exportProgress() const = 0;
+    //! "Update all sheets" (Joel, 6 Oct 2026): the songs in the library whose sheets were made before the current sheet
+    //! format and have sheets exported while Finished
+    virtual std::vector<StarScoreOutdatedSong> outdatedSongs() const = 0;
+    //! The open song: its sheets that were exported while Finished and are still Finished, made again; the ones that
+    //! come out differently are written (the old file to Version History) with their version's last number raised;
+    //! the others are left as they are. Then the song's record is marked up to date. Returns a one-line summary.
+    virtual muse::RetVal<QString> updateCurrentSongSheets() = 0;
+    //! Opens each song in turn, updates it (updateCurrentSongSheets), saves it, goes on to the next
+    virtual void startUpdateAllSheets(const QStringList& paths) = 0;
+    virtual void cancelUpdateAllSheets() = 0;
+    virtual StarScoreUpdateAllStatus updateAllStatus() const = 0;
+    virtual void endExportProgress() = 0;
     virtual int flexibleViewMode() const = 0;
     virtual void setFlexibleViewMode(int mode) = 0;
     //! Whether the current score has a Flexible section (the status bar shows the setting only then)

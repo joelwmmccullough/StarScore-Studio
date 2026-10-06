@@ -1158,6 +1158,29 @@ void StarScoreService::applyOnSections(const QStringList& onIds, const QString& 
 //  Part score tabs (Joel, 6 Oct 2026: the Parts window is gone, so showing a section opens its part scores)
 // ---------------------------------------------------------------------------
 
+StarScoreExportProgress StarScoreService::exportProgress() const
+{
+    return m_exportProgress;
+}
+
+void StarScoreService::reportExportProgress(const QString& phase, int done, int total, const QString& step)
+{
+    m_exportProgress.running = true;
+    m_exportProgress.phase = phase;
+    m_exportProgress.done = done;
+    m_exportProgress.total = total;
+    m_exportProgress.step = step;
+    // where the export is, in the log, so a crash can be traced to the sheet being made
+    LOGI() << "[starscore] " << phase << " " << done + 1 << "/" << total << ": " << step;
+    // the progress window repaints; clicks and keys wait (the export dialog can't be closed meanwhile)
+    QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+}
+
+void StarScoreService::endExportProgress()
+{
+    m_exportProgress = StarScoreExportProgress();
+}
+
 static const Settings::Key SHOW_SECTION_SCORES("project", "starscore/showSectionScores");
 static const Settings::Key SHOW_PERCUSSION_SCORE("project", "starscore/showPercussionScore");
 

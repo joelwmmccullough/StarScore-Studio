@@ -157,7 +157,10 @@ RetVal<QString> StarScoreService::exportAudioDemos()
 
     QStringList written;
     QStringList failed;
+    int demoNumber = 0;
     for (const Demo& demo : demos) {
+        reportExportProgress(muse::qtrc("starscore", "Audio demos"), demoNumber++, int(demos.size()),
+                             plan.val.code + " - " + demo.name + " Demo.wav");
         // the arrangement's own score: exactly its instruments, all shown (the main score may have sections hidden)
         INotationPtr n;
         for (const IExcerptNotationPtr& e : master->excerpts()) {

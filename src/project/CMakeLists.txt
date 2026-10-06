@@ -112,6 +112,7 @@ target_sources(project PRIVATE
     internal/starscore/starscoreimport.cpp
     internal/starscore/starscoremixer.cpp
     internal/starscore/starscoredemos.cpp
+    internal/starscore/starscoreupdate.cpp
     internal/starscore/starscorepdf.cpp
     internal/starscore/starscorepdf.h
     internal/starscore/starscoreengraving.h

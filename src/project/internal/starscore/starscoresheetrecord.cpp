@@ -126,6 +126,50 @@ void mu::project::starscore::forgetExportedPdfs()
     exportedPdfs().clear();
 }
 
+StarScoreStatus StarScoreService::exportedSheetStatus(const Data& data, const StarScoreBandFile& f)
+{
+    // a part's status: its own tag; untagged, the status of a section set by hand that holds it; else none
+    auto partStatus = [&](const QString& pid) {
+        auto it = data.partStatus.find(pid);
+        if (it != data.partStatus.end()) {
+            return statusFromKey(it->second);
+        }
+        bool found = false;
+        StarScoreStatus s = StarScoreStatus::Finished;
+        for (const StarScoreSection& sec : data.sections) {
+            if (!sec.autoStatus && sec.partIds.contains(pid)) {
+                s = found ? std::min(s, sec.status) : sec.status;
+                found = true;
+            }
+        }
+        return found ? s : StarScoreStatus::Empty;
+    };
+    // a sheet's status: the least finished of the parts on it
+    StarScoreStatus s = StarScoreStatus::Finished;
+    for (const QString& pid : f.partIds) {
+        s = std::min(s, partStatus(pid));
+    }
+    // the Big Band / Marching Band / Orchestra full score: also its own status
+    if (f.isScore) {
+        const QString folder = f.relativePath.section('/', 0, -2);
+        const QString tpl = folder == "Big Band" ? "big-band" : folder == "Marching Band" ? "marching-band"
+                            : folder == "Full Orchestra" ? "orchestra" : QString();
+        if (!tpl.isEmpty()) {
+            bool found = false;
+            for (const StarScoreArrangement& a : data.arrangements) {
+                if (a.templateKey == tpl) {
+                    s = std::min(s, ownScoreStatus(data, a));
+                    found = true;
+                }
+            }
+            if (!found) {
+                s = StarScoreStatus::Empty;
+            }
+        }
+    }
+    return f.partIds.isEmpty() ? StarScoreStatus::Empty : s;
+}
+
 void StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, const Data& data, const StarScoreBandExportPlan& full,
                                         const QStringList& onDisk) const
 {
@@ -143,48 +187,7 @@ void StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, const 
         }
     }
 
-    // --- a part's status: its own tag; untagged, the status of a section set by hand that holds it; else none
-    auto partStatus = [&](const QString& pid) {
-        auto it = data.partStatus.find(pid);
-        if (it != data.partStatus.end()) {
-            return statusFromKey(it->second);
-        }
-        bool found = false;
-        StarScoreStatus s = StarScoreStatus::Finished;
-        for (const StarScoreSection& sec : data.sections) {
-            if (!sec.autoStatus && sec.partIds.contains(pid)) {
-                s = found ? std::min(s, sec.status) : sec.status;
-                found = true;
-            }
-        }
-        return found ? s : StarScoreStatus::Empty;
-    };
-    // a sheet's status: the least finished of the parts on it
-    auto sheetStatus = [&](const StarScoreBandFile& f) {
-        StarScoreStatus s = StarScoreStatus::Finished;
-        for (const QString& pid : f.partIds) {
-            s = std::min(s, partStatus(pid));
-        }
-        // the Big Band / Marching Band / Orchestra full score: also its own status
-        if (f.isScore) {
-            const QString folder = f.relativePath.section('/', 0, -2);
-            const QString tpl = folder == "Big Band" ? "big-band" : folder == "Marching Band" ? "marching-band"
-                                : folder == "Full Orchestra" ? "orchestra" : QString();
-            if (!tpl.isEmpty()) {
-                bool found = false;
-                for (const StarScoreArrangement& a : data.arrangements) {
-                    if (a.templateKey == tpl) {
-                        s = std::min(s, ownScoreStatus(data, a));
-                        found = true;
-                    }
-                }
-                if (!found) {
-                    s = StarScoreStatus::Empty;
-                }
-            }
-        }
-        return f.partIds.isEmpty() ? StarScoreStatus::Empty : s;
-    };
+    auto sheetStatus = [&](const StarScoreBandFile& f) { return exportedSheetStatus(data, f); };
 
     // --- the sheets on disk after this export (written now, or the same as before and left alone)
     QJsonObject sheets = record.value("sheets").toObject();
@@ -537,6 +540,12 @@ void StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, const 
     record["songRoot"] = full.songFolder;
     record["title"] = full.title;
     record["scoreVersion"] = data.version;
+    // what made these sheets (1.18.18): "Update all sheets" re-exports a song whose sheets were made before the sheet
+    // format last changed
+    record["sheetFormat"] = STARSCORE_SHEET_FORMAT;
+#ifdef STARSCORE_VERSION_STR
+    record["exportedWith"] = QString::fromUtf8(STARSCORE_VERSION_STR);
+#endif
     record["updated"] = QDateTime::currentDateTime().toString(Qt::ISODate);
     record["sheets"] = sheets;
     record["tiers"] = tiers;

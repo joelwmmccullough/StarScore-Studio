@@ -131,6 +131,12 @@ Rectangle {
                         onClicked: dash.runAction("starscore-organize")
                     }
                     FlatButton {
+                        text: qsTrc("starscore", "Update all sheets")
+                        toolTipTitle: qsTrc("starscore", "Update all sheets")
+                        toolTipDescription: qsTrc("starscore", "After a StarScore update that changes how sheets are made: makes every song's Finished sheets again and writes the ones that change, with their version raised")
+                        onClicked: dash.openUpdateAllSheets()
+                    }
+                    FlatButton {
                         text: qsTrc("starscore", "Rebuild everything")
                         toolTipTitle: qsTrc("starscore", "Rebuild everything")
                         toolTipDescription: qsTrc("starscore", "Rebuilds every generated PDF in both folders")

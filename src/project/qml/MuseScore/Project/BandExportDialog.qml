@@ -240,12 +240,46 @@ StyledDialogView {
             text: root.done ? exportModel.result : exportModel.notes
         }
 
-        StyledTextLabel {
+        // what the export is doing, live (Joel, 6 Oct 2026): the export lets this window repaint between its steps
+        ColumnLayout {
             Layout.fillWidth: true
             visible: root.busy
-            horizontalAlignment: Text.AlignLeft
-            font: ui.theme.bodyBoldFont
-            text: qsTrc("starscore", "Exporting… Leave this window open until the export is done.")
+            spacing: 6
+
+            property var progress: ({ "running": false, "phase": "", "done": 0, "total": 0, "step": "" })
+
+            Timer {
+                interval: 150
+                repeat: true
+                running: root.busy
+                triggeredOnStart: true
+                onTriggered: parent.progress = exportModel.progress()
+            }
+
+            StyledTextLabel {
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignLeft
+                font: ui.theme.bodyBoldFont
+                text: parent.progress.running && parent.progress.total > 0
+                      ? qsTrc("starscore", "Exporting %1: %2 of %3").arg(parent.progress.phase)
+                        .arg(parent.progress.done + 1).arg(parent.progress.total)
+                      : qsTrc("starscore", "Exporting… Leave this window open until the export is done.")
+            }
+
+            ProgressBar {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 24
+                from: 0
+                to: Math.max(1, parent.progress.total)
+                value: parent.progress.done
+            }
+
+            StyledTextLabel {
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignLeft
+                elide: Text.ElideMiddle
+                text: parent.progress.step
+            }
         }
 
         CheckBox {

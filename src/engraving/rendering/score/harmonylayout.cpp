@@ -1022,25 +1022,8 @@ void HarmonyLayout::renderActionSet(Harmony* item, Harmony::LayoutData* ldata, c
             muse::draw::Font pFont = chordFont;
             String prefix = u"m";
             if (isDim) {
-                // the diminished circle, as in the chord file's "o" token: StarScore Jost's (U+E040), else Bravura Text's
-                bool found = false;
-                for (const muse::draw::Font& f : ldata->fontList.value()) {
-                    if (f.family().id().toLower().contains(u"starscore jost")) {
-                        pFont = f;
-                        prefix = String(Char(char16_t(0xE040)));
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found) {
-                    for (const muse::draw::Font& f : ldata->fontList.value()) {
-                        if (f.family().id().toLower().contains(u"bravura")) {
-                            pFont = f;
-                            break;
-                        }
-                    }
-                    prefix = String(Char(char16_t(0xE870)));
-                }
+                // the diminished circle, as in the chord file's "o" token: the chord font's own small o (1.18.18)
+                prefix = u"o";
             }
             pFont.setPointSizeF(pFont.pointSizeF() * harmonyCtx.scale);
             TextSegment* m = new TextSegment(prefix, pFont, harmonyCtx.x(), harmonyCtx.y(), harmonyCtx.hAlign);
