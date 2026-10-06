@@ -248,6 +248,9 @@ public:
         // Organizer: each exported sheet's bar signatures at its last export ("sheet path" -> {version, bars, marks}),
         // for bar-by-bar changelog entries; and this song's recordings (a copy of its part of recordings.json)
         QJsonObject exportSignatures;
+        // Each Score's system breaks once systems that fit together were joined (export path -> {key, breaks: end
+        // ticks}); worked out again when the reference part's systems or the song's bars change
+        QJsonObject scoreSystems;
         QJsonObject recordings;
 
         // Audit mode

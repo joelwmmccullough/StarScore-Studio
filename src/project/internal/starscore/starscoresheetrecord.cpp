@@ -367,7 +367,6 @@ void StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, const 
     needRole(red, "drums", "drums");
     needRole(red, "guitar", "guitar");
     needRole(red, "bass", "bass");
-    needRole(red, "keys", "keys");
 
     needLead(orange);
     need3(orange);
@@ -375,7 +374,6 @@ void StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, const 
     needRole(orange, "bass", "bass");
 
     needRole(yellow, "drums", "drums");
-    needRole(yellow, "keys", "keys");
 
     for (const QString& tpl : { QString("1-horn-standard"), QString("2-horn-any"), QString("2-horn-standard"), QString("3-horn-any"),
                                 QString("3-horn-standard"), QString("4-horn-standard") }) {
@@ -419,7 +417,6 @@ void StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, const 
             needRole(t, "drums", "drums");
             needRole(t, "guitar", "guitar");
             needRole(t, "bass", "bass");
-            needRole(t, "keys", "keys");
         }
     };
     for (const QString& tpl : { QString("4-horn-standard"), QString("5-horn-standard"), QString("6-horn-standard"),
@@ -466,19 +463,28 @@ void StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, const 
         setFolder("1 Lead Sheet", lead, {});
     }
     if (!roleParts.empty()) {
-        // with a lead sheet, only guitar and bass must have their own sheets; without one, drums and keys too
+        // Joel, 5 Oct 2026: the Rhythm folder is green once drums, bass and guitar (a drummer who reads the lead sheet:
+        // the lead sheet) and the lead sheet are exported and Finished. The Keys sheet never counts, nor percussion.
         QStringList req, mis;
-        QStringList roles { "guitar", "bass" };
-        if (lead.isEmpty()) {
-            roles << "drums" << "keys";
-        }
-        for (const QString& role : roles) {
-            if (roleFiles[role].isEmpty()) {
+        for (const QString& role : { QString("drums"), QString("guitar"), QString("bass") }) {
+            QStringList files = roleFiles[role];
+            if (roleReadsLead.count(role)) {
+                addUnique(files, lead);
+            }
+            if (files.isEmpty()) {
                 mis << QString("no %1 sheet").arg(role);
             }
-            addUnique(req, roleFiles[role]);
+            addUnique(req, files);
         }
+        if (lead.isEmpty()) {
+            mis << "no lead sheet";
+        }
+        addUnique(req, lead);
         setFolder("1 Rhythm", req, mis);
+        // only these sheets decide its colour (not every PDF in the folder)
+        QJsonObject o = folders.value("1 Rhythm").toObject();
+        o["onlyRequired"] = true;
+        folders["1 Rhythm"] = o;
     }
     for (const StarScoreSection& sec : data.sections) {
         const QString key = sec.templateKey;

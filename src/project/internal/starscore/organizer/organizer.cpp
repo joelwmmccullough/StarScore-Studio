@@ -71,10 +71,11 @@ Since October 2026 StarScore Studio does all of this. It runs after every "Expor
    (6 Inbox/.organizer/sheets/CODE.json, written at every export). Each colour needs everything below it:
    Purple = Big Band and Marching Band charts; Blue = every sheet the songbooks and the 4- to 7-Horn charts need;
    Green = every horn sheet of 1-Horn, 2-Horn Flexible, 2-Horn Standard, 3-Horn Flexible, 3-Horn Standard and
-   4-Horn Standard; Yellow = 3-Horn Section, drums, guitar, bass, keys and lead sheet; Orange = 3-Horn Section,
+   4-Horn Standard; Yellow = 3-Horn Section, drums, guitar, bass and lead sheet; Orange = 3-Horn Section,
    guitar, bass and lead sheet (all Finished); Red = those of Yellow exported at least as Sketch; Gray = less.
-   A song not exported since this started has no colour. Sheet folders: Gray when a sheet they must have is
-   missing, otherwise Green / Yellow / Orange / Red by their least finished file (Gray if a file has no status).
+   The Keys sheet never counts toward a colour. A song not exported since this started has no colour. Sheet
+   folders: Gray when a sheet they must have is missing, otherwise Green / Yellow / Orange / Red by their least
+   finished file (Gray if a file has no status); `1 Rhythm` only by drums, guitar, bass and the lead sheet.
    Each tune folder in Projects and Sheets gets the same colour as its song.
 
 ## Data files here

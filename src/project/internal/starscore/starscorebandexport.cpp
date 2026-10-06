@@ -24,6 +24,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QCryptographicHash>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -1666,6 +1667,125 @@ static void starscoreApplyScoreLayout(const IMasterNotationPtr& m, const StarSco
 //! A Score's repeated sections (start repeat to end repeat; from the top when there is no start repeat) on one page
 //! where they fit: a section running onto the next page gets a page break before it, kept only when the whole
 //! section then fits on its page. Lays the score out in page view after each try. Returns how many breaks were kept.
+//! What a Score's systems depend on besides the reference part: its bars (count, lengths, time signatures) and where
+//! its rehearsal marks are
+static QString starscoreSystemStructureKey(const mu::engraving::Score* sc)
+{
+    QStringList out;
+    for (const mu::engraving::Measure* m = sc->firstMeasure(); m; m = m->nextMeasure()) {
+        QString bar = m->ticks().toString();
+        if (m->timesig() != m->ticks()) {
+            bar += "/" + m->timesig().toString();
+        }
+        for (const mu::engraving::Segment* seg = m->first(mu::engraving::SegmentType::ChordRest); seg;
+             seg = seg->next(mu::engraving::SegmentType::ChordRest)) {
+            for (const mu::engraving::EngravingItem* a : seg->annotations()) {
+                if (a->isRehearsalMark()) {
+                    bar += "R" + QString::number(seg->rtick().ticks());
+                }
+            }
+        }
+        out << bar;
+    }
+    return out.join(",");
+}
+
+//! Whether a rehearsal mark sits at the very start of the bar
+static bool starscoreStartsWithRehearsalMark(const mu::engraving::Measure* m)
+{
+    const mu::engraving::Segment* seg = m->first(mu::engraving::SegmentType::ChordRest);
+    if (!seg || seg->rtick().ticks() != 0) {
+        return false;
+    }
+    for (const mu::engraving::EngravingItem* a : seg->annotations()) {
+        if (a->isRehearsalMark()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+//! The system a bar is laid out on (a multimeasure rest's, for a bar inside one)
+static const mu::engraving::System* starscoreSystemOf(const mu::engraving::Measure* m)
+{
+    const mu::engraving::Measure* shown = m ? m->coveringMMRestOrThis() : nullptr;
+    return shown ? shown->system() : nullptr;
+}
+
+//! Joel, 5 Oct 2026: a system break between two systems is taken out when both systems then fit on one system,
+//! whole: a system of 3 and one of 2 become one of 5, but never a 4 and a 1 (then the break goes back). Repeated, so
+//! 4 + 4 can become 8, then take the next system too. A system that starts with a rehearsal mark is never joined to
+//! the one before it. Page view, laid out after each try. Returns the end ticks of the bars left with system breaks.
+static std::vector<int> starscoreJoinSystems(const INotationPtr& n)
+{
+    mu::engraving::Score* sc = n && n->elements() ? n->elements()->msScore() : nullptr;
+    std::vector<int> ends;
+    if (!sc) {
+        return ends;
+    }
+    if (n->painting()->viewMode() != ViewMode::PAGE) {
+        n->painting()->setViewMode(ViewMode::PAGE);
+    }
+    sc->doLayout();
+    for (mu::engraving::Measure* m = sc->firstMeasure(); m && m->nextMeasure(); m = m->nextMeasure()) {
+        if (!m->lineBreak() || m->pageBreak()) {
+            continue;
+        }
+        mu::engraving::Measure* next = m->nextMeasure();
+        if (starscoreStartsWithRehearsalMark(next)) {
+            continue;
+        }
+        // the two systems: from the first bar of this one to the bar ending the next one
+        const mu::engraving::System* sys = starscoreSystemOf(m);
+        mu::engraving::Measure* first = sys ? sys->firstMeasure() : nullptr;
+        if (first && first->isMMRest()) {
+            first = first->mmRestFirst();
+        }
+        mu::engraving::Measure* last = next;
+        while (last->nextMeasure() && !last->lineBreak() && !last->pageBreak()) {
+            last = last->nextMeasure();
+        }
+        if (!first) {
+            continue;
+        }
+        n->undoStack()->prepareChanges(TranslatableString::untranslatable("Join systems"));
+        m->undoSetBreak(false, mu::engraving::LayoutBreakType::LINE);
+        n->undoStack()->commitChanges();
+        sc->doLayout();
+        if (starscoreSystemOf(first) && starscoreSystemOf(first) == starscoreSystemOf(last)) {
+            continue;   // joined; the next break tries to join the next system onto this one
+        }
+        n->undoStack()->prepareChanges(TranslatableString::untranslatable("Join systems"));
+        m->undoSetBreak(true, mu::engraving::LayoutBreakType::LINE);
+        n->undoStack()->commitChanges();
+        sc->doLayout();
+    }
+    for (const mu::engraving::Measure* m = sc->firstMeasure(); m; m = m->nextMeasure()) {
+        if (m->lineBreak()) {
+            ends.push_back(m->endTick().ticks());
+        }
+    }
+    return ends;
+}
+
+//! The system breaks worked out before (starscoreJoinSystems), put back: a line break exactly at those bars
+static void starscoreSetSystemBreaks(const INotationPtr& n, const std::vector<int>& ends)
+{
+    mu::engraving::Score* sc = n && n->elements() ? n->elements()->msScore() : nullptr;
+    if (!sc) {
+        return;
+    }
+    const std::set<int> want(ends.begin(), ends.end());
+    n->undoStack()->prepareChanges(TranslatableString::untranslatable("System breaks"));
+    for (mu::engraving::Measure* m = sc->firstMeasure(); m; m = m->nextMeasure()) {
+        const bool on = want.count(m->endTick().ticks()) > 0;
+        if (on != m->lineBreak()) {
+            m->undoSetBreak(on, mu::engraving::LayoutBreakType::LINE);
+        }
+    }
+    n->undoStack()->commitChanges();
+}
+
 static int starscoreKeepRepeatsOnOnePage(const INotationPtr& n)
 {
     mu::engraving::Score* score = n && n->elements() ? n->elements()->msScore() : nullptr;
@@ -2195,6 +2315,8 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
             return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "couldn't make the score copy"));
         }
         engraving::MasterScore* cs = p->masterNotation()->masterScore();
+        std::set<int> refSystemEnds;   // the reference part's systems, when the Score takes its systems from a part
+        QString refPartName;
         if (layout.valid) {
             starscoreApplyScoreLayout(p->masterNotation(), layout);
 
@@ -2310,6 +2432,8 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                             m->undoSetBreak(true, engraving::LayoutBreakType::LINE);
                         }
                     }
+                    refSystemEnds = systemEnds;
+                    refPartName = fs->name().toQString();
                 }
                 p->masterNotation()->notation()->undoStack()->commitChanges();
             }
@@ -2385,6 +2509,39 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
             n->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
             starscoreRetitleTexts(cs, QString(), file.sheetRight);
             n->undoStack()->commitChanges();
+            // Systems taken from a part: two systems become one where both fit on it whole (Joel, 5 Oct 2026). Worked
+            // out once and kept in the song until the part's systems or the song's bars change.
+            if (!refSystemEnds.empty()) {
+                QStringList keyParts { refPartName };
+                for (int t : refSystemEnds) {
+                    keyParts << QString::number(t);
+                }
+                for (const engraving::Part* part : cs->parts()) {
+                    if (file.partIds.contains(idText(part))) {
+                        keyParts << idText(part);
+                    }
+                }
+                keyParts << starscoreSystemStructureKey(cs);
+                const QString key = QString::fromLatin1(QCryptographicHash::hash(keyParts.join("|").toUtf8(),
+                                                                                  QCryptographicHash::Md5).toHex());
+                Data stored = loadFrom(ms);
+                const QJsonObject cached = stored.scoreSystems.value(file.relativePath).toObject();
+                if (cached.value("key").toString() == key) {
+                    std::vector<int> ends;
+                    for (const QJsonValue& v : cached.value("breaks").toArray()) {
+                        ends.push_back(v.toInt());
+                    }
+                    starscoreSetSystemBreaks(n, ends);
+                } else {
+                    const std::vector<int> ends = starscoreJoinSystems(n);
+                    QJsonArray arr;
+                    for (int t : ends) {
+                        arr.append(t);
+                    }
+                    stored.scoreSystems[file.relativePath] = QJsonObject { { "key", key }, { "breaks", arr } };
+                    storeTo(ms, stored, project);
+                }
+            }
             starscoreKeepRepeatsOnOnePage(n);
         }
         // The composer credit at its house position (last line on the subtitle's baseline), measured in page

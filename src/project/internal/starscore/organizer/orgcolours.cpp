@@ -174,7 +174,18 @@ SongColours songColours(const Paths& paths, const QString& songRoot, const QJson
                                                    QRegularExpression::CaseInsensitiveOption);
         int least = 4;
         int counted = 0;
-        const QStringList files = QDir(abs).entryList({ "*.pdf", "*.PDF" }, QDir::Files, QDir::Name);
+        // a folder whose colour only its required sheets decide (1 Rhythm: drums, bass, guitar and the lead sheet)
+        const bool onlyRequired = o.value("onlyRequired").toBool();
+        if (onlyRequired) {
+            for (const QString& rel : strings(o.value("required"))) {
+                if (check.exists(rel)) {
+                    least = std::min(least, check.status(rel));
+                    ++counted;
+                }
+            }
+        }
+        const QStringList files = onlyRequired ? QStringList()
+                                  : QDir(abs).entryList({ "*.pdf", "*.PDF" }, QDir::Files, QDir::Name);
         for (const QString& f : files) {
             if (!f.startsWith('.') && !percussion.match(f).hasMatch()) {
                 const int st = check.status(folder + "/" + f);
@@ -183,7 +194,7 @@ SongColours songColours(const Paths& paths, const QString& songRoot, const QJson
             }
         }
         // sheets it needs in a subfolder (the 7-Horn bass horns) count too
-        for (const QString& rel : strings(o.value("required"))) {
+        for (const QString& rel : onlyRequired ? QStringList() : strings(o.value("required"))) {
             if (rel.section('/', 0, -2) != folder && check.exists(rel)) {
                 least = std::min(least, check.status(rel));
                 ++counted;

@@ -395,6 +395,7 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
         data.decoRestore[it.key()] = fonts;
     }
     data.exportSignatures = root.value("exportSignatures").toObject();
+    data.scoreSystems = root.value("scoreSystems").toObject();
     data.recordings = root.value("recordings").toObject();
     const QJsonObject partStatus = root.value("partStatus").toObject();
     for (auto it = partStatus.begin(); it != partStatus.end(); ++it) {
@@ -543,6 +544,9 @@ QString StarScoreService::toJson(const Data& data)
     }
     if (!data.exportSignatures.isEmpty()) {
         root["exportSignatures"] = data.exportSignatures;
+    }
+    if (!data.scoreSystems.isEmpty()) {
+        root["scoreSystems"] = data.scoreSystems;
     }
     if (!data.recordings.isEmpty()) {
         root["recordings"] = data.recordings;
