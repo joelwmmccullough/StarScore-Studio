@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.11
+
+- **1-Horn Trombone in tenor clef too.** The 1-Horn export now also writes "1H/CODE - Trombone (Tenor Clef).pdf" next to the bass-clef Trombone sheet, made from the same part, like the Flexible trombone sheets.
+
 ## 1.18.10
 
 - **Scores join systems that fit together.** When a section Score takes its systems from the part with the most system breaks, StarScore then tries taking out each system break. The break stays out only when both systems fit whole on one system: a 3-bar and a 2-bar system become one of 5, two 4-bar systems one of 8 (then it tries adding the next system), but never 4 + 1, 5 + 3, 6 + 2 or 7 + 1. A system that starts with a rehearsal mark is never joined to the one before it. The result is kept in the song and used again at the next export, until the reference part's systems, the song's bars or its rehearsal marks change.

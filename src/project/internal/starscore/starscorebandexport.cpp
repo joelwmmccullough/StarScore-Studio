@@ -741,6 +741,17 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
                 addFile("1H", name, { pid }, false);
                 plan.files.back().sheetLeft = starscoreSheetHornName(name);
                 plan.files.back().sheetRight = QString("1-Horn Arrangement");
+                // the Trombone sheet in tenor clef too (Joel, 5 Oct 2026), as the Flexible trombone sheets
+                if (name == "Trombone") {
+                    addFile("1H", "Trombone (Tenor Clef)", { pid }, false);
+                    StarScoreBandFile& f = plan.files.back();
+                    f.sheetLeft = starscoreSheetHornName(name);
+                    f.sheetRight = QString("1-Horn Arrangement");
+                    f.isVersion = true;
+                    f.transposeDiatonic = 0;
+                    f.transposeChromatic = 0;
+                    f.clef = 3;
+                }
             }
             continue;
         }
