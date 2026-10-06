@@ -62,6 +62,7 @@
 #include "engraving/dom/instrument.h"
 #include "engraving/dom/staff.h"
 #include "engraving/dom/text.h"
+#include "engraving/dom/stafftext.h"
 #include "engraving/dom/box.h"
 #include "engraving/dom/measurebase.h"
 #include "engraving/dom/measure.h"
@@ -417,6 +418,24 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         master->notation()->undoStack()->commitChanges();
         master->notation()->notationChanged().notify();
         autotestLog(QString("  %1 notes in %2 bars").arg(notes).arg(bar));
+    } else if (step.startsWith("addtext:")) {
+        // a staff text on a part's first bar: addtext:<part name>|<text>
+        const QString partName = step.mid(8).section('|', 0, 0);
+        const QString text = step.section('|', 1);
+        for (engraving::Part* p : ms->parts()) {
+            engraving::Segment* s0 = ms->firstMeasure() ? ms->firstMeasure()->first(engraving::SegmentType::ChordRest) : nullptr;
+            if (p->partName().toQString() != partName || !s0) {
+                continue;
+            }
+            master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Autotest text"));
+            engraving::StaffText* st = engraving::Factory::createStaffText(s0);
+            st->setTrack(p->startTrack());
+            st->setXmlText(String(text));
+            st->setParent(s0);
+            ms->undoAddElement(st);
+            master->notation()->undoStack()->commitChanges();
+            autotestLog(QString("  added '%1' to %2").arg(text, partName));
+        }
     } else if (step == "parts") {
         for (const engraving::Part* p : ms->parts()) {
             autotestLog(QString("  %1 (%2)").arg(p->partName().toQString(), p->instrumentId().toQString()));

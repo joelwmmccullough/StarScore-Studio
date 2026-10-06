@@ -865,6 +865,19 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
                 addFile(bassHorns.count(pid) ? folder + "/" + STARSCORE_BASS_HORNS_FOLDER : folder, name, { pid }, false);
                 plan.files.back().sheetLeft = starscoreSheetHornName(name);
                 plan.files.back().sheetRight = QString("%1-Horn Arrangement").arg(players);
+                // 4- to 7-Horn trombones in tenor clef too (Joel, 6 Oct 2026), as the 1-Horn and Flexible ones; not the
+                // bass trombone, which reads bass clef
+                if (horn == "Trombone" && players >= 4 && players <= 7) {
+                    const QString tenor = name + " (Tenor Clef)";
+                    addFile(bassHorns.count(pid) ? folder + "/" + STARSCORE_BASS_HORNS_FOLDER : folder, tenor, { pid }, false);
+                    StarScoreBandFile& f = plan.files.back();
+                    f.sheetLeft = starscoreSheetHornName(name);
+                    f.sheetRight = QString("%1-Horn Arrangement").arg(players);
+                    f.isVersion = true;
+                    f.transposeDiatonic = 0;
+                    f.transposeChromatic = 0;
+                    f.clef = 3;
+                }
             }
             continue;
         }
@@ -2376,6 +2389,11 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         // The edits are kept, never undone: an edit undone after a layout could leave stray bars in the score (Balkan
         // Wedding gained two empty bars).
         book->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
+        // the 1-Horn saxophones, made from the Trumpet: no mute or open markings (Joel, 6 Oct 2026)
+        static const QRegularExpression oneHornSax("(^|/)1H/.*Saxophone");
+        if (oneHornSax.match(file.relativePath).hasMatch()) {
+            starscore::hideMuteMarkings(book->elements()->msScore());
+        }
         const Ret ret = starscorePrintSheet(writer, book, file.sheetLeft, file.sheetRight, true, pdf);
         book->undoStack()->commitChanges();
         touchedBooks.push_back(book);

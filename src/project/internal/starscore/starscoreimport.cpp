@@ -1379,11 +1379,15 @@ RetVal<QStringList> StarScoreService::createLowAlternates(const QString& section
     mainPart = ms->partById(ID(mainPartId));
     const IExcerptNotationPtr mainBook = mainPart ? bookOf(mainPart) : nullptr;
     std::vector<INotationPtr> newBooks;
+    std::set<engraving::Score*> noMutes;   // sheets for an instrument without a mute (the 1-Horn saxophones)
     for (const QString& pid : made.partIds) {
         const engraving::Part* p = ms->partById(ID(pid));
         const IExcerptNotationPtr book = p ? bookOf(p) : nullptr;
         if (book && book->notation()) {
             newBooks.push_back(book->notation());
+            if (!starscore::isBrassSheet(p->partName().toQString())) {
+                noMutes.insert(book->notation()->elements()->msScore());
+            }
         }
     }
     if (mainBook && mainBook->notation()) {
@@ -1410,6 +1414,10 @@ RetVal<QStringList> StarScoreService::createLowAlternates(const QString& section
             for (engraving::Score* t : targets) {
                 starscore::copyTextPositions(src, t);
                 starscore::copyMeasureWidths(src, t);
+                // after the text positions, which copy the trumpet's shown mute and open markings too (Joel, 6 Oct 2026)
+                if (noMutes.count(t)) {
+                    starscore::hideMuteMarkings(t);
+                }
             }
             master->notation()->undoStack()->commitChanges();
         }

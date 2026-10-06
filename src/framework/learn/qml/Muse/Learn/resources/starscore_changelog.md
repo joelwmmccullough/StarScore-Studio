@@ -4,6 +4,11 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.15
+
+- **4- to 7-Horn trombones in tenor clef too.** Every Trombone sheet in a 4-, 5-, 6- or 7-Horn arrangement is now also exported as "CODE - Trombone (Tenor Clef).pdf" next to the bass-clef sheet, like the 1-Horn and Flexible trombones. The Bass Trombone stays in bass clef only. Big Band, Orchestra and Marching Band sheets don't change.
+- **No mute or open markings on the 1-Horn saxophones.** When the E♭ and B♭ Saxophone sheets are made from the Trumpet, its mute and open markings are hidden on them, and the 1-Horn saxophone sheets made before this are cleaned at export. The 1-Horn Trombone keeps them.
+
 ## 1.18.14
 
 - **Finished songs leave the Home to-do list.** For songs converted from older files (The Courier, Amplitudes and the rest of the audit list), an arrangement now counts as done once it's Finished by the same rule as everywhere else. Before, every sheet in it had to be Finished itself, including a Keys or percussion part tagged Empty, which only reads the lead sheet. So The Courier stayed on the list with every arrangement Finished. Sheets audited one by one still count as before.
