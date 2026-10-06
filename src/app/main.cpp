@@ -48,8 +48,11 @@
 //! StarScore (Joel, 6 Oct 2026): a crash leaves a report with the call stack in ~/StarScore Studio/Logs
 //! (crash-<date>-<pid>.txt) when that folder is there, and on stderr, and then the default handler runs so macOS writes
 //! its own crash report too (exiting here used to stop it). Only async-signal-safe calls in the handler.
+#if defined(Q_OS_MACOS) || defined(Q_OS_LINUX)
 static char s_crashDir[1024] = { 0 };
+#endif
 
+#if defined(Q_OS_MACOS) || defined(Q_OS_LINUX)
 static void crashWrite(int fd, const char* text)
 {
     if (fd >= 0 && text) {
@@ -57,6 +60,7 @@ static void crashWrite(int fd, const char* text)
         (void)ignored;
     }
 }
+#endif
 
 static void crashCallback(int signum)
 {
@@ -102,6 +106,7 @@ static void crashCallback(int signum)
         close(fd);
     }
 #endif
+    (void)signame;
     // and the system's own handling (macOS writes a crash report with the stack, symbols and threads)
     signal(signum, SIG_DFL);
     raise(signum);

@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.17
+
+- **Windows build fixed.** 1.18.16's new crash report used a Mac and Linux function, so the Windows version didn't build. Mac and Linux are unchanged.
+
 ## 1.18.16
 
 - **"Flexible horns" menu in the status bar**, next to Concert pitch, shown when the score has a Flexible section. It sets how the Flexible 2- and 3-Horn chairs look while you write, in every score, and is remembered on this computer: Reference instruments (B♭ Trumpet, (Alto Sax), Tenor Sax; the default), Range-optimized clefs (treble, soprano, alto), Standard clefs (treble, bass), Treble clefs (the bottom horn in treble clef an octave down), Bass clefs (the upper horns in bass clef an octave up), B♭ instruments (B♭ Trumpet, Tenor Sax) and E♭ instruments (Alto Sax or E♭ Trumpet, whichever keeps more notes in range, and Bari Sax). The chairs' ranges and the exported sheets don't change. It replaces the section menu's "Show the chairs".
