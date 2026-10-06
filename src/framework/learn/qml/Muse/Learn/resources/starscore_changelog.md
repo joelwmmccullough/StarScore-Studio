@@ -4,6 +4,15 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.13
+
+- **The 1-Horn sheets made from the Trumpet start as Needs review** (the E♭ Saxophone, B♭ Saxophone and Trombone), instead of Finished like the Trumpet.
+- **A new 3- to 7-Horn section or arrangement suggests the doubler's instrument from the song.** If the song already has a 3- to 7-Horn section where the woodwind doubler plays something other than his usual chair (flute, clarinet, bass clarinet, piccolo…), that instrument is the recommended one and is picked to start with. Otherwise the defaults stay: alto sax in 3–5-Horn, soprano sax in 6–7-Horn.
+- **Bar numbers on Scores no longer touch the bracket's top hook.** After the Score is laid out, StarScore measures each bar number at the start of a system against the hook and raises the bar numbers until there's a gap. Checked on every section Score of The Courier, Bumper Cars and Top Hat, and on test Big Band, Orchestra and Marching Band scores.
+- **Big scores fit their pages.** When a Score's systems are taller than the page (a full orchestra or marching band), StarScore shrinks the staff size step by step until every system fits, instead of leaving page 1 blank and running systems off the bottom.
+- **No leftover brackets on Scores.** Old brackets in the song's third bracket column stayed next to the new ones: a second brace on the Big Band piano and the Marching Band marimba, and a thin extra bracket over Horns 1–2 on the 3-Horn Flexible Scores (Bumper Cars, Top Hat).
+- **Export crash fixed.** Closing or pressing Escape on the Export Sheets and Demos window while it was still exporting (audio demos take a while) crashed StarScore. The window now stays open and can't be closed until the export is done.
+
 ## 1.18.12
 
 - **1-Horn starts with the Trumpet only.** A new 1-Horn arrangement has just the Trumpet sheet. When the Trumpet is marked Finished, StarScore makes the other three sheets from it without asking: the same music, the part score's style, system and page breaks, system locks, bar widths and text positions (hidden texts stay hidden), marked Finished like the Trumpet. The B♭ Saxophone and the Trombone are an octave lower; the E♭ Saxophone plays the Trumpet's pitches. They're made again if one is deleted and the Trumpet is marked Finished again. Changing the Trumpet afterwards doesn't change them.

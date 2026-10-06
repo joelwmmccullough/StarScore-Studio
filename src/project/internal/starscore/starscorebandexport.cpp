@@ -42,6 +42,8 @@
 #include "engraving/dom/clef.h"
 #include "engraving/editing/editsystemlocks.h"
 #include "engraving/dom/page.h"
+#include "engraving/dom/bracket.h"
+#include "engraving/dom/measurenumber.h"
 #include "engraving/dom/system.h"
 #include "engraving/dom/box.h"
 #include "engraving/dom/text.h"
@@ -1648,8 +1650,10 @@ static void starscoreApplyScoreLayout(const IMasterNotationPtr& m, const StarSco
     m->parts()->setParts(list, order);
 
     // brackets
+    // every column: bracketLevels() is the highest column used, not a count (1.18.13: a big band's sub-brackets and
+    // the piano's second brace in column 2 survived, and printed beside the new ones)
     for (Staff* st : cs->staves()) {
-        for (size_t c = 0; c < st->bracketLevels(); ++c) {
+        for (size_t c = st->bracketLevels() + 1; c-- > 0;) {
             st->setBracketType(c, BracketType::NO_BRACKET);
         }
     }
@@ -1817,6 +1821,127 @@ static void starscoreSetSystemBreaks(const INotationPtr& n, const std::vector<in
         }
     }
     n->undoStack()->commitChanges();
+}
+
+//! A Score whose systems don't fit on the page (an orchestra's 28 staves ran off the bottom, and the first page held
+//! only the title): the staff size made smaller, a tenth at a time, until every system fits on its page and the first
+//! page has music under the title, down to half the size at most. Page view, laid out after each step.
+static void starscoreFitSystemsOnPages(const INotationPtr& n)
+{
+    mu::engraving::Score* sc = n && n->elements() ? n->elements()->msScore() : nullptr;
+    if (!sc) {
+        return;
+    }
+    if (n->painting()->viewMode() != ViewMode::PAGE) {
+        n->painting()->setViewMode(ViewMode::PAGE);
+    }
+    sc->doLayout();
+    const double start = sc->style().styleD(mu::engraving::Sid::spatium);
+    for (int step = 0; step < 8; ++step) {
+        bool fits = true;
+        const std::vector<mu::engraving::Page*>& pages = sc->pages();
+        for (const mu::engraving::Page* page : pages) {
+            const double limit = page->height() - page->bm() + 1.0;
+            for (const mu::engraving::System* sys : page->systems()) {
+                if (!sys->vbox() && sys->pageBoundingRect().bottom() > limit) {
+                    fits = false;
+                }
+            }
+        }
+        if (pages.size() > 1) {
+            const auto& first = pages.front()->systems();
+            fits &= std::any_of(first.begin(), first.end(), [](const mu::engraving::System* sys) { return !sys->vbox(); });
+        }
+        const double now = sc->style().styleD(mu::engraving::Sid::spatium);
+        if (fits || now * 0.9 < start * 0.5) {
+            return;
+        }
+        n->undoStack()->prepareChanges(TranslatableString::untranslatable("Staff size"));
+        sc->undoChangeStyleVal(mu::engraving::Sid::spatium, now * 0.9);
+        n->undoStack()->commitChanges();
+        sc->doLayout();
+    }
+}
+
+//! A bar number at the start of a system kept clear of the bracket's top hook (Joel, 5 Oct 2026): measured on the
+//! laid-out page, each number that touches a hook (with a quarter space to spare) is raised just enough. Petaluma's
+//! hook is 1.48 spaces tall, so the house raise of 1 space still left Bumper Cars' and The Courier's numbers on it.
+//! Page view, laid out first. Returns how many numbers moved.
+static int starscoreClearBarNumbersOfBrackets(const INotationPtr& n)
+{
+    mu::engraving::Score* sc = n && n->elements() ? n->elements()->msScore() : nullptr;
+    if (!sc) {
+        return 0;
+    }
+    if (n->painting()->viewMode() != ViewMode::PAGE) {
+        n->painting()->setViewMode(ViewMode::PAGE);
+    }
+    sc->doLayout();
+    const double gap = 0.25 * sc->style().spatium();
+    // how far the bar number that sits lowest onto a bracket's hook has to go up (0: none touches)
+    auto mostNeeded = [&](int* touching) {
+        double most = 0.0;
+        int count = 0;
+        for (const mu::engraving::Page* page : sc->pages()) {
+            for (mu::engraving::System* sys : page->systems()) {
+                mu::engraving::Measure* m = sys->firstMeasure();
+                if (!m || sys->brackets().empty()) {
+                    continue;
+                }
+                for (mu::engraving::staff_idx_t si = 0; si < sc->nstaves(); ++si) {
+                    mu::engraving::MeasureNumber* mn = m->measureNumber(si);
+                    if (!mn || !mn->visible() || !mn->ldata()) {
+                        continue;
+                    }
+                    const RectF num = mn->pageBoundingRect();
+                    for (const mu::engraving::Bracket* b : sys->brackets()) {
+                        if (!b || !b->ldata()) {
+                            continue;
+                        }
+                        // the bracket's page box leaves out the hook, which rises from the first staff's top line by
+                        // the music font's bracketTop glyph (1.48 spaces in Petaluma): measured from the glyph itself
+                        RectF br = b->pageBoundingRect();
+                        if (b->bracketType() == mu::engraving::BracketType::NORMAL) {
+                            const RectF hook = b->symBbox(mu::engraving::SymId::bracketTop);
+                            const double top = sys->staffYpage(b->firstStaff()) + hook.top();
+                            br = RectF(br.left(), std::min(br.top(), top), std::max(br.width(), hook.width()),
+                                       br.bottom() - std::min(br.top(), top));
+                        }
+                        const bool across = num.left() < br.right() && num.right() > br.left();
+                        if (across && num.bottom() > br.top() - gap && num.top() < br.bottom()) {
+                            most = std::max(most, num.bottom() - (br.top() - gap));
+                            ++count;
+                        }
+                    }
+                }
+            }
+        }
+        if (touching) {
+            *touching = count;
+        }
+        return most;
+    };
+    // Bar numbers are made again at every layout, so a number's own offset doesn't last: all of them go up, in the
+    // Score's style. A number can sit higher than its style puts it (pushed up by high notes), so raising the style
+    // by what one needs moves it less: measured again and raised again until none touches (a few rounds at most).
+    int first = 0;
+    for (int round = 0; round < 6; ++round) {
+        int touching = 0;
+        const double most = mostNeeded(&touching);
+        if (round == 0) {
+            first = touching;
+        }
+        if (most <= 0.0) {
+            break;
+        }
+        const double sp = sc->style().spatium();
+        const PointF pos = sc->style().styleV(mu::engraving::Sid::measureNumberPosAbove).value<PointF>();
+        n->undoStack()->prepareChanges(TranslatableString::untranslatable("Bar numbers clear of brackets"));
+        sc->undoChangeStyleVal(mu::engraving::Sid::measureNumberPosAbove, PointF(pos.x(), pos.y() - most / sp - 0.05));
+        n->undoStack()->commitChanges();
+        sc->doLayout();
+    }
+    return first;
 }
 
 static int starscoreKeepRepeatsOnOnePage(const INotationPtr& n)
@@ -2536,6 +2661,8 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                 n->undoStack()->commitChanges();
             }
         }
+        // every system on its page: big Scores (orchestra, marching band) at a smaller staff size
+        starscoreFitSystemsOnPages(p->masterNotation()->notation());
         // Repeated sections kept on one page where they fit (titled first: the label can move the composer credit)
         if (layout.valid) {
             INotationPtr n = p->masterNotation()->notation();
@@ -2577,6 +2704,8 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
             }
             starscoreKeepRepeatsOnOnePage(n);
         }
+        // bar numbers clear of the brackets' hooks, measured on the page as it now is
+        starscoreClearBarNumbersOfBrackets(p->masterNotation()->notation());
         // The composer credit at its house position (last line on the subtitle's baseline), measured in page
         // view: the main score's style can carry a credit moved too far (1.15.7's Apply Styles measured it in
         // continuous view and printed Bumper Cars' credit in the music). The arrangement top right, as on the parts.

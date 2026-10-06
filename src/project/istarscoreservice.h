@@ -473,6 +473,10 @@ public:
     //! horn player whose 3-horn chair is the alto sax, else one who lists both Alto Sax and Soprano Sax. "" when the
     //! roster has none or can't be read. Names live in the roster only, never in the program.
     virtual QString rosterDoublerName() const = 0;
+    //! What the woodwind doubler plays in the song's 3- to 7-Horn sections (the first one found, 3-Horn first): the
+    //! instrument the section has beyond its template's. Empty when the song has none of those sections, or the
+    //! doubler plays his chair's own instrument in them (alto in 3-5, soprano in 6-7): the new section's default then.
+    virtual QString songDoublerInstrumentId() const = 0;
 
     // --- sections ---
     //! Add the template's instruments (empty, following the score's bars and structure) as a new section.

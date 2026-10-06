@@ -28,7 +28,7 @@ StyledDialogView {
         id: newModel
     }
 
-    property string doublerId: newModel.defaultDoublerId(root.arrangementKey)
+    property string doublerId: newModel.defaultDoublerId(root.arrangementKey, true)
     property string lowHornId: newModel.lastLowHornId
     // with Ben on Bass Clarinet, the 7th horn can't be a second bass clarinet
     onDoublerIdChanged: {
@@ -52,7 +52,7 @@ StyledDialogView {
         StyledTextLabel { text: qsTrc("starscore", "Woodwind doubler plays"); font: ui.theme.bodyBoldFont }
         StyledDropdown {
             Layout.fillWidth: true
-            model: newModel.doublerChoices(root.arrangementKey)
+            model: newModel.doublerChoices(root.arrangementKey, true)
             currentIndex: indexOfValue(root.doublerId)
             onActivated: function(index, value) { root.doublerId = value }
         }

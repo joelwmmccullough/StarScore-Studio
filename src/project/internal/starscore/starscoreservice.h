@@ -81,6 +81,7 @@ public:
     std::vector<StarScoreHornChoice> doublerChoices() const override;
     std::vector<StarScoreHornChoice> lowHornChoices() const override;
     QString rosterDoublerName() const override;
+    QString songDoublerInstrumentId() const override;
 
     muse::RetVal<QString> createSectionFromTemplate(const QString& templateKey, const QString& doublerInstrumentId = {},
                                                     const QString& lowHornInstrumentId = {}) override;

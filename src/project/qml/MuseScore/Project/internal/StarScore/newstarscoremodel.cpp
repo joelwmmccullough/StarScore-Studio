@@ -109,19 +109,30 @@ bool NewStarScoreModel::hasLowHorn(const QString& arrangementKey) const
     return standardHorns(arrangementKey) == 7;
 }
 
-QString NewStarScoreModel::defaultDoublerId(const QString& arrangementKey) const
+QString NewStarScoreModel::defaultDoublerId(const QString& arrangementKey, bool matchSong) const
 {
+    // Adding to a song: what the doubler already plays in its other 3- to 7-Horn sections (Joel, 5 Oct 2026)
+    const int horns = standardHorns(arrangementKey);
+    if (matchSong && horns >= 3 && horns <= 7) {
+        const QString inSong = starScore()->songDoublerInstrumentId();
+        if (!inSong.isEmpty()) {
+            return inSong;
+        }
+    }
     // 3/4/5-Horn: the doubler is the alto chair; 6/7-Horn: the alto is a player of its own and the doubler the soprano chair
     return standardHorns(arrangementKey) >= 6 ? QString("soprano-saxophone") : QString("alto-saxophone");
 }
 
-QVariantList NewStarScoreModel::doublerChoices(const QString& arrangementKey) const
+QVariantList NewStarScoreModel::doublerChoices(const QString& arrangementKey, bool matchSong) const
 {
     // The doubler's name comes from the band roster at run time (the program never holds band members' names)
     const QString who = starScore()->rosterDoublerName();
     const int horns = standardHorns(arrangementKey);
-    // Alto Sax is recommended for 3/4/5-Horn; 6/7-Horn start on Soprano Sax without calling it recommended
-    const QString recommended = horns >= 3 && horns <= 5 ? QString("alto-saxophone") : QString();
+    // Alto Sax is recommended for 3/4/5-Horn; 6/7-Horn start on Soprano Sax without calling it recommended. Adding to a
+    // song: what the doubler plays in its other 3- to 7-Horn sections is the recommended one, for 3- to 7-Horn alike.
+    const QString inSong = matchSong && horns >= 3 && horns <= 7 ? starScore()->songDoublerInstrumentId() : QString();
+    const QString recommended = !inSong.isEmpty() ? inSong
+                                : horns >= 3 && horns <= 5 ? QString("alto-saxophone") : QString();
     QVariantList list;
     for (const StarScoreHornChoice& c : starScore()->doublerChoices()) {
         QString text = who.isEmpty() ? c.bandName : muse::qtrc("starscore", "%1 on %2").arg(who, c.bandName);

@@ -21,6 +21,17 @@ StyledDialogView {
     margins: 16
 
     property bool done: false
+    // An export runs inside the button's click: writing the audio demos keeps the app responsive meanwhile, so the
+    // window could be closed in the middle, which destroyed it under the running export and crashed StarScore
+    // (Balkan Wedding, 5 Oct 2026). While busy it doesn't close and its controls are off.
+    property bool busy: false
+    closeOnEscape: !root.busy
+
+    onAboutToClose: function(closeEvent) {
+        if (root.busy) {
+            closeEvent.accepted = false
+        }
+    }
     // the sheet list shows once the song has a folder in Sheets and Demos
     readonly property bool listMode: exportModel.errorText === "" && !exportModel.newSong && !root.done
 
@@ -51,6 +62,7 @@ StyledDialogView {
     ColumnLayout {
         anchors.fill: parent
         spacing: 10
+        enabled: !root.busy
 
         StyledTextLabel {
             Layout.fillWidth: true
@@ -228,6 +240,14 @@ StyledDialogView {
             text: root.done ? exportModel.result : exportModel.notes
         }
 
+        StyledTextLabel {
+            Layout.fillWidth: true
+            visible: root.busy
+            horizontalAlignment: Text.AlignLeft
+            font: ui.theme.bodyBoldFont
+            text: qsTrc("starscore", "Exporting… Leave this window open until the export is done.")
+        }
+
         CheckBox {
             visible: root.listMode && !root.done
             text: qsTrc("starscore", "Export Audio Demos")
@@ -280,7 +300,12 @@ StyledDialogView {
                 buttonRole: ButtonBoxModel.ApplyRole
                 buttonId: ButtonBoxModel.CustomButton + 1
                 onClicked: {
+                    if (root.busy) {
+                        return
+                    }
+                    root.busy = true
                     exportModel.exportNow()    // its summary shows through exportModel.result
+                    root.busy = false
                     // cancelled at "Save first?" (or the save failed): the list stays, nothing else happens
                     if (!exportModel.lastExportRan()) {
                         return
@@ -294,7 +319,7 @@ StyledDialogView {
             }
 
             onStandardButtonClicked: function(buttonId) {
-                if (buttonId === ButtonBoxModel.Close) {
+                if (buttonId === ButtonBoxModel.Close && !root.busy) {
                     root.hide()
                 }
             }

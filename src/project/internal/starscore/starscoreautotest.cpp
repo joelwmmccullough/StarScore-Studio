@@ -51,6 +51,10 @@
 
 #include "settings.h"
 #include "engraving/dom/masterscore.h"
+#include "engraving/dom/drumset.h"
+#include "engraving/dom/rehearsalmark.h"
+#include "engraving/dom/dynamic.h"
+#include "engraving/dom/factory.h"
 #include "engraving/rw/xmlreader.h"
 #include "engraving/dom/select.h"
 #include "engraving/dom/excerpt.h"
@@ -331,6 +335,88 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             master->notation()->undoStack()->commitChanges();
             autotestLog("  copied " + from + " to " + to);
         }
+    } else if (step == "fillnotes") {
+        // Test content (not music): quarter and eighth notes in each instrument's range on every staff, drum notes on
+        // drum staves, a dynamic every 4 bars on every staff and a rehearsal mark every 8 bars
+        unsigned seed = 7;
+        auto rnd = [&seed](int n) {
+            seed = seed * 1103515245u + 12345u;
+            return int((seed >> 16) % unsigned(std::max(1, n)));
+        };
+        master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Test notes"));
+        int bar = 0;
+        int notes = 0;
+        for (engraving::Measure* m = ms->firstMeasure(); m; m = m->nextMeasure(), ++bar) {
+            for (engraving::Staff* st : ms->staves()) {
+                if (st->isTabStaff(m->tick())) {
+                    continue;
+                }
+                const engraving::Part* p = st->part();
+                const engraving::Instrument* in = p->instrument(m->tick());
+                const engraving::track_idx_t track = st->idx() * engraving::VOICES;
+                int lo = in->minPitchA();
+                int hi = in->maxPitchA();
+                if (hi <= lo || hi - lo > 40) {
+                    lo = 55;
+                    hi = 79;
+                }
+                if (p->nstaves() > 1) {   // a grand staff: right hand high, left hand low
+                    lo = st->rstaff() == 0 ? 60 : 36;
+                    hi = st->rstaff() == 0 ? 84 : 59;
+                }
+                const engraving::Drumset* ds = in->drumset();
+                engraving::Fraction t = m->tick();
+                const engraving::Fraction end = m->endTick();
+                while (t < end) {
+                    engraving::Fraction d = rnd(3) == 0 ? engraving::Fraction(1, 8) : engraving::Fraction(1, 4);
+                    if (t + d > end) {
+                        d = end - t;
+                    }
+                    engraving::Segment* seg = ms->tick2segment(t, true, engraving::SegmentType::ChordRest);
+                    if (!seg) {
+                        break;
+                    }
+                    int pitch = lo + rnd(hi - lo + 1);
+                    if (ds) {
+                        static const int KIT[] = { 36, 38, 42, 46, 49, 51, 60, 62 };
+                        pitch = -1;
+                        for (int k = 0; k < 16 && pitch < 0; ++k) {
+                            const int c = KIT[rnd(8)];
+                            pitch = ds->isValid(c) ? c : -1;
+                        }
+                        for (int c = 0; c < 128 && pitch < 0; ++c) {
+                            pitch = ds->isValid(c) ? c : -1;
+                        }
+                    }
+                    if (pitch >= 0) {
+                        ms->setNoteRest(seg, track, engraving::NoteVal(pitch), d);
+                        ++notes;
+                    }
+                    t += d;
+                }
+                if (bar % 4 == 0) {
+                    if (engraving::Segment* s0 = m->first(engraving::SegmentType::ChordRest)) {
+                        engraving::Dynamic* dyn = engraving::Factory::createDynamic(s0);
+                        dyn->setDynamicType(bar % 8 == 0 ? engraving::DynamicType::MF : engraving::DynamicType::F);
+                        dyn->setTrack(track);
+                        dyn->setParent(s0);
+                        ms->undoAddElement(dyn);
+                    }
+                }
+            }
+            if (bar % 8 == 0) {
+                if (engraving::Segment* s0 = m->first(engraving::SegmentType::ChordRest)) {
+                    engraving::RehearsalMark* rm = engraving::Factory::createRehearsalMark(s0);
+                    rm->setTrack(0);
+                    rm->setXmlText(String(QString(QChar('A' + bar / 8))));
+                    rm->setParent(s0);
+                    ms->undoAddElement(rm);
+                }
+            }
+        }
+        master->notation()->undoStack()->commitChanges();
+        master->notation()->notationChanged().notify();
+        autotestLog(QString("  %1 notes in %2 bars").arg(notes).arg(bar));
     } else if (step == "parts") {
         for (const engraving::Part* p : ms->parts()) {
             autotestLog(QString("  %1 (%2)").arg(p->partName().toQString(), p->instrumentId().toQString()));

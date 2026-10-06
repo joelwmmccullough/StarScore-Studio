@@ -43,9 +43,10 @@ public:
     //! 7-Horn Standard: the 7th horn is chosen
     Q_INVOKABLE bool hasLowHorn(const QString& arrangementKey) const;
     //! The doubler dropdown for an arrangement: "<Name> on Alto Sax (recommended)" … (the name from the band roster)
-    Q_INVOKABLE QVariantList doublerChoices(const QString& arrangementKey) const;
+    //! matchSong (adding an arrangement to a song): the doubler instrument the song already uses is the recommended one
+    Q_INVOKABLE QVariantList doublerChoices(const QString& arrangementKey, bool matchSong = false) const;
     //! The arrangement's usual doubler instrument: alto sax for 3/4/5-Horn, soprano sax for 6/7-Horn
-    Q_INVOKABLE QString defaultDoublerId(const QString& arrangementKey) const;
+    Q_INVOKABLE QString defaultDoublerId(const QString& arrangementKey, bool matchSong = false) const;
     //! The 7th horn dropdown: Bass Trombone (recommended), then the other low horns
     //! The 7th horn's choices; with the doubler on Bass Clarinet (Ben), no Bass Clarinet: two in the band makes no sense
     Q_INVOKABLE QVariantList lowHornChoices(const QString& doublerInstrumentId = QString()) const;

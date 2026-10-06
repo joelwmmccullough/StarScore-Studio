@@ -647,6 +647,47 @@ static void starscoreSetChairDisplay(mu::engraving::MasterScore* ms, mu::engravi
     }
 }
 
+QString StarScoreService::songDoublerInstrumentId() const
+{
+    engraving::MasterScore* ms = masterScore();
+    if (!ms) {
+        return QString();
+    }
+    const Data d = load();
+    for (int horns = 3; horns <= 7; ++horns) {
+        const QString key = QString("%1-horn").arg(horns);
+        const std::optional<StarScoreSectionTemplate> t = sectionTemplate(key);
+        for (const StarScoreSection& s : d.sections) {
+            if (s.templateKey != key || !t) {
+                continue;
+            }
+            QStringList have;   // the section's instruments, stand-in versions left out
+            for (const QString& pid : s.partIds) {
+                const engraving::Part* p = s.alternates.count(pid) ? nullptr : ms->partById(ID(pid));
+                if (p) {
+                    have << p->instrumentId().toQString();
+                }
+            }
+            if (have.isEmpty()) {
+                continue;
+            }
+            // what's left once the template's own instruments are taken out is the doubler's
+            QStringList left = have;
+            for (const StarScoreInstrument& inst : t->instruments) {
+                left.removeOne(inst.instrumentId);
+            }
+            for (const StarScoreHornChoice& c : doublerChoices()) {
+                if (left.contains(c.instrumentId)) {
+                    return c.instrumentId;
+                }
+            }
+            // nothing left: the doubler plays the template's own chair (alto in 3-5H, soprano in 6-7H), which the
+            // new section's own default already matches
+        }
+    }
+    return QString();
+}
+
 int StarScoreService::setFlexibleWorkingClefs(const StarScoreSection& section)
 {
     IMasterNotationPtr master = globalContext()->currentMasterNotation();
@@ -1077,7 +1118,7 @@ void StarScoreService::offerLowAlternates(const QStringList& partIds, bool asked
             }
             interactive()->info(muse::trc("starscore", "1-Horn sheets made"),
                                 muse::qtrc("starscore", "%1 now have the Trumpet's music, formatting and text positions, "
-                                                        "marked Finished like the Trumpet. The B\u266D Saxophone and the "
+                                                        "marked Needs review. The B\u266D Saxophone and the "
                                                         "Trombone are an octave lower. Notes outside an instrument's range "
                                                         "are colored.").arg(list).toStdString());
         });
@@ -1307,10 +1348,7 @@ RetVal<QStringList> StarScoreService::createLowAlternates(const QString& section
                 s.shownPartIds << pid;
             }
             s.alternates[pid] = mainPartId;
-            // (1-Horn sheets are the Trumpet's music as it was marked: they take its status)
-            auto mainStatus = d.partStatus.find(mainPartId);
-            d.partStatus[pid] = templateKey == "1-horn" && mainStatus != d.partStatus.end()
-                                ? mainStatus->second : statusKey(StarScoreStatus::NeedsReview);
+            d.partStatus[pid] = statusKey(StarScoreStatus::NeedsReview);   // (the 1-Horn sheets too: Joel, 5 Oct 2026)
         }
     }
     d.alternatesInSection = true;

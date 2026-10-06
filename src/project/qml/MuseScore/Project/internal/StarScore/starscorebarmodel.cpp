@@ -7,6 +7,8 @@
 
 #include <set>
 
+#include <QRegularExpression>
+
 #include <QFileInfo>
 #include <QUrl>
 
@@ -790,7 +792,10 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
                 return;
             }
         }
-        RetVal<QString> ret = starScore()->createSectionFromTemplate(arg);
+        // a 3- to 7-Horn Section: the doubler plays what it plays in the song's other horn sections (Joel, 5 Oct 2026)
+        static const QRegularExpression hornKey("^[3-7]-horn$");
+        const QString doubler = hornKey.match(arg).hasMatch() ? starScore()->songDoublerInstrumentId() : QString();
+        RetVal<QString> ret = starScore()->createSectionFromTemplate(arg, doubler);
         if (!ret.ret) {
             interactive()->error(muse::trc("starscore", "Couldn't create the section"), ret.ret.toString());
         }
