@@ -5,6 +5,7 @@
  */
 #include <QSettings>
 #include "starscoreservice.h"
+#include "settings.h"
 #include "starscorehouse.h"
 #include "starscorepdf.h"
 #include "starscoreengraving.h"
@@ -1051,6 +1052,7 @@ void StarScoreService::applyOnSections(const QStringList& onIds, const QString& 
     std::set<QString> managed;
     std::set<QString> shown;
     bool rememberedChanged = false;
+    QStringList turnedOn;   // their part scores open afterwards
 
     for (StarScoreSection& s : data.sections) {
         const bool wasOn = std::any_of(current.begin(), current.end(), [&](const StarScoreSection& c) {
@@ -1070,6 +1072,7 @@ void StarScoreService::applyOnSections(const QStringList& onIds, const QString& 
                 }
             }
         } else if (wantOn) {
+            turnedOn << s.id;
             // turning on: bring back the instruments that were showing when it was turned off
             // (a remembered list with none of the section's own instruments is from an old mix-up: show everything)
             std::map<QString, int> uses;
@@ -1142,15 +1145,137 @@ void StarScoreService::applyOnSections(const QStringList& onIds, const QString& 
     for (const muse::ID& sid : unhideStaves) {
         master->parts()->setStaffVisible(sid, true);
     }
-    if (changes.empty()) {
-        if (!unhideStaves.empty()) {
-            scheduleChanged();
-        }
+    if (!changes.empty()) {
+        master->parts()->setPartsVisible(changes, TranslatableString::untranslatable(String::fromQString(actionName)));
+    }
+    if (!changes.empty() || !unhideStaves.empty()) {
+        scheduleChanged();
+    }
+    syncSectionTabs(turnedOn);
+}
+
+// ---------------------------------------------------------------------------
+//  Part score tabs (Joel, 6 Oct 2026: the Parts window is gone, so showing a section opens its part scores)
+// ---------------------------------------------------------------------------
+
+static const Settings::Key SHOW_SECTION_SCORES("project", "starscore/showSectionScores");
+static const Settings::Key SHOW_PERCUSSION_SCORE("project", "starscore/showPercussionScore");
+
+bool StarScoreService::percussionScoreShown() const
+{
+    settings()->setDefaultValue(SHOW_PERCUSSION_SCORE, Val(false));
+    return settings()->value(SHOW_PERCUSSION_SCORE).toBool();
+}
+
+void StarScoreService::setPercussionScoreShown(bool shown)
+{
+    settings()->setSharedValue(SHOW_PERCUSSION_SCORE, Val(shown));
+    syncSectionTabs({});
+    scheduleChanged();
+}
+
+bool StarScoreService::sectionScoresShown() const
+{
+    settings()->setDefaultValue(SHOW_SECTION_SCORES, Val(false));
+    return settings()->value(SHOW_SECTION_SCORES).toBool();
+}
+
+void StarScoreService::setSectionScoresShown(bool shown)
+{
+    settings()->setSharedValue(SHOW_SECTION_SCORES, Val(shown));
+    syncSectionTabs({});
+    scheduleChanged();
+}
+
+void StarScoreService::syncSectionTabs(const QStringList& turnedOnSectionIds)
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    engraving::MasterScore* ms = masterScore();
+    if (!master || !ms) {
         return;
     }
-
-    master->parts()->setPartsVisible(changes, TranslatableString::untranslatable(String::fromQString(actionName)));
-    scheduleChanged();
+    // a score closed here while it's the one showing: the main score shows first (as closing its tab does)
+    auto close = [&](const INotationPtr& n) {
+        if (globalContext()->currentNotation() == n) {
+            globalContext()->setCurrentNotation(master->notation());
+        }
+        master->setExcerptIsOpen(n, false);
+    };
+    const Data data = load();
+    // the part scores of the sections just turned on: their shown instruments, one part score each
+    std::set<QString> openParts;
+    for (const StarScoreSection& s : data.sections) {
+        if (!turnedOnSectionIds.contains(s.id)) {
+            continue;
+        }
+        for (const QString& pid : s.partIds) {
+            const engraving::Part* p = ms->partById(ID(pid));
+            if (p && p->show()) {
+                openParts.insert(pid);
+            }
+        }
+    }
+    // the arrangements' own scores ("4-Horn Arrangement"): open with every section of theirs showing, when the
+    // "Section scores visible" switch is on; closed when it's off (the exported Scores are made on their own)
+    const bool scoresShown = sectionScoresShown();
+    std::set<QString> onIds;
+    for (const QString& id : onSectionIds(data)) {
+        onIds.insert(id);
+    }
+    std::map<QString, bool> arrangementScores;   // score name -> open
+    for (const StarScoreArrangement& a : data.arrangements) {
+        if (a.scoreName.isEmpty()) {
+            continue;
+        }
+        const bool allOn = !a.sectionIds.isEmpty() && std::all_of(a.sectionIds.begin(), a.sectionIds.end(),
+                                                                   [&](const QString& id) { return onIds.count(id) > 0; });
+        arrangementScores[a.scoreName] = arrangementScores[a.scoreName] || (scoresShown && allOn);
+    }
+    for (const IExcerptNotationPtr& e : master->excerpts()) {
+        INotationPtr n = e ? e->notation() : nullptr;
+        engraving::Score* es = n && n->elements() ? n->elements()->msScore() : nullptr;
+        if (!es) {
+            continue;
+        }
+        const auto arr = arrangementScores.find(e->name());
+        if (arr != arrangementScores.end()) {
+            if (n->isOpen() && !arr->second) {
+                close(n);
+            } else if (!n->isOpen() && arr->second) {
+                master->setExcerptIsOpen(n, true);
+            }
+            continue;
+        }
+        if (es->parts().size() != 1) {
+            // any other score of several parts (the full horn scores kept from the converted files, "2-Horn
+            // Arrangement"): closed with the switch off
+            if (!scoresShown && n->isOpen()) {
+                close(n);
+            }
+            continue;
+        }
+        const std::vector<engraving::Part*> parts = masterPartsOf(es, ms);
+        if (parts.size() != 1) {
+            continue;
+        }
+        // the percussion part's score (Congas…): open only with the "Percussion score visible" switch on (Joel kept
+        // closing it)
+        if (rhythmRole(parts.front()->instrumentId().toQString()) == "percussion") {
+            if (!percussionScoreShown()) {
+                if (n->isOpen()) {
+                    close(n);
+                }
+                continue;
+            }
+            if (!n->isOpen() && parts.front()->show()) {
+                master->setExcerptIsOpen(n, true);
+            }
+            continue;
+        }
+        if (!n->isOpen() && openParts.count(idText(parts.front()))) {
+            master->setExcerptIsOpen(n, true);
+        }
+    }
 }
 
 void StarScoreService::showArrangement(const QString& arrangementId)
@@ -1344,6 +1469,15 @@ std::vector<StarScoreSectionTemplate> StarScoreService::sectionTemplates() const
         // (until 1.18.2 the 3-Horn also had a hidden "Horn 1 (Flute)" staff; Horn 1's Flute sheet is now made from Horn 1)
         { "3-horn-any", "3-Horn Flexible", { chair("c-trumpet", "Horn 1", 56, 80, 52, 85),
               chair("c-trumpet", "Horn 2", 52, 75, 52, 85), chair("trombone", "Horn 3", 44, 71, 44, 74) } },
+
+        // --- Strings (Joel, 6 Oct 2026): extra colour added to many songs, in no arrangement ---
+        { "string-duo", "String Duo", { inst("violin", "Duo: Violin"), inst("violoncello", "Duo: Cello") } },
+        { "string-trio", "String Trio", { inst("violin", "Trio: Violin"), inst("viola", "Trio: Viola"),
+              inst("violoncello", "Trio: Cello") } },
+        { "string-quartet", "String Quartet", { inst("violin", "Quartet: Violin"), inst("viola", "Quartet: Viola"),
+              inst("violoncello", "Quartet: Cello"), inst("contrabass", "Quartet: Double Bass") } },
+        { "string-quintet", "String Quintet", { inst("violin", "Quintet: Violin 1"), inst("violin", "Quintet: Violin 2"),
+              inst("viola", "Quintet: Viola"), inst("violoncello", "Quintet: Cello"), inst("contrabass", "Quintet: Double Bass") } },
 
         // --- Big band ---
         { "bigband-saxes", "Big Band Saxophones", {
@@ -1655,16 +1789,34 @@ RetVal<QString> StarScoreService::createSection(const QString& templateKey, cons
 
     if (section.templateKey.endsWith("-horn-any")) {
         fillAnyHornsFromStandard(section);
-        setFlexibleWorkingClefs(section);
+        applyFlexibleView(section);
         Data withClefs = load();
         if (!withClefs.flexibleClefsSet) {
             withClefs.flexibleClefsSet = true;   // (so opening the file doesn't set them again)
             store(withClefs);
         }
     }
+    // A piccolo's Flute part made with the section, empty, so both can be pasted into straight away (Joel, 6 Oct 2026);
+    // marking the Piccolo Finished while the Flute is still empty fills it from the Piccolo as before
+    QStringList madeIds = section.partIds;
+    static const QRegularExpression hornSection("^[3-7]-horn$");
+    if (hornSection.match(section.templateKey).hasMatch()) {
+        if (engraving::MasterScore* ms = masterScore()) {
+            for (const QString& pid : section.partIds) {
+                const engraving::Part* p = ms->partById(ID(pid));
+                if (!p || p->instrumentId().toQString() != "piccolo") {
+                    continue;
+                }
+                const RetVal<QStringList> flute = createLowAlternates(section.id, pid, { "flute" });
+                if (flute.ret) {
+                    madeIds << flute.val;
+                }
+            }
+        }
+    }
     // the new part scores open, with their sheet titles (after the Flexible chairs took the Standard parts' style)
     labelPartBooks();
-    openPartBooks(section.partIds);
+    openPartBooks(madeIds);
 
     if (!missing.isEmpty()) {
         LOGW() << "[starscore] skipped unknown instruments: " << missing.join(", ");

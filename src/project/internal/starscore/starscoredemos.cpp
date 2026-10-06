@@ -169,6 +169,15 @@ RetVal<QString> StarScoreService::exportAudioDemos()
             n = master->notation();
         }
         mu::engraving::Score* sc = n->elements()->msScore();
+        LOGI() << "[starscore] demo " << demo.name << ": starting, from " << (n == master->notation() ? "the main score"
+                                                                                : "\"" + demo.scoreName + "\"")
+               << (n->isOpen() ? " (open)" : " (closed)");
+        // a closed score was never laid out (bars without systems: Bet crashed making its demos, 6 Oct 2026): laid
+        // out first, in page view, as an open tab would be
+        if (sc && !n->isOpen()) {
+            sc->setLayoutAll();
+            sc->doLayout();
+        }
         INotationSoloMuteStatePtr soloMute = n->soloMuteState();
         if (!sc || !soloMute) {
             failed << demo.name;
@@ -215,6 +224,7 @@ RetVal<QString> StarScoreService::exportAudioDemos()
             soloMute->setTrackSoloMuteState(it->first, it->second);
         }
 
+        LOGI() << "[starscore] demo " << demo.name << ": rendered, " << (ret ? "ok" : ret.toString());
         if (ret && QFileInfo(tmp).size() > 0) {
             QFile::remove(target);
             if (QFile::rename(tmp, target)) {

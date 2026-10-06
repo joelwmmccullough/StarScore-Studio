@@ -148,6 +148,11 @@ void NotationSwitchListModel::listenNotationOpeningStatus(INotationPtr notation)
             endInsertRows();
         } else {
             int notationIndex = m_notations.indexOf(notation);
+            // StarScore: a part score can be open without a tab (its section switched off); closing it then has no
+            // tab to take away (removing index -1 crashed)
+            if (notationIndex < 0) {
+                return;
+            }
             beginRemoveRows(QModelIndex(), notationIndex, notationIndex);
             m_notations.removeAt(notationIndex);
             endRemoveRows();

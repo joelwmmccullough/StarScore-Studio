@@ -125,8 +125,7 @@ QString NewStarScoreModel::defaultDoublerId(const QString& arrangementKey, bool 
 
 QVariantList NewStarScoreModel::doublerChoices(const QString& arrangementKey, bool matchSong) const
 {
-    // The doubler's name comes from the band roster at run time (the program never holds band members' names)
-    const QString who = starScore()->rosterDoublerName();
+    // Just the instrument, under "Woodwind doubler plays" (Joel, 6 Oct 2026: "Ben on Piccolo" read crunchy)
     const int horns = standardHorns(arrangementKey);
     // Alto Sax is recommended for 3/4/5-Horn; 6/7-Horn start on Soprano Sax without calling it recommended. Adding to a
     // song: what the doubler plays in its other 3- to 7-Horn sections is the recommended one, for 3- to 7-Horn alike.
@@ -135,7 +134,7 @@ QVariantList NewStarScoreModel::doublerChoices(const QString& arrangementKey, bo
                                 : horns >= 3 && horns <= 5 ? QString("alto-saxophone") : QString();
     QVariantList list;
     for (const StarScoreHornChoice& c : starScore()->doublerChoices()) {
-        QString text = who.isEmpty() ? c.bandName : muse::qtrc("starscore", "%1 on %2").arg(who, c.bandName);
+        QString text = c.bandName;
         if (c.instrumentId == recommended) {
             text += muse::qtrc("starscore", " (recommended)");
         }

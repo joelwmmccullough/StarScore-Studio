@@ -69,6 +69,8 @@ qt_add_qml_module(project_qml
         internal/StarScore/newstarscoremodel.cpp
         internal/StarScore/newstarscoremodel.h
         internal/StarScore/songbooksvisibilitymodel.cpp
+        internal/StarScore/flexibleviewmodel.cpp
+        internal/StarScore/flexibleviewmodel.h
         internal/StarScore/songbooksvisibilitymodel.h
         internal/StarScore/starscorestylesmodel.cpp
         internal/StarScore/starscorestylesmodel.h

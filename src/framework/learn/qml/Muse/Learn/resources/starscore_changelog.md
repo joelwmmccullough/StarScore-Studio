@@ -4,6 +4,19 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.16
+
+- **"Flexible horns" menu in the status bar**, next to Concert pitch, shown when the score has a Flexible section. It sets how the Flexible 2- and 3-Horn chairs look while you write, in every score, and is remembered on this computer: Reference instruments (B♭ Trumpet, (Alto Sax), Tenor Sax; the default), Range-optimized clefs (treble, soprano, alto), Standard clefs (treble, bass), Treble clefs (the bottom horn in treble clef an octave down), Bass clefs (the upper horns in bass clef an octave up), B♭ instruments (B♭ Trumpet, Tenor Sax) and E♭ instruments (Alto Sax or E♭ Trumpet, whichever keeps more notes in range, and Bari Sax). The chairs' ranges and the exported sheets don't change. It replaces the section menu's "Show the chairs".
+- **No Parts window.** It's gone from the File menu and the toolbar; StarScore's sections show, name and make the parts. The part tabs have no close button (and middle-click doesn't close them); the tab's right-click menu still can.
+- **Showing a section opens its part scores.** The arrangements' own scores ("3-Horn Standard Score") and the full horn scores kept from the converted files ("2-Horn Arrangement") stay closed, unless "Section scores visible" is on (StarScore menu, ⋯). The percussion part (Congas…) stays closed unless "Percussion score visible" is on. Both switches are remembered on this computer.
+- **A piccolo section gets its Flute part right away.** A new 3- to 7-Horn section with the doubler on piccolo now has its Flute part from the start, empty, so music can be pasted into both. Marking the Piccolo Finished while the Flute is still empty fills it from the Piccolo as before; a Flute with music in it is left alone.
+- **String sections**: String Duo (violin, cello), String Trio (violin, viola, cello), String Quartet (violin, viola, cello, double bass) and String Quintet (two violins, viola, cello, double bass), in Add section. They belong to no arrangement; each exports to a folder of its own ("String Trio") with a sheet per instrument and a Score.
+- **"Woodwind doubler plays"** lists just the instruments ("Piccolo", not "Ben on Piccolo").
+- **Scores: bars that spill onto an extra system are spaced tighter.** When the bars between two system breaks take two or three systems and a little tighter spacing saves one (Bumper Cars' 4-Horn Score: 4 bars, then 1 alone), the Score's bars are tightened like the "{" shortcut, at most down to 0.3. MuseScore never spaces notes closer than its minimum, so they stay readable; where it doesn't save a system, nothing changes. Bumper Cars' 4-Horn Score is now 4 pages instead of 5.
+- **Crash reports.** A crash now writes "crash-<date>.txt" with the call stack to ~/StarScore Studio/Logs, and macOS writes its own crash report as well (StarScore used to quit without one). The log also says which sheet or audio demo was being made, so a crash during an export can be traced.
+- **Audio demos: the arrangement's score is laid out first.** Bet crashed while making its audio demos; the arrangement scores they're made from are usually closed and had never been laid out. Fixed for that cause; if it happens again, the new crash report will say where.
+- **Crash fixed: closing a part score that had no tab** (its section switched off).
+
 ## 1.18.15
 
 - **4- to 7-Horn trombones in tenor clef too.** Every Trombone sheet in a 4-, 5-, 6- or 7-Horn arrangement is now also exported as "CODE - Trombone (Tenor Clef).pdf" next to the bass-clef sheet, like the 1-Horn and Flexible trombones. The Bass Trombone stays in bass clef only. Big Band, Orchestra and Marching Band sheets don't change.

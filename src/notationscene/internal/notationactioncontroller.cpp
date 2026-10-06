@@ -41,6 +41,9 @@ using namespace muse;
 using namespace muse::io;
 using namespace muse::ui;
 using namespace mu::notation;
+
+//! StarScore: the Parts window stays out of reach (see openPartsDialog)
+static constexpr bool starscoreAllowPartsDialog = false;
 using namespace muse::actions;
 using namespace mu::context;
 
@@ -1825,6 +1828,11 @@ void NotationActionController::openTransposeDialog()
 
 void NotationActionController::openPartsDialog()
 {
+    // StarScore: the Parts window isn't used (Joel, 6 Oct 2026): StarScore's sections show, name and make the parts.
+    // Kept, but out of reach (File menu, toolbar and this action).
+    if (!starscoreAllowPartsDialog) {
+        return;
+    }
     interactive()->open("musescore://notation/parts");
 }
 

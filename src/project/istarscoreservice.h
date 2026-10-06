@@ -33,6 +33,17 @@ class Score;
 namespace mu::project {
 class INotationProject;
 
+//! How the Flexible chairs are shown while writing (Joel, 6 Oct 2026); Reference is the default
+enum class StarScoreFlexibleView {
+    Reference = 0,   // B♭ Trumpet, (Alto Sax), Tenor Sax
+    RangeClefs,      // treble, (soprano), alto
+    StandardClefs,   // treble, (treble), bass
+    TrebleClefs,     // treble, (treble), treble an octave down
+    BassClefs,       // bass an octave up, (bass an octave up), bass
+    Bb,              // B♭ Trumpet, (B♭ Trumpet), Tenor Sax
+    Eb,              // Alto Sax or E♭ Trumpet, (the same), Bari Sax
+};
+
 //! Status shown by the coloured dot on each section (and, derived, each arrangement).
 enum class StarScoreStatus {
     Empty = 0,
@@ -507,12 +518,22 @@ public:
     //! instrument (hidden in the score, with its own part score, opened), printed as it is from then on. Opens the
     //! part score when the sheet already has one. Returns the part id.
     virtual muse::RetVal<QString> makeFlexibleSheetPart(const QString& sectionId, const QString& sheetName) = 0;
-    //! How a Flexible section's chairs are shown while writing: in the Flexible clefs at concert pitch (treble, the
-    //! 3-Horn's Horn 2 soprano clef, the bottom chair alto clef), or as the Standard horns (B♭ Trumpet, Tenor Sax;
-    //! 3-Horn: B♭ Trumpet, Alto Sax, Tenor Sax) with their transpositions and clefs. The chairs keep their Flexible
-    //! ranges, and the exported sheets are the same either way.
-    virtual bool flexibleShownAsStandard(const QString& sectionId) const = 0;
-    virtual void setFlexibleShownAsStandard(const QString& sectionId, bool standard) = 0;
+    //! How every Flexible section's chairs are shown while writing (one setting for all scores, the status bar's
+    //! "Show Flexible horns as"): StarScoreFlexibleView. The chairs keep their Flexible ranges, and the exported sheets
+    //! are the same whatever the view. Setting it shows the current score's chairs that way at once.
+    virtual int flexibleViewMode() const = 0;
+    virtual void setFlexibleViewMode(int mode) = 0;
+    //! Whether the current score has a Flexible section (the status bar shows the setting only then)
+    virtual bool hasFlexibleSections() const = 0;
+    //! "Section scores visible": whether the arrangements' own scores ("4-Horn Arrangement") are open as tabs while
+    //! all their sections show (on), or kept closed (off, the default: the exported Scores are made on their own).
+    //! One setting for every score. Showing a section always opens its instruments' part scores.
+    virtual bool sectionScoresShown() const = 0;
+    virtual void setSectionScoresShown(bool shown) = 0;
+    //! "Percussion score visible": whether the Rhythm Section's percussion part score (Congas…) is open as a tab
+    //! (off by default: it's closed and not opened with its section). One setting for every score.
+    virtual bool percussionScoreShown() const = 0;
+    virtual void setPercussionScoreShown(bool shown) = 0;
     //! A part score's status (for its tab): the least-finished of its parts' tags, a part without a tag
     //! counting as Empty; -1 when none of its parts has a tag, or for the main score
     virtual int partScoreStatus(const mu::engraving::Score* score) const = 0;

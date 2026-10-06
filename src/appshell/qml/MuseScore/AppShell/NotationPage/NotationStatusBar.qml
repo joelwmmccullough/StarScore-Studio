@@ -29,6 +29,7 @@ import Muse.UiComponents
 import MuseScore.AppShell
 import MuseScore.NotationScene
 import MuseScore.Playback
+import MuseScore.Project
 
 Item {
     id: root
@@ -162,6 +163,47 @@ Item {
 
             onToggleConcertPitchRequested: {
                 model.toggleConcertPitch()
+            }
+        }
+
+        //! StarScore: how the Flexible horns are shown while writing (Joel, 6 Oct 2026), next to concert pitch; only
+        //! when the score has a Flexible section. One setting for every score; the exported sheets don't change.
+        FlexibleViewModel {
+            id: flexibleView
+        }
+
+        Component.onCompleted: flexibleView.load()
+
+        SeparatorLine { orientation: Qt.Vertical; visible: flexibleViewControl.visible }
+
+        FlatButton {
+            id: flexibleViewControl
+            Layout.alignment: Qt.AlignVCenter
+            Layout.preferredHeight: 28
+
+            text: qsTrc("starscore", "Flexible horns: %1").arg(flexibleView.currentTitle)
+            orientation: Qt.Horizontal
+            transparent: true
+            visible: flexibleView.available && statusBarRow.remainingSpace > width + concertPitchControl.width
+
+            toolTipTitle: qsTrc("starscore", "Show Flexible horns as")
+            toolTipDescription: qsTrc("starscore", "How the Flexible 2-Horn and 3-Horn chairs look while you write, in every score. Their ranges and the exported sheets don't change.")
+
+            navigation.panel: navPanel
+            navigation.order: 3
+
+            onClicked: {
+                flexibleViewMenu.toggleOpened(flexibleView.menuItems)
+            }
+
+            StyledMenuLoader {
+                id: flexibleViewMenu
+
+                menuAnchorItem: ui.rootItem
+
+                onHandleMenuItem: function(itemId) {
+                    Qt.callLater(flexibleView.choose, itemId)
+                }
             }
         }
 

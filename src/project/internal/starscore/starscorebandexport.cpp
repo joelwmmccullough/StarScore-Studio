@@ -743,6 +743,27 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
             continue;
         }
 
+        // Strings (String Duo … Quintet): a folder each, a sheet per instrument (without the "Trio: " in front) and a Score
+        if (sec.templateKey.startsWith("string-")) {
+            const QString folder = sec.name;
+            QStringList scoreParts;
+            for (const QString& pid : sec.partIds) {
+                engraving::Part* p = partById(pid);
+                if (!p) {
+                    continue;
+                }
+                scoreParts << pid;
+                const QString name = p->partName().toQString().section(": ", -1);
+                addFile(folder, name, { pid }, false);
+                plan.files.back().sheetRight = sec.name;
+            }
+            if (scoreParts.size() > 1) {
+                addFile(folder, "Score", scoreParts, true);
+                plan.files.back().sheetRight = sec.name;
+            }
+            continue;
+        }
+
         // 1-Horn: one melody sheet per horn, each played alone with the rhythm section (no score)
         if (sec.templateKey == "1-horn") {
             for (const QString& pid : sec.partIds) {
@@ -1818,6 +1839,77 @@ static std::vector<int> starscoreJoinSystems(const INotationPtr& n)
     return ends;
 }
 
+//! Joel, 6 Oct 2026: bars between two system breaks that run onto more systems than needed (Bumper Cars' 4-Horn
+//! Score: 4 bars, then 1 bar alone before the break) are spaced tighter, as his "{" shortcut does: the bars' stretch
+//! down 0.1 at a time, to 0.3 at most. MuseScore never spaces notes closer than its minimum distances, so the bars stay
+//! readable; when even the tightest spacing doesn't save a system, the bars keep their spacing. Page view, laid out
+//! after each try. Returns how many runs of bars were tightened.
+static int starscoreTightenWrappedSystems(const INotationPtr& n)
+{
+    using namespace mu::engraving;
+    Score* sc = n && n->elements() ? n->elements()->msScore() : nullptr;
+    if (!sc) {
+        return 0;
+    }
+    if (n->painting()->viewMode() != ViewMode::PAGE) {
+        n->painting()->setViewMode(ViewMode::PAGE);
+    }
+    sc->doLayout();
+    auto systemsOf = [](const std::vector<Measure*>& run) {
+        std::set<const System*> systems;
+        for (const Measure* m : run) {
+            if (const System* s = starscoreSystemOf(m)) {
+                systems.insert(s);
+            }
+        }
+        return int(systems.size());
+    };
+    int tightened = 0;
+    Measure* m = sc->firstMeasure();
+    while (m) {
+        // one run: up to and including the next bar with a system or page break (or the last bar)
+        std::vector<Measure*> run;
+        for (; m; m = m->nextMeasure()) {
+            run.push_back(m);
+            if (m->lineBreak() || m->pageBreak() || m->sectionBreak()) {
+                m = m->nextMeasure();
+                break;
+            }
+        }
+        // two or three systems between breaks (a long run without breaks is left as it is: the whole of it would
+        // be tightened to save one system)
+        const int before = systemsOf(run);
+        if (before < 2 || before > 3) {
+            continue;
+        }
+        std::vector<double> original;
+        for (const Measure* r : run) {
+            original.push_back(r->userStretch());
+        }
+        bool kept = false;
+        for (int step = 1; step <= 7 && !kept; ++step) {
+            n->undoStack()->prepareChanges(TranslatableString::untranslatable("Tighter spacing"));
+            for (size_t i = 0; i < run.size(); ++i) {
+                run[i]->undoChangeProperty(Pid::USER_STRETCH, std::max(0.3, original[i] - 0.1 * step));
+            }
+            n->undoStack()->commitChanges();
+            sc->doLayout();
+            kept = systemsOf(run) < before;
+        }
+        if (kept) {
+            ++tightened;
+        } else {
+            n->undoStack()->prepareChanges(TranslatableString::untranslatable("Tighter spacing"));
+            for (size_t i = 0; i < run.size(); ++i) {
+                run[i]->undoChangeProperty(Pid::USER_STRETCH, original[i]);
+            }
+            n->undoStack()->commitChanges();
+            sc->doLayout();
+        }
+    }
+    return tightened;
+}
+
 //! The system breaks worked out before (starscoreJoinSystems), put back: a line break exactly at those bars
 static void starscoreSetSystemBreaks(const INotationPtr& n, const std::vector<int>& ends)
 {
@@ -2720,6 +2812,8 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                     storeTo(ms, stored, project);
                 }
             }
+            // bars run onto an extra system before a break: tighter spacing where it saves the system
+            starscoreTightenWrappedSystems(n);
             starscoreKeepRepeatsOnOnePage(n);
         }
         // bar numbers clear of the brackets' hooks, measured on the page as it now is
@@ -2773,9 +2867,12 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     QStringList written;
     QStringList unchanged;
 
+    int fileNumber = 0;
     for (const StarScoreBandFile& file : plan.files) {
         QByteArray pdf;
         Ret ret;
+        // where the export is, in the log, so a crash can be traced to the sheet being made (1.18.16)
+        LOGI() << "[starscore] export " << ++fileNumber << "/" << plan.files.size() << ": " << file.relativePath;
 
         if (!file.sourceFile.isEmpty()) {
             QFile source(file.sourceFile);

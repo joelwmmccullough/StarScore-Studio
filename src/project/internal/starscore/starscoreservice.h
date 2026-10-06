@@ -160,8 +160,13 @@ public:
     std::pair<QString, QString> mainLowHorn(const QString& sectionId) const override;
     std::vector<StarScoreFlexibleSheet> flexibleSheets(const QString& sectionId) const override;
     muse::RetVal<QString> makeFlexibleSheetPart(const QString& sectionId, const QString& sheetName) override;
-    bool flexibleShownAsStandard(const QString& sectionId) const override;
-    void setFlexibleShownAsStandard(const QString& sectionId, bool standard) override;
+    int flexibleViewMode() const override;
+    void setFlexibleViewMode(int mode) override;
+    bool hasFlexibleSections() const override;
+    bool sectionScoresShown() const override;
+    void setSectionScoresShown(bool shown) override;
+    bool percussionScoreShown() const override;
+    void setPercussionScoreShown(bool shown) override;
     //! The band's name for a low horn ("Bass Trombone", "Bari Sax", …, "Tuba"), or "" when the instrument isn't one
     //! of the eight. The low horn a 7-Horn section is built on and its stand-in versions are all told apart this way.
     static QString lowHornName(const QString& instrumentId);
@@ -354,7 +359,9 @@ private:
     //! A Flexible section's chairs written in the clefs that keep their range on the staff: Horn 1 treble, the
     //! 3-Horn's Horn 2 soprano clef, the bottom chair alto clef. Only a chair still in its old clef (treble, the
     //! bottom chair bass) changes. Returns how many chairs changed. The exported sheets have their own clefs.
-    int setFlexibleWorkingClefs(const StarScoreSection& section);
+    int applyFlexibleView(const StarScoreSection& section);
+    void syncSectionTabs(const QStringList& turnedOnSectionIds);
+    void removeEmptyVersions(const QStringList& partIds);
     //! A part with stand-in versions (a 7-Horn section's main low horn, a Piccolo) marked Finished: offer the versions
     //! it lacks (versionsFor)
     void offerLowAlternates(const QStringList& partIds, bool asked = false);

@@ -82,6 +82,10 @@ FlatRadioButton {
             Layout.preferredWidth: height
             Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
 
+            //! StarScore: no close button on the tabs, so a part isn't closed by accident (Joel, 6 Oct 2026); the
+            //! tab's right-click menu still closes it
+            visible: false
+
             transparent: true
             icon: IconCode.CLOSE_X_ROUNDED
             iconFont {
@@ -136,9 +140,7 @@ FlatRadioButton {
                     return
                 }
 
-                if (mouse.button === Qt.MiddleButton) {
-                    root.closeRequested()
-                }
+                // StarScore: no closing with the middle button either (only from the right-click menu)
             }
 
             ContextMenuLoader {

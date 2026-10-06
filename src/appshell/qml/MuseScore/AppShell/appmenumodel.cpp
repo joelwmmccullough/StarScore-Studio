@@ -221,7 +221,7 @@ MenuItem* AppMenuModel::makeFileMenu()
         makeMenuItem("starscore-band-roster"),
         makeSeparator(),
         makeMenuItem("project-properties"),
-        makeMenuItem("parts", TranslatableString("action", "Parts…")),
+        // StarScore: no "Parts…" (Joel, 6 Oct 2026): sections and their menus show, name and make the parts
         makeSeparator(),
         makeMenuItem("print"),
         makeSeparator(),

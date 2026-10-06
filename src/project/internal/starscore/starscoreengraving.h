@@ -72,6 +72,8 @@ constexpr int FLUTE_HIGHEST = 96;
 //! Hides the texts that are only a mute or open marking ("mute", "(open)", "cup mute", "con sord."…), for a sheet on
 //! an instrument without a mute; "Open solos" stays. Undoable (inside a command). Returns how many were hidden.
 int hideMuteMarkings(mu::engraving::Score* score);
+//! Whether the part has any note (a rest-only part is empty)
+bool partHasNotes(const mu::engraving::Part* part);
 
 //! Colour notes (noteheads, accidentals, dots) by pitch class using Joel's 12 colours, or reset them
 //! to the default colour. Works on the selected notes, or the whole score when nothing is selected.

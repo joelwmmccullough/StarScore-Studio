@@ -752,6 +752,23 @@ int mu::project::starscore::hideMuteMarkings(Score* score)
     return int(hide.size());
 }
 
+bool mu::project::starscore::partHasNotes(const Part* part)
+{
+    if (!part || !part->score()) {
+        return false;
+    }
+    const Score* score = part->score();
+    for (const Segment* s = score->firstSegment(SegmentType::ChordRest); s; s = s->next1(SegmentType::ChordRest)) {
+        for (track_idx_t t = part->startTrack(); t < part->endTrack(); ++t) {
+            const EngravingItem* e = s->element(t);
+            if (e && e->isChord()) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 bool mu::project::starscore::pitchesWithin(const Part* part, int lowest, int highest)
 {
     if (!part || !part->score()) {

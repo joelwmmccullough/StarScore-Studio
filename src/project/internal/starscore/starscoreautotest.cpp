@@ -53,6 +53,7 @@
 #include "engraving/dom/masterscore.h"
 #include "engraving/dom/drumset.h"
 #include "engraving/dom/rehearsalmark.h"
+#include "engraving/dom/harmony.h"
 #include "engraving/dom/dynamic.h"
 #include "engraving/dom/factory.h"
 #include "engraving/rw/xmlreader.h"
@@ -460,6 +461,13 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             }
         }
         autotestLog(QString("  showing: %1").arg(showing.join(", ")));
+        QStringList tabs;
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            if (e->notation() && e->notation()->isOpen()) {
+                tabs << e->name();
+            }
+        }
+        autotestLog(QString("  open tabs: %1").arg(tabs.join(", ")));
     } else if (step == "dashboard") {
         // what Home › Dashboard reads for this file: each arrangement's column, status, audited
         const QString path = globalContext()->currentProject() ? globalContext()->currentProject()->path().toQString() : QString();
@@ -495,12 +503,21 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             }
         }
     } else if (step.startsWith("flexview:")) {
-        // flexview:<section template key>:<0|1>: the chairs in the Flexible clefs (0) or as the Standard horns (1)
-        const QString key = step.section(':', 1, 1);
+        // flexview:<mode>: every Flexible chair shown in that view (StarScoreFlexibleView), then each chair's clef and
+        // transposition
+        setFlexibleViewMode(step.section(':', 1).toInt());
         for (const StarScoreSection& s : load().sections) {
-            if (s.templateKey == key) {
-                setFlexibleShownAsStandard(s.id, step.section(':', 2) == "1");
-                autotestLog(QString("  %1 shown as standard: %2").arg(key).arg(flexibleShownAsStandard(s.id)));
+            if (!s.templateKey.endsWith("-horn-any")) {
+                continue;
+            }
+            for (const QString& pid : s.partIds) {
+                const engraving::Part* p = ms->partById(ID(pid));
+                if (p && !p->staves().empty()) {
+                    const engraving::ClefTypeList c = p->staves().front()->defaultClefType();
+                    autotestLog(QString("  %1: clef %2/%3 transpose %4")
+                                .arg(p->partName().toQString()).arg(int(c.concertClef)).arg(int(c.transposingClef))
+                                .arg(p->instrument()->transpose().chromatic));
+                }
             }
         }
     } else if (step.startsWith("clefs:")) {
@@ -627,6 +644,83 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             autotestLog(QString("  wrote chords.json, chart.html, ireal.html (%1 bars, lead %2, status %3)")
                         .arg(data.measures.size()).arg(data.lead, data.leadStatus.value_or("none")));
         }
+    } else if (step.startsWith("rechord:")) {
+        // rechord:<marks>|<from>|<to>: in the bars from each rehearsal mark (e.g. "G+J") to the next one, in the main
+        // score and every part score, each chord symbol whose extension is exactly <from> (e.g. "^9") gets <to>
+        // ("^7"); the root and bass stay (so a transposed part keeps its own). <to> empty: only lists the chords.
+        const QString arg = step.mid(8);
+        const QStringList marks = arg.section('|', 0, 0).split('+');
+        const QString from = arg.section('|', 1, 1), to = arg.section('|', 2, 2);
+        // the tick ranges, from the main score's rehearsal marks
+        std::vector<std::pair<int, int> > ranges;
+        std::vector<std::pair<int, QString> > all;
+        for (const engraving::Segment* seg = ms->firstSegment(engraving::SegmentType::ChordRest); seg;
+             seg = seg->next1(engraving::SegmentType::ChordRest)) {
+            for (const engraving::EngravingItem* a : seg->annotations()) {
+                if (a->isRehearsalMark() && (all.empty() || all.back().first != seg->tick().ticks())) {
+                    all.push_back({ seg->tick().ticks(), engraving::toRehearsalMark(a)->plainText().toQString().trimmed() });
+                }
+            }
+        }
+        for (size_t i = 0; i < all.size(); ++i) {
+            if (marks.contains(all[i].second)) {
+                const int end = i + 1 < all.size() ? all[i + 1].first : ms->endTick().ticks();
+                ranges.push_back({ all[i].first, end });
+                autotestLog(QString("  %1: ticks %2-%3").arg(all[i].second).arg(all[i].first).arg(end));
+            }
+        }
+        std::vector<engraving::Score*> scores { ms };
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            if (e->notation()) {
+                scores.push_back(e->notation()->elements()->msScore());
+            }
+        }
+        static const QRegularExpression name("^([A-Ga-g](?:b|#)?)(.*?)(/[A-Ga-g](?:b|#)?)?$");
+        int changed = 0;
+        for (engraving::Score* sc : scores) {
+            QStringList seen;
+            for (engraving::Segment* seg = sc->firstSegment(engraving::SegmentType::ChordRest); seg;
+                 seg = seg->next1(engraving::SegmentType::ChordRest)) {
+                const int t = seg->tick().ticks();
+                if (std::none_of(ranges.begin(), ranges.end(), [t](const auto& r) { return t >= r.first && t < r.second; })) {
+                    continue;
+                }
+                for (engraving::EngravingItem* a : seg->annotations()) {
+                    if (!a->isHarmony()) {
+                        continue;
+                    }
+                    engraving::Harmony* h = engraving::toHarmony(a);
+                    const QString old = h->harmonyName().toQString();
+                    const QRegularExpressionMatch m = name.match(old);
+                    QString now = old;
+                    if (!to.isEmpty() && m.hasMatch() && m.captured(2) == from) {
+                        // (a root kept in lower case is written in capitals: these are major chords)
+                        QString root = m.captured(1);
+                        root[0] = root[0].toUpper();
+                        now = root + to + m.captured(3);
+                        h->setPlainText(String::fromQString(now));
+                        h->setHarmony(String::fromQString(now));
+                        h->triggerLayout();
+                        ++changed;
+                    }
+                    seen << QString("%1:%2%3").arg(t).arg(old).arg(now != old ? "->" + now : QString());
+                }
+            }
+            autotestLog(QString("  [%1] %2").arg(sc->isMaster() ? QString("main score") : sc->excerpt()->name().toQString(),
+                                                 seen.join("  ")));
+        }
+        if (changed) {
+            ms->setLayoutAll();
+            ms->doLayout();
+            for (engraving::Score* sc : scores) {
+                sc->setLayoutAll();
+                sc->doLayout();
+            }
+            if (INotationProjectPtr project = globalContext()->currentProject()) {
+                project->markAsUnsaved();
+            }
+        }
+        autotestLog(QString("  changed %1 chord symbols").arg(changed));
     } else if (step == "save") {
         INotationProjectPtr project = globalContext()->currentProject();
         const Ret r = project ? project->save(io::path_t(autotestDir() + "/saved.starscore"), SaveMode::SaveCopy, false)

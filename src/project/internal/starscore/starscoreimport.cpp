@@ -17,6 +17,8 @@
 #include <QFile>
 #include <QDir>
 
+#include "settings.h"
+
 #include "engraving/dom/masterscore.h"
 #include "engraving/dom/excerpt.h"
 #include "engraving/dom/part.h"
@@ -25,6 +27,7 @@
 #include "engraving/dom/measure.h"
 #include "engraving/dom/segment.h"
 #include "engraving/dom/chord.h"
+#include "engraving/dom/note.h"
 #include "engraving/dom/clef.h"
 #include "engraving/rw/xmlreader.h"
 #include "engraving/dom/select.h"
@@ -688,31 +691,136 @@ QString StarScoreService::songDoublerInstrumentId() const
     return QString();
 }
 
-int StarScoreService::setFlexibleWorkingClefs(const StarScoreSection& section)
+// ---------------------------------------------------------------------------
+//  How the Flexible chairs are shown while writing (Joel, 6 Oct 2026): one setting for every score, in the status bar.
+//  Only the display: the chairs' ranges stay the Flexible ones and the exported sheets don't change.
+// ---------------------------------------------------------------------------
+
+static const Settings::Key FLEXIBLE_VIEW("project", "starscore/flexibleView");
+
+namespace {
+struct StarScoreChairView {
+    mu::engraving::Interval transpose;
+    mu::engraving::ClefTypeList clef;
+};
+
+//! How many of the chair's notes would be written outside [low, high] at this transposition
+int starscoreNotesOutside(const mu::engraving::Part* part, int chromatic, int low, int high)
+{
+    using namespace mu::engraving;
+    int outside = 0;
+    const Score* score = part->score();
+    for (const Segment* s = score->firstSegment(SegmentType::ChordRest); s; s = s->next1(SegmentType::ChordRest)) {
+        for (track_idx_t t = part->startTrack(); t < part->endTrack(); ++t) {
+            const EngravingItem* e = s->element(t);
+            if (e && e->isChord()) {
+                for (const Note* n : toChord(e)->notes()) {
+                    const int written = n->pitch() - chromatic;
+                    outside += (written < low || written > high) ? 1 : 0;
+                }
+            }
+        }
+    }
+    return outside;
+}
+
+//! Chair i of n (the bottom chair is the last) in this view
+StarScoreChairView starscoreChairView(int mode, int i, int n, const mu::engraving::Part* part)
+{
+    using mu::engraving::ClefType;
+    using mu::engraving::ClefTypeList;
+    using mu::engraving::Interval;
+    const bool bottom = i == n - 1;
+    const Interval none(0, 0), bbTrumpet(-1, -2), alto(-5, -9), tenor(-8, -14), bari(-12, -21), ebTrumpet(2, 3);
+    const ClefTypeList treble(ClefType::G, ClefType::G);
+    switch (StarScoreFlexibleView(mode)) {
+    case StarScoreFlexibleView::Reference:   // B♭ Trumpet, (Alto Sax), Tenor Sax
+        return i == 0 ? StarScoreChairView { bbTrumpet, treble }
+               : bottom ? StarScoreChairView { tenor, ClefTypeList(ClefType::G8_VB, ClefType::G) }
+               : StarScoreChairView { alto, treble };
+    case StarScoreFlexibleView::RangeClefs:   // treble, soprano, alto
+        return i == 0 ? StarScoreChairView { none, treble }
+               : bottom ? StarScoreChairView { none, ClefTypeList(ClefType::C3, ClefType::C3) }
+               : StarScoreChairView { none, ClefTypeList(ClefType::C1, ClefType::C1) };
+    case StarScoreFlexibleView::StandardClefs:   // treble, (treble), bass
+        return bottom ? StarScoreChairView { none, ClefTypeList(ClefType::F, ClefType::F) } : StarScoreChairView { none, treble };
+    case StarScoreFlexibleView::TrebleClefs:   // treble, (treble), treble an octave down
+        return bottom ? StarScoreChairView { none, ClefTypeList(ClefType::G8_VB, ClefType::G8_VB) }
+               : StarScoreChairView { none, treble };
+    case StarScoreFlexibleView::BassClefs:   // bass an octave up, (bass an octave up), bass
+        return bottom ? StarScoreChairView { none, ClefTypeList(ClefType::F, ClefType::F) }
+               : StarScoreChairView { none, ClefTypeList(ClefType::F_8VA, ClefType::F_8VA) };
+    case StarScoreFlexibleView::Bb:   // B♭ Trumpet, (B♭ Trumpet), Tenor Sax
+        return bottom ? StarScoreChairView { tenor, ClefTypeList(ClefType::G8_VB, ClefType::G) }
+               : StarScoreChairView { bbTrumpet, treble };
+    case StarScoreFlexibleView::Eb: {   // Alto Sax or E♭ Trumpet (whichever keeps more notes in range), (the same), Bari Sax
+        if (bottom) {
+            return StarScoreChairView { bari, ClefTypeList(ClefType::F, ClefType::G) };
+        }
+        // written ranges: alto sax B♭3–F♯6, E♭ trumpet F♯3–C6
+        const int altoOut = part ? starscoreNotesOutside(part, -9, 58, 90) : 0;
+        const int trumpetOut = part ? starscoreNotesOutside(part, 3, 54, 84) : 0;
+        return StarScoreChairView { trumpetOut < altoOut ? ebTrumpet : alto, treble };
+    }
+    }
+    return StarScoreChairView { none, treble };
+}
+}
+
+int StarScoreService::flexibleViewMode() const
+{
+    settings()->setDefaultValue(FLEXIBLE_VIEW, Val(int(StarScoreFlexibleView::Reference)));
+    return std::clamp(settings()->value(FLEXIBLE_VIEW).toInt(), 0, int(StarScoreFlexibleView::Eb));
+}
+
+void StarScoreService::setFlexibleViewMode(int mode)
+{
+    settings()->setSharedValue(FLEXIBLE_VIEW, Val(std::clamp(mode, 0, int(StarScoreFlexibleView::Eb))));
+    if (!masterScore()) {
+        return;
+    }
+    for (const StarScoreSection& s : load().sections) {
+        applyFlexibleView(s);
+    }
+    m_changed.notify();
+}
+
+bool StarScoreService::hasFlexibleSections() const
+{
+    if (!masterScore()) {
+        return false;
+    }
+    const Data d = load();
+    return std::any_of(d.sections.begin(), d.sections.end(),
+                       [](const StarScoreSection& s) { return s.templateKey.endsWith("-horn-any"); });
+}
+
+int StarScoreService::applyFlexibleView(const StarScoreSection& section)
 {
     IMasterNotationPtr master = globalContext()->currentMasterNotation();
     engraving::MasterScore* ms = masterScore();
     if (!master || !ms || !section.templateKey.endsWith("-horn-any")) {
         return 0;
     }
+    const int mode = flexibleViewMode();
     const std::vector<engraving::Part*> chairs = starscoreChairParts(ms, section);
     const int n = int(chairs.size());
+    if (n < 2) {
+        return 0;
+    }
     int changed = 0;
-    master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Flexible clefs"));
-    for (int i = 1; i < n; ++i) {
+    master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Show the Flexible chairs"));
+    for (int i = 0; i < n; ++i) {
         engraving::Part* part = chairs[size_t(i)];
-        engraving::Staff* staff = part->staves().empty() ? nullptr : part->staves().front();
-        // (a chair shown as a Standard horn is left as it is)
-        if (!staff || part->instrument()->transpose().chromatic != 0) {
+        const engraving::Staff* staff = part->staves().empty() ? nullptr : part->staves().front();
+        if (!staff) {
             continue;
         }
-        const bool bottom = i == n - 1;
-        const engraving::ClefType from = bottom ? engraving::ClefType::F : engraving::ClefType::G;
-        const engraving::ClefType to = bottom ? engraving::ClefType::C3 : engraving::ClefType::C1;
-        if (staff->defaultClefType().concertClef != from) {
+        const StarScoreChairView view = starscoreChairView(mode, i, n, part);
+        if (part->instrument()->transpose() == view.transpose && staff->defaultClefType() == view.clef) {
             continue;
         }
-        starscoreSetChairDisplay(ms, part, engraving::Interval(0, 0), engraving::ClefTypeList(to, to));
+        starscoreSetChairDisplay(ms, part, view.transpose, view.clef);
         ++changed;
     }
     master->notation()->undoStack()->commitChanges();
@@ -720,72 +828,6 @@ int StarScoreService::setFlexibleWorkingClefs(const StarScoreSection& section)
         master->notation()->notationChanged().notify();
     }
     return changed;
-}
-
-bool StarScoreService::flexibleShownAsStandard(const QString& sectionId) const
-{
-    engraving::MasterScore* ms = masterScore();
-    if (!ms) {
-        return false;
-    }
-    for (const StarScoreSection& s : load().sections) {
-        if (s.id == sectionId) {
-            const std::vector<engraving::Part*> chairs = starscoreChairParts(ms, s);
-            return !chairs.empty() && chairs.front()->instrument()->transpose().chromatic != 0;
-        }
-    }
-    return false;
-}
-
-void StarScoreService::setFlexibleShownAsStandard(const QString& sectionId, bool standard)
-{
-    IMasterNotationPtr master = globalContext()->currentMasterNotation();
-    engraving::MasterScore* ms = masterScore();
-    if (!master || !ms) {
-        return;
-    }
-    const Data d = load();
-    const StarScoreSection* section = nullptr;
-    for (const StarScoreSection& s : d.sections) {
-        if (s.id == sectionId && s.templateKey.endsWith("-horn-any")) {
-            section = &s;
-        }
-    }
-    if (!section) {
-        return;
-    }
-    const std::vector<engraving::Part*> chairs = starscoreChairParts(ms, *section);
-    const int n = int(chairs.size());
-    if (n < 2) {
-        return;
-    }
-    using engraving::ClefType;
-    using engraving::ClefTypeList;
-    master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable(
-                                                        standard ? "Show as Standard horns" : "Show in Flexible clefs"));
-    for (int i = 0; i < n; ++i) {
-        const bool bottom = i == n - 1;
-        engraving::Interval transpose(0, 0);
-        ClefTypeList clef(ClefType::G, ClefType::G);
-        if (standard) {
-            // B♭ Trumpet on top, Tenor Sax at the bottom, Alto Sax between (3-Horn)
-            if (i == 0) {
-                transpose = engraving::Interval(-1, -2);
-            } else if (bottom) {
-                transpose = engraving::Interval(-8, -14);
-                clef = ClefTypeList(ClefType::G8_VB, ClefType::G);
-            } else {
-                transpose = engraving::Interval(-5, -9);
-            }
-        } else if (bottom) {
-            clef = ClefTypeList(ClefType::C3, ClefType::C3);
-        } else if (i > 0) {
-            clef = ClefTypeList(ClefType::C1, ClefType::C1);
-        }
-        starscoreSetChairDisplay(ms, chairs[size_t(i)], transpose, clef);
-    }
-    master->notation()->undoStack()->commitChanges();
-    master->notation()->notationChanged().notify();
 }
 
 void StarScoreService::fillAnyHornsFromStandard(const StarScoreSection& anySection)
@@ -1006,6 +1048,7 @@ void StarScoreService::offerLowAlternates(const QStringList& partIds, bool asked
     QStringList missing;   // instrument ids of the versions the line doesn't have yet
     std::vector<StarScoreHornChoice> all;   // every version the main part can have, in order
     bool oneHorn = false;   // the 1-Horn Trumpet: its three other sheets are made without asking
+    QStringList emptyVersions;   // empty stand-ins (made with the section) that the new versions replace
     for (const StarScoreSection& s : data.sections) {
         const QString seventh = starscoreSeventhChair(ms, s);
         for (const QString& pid : partIds) {
@@ -1041,9 +1084,14 @@ void StarScoreService::offerLowAlternates(const QStringList& partIds, bool asked
             // bass clarinet in bass clef counts as the Bass Clarinet version.
             QStringList have;
             QStringList haveIds;   // (the 1-Horn versions' names aren't the band's names for the horns)
+            QStringList emptyHere;   // stand-ins made empty with the section (a piccolo's Flute): filled now
             for (const auto& [alt, main] : s.alternates) {
                 if (main == pid) {
                     if (const engraving::Part* a = ms->partById(ID(alt))) {
+                        if (!starscore::partHasNotes(a)) {
+                            emptyHere << alt;
+                            continue;
+                        }
                         have << starscore::bandHornName(a->instrumentId().toQString());
                         haveIds << a->instrumentId().toQString();
                     }
@@ -1053,7 +1101,7 @@ void StarScoreService::offerLowAlternates(const QStringList& partIds, bool asked
             const int from = seventh.isEmpty() ? 0 : int(s.partIds.indexOf(seventh));
             for (int i = 0; i < s.partIds.size(); ++i) {
                 const QString& other = s.partIds.at(i);
-                if (other != pid && i >= from) {
+                if (other != pid && i >= from && !emptyHere.contains(other)) {
                     if (const engraving::Part* a = ms->partById(ID(other))) {
                         have << starscore::bandHornName(a->instrumentId().toQString());
                         haveIds << a->instrumentId().toQString();
@@ -1067,6 +1115,7 @@ void StarScoreService::offerLowAlternates(const QStringList& partIds, bool asked
                 }
             }
             if (!want.isEmpty()) {
+                emptyVersions = emptyHere;
                 oneHorn = s.templateKey == "1-horn";
                 sectionId = s.id;
                 mainId = pid;
@@ -1110,7 +1159,8 @@ void StarScoreService::offerLowAlternates(const QStringList& partIds, bool asked
     // 1-Horn (Joel, 5 Oct 2026): the Trumpet sheet marked Finished makes the other three, the same music and
     // formatting, without asking
     if (oneHorn) {
-        QTimer::singleShot(0, &m_timerGuard, [this, sectionId, mainId, missing, list]() {
+        QTimer::singleShot(0, &m_timerGuard, [this, sectionId, mainId, missing, list, emptyVersions]() {
+            removeEmptyVersions(emptyVersions);
             const RetVal<QStringList> made = createLowAlternates(sectionId, mainId, missing);
             if (!made.ret) {
                 interactive()->error(muse::trc("starscore", "Couldn't make the 1-Horn sheets"), made.ret.toString());
@@ -1126,7 +1176,7 @@ void StarScoreService::offerLowAlternates(const QStringList& partIds, bool asked
     }
 
     // After the menu that set the status has closed
-    QTimer::singleShot(0, &m_timerGuard, [this, sectionId, mainId, mainName, missing, list, one, piccolo]() {
+    QTimer::singleShot(0, &m_timerGuard, [this, sectionId, mainId, mainName, missing, list, one, piccolo, emptyVersions]() {
         constexpr int Create = static_cast<int>(IInteractive::Button::CustomButton) + 1;
         constexpr int NotNow = static_cast<int>(IInteractive::Button::CustomButton) + 2;
         const QString question = piccolo
@@ -1148,6 +1198,7 @@ void StarScoreService::offerLowAlternates(const QStringList& partIds, bool asked
         if (answer.button() != Create) {
             return;
         }
+        removeEmptyVersions(emptyVersions);
         const RetVal<QStringList> made = createLowAlternates(sectionId, mainId, missing);
         if (!made.ret) {
             interactive()->error(one ? muse::trc("starscore", "Couldn't create the part") : muse::trc("starscore", "Couldn't create the parts"),
@@ -1167,6 +1218,27 @@ void StarScoreService::offerLowAlternates(const QStringList& partIds, bool asked
                                                        "page breaks, system breaks and system locks. Notes outside an instrument's "
                                                        "range are colored.")).arg(list, mainName).toStdString());
     });
+}
+
+//! Empty stand-in versions (a piccolo's Flute made with the section, never written in) taken out before new ones with
+//! the main part's music are made in their place
+void StarScoreService::removeEmptyVersions(const QStringList& partIds)
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    engraving::MasterScore* ms = masterScore();
+    if (!master || !ms || partIds.isEmpty()) {
+        return;
+    }
+    muse::IDList ids;
+    for (const QString& pid : partIds) {
+        const engraving::Part* p = ms->partById(ID(pid));
+        if (p && !starscore::partHasNotes(p)) {
+            ids.push_back(p->id());
+        }
+    }
+    if (!ids.empty()) {
+        master->parts()->removeParts(ids);
+    }
 }
 
 RetVal<QStringList> StarScoreService::createLowAlternates(const QString& sectionId, const QString& mainPartId,
@@ -1888,17 +1960,12 @@ void StarScoreService::tidyOpenedScore()
         }
     }
 
-    // The Flexible chairs' working clefs (treble / soprano / alto, 1.18.7): once per file
-    const bool anyFlexible = std::any_of(d.sections.begin(), d.sections.end(),
-                                         [](const StarScoreSection& s) { return s.templateKey.endsWith("-horn-any"); });
-    if (!d.flexibleClefsSet && anyFlexible) {
-        for (const StarScoreSection& s : d.sections) {
-            setFlexibleWorkingClefs(s);
-        }
-        d = load();
-        d.flexibleClefsSet = true;
-        store(d);
+    // The Flexible chairs as the status bar's "Show Flexible horns as" says (every score, 1.18.16)
+    for (const StarScoreSection& s : d.sections) {
+        applyFlexibleView(s);
     }
+    // the arrangements' own score tabs as the "Section scores visible" switch says
+    syncSectionTabs({});
 
     // Tempo marks in the text style's font, title frames of a fixed height
     if (starscore::tidyTempoAndFrames(ms, false) > 0) {

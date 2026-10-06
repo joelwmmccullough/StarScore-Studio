@@ -34,8 +34,8 @@ void NotationToolBarModel::load()
         return;
     }
 
+    // StarScore: no Parts button (Joel, 6 Oct 2026): sections and their menus show, name and make the parts
     muse::actions::ActionCodeList itemsCodes = {
-        "parts",
         "toggle-mixer"
     };
 
