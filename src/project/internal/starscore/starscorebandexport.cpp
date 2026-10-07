@@ -1904,10 +1904,10 @@ static int starscoreTightenWrappedSystems(const INotationPtr& n)
     if (!sc) {
         return 0;
     }
-    // (laid out already: the systems were just set, in page view)
     if (n->painting()->viewMode() != ViewMode::PAGE) {
         n->painting()->setViewMode(ViewMode::PAGE);
     }
+    sc->doLayout();   // (the systems were just set; the Score's copy isn't laid out after each edit)
     auto systemsOf = [](const std::vector<Measure*>& run) {
         std::set<const System*> systems;
         for (const Measure* m : run) {
@@ -2053,7 +2053,7 @@ static void starscoreFitSystemsOnPages(const INotationPtr& n)
 //! laid-out page, each number that touches a hook (with a quarter space to spare) is raised just enough. Petaluma's
 //! hook is 1.48 spaces tall, so the house raise of 1 space still left Bumper Cars' and The Courier's numbers on it.
 //! Page view, laid out first. Returns how many numbers moved.
-static int starscoreClearBarNumbersOfBrackets(const INotationPtr& n)
+static int starscoreClearBarNumbersOfBrackets(const INotationPtr& n, bool laidOut = false)
 {
     mu::engraving::Score* sc = n && n->elements() ? n->elements()->msScore() : nullptr;
     if (!sc) {
@@ -2061,8 +2061,11 @@ static int starscoreClearBarNumbersOfBrackets(const INotationPtr& n)
     }
     if (n->painting()->viewMode() != ViewMode::PAGE) {
         n->painting()->setViewMode(ViewMode::PAGE);
+        laidOut = false;
     }
-    sc->doLayout();
+    if (!laidOut) {
+        sc->doLayout();
+    }
     const double gap = 0.25 * sc->style().spatium();
     // how far the bar number that sits lowest onto a bracket's hook has to go up (0: none touches)
     auto mostNeeded = [&](int* touching) {
@@ -2130,7 +2133,7 @@ static int starscoreClearBarNumbersOfBrackets(const INotationPtr& n)
     return first;
 }
 
-static int starscoreKeepRepeatsOnOnePage(const INotationPtr& n)
+static int starscoreKeepRepeatsOnOnePage(const INotationPtr& n, bool laidOut = false)
 {
     mu::engraving::Score* score = n && n->elements() ? n->elements()->msScore() : nullptr;
     if (!score) {
@@ -2138,8 +2141,11 @@ static int starscoreKeepRepeatsOnOnePage(const INotationPtr& n)
     }
     if (n->painting()->viewMode() != ViewMode::PAGE) {
         n->painting()->setViewMode(ViewMode::PAGE);
+        laidOut = false;
     }
-    score->doLayout();
+    if (!laidOut) {
+        score->doLayout();
+    }
     auto pageOf = [](const mu::engraving::Measure* m) -> const mu::engraving::Page* {
         const mu::engraving::Measure* shown = m ? m->coveringMMRestOrThis() : nullptr;
         return shown && shown->system() ? shown->system()->page() : nullptr;
@@ -2691,6 +2697,10 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         // gets its label on the instrument name's line and the credit below it; both change nothing when in place.
         // The edits are kept, never undone: an edit undone after a layout could leave stray bars in the score (Balkan
         // Wedding gained two empty bars).
+        // (printing lays the sheet out; the layout MuseScore does when the edit ends would be a second one. The book
+        // is shown again once at the end of the export.)
+        engraving::Score* bookScore = book->elements()->msScore();
+        bookScore->lockUpdates(true);
         book->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
         // the 1-Horn saxophones, made from the Trumpet: no mute or open markings (Joel, 6 Oct 2026)
         static const QRegularExpression oneHornSax("(^|/)1H/.*Saxophone");
@@ -2699,6 +2709,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         }
         const Ret ret = starscorePrintSheet(writer, book, file.sheetLeft, file.sheetRight, true, pdf);
         book->undoStack()->commitChanges();
+        bookScore->lockUpdates(false);
         touchedBooks.push_back(book);
         return ret;
     };
@@ -2814,6 +2825,15 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
             return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "couldn't make the score copy"));
         }
         engraving::MasterScore* cs = p->masterNotation()->masterScore();
+        // (Joel, 6 Oct 2026: exports took long) MuseScore lays the copy out again after every edit, and most steps
+        // below then lay it out themselves to measure it: while a Score is made, the copy is laid out only where
+        // something is measured (each step lays out first), about half the layouts
+        struct UpdatesLock {
+            engraving::Score* s;
+            explicit UpdatesLock(engraving::Score* sc)
+                : s(sc) { s->lockUpdates(true); }
+            ~UpdatesLock() { s->lockUpdates(false); }
+        } updatesLock(cs);
         std::set<int> refSystemEnds;   // the reference part's systems, when the Score takes its systems from a part
         QString refPartName;
         if (reuse) {
@@ -2994,6 +3014,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                                                   [](const engraving::Staff* st) { return st->visible(); });
                 if (!anyShown) {
                     for (engraving::Staff* st : part->staves()) {
+                        cs->doLayout();   // (judged on the layout so far, as when MuseScore lays out after each edit)
                         p->masterNotation()->parts()->setStaffVisible(st->id(), true);
                     }
                 }
@@ -3046,18 +3067,20 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                     starscoreRewritePartInstrument(p->masterNotation(), part, v.diatonic, v.chromatic, v.clef, false);
                 }
             }
-            n->undoStack()->prepareChanges(TranslatableString::untranslatable("Score pitch"));
-            n->style()->setStyleValue(StyleId::concertPitch, !file.transposingScore && file.flexibleScoreKey.isEmpty()
-                                      && file.scoreKey.isEmpty());
-            // multimeasure rests on every Score (Joel, 6 Oct 2026)
-            n->style()->setStyleValue(StyleId::createMultiMeasureRests, true);
-            n->undoStack()->commitChanges();
+            // a style change goes through the laid-out systems, so the copy is laid out once after the edits above
+            cs->doLayout();
             if (layout.valid) {
                 const PointF pos = cs->style().styleV(engraving::Sid::measureNumberPosAbove).value<PointF>();
                 n->undoStack()->prepareChanges(TranslatableString::untranslatable("Measure numbers"));
                 cs->undoChangeStyleVal(engraving::Sid::measureNumberPosAbove, PointF(pos.x(), pos.y() - 1.0));
                 n->undoStack()->commitChanges();
             }
+            n->undoStack()->prepareChanges(TranslatableString::untranslatable("Score pitch"));
+            n->style()->setStyleValue(StyleId::concertPitch, !file.transposingScore && file.flexibleScoreKey.isEmpty()
+                                      && file.scoreKey.isEmpty());
+            // multimeasure rests on every Score (Joel, 6 Oct 2026)
+            n->style()->setStyleValue(StyleId::createMultiMeasureRests, true);
+            n->undoStack()->commitChanges();
         }
         lap("prepared");
         // every system on its page: big Scores (orchestra, marching band) at a smaller staff size
@@ -3107,11 +3130,11 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
             // bars run onto an extra system before a break: tighter spacing where it saves the system
             starscoreTightenWrappedSystems(n);
             lap("tighten");
-            starscoreKeepRepeatsOnOnePage(n);
+            starscoreKeepRepeatsOnOnePage(n, true);   // (the tightening leaves it laid out)
         }
         lap("repeats");
-        // bar numbers clear of the brackets' hooks, measured on the page as it now is
-        starscoreClearBarNumbersOfBrackets(p->masterNotation()->notation());
+        // bar numbers clear of the brackets' hooks, measured on the page as it now is (laid out by the steps above)
+        starscoreClearBarNumbersOfBrackets(p->masterNotation()->notation(), layout.valid);
         // The composer credit at its house position (last line on the subtitle's baseline), measured in page
         // view: the main score's style can carry a credit moved too far (1.15.7's Apply Styles measured it in
         // continuous view and printed Bumper Cars' credit in the music). The arrangement top right, as on the parts.

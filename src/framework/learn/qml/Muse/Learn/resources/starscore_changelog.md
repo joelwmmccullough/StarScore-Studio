@@ -4,6 +4,12 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.21
+
+- **Faster exports.** A Score's working copy is no longer laid out again after every change while it's prepared, only where something has to be measured, and a part sheet isn't laid out a second time after it's printed. About a third less time on Bet and The Courier here; the sheets come out the same.
+- **Evenly spaced version numbers.** In the footer, the digits and dots of "Version 5.1.0" are now the same distance apart (the font set "5." tight and left a wide gap after the "1").
+- **"Save first?" only when there's something to save.** Exporting right after saving no longer asks.
+
 ## 1.18.20
 
 - **Minor-major 7 footnote** now reads "The [symbol] symbol denotes a minor-major 7 chord." (was "indicates"). "Update all sheets" makes again only the sheets that have the footnote, each with its version's last number raised.

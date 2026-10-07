@@ -31,8 +31,63 @@
 #include "ifileinfoprovider.h"
 #include "tlayout.h"
 
+#include "draw/fontmetrics.h"
+
 using namespace mu::engraving;
 using namespace mu::engraving::rendering::score;
+
+//! StarScore (Joel, 6 Oct 2026): "Version 5.1.0" in the footer had uneven gaps: the font kerns "5." tight and its "1"
+//! is narrow. Each digit and dot of a version number becomes a run of its own (runs aren't kerned against each other)
+//! with a small space between, sized from the font's own measurements, so the ink of every digit and dot is the same
+//! distance from the next. The footer's text in the style stays "Version 5.1.0".
+static String starscoreEvenVersionSpacing(const String& s, const String& face, double size)
+{
+    const size_t at = s.indexOf(u"Version ");
+    static const bool plain = qEnvironmentVariableIsSet("STARSCORE_TEST_PLAIN_VERSION");   // (for comparing exports)
+    if (plain || at == muse::nidx || face.empty() || size <= 0.0) {
+        return s;
+    }
+    const size_t start = at + 8;
+    size_t end = start;
+    while (end < s.size() && (s.at(end).isDigit() || s.at(end) == u'.')) {
+        ++end;
+    }
+    const String number = s.mid(start, end - start);
+    if (number.size() < 3 || !number.contains(u'.')) {
+        return s;
+    }
+    muse::draw::Font font;
+    font.setFamily(face, muse::draw::Font::Type::Unknown);
+    font.setPointSizeF(100.0);
+    const muse::draw::FontMetrics fm(font);
+    const double space = fm.horizontalAdvance(char32_t(' '));
+    if (space <= 0.0) {
+        return s;
+    }
+    // the gap between one character's ink and the next one's, unkerned (at 100 points)
+    std::vector<double> gaps;
+    for (size_t i = 0; i + 1 < number.size(); ++i) {
+        const Char a = number.at(i);
+        const Char b = number.at(i + 1);
+        const RectF inkA = fm.tightBoundingRect(a);
+        const RectF inkB = fm.tightBoundingRect(b);
+        gaps.push_back(fm.horizontalAdvance(char32_t(a.unicode())) - inkA.right() + inkB.left());
+    }
+    // every gap as wide as the widest, plus a little so each one has a space of its own to split the runs
+    const double target = *std::max_element(gaps.begin(), gaps.end()) + 0.05 * space;
+    String out = s.left(start);
+    const String back = u"<font size=\"" + String::number(size, 3) + u"\"/>";
+    for (size_t i = 0; i < number.size(); ++i) {
+        out += number.at(i);
+        if (i < gaps.size()) {
+            // a space this size is (target - gap) at the footer's size
+            const double spacer = (target - gaps[i]) * size / space;
+            out += u"<font size=\"" + String::number(spacer, 3) + u"\"/> " + back;
+        }
+    }
+    out += s.mid(end);
+    return out;
+}
 
 void HeaderFooterLayout::layoutHeaderFooter(LayoutContext& ctx, Page* page)
 {
@@ -150,7 +205,9 @@ void HeaderFooterLayout::createUpdateFooterText(LayoutContext& ctx, Page* page, 
         }
     }
 
-    if (!updateHeaderFooterText(ctx, page, text, s)) {
+    const String spaced = starscoreEvenVersionSpacing(s, ctx.conf().styleSt(Sid::footerFontFace),
+                                                       ctx.conf().styleD(Sid::footerFontSize));
+    if (!updateHeaderFooterText(ctx, page, text, spaced)) {
         removeFooterText(page, area);
     }
 }

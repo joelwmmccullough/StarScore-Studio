@@ -331,8 +331,10 @@ QString BandExportModel::exportNow()
     }
 
     // Exporting can occasionally crash StarScore: offered a save first. Yes saves and goes on only once the save has
-    // worked (the score has nothing unsaved left); No exports without saving; Cancel Export stops.
-    {
+    // worked (the score has nothing unsaved left); No exports without saving; Cancel Export stops. Not asked when
+    // there's nothing to save (Joel, 6 Oct 2026: saved just before exporting).
+    const INotationProjectPtr current = globalContext()->currentProject();
+    if (!current || current->needSave().val) {
         constexpr int Yes = static_cast<int>(muse::IInteractive::Button::CustomButton) + 1;
         constexpr int No = static_cast<int>(muse::IInteractive::Button::CustomButton) + 2;
         constexpr int Cancel = static_cast<int>(muse::IInteractive::Button::CustomButton) + 3;
