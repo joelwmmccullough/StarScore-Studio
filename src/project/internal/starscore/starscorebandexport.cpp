@@ -2300,7 +2300,12 @@ static bool starscoreSetMinMajNote(mu::engraving::Score* score)
     if (qEnvironmentVariableIsSet("STARSCORE_TEST_NO_MINMAJ_NOTE")) {
         return false;
     }
-    for (size_t pi = 0; pi < score->pages().size(); ++pi) {
+    // Joel, 7 Oct 2026: the diminished-major 7 diamond (U+E020…, even: no bar) gets the same kind of note on the
+    // first page where it appears. When both symbols first appear on the same page, one shorter combined note.
+    int mmPage = -1, dmPage = -1;
+    String mmFace, dmFace;
+    char16_t mmChar = 0, dmChar = 0;
+    for (size_t pi = 0; pi < score->pages().size() && (mmPage < 0 || dmPage < 0); ++pi) {
         for (const System* sys : score->pages().at(pi)->systems()) {
             for (const MeasureBase* mb : sys->measures()) {
                 if (!mb->isMeasure()) {
@@ -2323,16 +2328,16 @@ static bool starscoreSetMinMajNote(mu::engraving::Score* score)
                             }
                             const char16_t c = ts->text().at(0).unicode();
                             // the barred triangles U+E001… and barred diamonds U+E021… (odd: barred), one per chord font
-                            if (((c >= 0xE001 && c <= 0xE00D) || (c >= 0xE021 && c <= 0xE02D)) && (c & 1)) {
-                                const String face = ts->font().family().id();
-                                const String footerFace = score->style().styleSt(Sid::footerFontFace);
-                                score->setMetaTag(u"starscoreFooterNote",
-                                                  u"The <font face=\"" + face + u"\"/>" + String(Char(c))
-                                                  + u"<font face=\"" + footerFace + u"\"/> symbol denotes a minor-major 7 chord.");
-                                score->setMetaTag(u"starscoreFooterNotePage", String::number(int(pi)));
-                                score->setLayoutAll();
-                                score->doLayout();
-                                return true;
+                            if (mmPage < 0 && ((c >= 0xE001 && c <= 0xE00D) || (c >= 0xE021 && c <= 0xE02D)) && (c & 1)) {
+                                mmPage = int(pi);
+                                mmChar = c;
+                                mmFace = ts->font().family().id();
+                            }
+                            // the plain diamonds U+E020… (even): diminished-major 7
+                            if (dmPage < 0 && c >= 0xE020 && c <= 0xE02C && !(c & 1)) {
+                                dmPage = int(pi);
+                                dmChar = c;
+                                dmFace = ts->font().family().id();
                             }
                         }
                     }
@@ -2340,7 +2345,31 @@ static bool starscoreSetMinMajNote(mu::engraving::Score* score)
             }
         }
     }
-    return false;
+    if (mmPage < 0 && dmPage < 0) {
+        return false;
+    }
+    const String footerFace = score->style().styleSt(Sid::footerFontFace);
+    auto sym = [&](const String& face, char16_t c) {
+        return u"<font face=\"" + face + u"\"/>" + String(Char(c)) + u"<font face=\"" + footerFace + u"\"/>";
+    };
+    const String mmNote = mmPage < 0 ? String() : u"The " + sym(mmFace, mmChar) + u" symbol denotes a minor-major 7 chord.";
+    const String dmNote = dmPage < 0 ? String() : u"The " + sym(dmFace, dmChar)
+                          + u" symbol denotes a diminished-major 7 chord.";
+    if (mmPage >= 0 && mmPage == dmPage) {
+        score->setMetaTag(u"starscoreFooterNote", sym(mmFace, mmChar) + u" = minor-major 7; "
+                          + sym(dmFace, dmChar) + u" = diminished-major 7.");
+        score->setMetaTag(u"starscoreFooterNotePage", String::number(mmPage));
+    } else {
+        score->setMetaTag(u"starscoreFooterNote", mmPage >= 0 ? mmNote : dmNote);
+        score->setMetaTag(u"starscoreFooterNotePage", String::number(mmPage >= 0 ? mmPage : dmPage));
+        if (mmPage >= 0 && dmPage >= 0) {
+            score->setMetaTag(u"starscoreFooterNote2", dmNote);
+            score->setMetaTag(u"starscoreFooterNotePage2", String::number(dmPage));
+        }
+    }
+    score->setLayoutAll();
+    score->doLayout();
+    return true;
 }
 
 static void starscoreClearMinMajNote(mu::engraving::Score* score)
@@ -2348,6 +2377,8 @@ static void starscoreClearMinMajNote(mu::engraving::Score* score)
     // taken out entirely, so a part score saved after the export carries no trace of them
     score->metaTags().erase(u"starscoreFooterNote");
     score->metaTags().erase(u"starscoreFooterNotePage");
+    score->metaTags().erase(u"starscoreFooterNote2");
+    score->metaTags().erase(u"starscoreFooterNotePage2");
 }
 
 static Ret starscorePrintSheet(const INotationWriterPtr& writer, const INotationPtr& notation, const QString& left,

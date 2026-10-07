@@ -115,6 +115,11 @@ void HeaderFooterLayout::layoutHeaderFooter(LayoutContext& ctx, Page* page)
     if (page->score()->metaTag(u"starscoreFooterNotePage") == String::number(int(page->pageNumber()))) {
         note = page->score()->metaTag(u"starscoreFooterNote");
     }
+    // a second note (diminished-major 7, 1.18.25) when its symbol first appears on a different page
+    if (page->score()->metaTag(u"starscoreFooterNotePage2") == String::number(int(page->pageNumber()))) {
+        const String note2 = page->score()->metaTag(u"starscoreFooterNote2");
+        note = note.empty() ? note2 : note + u"\n" + note2;
+    }
     const bool footer = ctx.conf().styleB(Sid::showFooter) && (page->pageNumber() || ctx.conf().styleB(Sid::footerFirstPage));
     if (footer || !note.empty()) {
         const bool odd = (n & 1) || !ctx.conf().styleB(Sid::footerOddEven);

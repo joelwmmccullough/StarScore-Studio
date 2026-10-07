@@ -533,8 +533,8 @@ QVariantList StarScoreBarModel::moreMenu() const
         QVariantMap { { "id", "compare-parts" }, { "title", muse::qtrc("starscore", "Compare parts…") }, { "enabled", true } },
         QVariantMap { { "id", "toggle-minmaj" },
                       { "title", starScore()->minMajSymbolInCurrentScore()
-                        ? muse::qtrc("starscore", "Minor-major symbol in this part: on (switch off)")
-                        : muse::qtrc("starscore", "Minor-major symbol in this part: off (switch on)") },
+                        ? muse::qtrc("starscore", "Minor-major / diminished-major symbols in this part: on (switch off)")
+                        : muse::qtrc("starscore", "Minor-major / diminished-major symbols in this part: off (switch on)") },
                       { "enabled", true } },
         QVariantMap { { "id", "voice-order" }, { "title", muse::qtrc("starscore", "Check voice order…") }, { "enabled", true } },
         QVariantMap { { "id", "audit" }, { "title", muse::qtrc("starscore", "Audit this song") }, { "enabled", true } },
