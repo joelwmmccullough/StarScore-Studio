@@ -490,6 +490,11 @@ void DashboardModel::openUpdateAllSheets()
     interactive()->open(muse::UriQuery("musescore://starscore/updateallsheets"));
 }
 
+void DashboardModel::openApplyStylesToAll()
+{
+    interactive()->open(muse::UriQuery("musescore://starscore/updateallsheets?mode=styles"));
+}
+
 void DashboardModel::runAction(const QString& action)
 {
     dispatcher()->dispatch(action.toStdString());

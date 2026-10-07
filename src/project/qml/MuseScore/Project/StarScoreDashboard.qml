@@ -137,6 +137,12 @@ Rectangle {
                         onClicked: dash.openUpdateAllSheets()
                     }
                     FlatButton {
+                        text: qsTrc("starscore", "Apply part styles to every song")
+                        toolTipTitle: qsTrc("starscore", "Apply part styles to every song")
+                        toolTipDescription: qsTrc("starscore", "Opens each song in turn, applies Format › Part Styles to it and saves it")
+                        onClicked: dash.openApplyStylesToAll()
+                    }
+                    FlatButton {
                         text: qsTrc("starscore", "Rebuild everything")
                         toolTipTitle: qsTrc("starscore", "Rebuild everything")
                         toolTipDescription: qsTrc("starscore", "Rebuilds every generated PDF in both folders")

@@ -2159,6 +2159,72 @@ StarScoreAuditFileSummary StarScoreService::auditFile(const QString& path, bool 
     return summary;
 }
 
+//! Joel, 6 Oct 2026: a song's file named just "Title.starscore" ("Another One.starscore" in "Another One") is renamed
+//! "CODE - Title.starscore" ("ANON - Another One.starscore"), the code from Sheets and Demos' codes.json, when
+//! StarScore starts and finds the library. A file open now, a song with no code yet, or a name already taken is left as
+//! it is; files with any other name are never touched. The recent files list and the dashboard's audit cache follow.
+int StarScoreService::renameLibraryFilesToCodes()
+{
+    const QString library = auditLibraryFolder();
+    const QString band = bandFolder();
+    if (library.isEmpty() || band.isEmpty()) {
+        return 0;
+    }
+    QFile codesFile(band + "/6 Inbox/.organizer/codes.json");
+    if (!codesFile.open(QIODevice::ReadOnly)) {
+        return 0;
+    }
+    const QJsonObject codes = QJsonDocument::fromJson(codesFile.readAll()).object();
+    static const QRegularExpression category("^\\d+\\s+");
+    std::map<QString, QString> codeOfTitle;   // "another one" -> "ANON"
+    for (auto it = codes.begin(); it != codes.end(); ++it) {
+        QString title = it.key().section('/', -1);
+        title.remove(category);
+        codeOfTitle[title.toLower()] = it.value().toString();
+    }
+    QString openPath;
+    if (INotationProjectPtr current = globalContext()->currentProject()) {
+        openPath = QFileInfo(current->path().toQString()).absoluteFilePath();
+    }
+    int renamed = 0;
+    for (const QString& path : auditLibraryFiles(library)) {
+        const QFileInfo fi(path);
+        const QString title = fi.absoluteDir().dirName();
+        if (fi.completeBaseName().compare(title, Qt::CaseInsensitive) != 0) {
+            continue;
+        }
+        auto c = codeOfTitle.find(title.toLower());
+        if (c == codeOfTitle.end() || c->second.isEmpty() || fi.absoluteFilePath() == openPath) {
+            continue;
+        }
+        const QString newPath = fi.absolutePath() + "/" + c->second + " - " + title + ".starscore";
+        if (QFileInfo::exists(newPath) || !QFile::rename(path, newPath)) {
+            LOGW() << "[starscore] couldn't rename " << path << " to " << newPath;
+            continue;
+        }
+        ++renamed;
+        LOGI() << "[starscore] renamed " << path << " -> " << newPath;
+        // the recent files list (its paths compared as files: the list may spell the folder differently)
+        for (const RecentFile& r : recentFilesController()->recentFilesList()) {
+            if (QFileInfo(r.path.toQString()).absoluteFilePath() == fi.absoluteFilePath()) {
+                recentFilesController()->moveRecentFile(r.path, RecentFile(muse::io::path_t(newPath), r.displayNameOverride));
+                break;
+            }
+        }
+        // the dashboard's audit of the file (the file is the same, so its audit stays good)
+        const QJsonObject& cache = auditReadCache();
+        if (cache.contains(path)) {
+            const QJsonObject entry = cache.value(path).toObject();
+            auditLibraryCache().entries.remove(path);
+            auditUpdateCache(newPath, entry);
+        }
+    }
+    if (renamed) {
+        LOGI() << "[starscore] " << renamed << " song file(s) renamed to the standard name";
+    }
+    return renamed;
+}
+
 std::vector<StarScoreAuditFileSummary> StarScoreService::cachedLibraryAudit(const QString& folder) const
 {
     std::vector<StarScoreAuditFileSummary> out;

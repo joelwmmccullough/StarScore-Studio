@@ -577,6 +577,9 @@ public:
     virtual muse::RetVal<QString> updateCurrentSongSheets() = 0;
     //! Opens each song in turn, updates it (updateCurrentSongSheets), saves it, goes on to the next
     virtual void startUpdateAllSheets(const QStringList& paths) = 0;
+    //! The same run, but each song gets its part styles applied (Format › Part Styles › Apply to open score now) and is
+    //! saved (Joel, 6 Oct 2026: every song at once); status and stopping as for updating
+    virtual void startApplyStylesToAll(const QStringList& paths) = 0;
     virtual void cancelUpdateAllSheets() = 0;
     virtual StarScoreUpdateAllStatus updateAllStatus() const = 0;
     virtual void endExportProgress() = 0;

@@ -30,6 +30,9 @@
 using namespace mu::project;
 using namespace muse;
 
+//! (starscorebandexport.cpp) the section folder a sheet belongs to, above "Section Scores" or "Horn 1"…
+QString starscoreSectionFolderOf(const QString& rel);
+
 namespace {
 //! "1.2.3" as numbers, for comparing (missing parts are 0)
 std::vector<int> versionParts(const QString& v)
@@ -138,8 +141,9 @@ RetVal<QString> StarScoreService::updateCurrentSongSheets()
         return RetVal<QString>::make_ret(Ret::Code::UnknownError, muse::trc("starscore", "not in Sheets and Demos yet"));
     }
     const QString recordPath = plan.bandFolder + "/6 Inbox/.organizer/sheets/" + plan.code + ".json";
-    // Scores under their 1.18.18 names take their new names (sheet format 2 -> 3 changed nothing else)
-    const int renamed = renameScoresToSectionNames(plan);
+    // sheets exported under an older path or name moved to their place now (the Scores' names, 1.18.19; the Section
+    // Scores and Horn subfolders, 1.18.22)
+    const int renamed = moveSheetsToCurrentPaths(plan);
     QJsonObject record = readJson(recordPath);
     if (record.isEmpty()) {
         return RetVal<QString>::make_ret(Ret::Code::UnknownError, muse::trc("starscore", "no sheet record (never exported)"));
@@ -156,7 +160,7 @@ RetVal<QString> StarScoreService::updateCurrentSongSheets()
             out.commit();
         }
     };
-    const QString renamedNote = renamed > 0 ? muse::qtrc("starscore", " %1 Score(s) renamed.").arg(renamed) : QString();
+    const QString renamedNote = renamed > 0 ? muse::qtrc("starscore", " %1 sheet(s) moved or renamed.").arg(renamed) : QString();
     const Data data = load();
 
     // The sheets to make again, by the version printed on them: exported while Finished, and still Finished now (a
@@ -176,7 +180,8 @@ RetVal<QString> StarScoreService::updateCurrentSongSheets()
                 continue;   // reference PDFs are copied, not made
             }
             const bool same = f.relativePath == rel || f.formerPath == rel;   // (or the same sheet under its old name)
-            const bool renamedScore = f.isScore && isOldScoreName(rel) && f.relativePath.section('/', 0, -2) == folder;
+            const bool renamedScore = f.isScore && isOldScoreName(rel)
+                                      && starscoreSectionFolderOf(f.relativePath) == starscoreSectionFolderOf(rel);
             if (!same && !renamedScore) {
                 continue;
             }
@@ -260,12 +265,23 @@ void StarScoreService::startUpdateAllSheets(const QStringList& paths)
         return;
     }
     m_updateQueue = paths;
+    m_bulkStyles = false;
     m_updateStatus = StarScoreUpdateAllStatus();
     m_updateStatus.running = true;
     m_updateStatus.songCount = int(paths.size());
     m_updateStatus.songIndex = -1;
     LOGI() << "[starscore] update all sheets: " << paths.size() << " song(s)";
     QTimer::singleShot(0, &m_timerGuard, [this]() { updateAllNext(); });
+}
+
+void StarScoreService::startApplyStylesToAll(const QStringList& paths)
+{
+    if (m_updateStatus.running) {
+        return;
+    }
+    startUpdateAllSheets(paths);
+    m_bulkStyles = true;
+    LOGI() << "[starscore] (applying part styles, not updating sheets)";
 }
 
 void StarScoreService::cancelUpdateAllSheets()
@@ -302,6 +318,14 @@ void StarScoreService::updateAllNext()
     LOGI() << "[starscore] update all sheets: opening " << path;
     auto current = globalContext()->currentProject();
     if (!current || QFileInfo(current->path().toQString()).absoluteFilePath() != QFileInfo(path).absoluteFilePath()) {
+        // the song open now saved first, so opening the next one doesn't stop at "Save changes?"
+        if (current && current->needSave().val && !projectFilesController()->saveProject()) {
+            m_updateStatus.results << muse::qtrc("starscore", "Stopped: the song that was open couldn't be saved. Save it, then start again.");
+            m_updateQueue.clear();
+            m_updateStatus.running = false;
+            m_updateStatus.finished = true;
+            return;
+        }
         dispatcher()->dispatch("starscore-audit-open", muse::actions::ActionData::make_arg1<QUrl>(QUrl::fromLocalFile(path)));
     }
     QTimer::singleShot(500, &m_timerGuard, [this, path]() { updateAllWhenOpen(path); });
@@ -327,11 +351,18 @@ void StarScoreService::updateAllWhenOpen(const QString& path)
         QTimer::singleShot(4000, &m_timerGuard, [this, path]() { updateAllWhenOpen(path); });
         return;
     }
-    m_updateStatus.phase = muse::qtrc("starscore", "Comparing");
-    const RetVal<QString> result = updateCurrentSongSheets();
-    QString line = result.ret ? result.val
-                   : muse::qtrc("starscore", "%1: not updated (%2).").arg(m_updateStatus.song,
-                                                                           QString::fromStdString(result.ret.toString()));
+    QString line;
+    if (m_bulkStyles) {
+        m_updateStatus.phase = muse::qtrc("starscore", "Applying part styles");
+        const int n = applyStyles();
+        line = muse::qtrc("starscore", "%1: part styles applied to %2 score(s) and part book(s).").arg(m_updateStatus.song).arg(n);
+    } else {
+        m_updateStatus.phase = muse::qtrc("starscore", "Comparing");
+        const RetVal<QString> result = updateCurrentSongSheets();
+        line = result.ret ? result.val
+               : muse::qtrc("starscore", "%1: not updated (%2).").arg(m_updateStatus.song,
+                                                                       QString::fromStdString(result.ret.toString()));
+    }
     // saved, so the next song can open in its place (and the new version numbers are kept)
     m_updateStatus.phase = muse::qtrc("starscore", "Saving");
     if (current->needSave().val && !projectFilesController()->saveProject()) {

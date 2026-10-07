@@ -15,7 +15,11 @@ import MuseScore.Project
 StyledDialogView {
     id: root
 
-    title: qsTrc("starscore", "Update all sheets")
+    // "update" (Update all sheets) or "styles" (Apply part styles to every song), from the dialog's address
+    property string mode: "update"
+    readonly property bool styles: root.mode === "styles"
+
+    title: root.styles ? qsTrc("starscore", "Apply part styles to every song") : qsTrc("starscore", "Update all sheets")
 
     contentWidth: 640
     contentHeight: 560
@@ -33,6 +37,7 @@ StyledDialogView {
 
     UpdateAllSheetsModel {
         id: model
+        mode: root.mode
     }
 
     Component.onCompleted: model.load()
@@ -53,7 +58,10 @@ StyledDialogView {
             Layout.fillWidth: true
             horizontalAlignment: Text.AlignLeft
             wrapMode: Text.WordWrap
-            text: qsTrc("starscore", "For after a StarScore update that changes how sheets are made. Each song below is "
+            text: root.styles
+                  ? qsTrc("starscore", "Each song below is opened in turn, gets Format › Part Styles › Apply to open score now, "
+                          + "and is saved. Save the song that's open now first.")
+                  : qsTrc("starscore", "For after a StarScore update that changes how sheets are made. Each song below is "
                         + "opened in turn and its sheets that were exported while Finished, and are still Finished, are "
                         + "made again. Only the ones that come out differently are written: the old file goes to Version "
                         + "History and the version on the sheet goes up by its last number (1.2.0 becomes 1.2.1). Each song "
@@ -65,7 +73,8 @@ StyledDialogView {
             horizontalAlignment: Text.AlignLeft
             font: ui.theme.bodyBoldFont
             visible: !root.busy && !root.state.finished
-            text: model.songs.length === 0 ? qsTrc("starscore", "Every song's sheets are up to date.")
+            text: root.styles ? qsTrc("starscore", "%1 song(s):").arg(model.songs.length)
+                  : model.songs.length === 0 ? qsTrc("starscore", "Every song's sheets are up to date.")
                   : qsTrc("starscore", "%1 song(s), %2 Finished sheet(s) to check:").arg(model.songs.length).arg(model.sheetCount)
         }
 
@@ -77,8 +86,9 @@ StyledDialogView {
             delegate: StyledTextLabel {
                 width: ListView.view ? ListView.view.width : 0
                 horizontalAlignment: Text.AlignLeft
-                text: modelData.code + " – " + modelData.title + "   ("
-                      + qsTrc("starscore", "%1 Finished sheet(s), made with %2").arg(modelData.sheets).arg(modelData.made) + ")"
+                text: root.styles ? (modelData.code ? modelData.code + " – " : "") + modelData.title
+                      : modelData.code + " – " + modelData.title + "   ("
+                        + qsTrc("starscore", "%1 Finished sheet(s), made with %2").arg(modelData.sheets).arg(modelData.made) + ")"
             }
         }
 
@@ -130,7 +140,8 @@ StyledDialogView {
                 onClicked: model.cancel()
             }
             FlatButton {
-                text: qsTrc("starscore", "Update %n song(s)", "", model.songs.length)
+                text: root.styles ? qsTrc("starscore", "Apply to %n song(s)", "", model.songs.length)
+                      : qsTrc("starscore", "Update %n song(s)", "", model.songs.length)
                 accentButton: true
                 visible: !root.busy && !root.state.finished
                 enabled: model.songs.length > 0

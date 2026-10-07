@@ -82,6 +82,9 @@ void StarScoreService::init()
 {
     installBuiltinDefaultStyle();
 
+    // the library's files under the standard name, once StarScore has started (and opened whatever it reopens)
+    QTimer::singleShot(4000, &m_timerGuard, [this]() { renameLibraryFilesToCodes(); });
+
     // One handler per channel: muse async keeps the first callback set for a receiver and silently drops a
     // second onNotify(this, ...) on the same channel, so the reference-panel part of this used to never run
     globalContext()->currentProjectChanged().onNotify(this, [this]() {

@@ -5,6 +5,9 @@
  */
 #include "updateallsheetsmodel.h"
 
+#include <QDir>
+#include <QFileInfo>
+
 #include "translation.h"
 
 using namespace mu::project;
@@ -16,7 +19,21 @@ UpdateAllSheetsModel::UpdateAllSheetsModel(QObject* parent)
 
 void UpdateAllSheetsModel::load()
 {
-    m_songs = starScore()->outdatedSongs();
+    if (m_mode == "styles") {
+        // every .starscore in the library ("AMPL - Amplitudes.starscore": code and title from the file's name)
+        m_songs.clear();
+        const QString library = starScore()->auditLibraryFolder();
+        for (const QString& path : library.isEmpty() ? QStringList() : starScore()->auditLibraryFiles(library)) {
+            StarScoreOutdatedSong s;
+            s.path = path;
+            const QString base = QFileInfo(path).completeBaseName();
+            s.code = base.contains(" - ") ? base.section(" - ", 0, 0) : QString();
+            s.title = QFileInfo(path).absoluteDir().dirName();
+            m_songs.push_back(s);
+        }
+    } else {
+        m_songs = starScore()->outdatedSongs();
+    }
     emit loaded();
 }
 
@@ -26,7 +43,12 @@ void UpdateAllSheetsModel::start()
     for (const StarScoreOutdatedSong& s : m_songs) {
         paths << s.path;
     }
-    if (!paths.isEmpty()) {
+    if (paths.isEmpty()) {
+        return;
+    }
+    if (m_mode == "styles") {
+        starScore()->startApplyStylesToAll(paths);
+    } else {
         starScore()->startUpdateAllSheets(paths);
     }
 }

@@ -320,6 +320,40 @@ static QString starscoreScoreNameBefore11819(const QString& rel)
     return m.hasMatch() ? m.captured(1) + " - " + m.captured(2) + " Score.pdf" : QString();
 }
 
+//! The section folder a sheet belongs to: its own folder, or the one above for a Score in "Section Scores" or a
+//! Flexible horn's sheet in "Horn 1"… (1.18.22)
+QString starscoreSectionFolderOf(const QString& rel)
+{
+    static const QRegularExpression sub("/(Section Scores|Horn \\d+)$");
+    QString folder = rel.section('/', 0, -2);
+    folder.remove(sub);
+    return folder;
+}
+
+//! Where the same sheet was before StarScore moved or renamed it, newest first: a Score at the top of its section
+//! folder (1.18.19 to 1.18.21) and under its 1.18.18 name; a Flexible horn's sheet at the top of the Flexible folder
+static QStringList starscoreFormerPathsOf(const StarScoreBandFile& f)
+{
+    QStringList out;
+    const QString folder = f.relativePath.section('/', 0, -2);
+    const QString file = f.relativePath.section('/', -1);
+    static const QString scoresSub = "/Section Scores";
+    if (f.isScore && folder.endsWith(scoresSub)) {
+        const QString top = folder.left(folder.size() - scoresSub.size()) + "/" + file;
+        out << top;
+        const QString v18 = starscoreScoreNameBefore11819(top);
+        if (!v18.isEmpty()) {
+            out << v18;
+        }
+    }
+    static const QRegularExpression hornSub("^(\\d+H Flexible)/Horn \\d+/(.+)$");
+    const QRegularExpressionMatch m = hornSub.match(f.relativePath);
+    if (m.hasMatch()) {
+        out << m.captured(1) + "/" + m.captured(2);
+    }
+    return out;
+}
+
 static QString starscoreSafeFileName(QString s)
 {
     static const QRegularExpression unsafe("[/:\\\\]");
@@ -983,6 +1017,25 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
         f.relativePath = "Reference PDFs/" + starscoreSafeFileName(ref.name) + ".pdf";
         f.sourceFile = referencePath(ref.id).toQString();
         plan.files.push_back(f);
+    }
+
+    // Joel, 6 Oct 2026 (1.18.22): a folder's Scores in its "Section Scores" subfolder, and a Flexible folder's sheets in
+    // a subfolder per horn ("2H Flexible/Horn 1/CODE - Horn 1 - Trumpet in Bb.pdf")
+    {
+        static const QRegularExpression flexibleHorn("^(\\d+H Flexible)/(.+ - Horn (\\d+) - .+)$");
+        for (StarScoreBandFile& f : plan.files) {
+            if (!f.sourceFile.isEmpty()) {
+                continue;
+            }
+            if (f.isScore) {
+                f.relativePath = f.relativePath.section('/', 0, -2) + "/Section Scores/" + f.relativePath.section('/', -1);
+                continue;
+            }
+            const QRegularExpressionMatch m = flexibleHorn.match(f.relativePath);
+            if (m.hasMatch()) {
+                f.relativePath = m.captured(1) + "/Horn " + m.captured(3) + "/" + m.captured(2);
+            }
+        }
     }
 
     // A path should appear once only
@@ -2570,9 +2623,10 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     }
 
     const QString songDir = plan.bandFolder + "/" + plan.songFolder;
-    // Scores under their 1.18.18 names take their new names first (not made again for that)
+    // sheets exported under an older path or name go to their place now first (every sheet of the song, ticked or
+    // not; none is made again for that)
     if (!m_exportDryRun) {
-        renameScoresToSectionNames(plan);
+        moveSheetsToCurrentPaths(full);
     }
     const QString today = QDate::currentDate().toString(Qt::ISODate);
     const QString tmpDir = QDir::tempPath() + "/StarScoreExport-" + QUuid::createUuid().toString(QUuid::Id128);
@@ -3108,7 +3162,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                                                                                   QCryptographicHash::Md5).toHex());
                 Data stored = loadFrom(ms);
                 // one set of systems for a folder's six Scores, worked out on the Concert Score (written first)
-                const QString systemsKey = file.relativePath.section('/', 0, -2) + "/Scores";
+                const QString systemsKey = starscoreSectionFolderOf(file.relativePath) + "/Scores";
                 const QJsonObject cached = stored.scoreSystems.value(systemsKey).toObject();
                 if (cached.value("key").toString() == key) {
                     std::vector<int> ends;
@@ -3371,16 +3425,18 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         // Scores under their names from before 1.18.17 ("CODE - Score.pdf", "CODE - Score (Transposing).pdf", the Flexible
         // "CODE - Score (Bb).pdf"…): archived once the folder's new Scores ("Concert Score"…) are written
         {
-            std::set<QString> scoreFolders;
+            std::set<QString> scoreFolders;   // the section folders (above "Section Scores")
             for (const StarScoreBandFile& f : plan.files) {
                 if (f.isScore && QFileInfo::exists(songDir + "/" + f.relativePath)) {
-                    scoreFolders.insert(f.relativePath.section('/', 0, -2));
+                    scoreFolders.insert(starscoreSectionFolderOf(f.relativePath));
                 }
             }
             for (const QString& folder : scoreFolders) {
                 const QDir dir(songDir + "/" + folder);
-                // (and the 1.18.18 names, "CODE - Concert Score.pdf"…, left over when the renamed one was already there)
-                QStringList names { plan.code + " - Score.pdf", plan.code + " - Score (*).pdf" };
+                // (and the 1.18.18 names, "CODE - Concert Score.pdf"…, and the 1.18.19 ones at the top of the folder,
+                // "CODE - Section Score (Concert).pdf", left over when the moved one was already there)
+                QStringList names { plan.code + " - Score.pdf", plan.code + " - Score (*).pdf",
+                                    plan.code + " - Section Score (*).pdf" };
                 for (const QString& type : { "Concert", "Transposing", "Bb", "Eb", "Treble Clef", "Bass Clef" }) {
                     names << plan.code + " - " + type + " Score.pdf";
                 }
@@ -3670,37 +3726,38 @@ std::vector<StarScoreFlexibleSheet> StarScoreService::flexibleSheets(const QStri
     return out;
 }
 
-//! 1.18.19 (Joel, 6 Oct 2026): a section's Scores went from "CODE - Concert Score.pdf"… to "CODE - Section Score
-//! (Concert).pdf"…. Only the name changed, so the file is renamed rather than made again (no new version, nothing
-//! archived), and its sheet record entry and the folder colours' lists follow it.
-int StarScoreService::renameScoresToSectionNames(const StarScoreBandExportPlan& plan)
+//! Sheets StarScore has moved or renamed since they were exported (1.18.19: the Scores' names; 1.18.22: Scores into
+//! "Section Scores", Flexible horns' sheets into "Horn 1"…): the file already there is moved to its new place rather
+//! than made again (no new version, nothing archived), and its sheet record entry and the folder colours' lists
+//! follow it. Returns how many moved.
+int StarScoreService::moveSheetsToCurrentPaths(const StarScoreBandExportPlan& plan)
 {
     if (plan.bandFolder.isEmpty() || plan.songFolder.isEmpty()) {
         return 0;
     }
     const QString songDir = plan.bandFolder + "/" + plan.songFolder;
-    std::vector<std::pair<QString, QString> > renamed;   // old -> new, relative to the song folder
+    std::vector<std::pair<QString, QString> > moved;   // old -> new, relative to the song folder
     for (const StarScoreBandFile& f : plan.files) {
-        if (!f.isScore) {
-            continue;
-        }
-        const QString old = starscoreScoreNameBefore11819(f.relativePath);
-        if (old.isEmpty()) {
-            continue;
-        }
-        const QString from = songDir + "/" + old;
         const QString to = songDir + "/" + f.relativePath;
-        if (!QFileInfo::exists(from) || QFileInfo::exists(to)) {
-            continue;   // nothing to rename, or the new one is there already (the old one is archived after the export)
+        if (QFileInfo::exists(to)) {
+            continue;   // already in place (a file left at an old path is archived after the export)
         }
-        if (QFile::rename(from, to)) {
-            renamed.push_back({ old, f.relativePath });
-            LOGI() << "[starscore] renamed " << old << " -> " << f.relativePath;
-        } else {
-            LOGW() << "[starscore] couldn't rename " << old << " -> " << f.relativePath;
+        for (const QString& old : starscoreFormerPathsOf(f)) {
+            const QString from = songDir + "/" + old;
+            if (!QFileInfo::exists(from)) {
+                continue;
+            }
+            QDir().mkpath(QFileInfo(to).absolutePath());
+            if (QFile::rename(from, to)) {
+                moved.push_back({ old, f.relativePath });
+                LOGI() << "[starscore] moved " << old << " -> " << f.relativePath;
+            } else {
+                LOGW() << "[starscore] couldn't move " << old << " -> " << f.relativePath;
+            }
+            break;
         }
     }
-    if (renamed.empty()) {
+    if (moved.empty()) {
         return 0;
     }
     // the sheet record: every mention of the old path (its entry, and the lists of sheets each folder colour needs)
@@ -3709,7 +3766,7 @@ int StarScoreService::renameScoresToSectionNames(const StarScoreBandExportPlan& 
     if (in.open(QIODevice::ReadOnly)) {
         QString text = QString::fromUtf8(in.readAll());
         in.close();
-        for (const auto& [old, now] : renamed) {
+        for (const auto& [old, now] : moved) {
             text.replace("\"" + old + "\"", "\"" + now + "\"");
         }
         if (!QJsonDocument::fromJson(text.toUtf8()).isNull()) {
@@ -3720,7 +3777,7 @@ int StarScoreService::renameScoresToSectionNames(const StarScoreBandExportPlan& 
             }
         }
     }
-    return int(renamed.size());
+    return int(moved.size());
 }
 
 StarScoreVersionSuggestion StarScoreService::suggestVersionBump(const StarScoreBandExportPlan& plan) const

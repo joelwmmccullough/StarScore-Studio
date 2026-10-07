@@ -22,6 +22,8 @@ class UpdateAllSheetsModel : public QObject, public muse::Contextable
 
     Q_PROPERTY(QVariantList songs READ songs NOTIFY loaded)
     Q_PROPERTY(int sheetCount READ sheetCount NOTIFY loaded)
+    //! "update" (the outdated songs' sheets) or "styles" (every song in the library gets its part styles applied)
+    Q_PROPERTY(QString mode READ mode WRITE setMode NOTIFY loaded)
 
     QML_ELEMENT
 
@@ -36,6 +38,8 @@ public:
 
     QVariantList songs() const;
     int sheetCount() const;
+    QString mode() const { return m_mode; }
+    void setMode(const QString& mode) { m_mode = mode; }
 
 signals:
     void loaded();
@@ -43,5 +47,6 @@ signals:
 private:
     muse::ContextInject<IStarScoreService> starScore = { this };
     std::vector<StarScoreOutdatedSong> m_songs;
+    QString m_mode = "update";
 };
 }

@@ -30,6 +30,7 @@
 #include "actions/iactionsdispatcher.h"
 #include "iinteractive.h"
 #include "../../iprojectfilescontroller.h"
+#include "../../irecentfilescontroller.h"
 
 namespace mu::engraving {
 class MasterScore;
@@ -52,6 +53,7 @@ class StarScoreService : public IStarScoreService, public muse::Contextable, pub
     muse::ContextInject<muse::actions::IActionsDispatcher> dispatcher = { this };
     muse::ContextInject<muse::IInteractive> interactive = { this };
     muse::ContextInject<IProjectFilesController> projectFilesController = { this };
+    muse::ContextInject<IRecentFilesController> recentFilesController = { this };
 
 public:
     explicit StarScoreService(const muse::modularity::ContextPtr& iocCtx);
@@ -166,6 +168,7 @@ public:
     std::vector<StarScoreOutdatedSong> outdatedSongs() const override;
     muse::RetVal<QString> updateCurrentSongSheets() override;
     void startUpdateAllSheets(const QStringList& paths) override;
+    void startApplyStylesToAll(const QStringList& paths) override;
     void cancelUpdateAllSheets() override;
     StarScoreUpdateAllStatus updateAllStatus() const override;
     //! Records where the export is, logs it, and lets the windows repaint
@@ -300,9 +303,9 @@ public:
     static std::vector<mu::engraving::Part*> masterPartsOf(const mu::engraving::Score* score, const mu::engraving::MasterScore* ms);
 
 private:
-    //! Scores under their 1.18.18 names ("CODE - Concert Score.pdf"…) renamed to "CODE - Section Score (Concert).pdf"…,
-    //! with their sheet record entries; how many were renamed
-    int renameScoresToSectionNames(const StarScoreBandExportPlan& plan);
+    //! Sheets already exported under an older path or name (see starscoreFormerPathsOf) moved to where the export
+    //! puts them now, with their sheet record entries; how many moved
+    int moveSheetsToCurrentPaths(const StarScoreBandExportPlan& plan);
 
     //! Organizer: per-bar signatures of a sheet ({bars: [...], marks: {bar: "A"}}), and the 1-3 horn parts analysed
     //! for the Horn Part Guides (starscoreaudit.cpp)
@@ -471,6 +474,9 @@ private:
     bool m_exportDryRun = false;          // the export writes nothing; m_dryRunChanged gets the sheets that would change
     QStringList m_dryRunChanged;
     QStringList m_updateQueue;
+    bool m_bulkStyles = false;   // the run applies part styles instead of updating sheets
+    //! When StarScore starts: songs' files named "Title.starscore" renamed "CODE - Title.starscore"; how many
+    int renameLibraryFilesToCodes();
     StarScoreUpdateAllStatus m_updateStatus;
     int m_updateWaits = 0;
     void updateAllNext();

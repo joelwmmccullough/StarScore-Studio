@@ -33,6 +33,9 @@
 #include "engraving/dom/masterscore.h"
 #include "engraving/dom/part.h"
 
+//! (starscorebandexport.cpp) the section folder a sheet belongs to, above "Section Scores" or "Horn 1"…
+QString starscoreSectionFolderOf(const QString& rel);
+
 using namespace mu::project;
 using namespace muse;
 
@@ -215,7 +218,8 @@ void StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, const 
         if (!f.sourceFile.isEmpty()) {
             continue;
         }
-        const QString folder = f.relativePath.section('/', 0, -2);
+        // (a Score in "Section Scores" and a Flexible horn's sheet in "Horn 1" belong to the folder above)
+        const QString folder = starscoreSectionFolderOf(f.relativePath);
         if (f.isScore) {
             scoreOfFolder[folder] = f.relativePath;
             continue;
@@ -250,7 +254,7 @@ void StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, const 
     auto folderOf = [&](const QStringList& files) {
         QString best;
         for (const QString& f : files) {
-            const QString folder = f.section('/', 0, -2);
+            const QString folder = starscoreSectionFolderOf(f);
             if (best.isEmpty() || folder.count('/') < best.count('/')) {
                 best = folder;
             }

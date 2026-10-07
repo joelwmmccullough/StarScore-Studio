@@ -635,6 +635,20 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         }
         autotestLog(QString("  %1 song(s): %2").arg(paths.size()).arg(paths.join(", ")));
         startUpdateAllSheets(paths);
+    } else if (step.startsWith("renamelib:")) {
+        // renamelib:<Projects and Sheets folder>: what StarScore does when it starts (Title.starscore -> CODE - Title)
+        const QString band = qEnvironmentVariable("STARSCORE_AUTOTEST_BAND");
+        if (!band.isEmpty()) {
+            setBandFolder(band);
+        }
+        setAuditLibraryFolder(step.mid(10));
+        autotestLog(QString("  %1 renamed").arg(renameLibraryFilesToCodes()));
+    } else if (step.startsWith("stylesall:")) {
+        // stylesall:<Projects and Sheets folder>: "Apply part styles to every song" (then waitupdate)
+        setAuditLibraryFolder(step.mid(10));
+        const QStringList paths = auditLibraryFiles(step.mid(10));
+        autotestLog(QString("  %1 song(s)").arg(paths.size()));
+        startApplyStylesToAll(paths);
     } else if (step.startsWith("exportonly:") || step == "updatesong" || step.startsWith("outdated:")) {
         // exportonly:<path>+<path>: only those sheets; updatesong: "Update all sheets" for the open song;
         // outdated:<Projects and Sheets folder>: the songs Update all sheets would offer

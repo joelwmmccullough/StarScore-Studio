@@ -4,6 +4,12 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.22
+
+- **Section Scores in their own subfolder.** Each part folder (4H…, Big Band, the String sections…) keeps its Scores in "Section Scores". The Flexible 2H and 3H folders have a subfolder per horn ("Horn 1", "Horn 2"…) plus "Section Scores". Sheets already exported are moved there the next time the song is exported or "Update all sheets" reaches it: same files, same versions, nothing archived. The sheet record and the folder colours follow.
+- **Song files get the standard name.** When StarScore starts, a song's file named just "Title.starscore" ("Another One.starscore") is renamed "CODE - Title.starscore" ("ANON - Another One.starscore"), using the code from Sheets and Demos. A song that's open is left alone, files with any other name are never touched, and the recent files list follows the new name.
+- **Apply part styles to every song** (Home › Dashboard): opens each song in turn, applies Format › Part Styles › Apply to open score now, and saves it. The song open when it starts is saved first.
+
 ## 1.18.21
 
 - **Faster exports.** A Score's working copy is no longer laid out again after every change while it's prepared, only where something has to be measured, and a part sheet isn't laid out a second time after it's printed. About a third less time on Bet and The Courier here; the sheets come out the same.
