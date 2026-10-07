@@ -26,6 +26,8 @@
  *                 JSON), chart.html (the PDF page, without the version footer, as pdfchart.py writes it),
  *                 ireal.html (the iReal Pro page); plus CODE - Chord Chart.html with the footer. The page's font
  *                 URLs come from STARSCORE_AUTOTEST_FONTS ("modernoir;jost;bravura"), else the app's embedded ones.
+ *   standardize   makes the song standard (standardize:plan only lists what it would change), then lists its
+ *                 sections, arrangements and part scores
  *   save          saves a copy of the song as saved.starscore
  * Everything is logged to log.txt.
  */
@@ -635,6 +637,45 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         }
         autotestLog(QString("  %1 song(s): %2").arg(paths.size()).arg(paths.join(", ")));
         startUpdateAllSheets(paths);
+    } else if (step == "personnames") {
+        // personnames: part scores named after players renamed (also done when a song opens); then lists them all
+        autotestLog(QString("  %1 renamed").arg(renamePersonNamedPartScores()));
+        if (IMasterNotationPtr master = globalContext()->currentMasterNotation()) {
+            QStringList names;
+            for (const IExcerptNotationPtr& e : master->excerpts()) {
+                names << e->name();
+            }
+            autotestLog("  part scores: " + names.join(" | "));
+        }
+    } else if (step == "standardize" || step == "standardize:plan") {
+        // standardize: the song made standard (standardize:plan only lists what that would change)
+        const QStringList lines = standardizeSong(step == "standardize");
+        autotestLog(QString("  %1 change(s)").arg(lines.size()));
+        for (const QString& l : lines) {
+            autotestLog("  - " + l);
+        }
+        if (step == "standardize") {
+            if (engraving::MasterScore* nms = masterScore()) {
+                for (const StarScoreSection& s : load().sections) {
+                    QStringList names;
+                    for (const QString& pid : s.partIds) {
+                        const engraving::Part* p = nms->partById(ID(pid));
+                        names << (p ? p->partName().toQString() : pid);
+                    }
+                    autotestLog(QString("  section %1 \"%2\" (%3): %4").arg(s.id, s.name, s.templateKey, names.join(", ")));
+                }
+                for (const StarScoreArrangement& a : load().arrangements) {
+                    autotestLog(QString("  arrangement \"%1\" (%2) score \"%3\": %4").arg(a.name, a.templateKey, a.scoreName, a.sectionIds.join(", ")));
+                }
+            }
+            if (IMasterNotationPtr master = globalContext()->currentMasterNotation()) {
+                QStringList names;
+                for (const IExcerptNotationPtr& e : master->excerpts()) {
+                    names << e->name();
+                }
+                autotestLog("  part scores: " + names.join(" | "));
+            }
+        }
     } else if (step == "doubletime") {
         // doubletime: "Convert from double time" on the open song
         const RetVal<QString> r = convertFromDoubleTime();

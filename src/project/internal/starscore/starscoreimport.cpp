@@ -15,6 +15,10 @@
 #include <QTimer>
 #include <QUuid>
 #include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QSet>
 #include <QDir>
 
 #include "settings.h"
@@ -1984,5 +1988,131 @@ void StarScoreService::tidyOpenedScore()
     }
 
     standardizeHornNames();
+    renamePersonNamedPartScores();
     labelPartBooks();
+}
+
+//! Joel, 6 Oct 2026: part scores named after the player who read them (G.I. Jorge's "Cory", "Harley", "Katelyn"…)
+//! are named after what's in them, as every other sheet is: the instrument's name in the part ("Drums Lead", "Bass
+//! (5-String)", "Cello"), with the band's words for guitar and bass. A player is anyone in the band roster (players and
+//! old file-name hints), "Percussionist", or a "Guest Player: …". Scores of several instruments keep their names.
+int StarScoreService::renamePersonNamedPartScores()
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    if (!master || bandFolder().isEmpty()) {
+        return 0;
+    }
+    QSet<QString> people { "percussionist" };
+    std::map<QString, QString> roleOf;   // "todd" -> "Percussion" (the roster's file-name hints)
+    {
+        QFile f(bandFolder() + "/6 Inbox/.organizer/roster.json");
+        if (f.open(QIODevice::ReadOnly)) {
+            const QJsonObject o = QJsonDocument::fromJson(f.readAll()).object();
+            for (const QJsonValue& v : o.value("players").toArray()) {
+                people.insert(v.toObject().value("name").toString().trimmed().toLower());
+            }
+            const QJsonObject hints = o.value("fileNameHints").toObject();
+            for (auto it = hints.begin(); it != hints.end(); ++it) {
+                people.insert(it.key().trimmed().toLower());
+                roleOf[it.key().trimmed().toLower()] = it.value().toString();
+            }
+        }
+    }
+    people.remove(QString());
+    auto personNamed = [&](const QString& name) {
+        const QString n = name.trimmed().toLower();
+        return people.contains(n) || n.startsWith("guest player");
+    };
+    // an instrument in the band's words: "Violoncello" -> "Cello", "Tenor Saxophone 1" -> "Tenor Sax 1",
+    // "Trumpet in B♭ 2" -> "Trumpet 2", "Bass Guitar (5-String)" -> "Bass (5-String)", "Drumset" -> "Drums"
+    auto bandWords = [](QString name) {
+        const int at = name.lastIndexOf(": ");
+        if (at >= 0) {
+            name = name.mid(at + 2);
+        }
+        static const std::vector<std::pair<QRegularExpression, QString> > WORDS {
+            { QRegularExpression("^Violoncello"), "Cello" },
+            { QRegularExpression("^Electric Guitar"), "Guitar" },
+            { QRegularExpression("^(\\d)[- ]String Bass( Guitar)?"), "Bass (\\1-String)" },
+            { QRegularExpression("^Bass Guitar \\((\\d)[- ]String\\)"), "Bass (\\1-String)" },
+            { QRegularExpression("^Bass Guitar 5s"), "Bass (5-String)" },
+            { QRegularExpression("^Bass Guitar"), "Bass" },
+            { QRegularExpression("^Contrabass"), "Double Bass" },
+            { QRegularExpression("^Baritone Saxophone"), "Bari Sax" },
+            { QRegularExpression("Saxophone"), "Sax" },
+            { QRegularExpression(" in B♭| in Bb| in E♭| in Eb"), "" },
+            { QRegularExpression("^(Drumset|Drum Kit|Drum Set|Large Drum Kit)$"), "Drums" },
+            { QRegularExpression("Synthesizer"), "Synth" },
+            { QRegularExpression("^El\\. Pno\\.?$"), "Electric Piano" },
+        };
+        for (const auto& [re, to] : WORDS) {
+            name.replace(re, to);
+        }
+        return name.simplified();
+    };
+
+    QSet<QString> taken;
+    for (const IExcerptNotationPtr& e : master->excerpts()) {
+        taken.insert(e->name().toLower());
+    }
+    int renamed = 0;
+    for (const IExcerptNotationPtr& e : master->excerpts()) {
+        if (!personNamed(e->name())) {
+            continue;
+        }
+        // the staves as the part score names them (the main score can call a staff just "Lead")
+        engraving::Excerpt* ex = importExcerptOf(e);
+        std::vector<engraving::Part*> ps;
+        if (ex && ex->excerptScore()) {
+            ps = ex->excerptScore()->parts();
+        } else if (ex) {
+            ps = masterPartsOf(ex);
+        }
+        QStringList instruments;   // what's in it
+        QStringList leads;         // cue staves ("Lead", "Drums Lead", "Joel Lead" as "Keys Lead"), named only alone
+        for (const engraving::Part* p : ps) {
+            QString n = p->longName().toQString().trimmed();
+            if (n.isEmpty()) {
+                n = p->partName().toQString().trimmed();
+            }
+            n = n.mid(n.lastIndexOf(": ") >= 0 ? n.lastIndexOf(": ") + 2 : 0).trimmed();
+            static const QRegularExpression lead("^((\\w+) )?Lead( Sheet.*)?$");
+            const QRegularExpressionMatch m = lead.match(n);
+            if (m.hasMatch()) {
+                const QString who = m.captured(2).toLower();
+                auto r = roleOf.find(who);
+                leads << (people.contains(who) ? (r != roleOf.end() ? r->second + " Lead" : QString()) : n);
+                continue;
+            }
+            n = bandWords(n);
+            if (!n.isEmpty() && !instruments.contains(n)) {
+                instruments << n;
+            }
+        }
+        if (instruments.isEmpty()) {
+            instruments = leads;
+            instruments.removeAll(QString());
+            instruments.removeDuplicates();
+        }
+        const QString name = instruments.join(" & ");
+        if (name.isEmpty() || personNamed(name)) {
+            continue;
+        }
+        QString unique = name;
+        for (int n = 2; taken.contains(unique.toLower()); ++n) {
+            unique = QString("%1 %2").arg(name).arg(n);
+        }
+        LOGI() << "[starscore] part score " << e->name() << " renamed " << unique;
+        taken.insert(unique.toLower());
+        e->setName(unique);
+        ++renamed;
+    }
+    if (renamed) {
+        if (INotationProjectPtr project = globalContext()->currentProject()) {
+            project->markAsUnsaved();
+        }
+        master->notation()->notationChanged().notify();
+        scheduleChanged();
+    }
+    return renamed;
 }
