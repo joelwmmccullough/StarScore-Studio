@@ -53,6 +53,7 @@
 #include <QTimer>
 
 #include <cstdio>
+#include <set>
 #include <cstdlib>
 
 #include "settings.h"
@@ -74,6 +75,7 @@
 #include "engraving/dom/measurebase.h"
 #include "engraving/dom/measure.h"
 #include "engraving/dom/segment.h"
+#include "engraving/dom/spanner.h"
 #include "engraving/dom/chord.h"
 #include "engraving/dom/note.h"
 #include "engraving/style/style.h"
@@ -697,6 +699,107 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         QString text = r.ret ? r.val : QString::fromStdString(r.ret.toString());
         text.replace("\n", "\n  ");
         autotestLog("  " + text);
+    } else if (step.startsWith("importstaves:")) {
+        // importstaves:<file.mscz>|<from>:<to>;<from>:<to>… (0-based staff numbers): each staff's music in that file
+        // copied over the open song's staff, every bar (the two must have the same bars). System markings the copy
+        // brings along twice (rehearsal marks, system texts, tempo, voltas…) are removed again.
+        const QString arg = step.mid(13);
+        const QString file = arg.section('|', 0, 0);
+        INotationProjectPtr src = projectCreator()->newProject(iocContext());
+        engraving::MasterScore* ms = masterScore();
+        if (!ms || !src->load(io::path_t(file)) || !src->masterNotation()) {
+            autotestLog("  couldn't load " + file);
+        } else {
+            engraving::MasterScore* ss = src->masterNotation()->masterScore();
+            int bars = 0, same = 0;
+            for (engraving::Measure *a = ms->firstMeasure(), *b = ss->firstMeasure(); a || b;
+                 a = a ? a->nextMeasure() : nullptr, b = b ? b->nextMeasure() : nullptr) {
+                ++bars;
+                same += (a && b && a->tick() == b->tick() && a->ticks() == b->ticks()) ? 1 : 0;
+            }
+            autotestLog(QString("  bars: %1, the same in both: %2").arg(bars).arg(same));
+            if (same == bars) {
+                const int spannersBefore = int(ms->spanner().size());
+                globalContext()->currentMasterNotation()->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Import staves"));
+                const bool mm = ms->style().styleB(engraving::Sid::createMultiMeasureRests);
+                if (mm) {
+                    ms->undoChangeStyleVal(engraving::Sid::createMultiMeasureRests, false);
+                }
+                ss->style().set(engraving::Sid::createMultiMeasureRests, false);
+                ss->setLayoutAll();
+                ss->doLayout();
+                ms->setLayoutAll();
+                ms->doLayout();
+                // what is on the staves now, before the paste: system markings kept as they are
+                std::map<QString, int> keep;
+                for (engraving::Segment* seg = ms->firstSegment(engraving::SegmentType::ChordRest); seg;
+                     seg = seg->next1(engraving::SegmentType::ChordRest)) {
+                    for (engraving::EngravingItem* e : seg->annotations()) {
+                        if (e->systemFlag() || e->isRehearsalMark() || e->isTempoText()) {
+                            keep[QString("%1|%2|%3").arg(int(e->type())).arg(seg->tick().ticks()).arg(e->track())]++;
+                        }
+                    }
+                }
+                std::set<engraving::Spanner*> spannersThen;
+                for (const auto& [t, sp] : ms->spanner()) {
+                    spannersThen.insert(sp);
+                }
+                for (const QString& pair : arg.section('|', 1).split(';', Qt::SkipEmptyParts)) {
+                    const engraving::staff_idx_t from = pair.section(':', 0, 0).toUInt();
+                    const engraving::staff_idx_t to = pair.section(':', 1, 1).toUInt();
+                    ss->deselectAll();
+                    ss->selection().setRangeTicks(engraving::Fraction(0, 1), ss->lastMeasure()->endTick(), from, from + 1);
+                    ss->selection().updateSelectedElements();
+                    const ByteArray mime = ss->selection().mimeData();
+                    ss->deselectAll();
+                    engraving::XmlReader reader(mime);
+                    const bool ok = !mime.empty()
+                                    && ms->pasteStaff(reader, ms->firstMeasure()->first(engraving::SegmentType::ChordRest), to);
+                    ms->deselectAll();
+                    autotestLog(QString("  staff %1 -> %2: %3").arg(from).arg(to).arg(ok ? "pasted" : "FAILED"));
+                }
+                // system markings and system lines the paste added a second time
+                int removed = 0;
+                std::map<QString, int> seen;
+                std::vector<engraving::EngravingItem*> extra;
+                for (engraving::Segment* seg = ms->firstSegment(engraving::SegmentType::ChordRest); seg;
+                     seg = seg->next1(engraving::SegmentType::ChordRest)) {
+                    for (engraving::EngravingItem* e : seg->annotations()) {
+                        if (e->systemFlag() || e->isRehearsalMark() || e->isTempoText()) {
+                            const QString key = QString("%1|%2|%3").arg(int(e->type())).arg(seg->tick().ticks()).arg(e->track());
+                            if (++seen[key] > std::max(1, keep[key])) {
+                                extra.push_back(e);
+                            }
+                        }
+                    }
+                }
+                for (engraving::EngravingItem* e : extra) {
+                    ms->undoRemoveElement(e);
+                    ++removed;
+                }
+                std::vector<engraving::Spanner*> newSystemLines;
+                for (const auto& [t, sp] : ms->spanner()) {
+                    if (!spannersThen.count(sp) && sp->systemFlag()) {
+                        newSystemLines.push_back(sp);
+                    }
+                }
+                for (engraving::Spanner* sp : newSystemLines) {
+                    ms->undoRemoveElement(sp);
+                    ++removed;
+                }
+                if (mm) {
+                    ms->undoChangeStyleVal(engraving::Sid::createMultiMeasureRests, true);
+                }
+                globalContext()->currentMasterNotation()->notation()->undoStack()->commitChanges();
+                ms->setLayoutAll();
+                ms->doLayout();
+                if (INotationProjectPtr project = globalContext()->currentProject()) {
+                    project->markAsUnsaved();
+                }
+                autotestLog(QString("  removed %1 system marking(s)/line(s) brought twice; spanners %2 -> %3")
+                            .arg(removed).arg(spannersBefore).arg(ms->spanner().size()));
+            }
+        }
     } else if (step == "todouble") {
         // todouble: the open song rewritten at twice its note lengths (what the Double-Time sheets are made from)
         const RetVal<QString> r = convertTimeOf(globalContext()->currentProject(), true, true);
