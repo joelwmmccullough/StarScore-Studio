@@ -19,7 +19,7 @@ StyledDialogView {
     property string mode: "update"
     readonly property bool styles: root.mode === "styles"
 
-    title: root.styles ? qsTrc("starscore", "Apply part styles to every song") : qsTrc("starscore", "Update all sheets")
+    title: root.styles ? qsTrc("starscore", "Apply default style settings to every song") : qsTrc("starscore", "Update all sheets")
 
     contentWidth: 640
     contentHeight: 560
@@ -59,7 +59,7 @@ StyledDialogView {
             horizontalAlignment: Text.AlignLeft
             wrapMode: Text.WordWrap
             text: root.styles
-                  ? qsTrc("starscore", "Each song below is opened in turn, gets Format › Part Styles › Apply to open score now, "
+                  ? qsTrc("starscore", "Each song below is opened in turn, gets Format › Apply default style settings › Apply to open score now, "
                           + "and is saved. Save the song that's open now first.")
                   : qsTrc("starscore", "For after a StarScore update that changes how sheets are made. Each song below is "
                         + "opened in turn and its sheets that were exported while Finished, and are still Finished, are "

@@ -169,7 +169,7 @@ public:
     muse::RetVal<QString> updateCurrentSongSheets() override;
     muse::RetVal<QString> convertFromDoubleTime() override;
     //! Makes an older song standard (starscorestandardize.cpp): with apply false, only lists what it would change
-    QStringList standardizeSong(bool apply);
+    QStringList standardizeSong(bool apply) override;
     void startUpdateAllSheets(const QStringList& paths) override;
     void startApplyStylesToAll(const QStringList& paths) override;
     void cancelUpdateAllSheets() override;

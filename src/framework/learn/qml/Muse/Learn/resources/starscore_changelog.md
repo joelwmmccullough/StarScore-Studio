@@ -4,6 +4,13 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.24
+
+- **Standardize this song** (Format menu). Gives an older song the standard layout: the "2-Horn / 3-Horn Any (all keys)" and "Flexible (all keys)" sections become the standard 2-Horn and 3-Horn Flexible sections (each chair gets the music, part score layout and status of its old "in C" part, or the "in Bass Clef" part for a trombone chair); "Strings & Extras" becomes a String Duo, Trio, Quartet or Quintet section and its other instruments are removed; "Horn Section (full score)", "Player Lead Sheets", "Full Score" and other arrangements not made from a template are removed; a 3-Horn Flexible section's old hidden "Horn 1 (Flute)" chair goes; part scores of several instruments that aren't an arrangement's score, empty ones and second part scores of the same instrument are removed. It lists every change first, and copies the file as it was to Version History/Before standardizing (date). All songs in Projects and Sheets were standardized this way on 6 October 2026.
+- **Part scores named after players** ("Cory", "Harley", "Katelyn") are renamed after what's in them ("Drums Lead", "Bass (5-String)", "Cello") when a song opens.
+- **"Part styles" is now "Apply default style settings"** (Format menu, the dialog, the status bar menu and the dashboard button "Apply default style settings to every song").
+- **Applying the default style settings is much faster** on songs with many part scores open. Each score was laid out again, along with every open score, after each of the three steps of its restyle (Branston Pickle took many minutes); now each score is laid out on its own.
+
 ## 1.18.23
 
 - **Convert from double time** (Format menu). Rewrites a song written in double time in standard time: every note, rest and marking half as long, the tempo halved (♩ = 216 becomes ♩ = 108), so it sounds the same. In 4/4 two bars become one, counted within each stretch between rehearsal marks, repeats and double barlines; a bar left over keeps its length (G.I. Jorge's fermata bar). In 7/8 each bar becomes a bar of 7/16 (Shatter). Bar repeat signs are written out; rehearsal marks, system texts, repeats, barlines, ties, rit. lines and fermatas come through. Hand-placed system breaks in the parts are dropped. One step: Undo puts it all back.

@@ -3067,6 +3067,18 @@ int StarScoreService::applyStylesOnly(const QStringList& partIds, const Data& da
         if (!n) {
             return false;
         }
+        engraving::Score* score = n->elements()->msScore();
+        if (!score) {
+            return false;
+        }
+        // Each edit's end lays out every open score (the main score and each open part score), and a restyle is
+        // three edits: Branston Pickle, with dozens of part scores open, took many minutes (Joel, 6 Oct 2026). So
+        // this score's updates are held while it's restyled, and it is laid out on its own: once first (a style
+        // change looks through the score's systems, which must be current), then by the house style where it
+        // measures, and once at the end.
+        score->setLayoutAll();
+        score->doLayout();
+        score->lockUpdates(true);
         bool changed = false;
         if (usable(settings.defaultStyle)) {
             changed |= n->style()->loadStyle(settings.defaultStyle, true);
@@ -3074,10 +3086,12 @@ int StarScoreService::applyStylesOnly(const QStringList& partIds, const Data& da
         if (!ruleStyle.isEmpty()) {
             changed |= n->style()->loadStyle(ruleStyle, true);
         }
-        engraving::Score* score = n->elements()->msScore();
         n->undoStack()->prepareChanges(TranslatableString::untranslatable("StarScore house style"));
         starscore::applyHouseStyle(score, partBook, version);
         n->undoStack()->commitChanges();
+        score->lockUpdates(false);
+        score->setLayoutAll();
+        score->doLayout();
         n->notationChanged().notify();
         return true;
     };

@@ -14,7 +14,7 @@ import MuseScore.Project
 StyledDialogView {
     id: root
 
-    title: qsTrc("starscore", "Part styles")
+    title: qsTrc("starscore", "Apply default style settings")
 
     contentWidth: 720
     contentHeight: 520

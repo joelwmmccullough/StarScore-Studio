@@ -27,6 +27,9 @@
 #include <map>
 
 #include <QBuffer>
+#include <QDate>
+#include <QFile>
+#include <algorithm>
 #include <QDir>
 #include <QStringList>
 #include <QEventLoop>
@@ -127,6 +130,43 @@ void ProjectActionsController::init()
         const muse::RetVal<QString> done = starScoreService()->convertFromDoubleTime();
         interactive()->info(muse::trc("starscore", "Convert from double time"),
                             (done.ret ? done.val : QString::fromStdString(done.ret.toString())).toStdString());
+    });
+    dispatcher()->reg(this, "starscore-standardize", [this]() {
+        const QStringList plan = starScoreService()->standardizeSong(false);
+        const bool anything = std::any_of(plan.begin(), plan.end(), [](const QString& l) { return !l.startsWith("??"); });
+        if (!anything) {
+            interactive()->info(muse::trc("starscore", "Standardize this song"),
+                                (plan.isEmpty() ? muse::qtrc("starscore", "This song is already standard.")
+                                 : muse::qtrc("starscore", "Nothing to change. Left as they are:") + "\n\n" + plan.join("\n"))
+                                .toStdString());
+            return;
+        }
+        constexpr int Go = static_cast<int>(IInteractive::Button::CustomButton) + 1;
+        const IInteractive::Result answer = interactive()->questionSync(
+            muse::trc("starscore", "Standardize this song?"),
+            (muse::qtrc("starscore", "These changes will be made (lines starting with ?? are left as they are). The file as it is "
+                                     "now is first copied to Version History. Undo is not reliable for this; use the copy.")
+             + "\n\n" + plan.join("\n")).toStdString(),
+            { IInteractive::ButtonData(int(IInteractive::Button::Cancel), muse::trc("global", "Cancel")),
+              IInteractive::ButtonData(Go, muse::trc("starscore", "Standardize"), true) }, Go);
+        if (answer.button() != Go) {
+            return;
+        }
+        // the file on disk as it is now, into Version History next to it
+        const QString path = starScoreService()->mainProjectPath().toQString();
+        if (!path.isEmpty() && QFileInfo::exists(path)) {
+            const QFileInfo fi(path);
+            const QString dir = fi.absolutePath() + "/Version History/Before standardizing "
+                                + QDate::currentDate().toString("yyyy-MM-dd");
+            QDir().mkpath(dir);
+            const QString copy = dir + "/" + fi.fileName();
+            if (!QFileInfo::exists(copy)) {
+                QFile::copy(path, copy);
+            }
+        }
+        const QStringList done = starScoreService()->standardizeSong(true);
+        interactive()->info(muse::trc("starscore", "Standardize this song"),
+                            (muse::qtrc("starscore", "Done. Save the song to keep the changes.") + "\n\n" + done.join("\n")).toStdString());
     });
     dispatcher()->reg(this, "starscore-toggle-minmaj", [this]() {
         starScoreService()->setMinMajSymbolInCurrentScore(!starScoreService()->minMajSymbolInCurrentScore());

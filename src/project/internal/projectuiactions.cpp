@@ -72,8 +72,8 @@ const UiActionList ProjectUiActions::m_actions = {
     UiAction("starscore-part-styles",
              mu::context::UiCtxAny,
              mu::context::CTX_ANY,
-             TranslatableString("action", "Part styles…"),
-             TranslatableString("action", "Part styles")
+             TranslatableString("action", "Apply default style settings…"),
+             TranslatableString("action", "Apply default style settings")
              ),
     UiAction("starscore-additive-timesig",
              mu::context::UiCtxProjectOpened,
@@ -140,6 +140,12 @@ const UiActionList ProjectUiActions::m_actions = {
              mu::context::CTX_ANY,
              TranslatableString("action", "Convert from double time…"),
              TranslatableString("action", "Rewrite a song written in double time in standard time: every note half as long, two bars become one, the tempo halved")
+             ),
+    UiAction("starscore-standardize",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Standardize this song…"),
+             TranslatableString("action", "Give an older song the standard sections, arrangements and part scores")
              ),
     UiAction("starscore-toggle-minmaj",
              mu::context::UiCtxProjectOpened,

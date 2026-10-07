@@ -577,6 +577,9 @@ public:
     virtual muse::RetVal<QString> updateCurrentSongSheets() = 0;
     //! The open song rewritten from double time into standard time (see starscoredoubletime.cpp); one undo step
     virtual muse::RetVal<QString> convertFromDoubleTime() = 0;
+    //! Makes an older song standard: standard sections, arrangements and part scores (with apply false, only lists what
+    //! it would change). Lines starting with "??" are left as they are.
+    virtual QStringList standardizeSong(bool apply) = 0;
     //! Opens each song in turn, updates it (updateCurrentSongSheets), saves it, goes on to the next
     virtual void startUpdateAllSheets(const QStringList& paths) = 0;
     //! The same run, but each song gets its part styles applied (Format › Part Styles › Apply to open score now) and is

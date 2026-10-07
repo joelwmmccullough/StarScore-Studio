@@ -137,9 +137,9 @@ Rectangle {
                         onClicked: dash.openUpdateAllSheets()
                     }
                     FlatButton {
-                        text: qsTrc("starscore", "Apply part styles to every song")
-                        toolTipTitle: qsTrc("starscore", "Apply part styles to every song")
-                        toolTipDescription: qsTrc("starscore", "Opens each song in turn, applies Format › Part Styles to it and saves it")
+                        text: qsTrc("starscore", "Apply default style settings to every song")
+                        toolTipTitle: qsTrc("starscore", "Apply default style settings to every song")
+                        toolTipDescription: qsTrc("starscore", "Opens each song in turn, applies Format › Apply default style settings to it and saves it")
                         onClicked: dash.openApplyStylesToAll()
                     }
                     FlatButton {
