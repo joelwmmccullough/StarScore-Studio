@@ -469,7 +469,8 @@ QStringList StarScoreService::standardizeSong(bool apply)
             keysAfter.insert(QString("%1-horn-any").arg(c.horns));
         }
         static const QRegularExpression hornKeyRe("^([1-7])-horn(-any)?$");
-        for (const QString& key : keysAfter) {
+        const std::set<QString> keysNow = keysAfter;
+        for (const QString& key : keysNow) {
             const QRegularExpressionMatch m = hornKeyRe.match(key);
             if (!m.hasMatch()) {
                 continue;
@@ -478,16 +479,22 @@ QStringList StarScoreService::standardizeSong(bool apply)
             if (arrangementTemplatesHeld.count(arrKey)) {
                 continue;
             }
-            if (!keysAfter.count("lead-sheet") || !keysAfter.count("rhythm")) {
-                report << QString("?? no %1 arrangement made: the song has no %2").arg(arrKey, keysAfter.count("lead-sheet") ? "Rhythm Section" : "Lead Sheet");
-                continue;
+            QStringList made;   // sections the arrangement needs that the song doesn't have yet (made empty)
+            if (!keysAfter.count("lead-sheet")) {
+                made << "Lead Sheet";
+            }
+            if (!keysAfter.count("rhythm")) {
+                made << "Rhythm Section";
             }
             missingArrangements << arrKey;
             for (const StarScoreArrangementTemplate& t : arrangementTpls) {
                 if (t.key == arrKey) {
-                    report << QString("arrangement \"%1\" added").arg(t.name);
+                    report << QString("arrangement \"%1\" added%2").arg(t.name, made.isEmpty() ? QString()
+                                                                         : QString(", with a new empty %1").arg(made.join(" and ")));
                 }
             }
+            keysAfter.insert("lead-sheet");
+            keysAfter.insert("rhythm");
         }
     }
 
@@ -582,8 +589,10 @@ QStringList StarScoreService::standardizeSong(bool apply)
     // --- doing it ---------------------------------------------------------------------------------------------------
     const QString wasActive = activeArrangementId();
 
+    LOGI() << "[starscore] standardize: 1. the standard Flexible sections";
     // 1. the standard Flexible sections, with the music of the old "in C" parts
     for (const FlexConversion& c : conversions) {
+        LOGI() << "[starscore] standardize: making the " << c.horns << "-Horn Flexible section";
         const RetVal<QString> made = createSectionFromTemplate(QString("%1-horn-any").arg(c.horns));
         if (!made.ret) {
             report << QString("?? could not make the %1-Horn Flexible section").arg(c.horns);
@@ -641,6 +650,7 @@ QStringList StarScoreService::standardizeSong(bool apply)
         master->notation()->notationChanged().notify();
         store(now);
 
+        LOGI() << "[starscore] standardize: music copied, now the part score layouts";
         // each chair's part score takes the layout of the old part's score
         auto bookOf = [&](const engraving::Part* part) -> INotationPtr {
             for (const IExcerptNotationPtr& e : master->excerpts()) {
@@ -685,6 +695,7 @@ QStringList StarScoreService::standardizeSong(bool apply)
         }
     }
 
+    LOGI() << "[starscore] standardize: 2. the sections and arrangements";
     // 2. the sections and arrangements
     Data d = load();
     for (StarScoreSection& s : d.sections) {
@@ -741,6 +752,7 @@ QStringList StarScoreService::standardizeSong(bool apply)
     }
     store(d);
 
+    LOGI() << "[starscore] standardize: 3. the string parts";
     // 3. the string parts' names (and their part scores')
     if (strings) {
         std::vector<std::pair<engraving::Part*, QString> > renames;
@@ -763,6 +775,7 @@ QStringList StarScoreService::standardizeSong(bool apply)
         }
     }
 
+    LOGI() << "[starscore] standardize: 4. the part scores that go";
     // 4. the part scores that go
     {
         ExcerptNotationList kept;
@@ -780,9 +793,11 @@ QStringList StarScoreService::standardizeSong(bool apply)
         }
     }
 
+    LOGI() << "[starscore] standardize: 5. the instruments that go";
     // 5. the instruments that go
     removePartsKeepingSystemObjects(doomedParts);
 
+    LOGI() << "[starscore] standardize: 6. arrangement scores";
     // 6. arrangement scores, missing arrangements, and anything left empty
     syncArrangementScores();
     for (const QString& key : missingArrangements) {
