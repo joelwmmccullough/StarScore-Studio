@@ -18,6 +18,7 @@
 
 #include <QCryptographicHash>
 #include <QDir>
+#include <QElapsedTimer>
 #include <QTimer>
 #include <QDateTime>
 #include <QImage>
@@ -3071,13 +3072,18 @@ int StarScoreService::applyStylesOnly(const QStringList& partIds, const Data& da
         if (!score) {
             return false;
         }
+        QElapsedTimer clock;   // how long each score takes, in the log
+        clock.start();
         // Each edit's end lays out every open score (the main score and each open part score), and a restyle is
         // three edits: Branston Pickle, with dozens of part scores open, took many minutes (Joel, 6 Oct 2026). So
-        // this score's updates are held while it's restyled, and it is laid out on its own: once first (a style
-        // change looks through the score's systems, which must be current), then by the house style where it
-        // measures, and once at the end.
-        score->setLayoutAll();
-        score->doLayout();
+        // this score's updates are held while it's restyled, and it is laid out on its own: by the house style
+        // where it measures, and last of all in its own view (applyHouseStyle ends with that layout). A style
+        // change looks through the score's systems, which must be current: a part score whose tab is closed is laid
+        // out first (MuseScore lays out the open ones after every edit, as for its own Load style).
+        if (!score->isOpen()) {
+            score->setLayoutAll();
+            score->doLayout();
+        }
         score->lockUpdates(true);
         bool changed = false;
         if (usable(settings.defaultStyle)) {
@@ -3090,9 +3096,8 @@ int StarScoreService::applyStylesOnly(const QStringList& partIds, const Data& da
         starscore::applyHouseStyle(score, partBook, version);
         n->undoStack()->commitChanges();
         score->lockUpdates(false);
-        score->setLayoutAll();
-        score->doLayout();
         n->notationChanged().notify();
+        LOGI() << "[starscore] restyled " << score->name() << " in " << clock.elapsed() << " ms";
         return true;
     };
 

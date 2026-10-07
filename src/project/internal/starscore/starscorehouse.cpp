@@ -65,11 +65,13 @@ double houseStaffHeightMm(const Score* score, bool partBook)
     return 4.0;
 }
 
-static void starscoreSet(Score* score, Sid id, const PropertyValue& value)
+static bool starscoreSet(Score* score, Sid id, const PropertyValue& value)
 {
     if (score->style().styleV(id) != value) {
         score->undoChangeStyleVal(id, value);
+        return true;
     }
+    return false;
 }
 
 //! The title frame is measured in page view, as it prints. The main score is shown in continuous view, where the
@@ -85,8 +87,12 @@ public:
             m_score->setLayoutMode(LayoutMode::PAGE);
             m_score->setLayoutAll();
             m_score->doLayout();
+            m_laidOut = true;
         }
     }
+
+    //! whether the score was laid out (in page view) by the switch
+    bool laidOut() const { return m_laidOut; }
 
     ~PageViewLayout()
     {
@@ -100,36 +106,39 @@ public:
 private:
     Score* m_score = nullptr;
     LayoutMode m_mode = LayoutMode::PAGE;
+    bool m_laidOut = false;
 };
 
-void applyVersionFooter(Score* score, const QString& version)
+bool applyVersionFooter(Score* score, const QString& version)
 {
     if (!score || version.isEmpty()) {
-        return;
+        return false;
     }
     static const QRegularExpression re("Version\\s+\\d+\\.\\d+\\.\\d+", QRegularExpression::CaseInsensitiveOption);
     const QString text = "Version " + version;
 
     bool found = false;
+    bool changed = false;
     for (Sid id : { Sid::oddFooterL, Sid::oddFooterC, Sid::oddFooterR, Sid::evenFooterL, Sid::evenFooterC, Sid::evenFooterR }) {
         QString v = score->style().styleSt(id).toQString();
         if (re.match(v).hasMatch()) {
             v.replace(re, text);
-            starscoreSet(score, id, String::fromQString(v));
+            changed |= starscoreSet(score, id, String::fromQString(v));
             found = true;
         }
     }
     if (!found) {
         // No version in the footer yet: put it in the right-hand footer box, as Starsign 2.3 does
         const QString odd = score->style().styleSt(Sid::oddFooterR).toQString();
-        starscoreSet(score, Sid::oddFooterR, String::fromQString(odd.isEmpty() ? text : text + "\n" + odd));
+        changed |= starscoreSet(score, Sid::oddFooterR, String::fromQString(odd.isEmpty() ? text : text + "\n" + odd));
         if (score->style().styleB(Sid::footerOddEven)) {
             const QString even = score->style().styleSt(Sid::evenFooterR).toQString();
-            starscoreSet(score, Sid::evenFooterR, String::fromQString(even.isEmpty() ? text : text + "\n" + even));
+            changed |= starscoreSet(score, Sid::evenFooterR, String::fromQString(even.isEmpty() ? text : text + "\n" + even));
         }
     }
-    starscoreSet(score, Sid::showFooter, true);
-    starscoreSet(score, Sid::footerFirstPage, true);
+    changed |= starscoreSet(score, Sid::showFooter, true);
+    changed |= starscoreSet(score, Sid::footerFirstPage, true);
+    return changed;
 }
 
 void applyHouseStyle(Score* score, bool partBook, const QString& version)
@@ -208,8 +217,10 @@ void applyHouseStyle(Score* score, bool partBook, const QString& version)
     // layout and corrected through the style's composer offset, so it fits this score's frame and staff size;
     // applying the style again changes nothing once they line up.
     const PageViewLayout pageView(score);
-    score->setLayoutAll();
-    score->doLayout();
+    if (!pageView.laidOut()) {   // (a score shown in continuous view was just laid out by the switch to page view)
+        score->setLayoutAll();
+        score->doLayout();
+    }
     const Text* sub = nullptr;
     const Text* comp = nullptr;
     for (MeasureBase* mb = score->first(); mb && !mb->isMeasure() && !(sub && comp); mb = mb->next()) {

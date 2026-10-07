@@ -37,7 +37,7 @@ bool fitArrangementLabel(mu::engraving::Score* score);
 
 //! Writes "Version x.y.z" into the footer text (Starsign 2.3 has "Version 1.0.0" in the right-hand box),
 //! replacing the version already there, or adding it to the right-hand box. Must be called inside a command.
-void applyVersionFooter(mu::engraving::Score* score, const QString& version);
+bool applyVersionFooter(mu::engraving::Score* score, const QString& version);   // true when a footer changed
 
 //! "Version 4.0.1" <-> "4.0.1"
 QString versionFromCopyright(const QString& copyright);   // empty when there is none
