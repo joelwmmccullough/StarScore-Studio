@@ -37,6 +37,7 @@
 #include "engraving/dom/system.h"
 #include "engraving/dom/chord.h"
 #include "engraving/dom/note.h"
+#include "engraving/dom/linkedobjects.h"
 #include "engraving/dom/tie.h"
 #include "engraving/dom/rest.h"
 #include "engraving/dom/fermata.h"
@@ -649,6 +650,89 @@ RetVal<QString> StarScoreService::convertTimeOf(const INotationProjectPtr& proje
             ++restBars;
         }
     }
+
+    // 9b. bars filled with slashes (Format › Fill with slashes: stemless slash heads) get one slash per beat again, as
+    // many as the time signature's top number (4/4: four quarter-note slashes, never two halves); 2/2 also gets four
+    // quarter-note slashes (Joel, 7 Oct 2026: FYKB's section D came out in half-note slashes)
+    int slashBars = 0;
+    auto isFillSlash = [](const Chord* c) {
+        if (!c->noStem() || c->notes().empty()) {
+            return false;
+        }
+        return std::all_of(c->notes().begin(), c->notes().end(), [](const Note* n) {
+            return n->headGroup() == NoteHeadGroup::HEAD_SLASH;
+        });
+    };
+    for (Measure* m = ms->firstMeasure(); m; m = m->nextMeasure()) {
+        const Fraction sig = m->timesig();
+        if (m->ticks() != sig) {
+            continue;   // a pickup or other odd-length bar: left as it is
+        }
+        const bool cut = sig == Fraction(2, 2);
+        const int count = cut ? 4 : sig.numerator();
+        const Fraction beat = cut ? Fraction(1, 4) : Fraction(1, sig.denominator());
+        for (track_idx_t track = 0; track < ms->ntracks(); ++track) {
+            std::vector<ChordRest*> crs;
+            bool slashes = false;
+            bool other = false;
+            for (Segment* seg = m->first(SegmentType::ChordRest); seg; seg = seg->next(SegmentType::ChordRest)) {
+                EngravingItem* e = seg->element(track);
+                if (!e) {
+                    continue;
+                }
+                ChordRest* cr = toChordRest(e);
+                if (cr->tuplet() || (cr->isChord() && !isFillSlash(toChord(cr)))) {
+                    other = true;
+                    break;
+                }
+                slashes = slashes || cr->isChord();
+                crs.push_back(cr);
+            }
+            if (other || !slashes) {
+                continue;
+            }
+            const bool already = int(crs.size()) == count && std::all_of(crs.begin(), crs.end(), [&](const ChordRest* cr) {
+                return cr->isChord() && cr->ticks() == beat;
+            });
+            if (already) {
+                continue;
+            }
+            // the slashes' note (pitch and spelling), as the first one had it
+            const Note* model = nullptr;
+            for (const ChordRest* cr : crs) {
+                if (cr->isChord()) {
+                    model = toChord(cr)->notes().front();
+                    break;
+                }
+            }
+            NoteVal nv(model->pitch());
+            nv.tpc1 = model->tpc1();
+            nv.tpc2 = model->tpc2();
+            nv.headGroup = NoteHeadGroup::HEAD_SLASH;
+            for (ChordRest* cr : crs) {
+                ms->undoRemoveElement(cr);
+            }
+            ms->setRest(m->tick(), track, m->ticks(), false, nullptr, true);
+            for (int i = 0; i < count; ++i) {
+                Measure* mm = ms->tick2measure(m->tick());
+                Segment* seg = mm->undoGetSegment(SegmentType::ChordRest, m->tick() + beat * i);
+                seg = ms->setNoteRest(seg, track, nv, beat);
+                Chord* c = seg && seg->element(track) && seg->element(track)->isChord() ? toChord(seg->element(track)) : nullptr;
+                if (!c) {
+                    continue;
+                }
+                if (c->links()) {
+                    for (EngravingObject* l : *c->links()) {
+                        toChord(l)->setSlash(true, true);
+                    }
+                } else {
+                    c->setSlash(true, true);
+                }
+            }
+            ++slashBars;
+        }
+    }
+    LOGI() << "[starscore] double time: " << slashBars << " bar(s) of slashes made one slash per beat again";
 
     // 10. keepBarNumbers (the Half-Time and Double-Time sheets, Joel 7 Oct 2026): each new bar numbered like the bar of
     // the song it starts in, so the sheets' bar numbers match the standard sheets. Both halves of a doubled bar carry
