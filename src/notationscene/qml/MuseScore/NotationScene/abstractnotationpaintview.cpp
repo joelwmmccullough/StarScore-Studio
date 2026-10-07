@@ -29,6 +29,13 @@
 
 #include "actions/actiontypes.h"
 #include "engraving/dom/shadownote.h"
+#include "engraving/dom/masterscore.h"
+#include "engraving/dom/measure.h"
+#include "engraving/dom/page.h"
+#include "engraving/dom/part.h"
+#include "engraving/dom/staff.h"
+#include "engraving/dom/system.h"
+#include "engraving/dom/starscoreprogress.h"
 #include "log.h"
 
 using namespace mu;
@@ -679,6 +686,9 @@ void AbstractNotationPaintView::paint(QPainter* qp)
 
     bool isPrinting = publishMode() || m_inputController->readonly();
     notation()->painting()->paintView(painter, toLogical(rect), isPrinting);
+    if (!publishMode()) {
+        paintStarScoreProgress(toLogical(rect), painter);
+    }
 
     const ui::UiContext& uiCtx = uiContextResolver()->currentUiContext();
     const bool isOnNotationPage = uiCtx == ui::UiCtxProjectOpened || uiCtx == ui::UiCtxProjectFocused;
@@ -706,6 +716,77 @@ void AbstractNotationPaintView::paint(QPainter* qp)
         engraving::rendering::PaintOptions opt;
         opt.invertColors = notationConfiguration()->shouldInvertScore();
         m_continuousPanel->paint(*painter, nvCtx, opt);
+    }
+}
+
+void AbstractNotationPaintView::paintStarScoreProgress(const RectF& logicalRect, Painter* painter)
+{
+    using namespace mu::engraving;
+    if (!starscore::progressColorsShown() || !notation() || !notation()->elements()) {
+        return;
+    }
+    Score* score = notation()->elements()->msScore();
+    MasterScore* master = score ? score->masterScore() : nullptr;
+    if (!master) {
+        return;
+    }
+    const std::string text = master->metaTag(String(starscore::PROGRESS_TAG)).toStdString();
+    if (text.empty()) {
+        return;
+    }
+    if (text != m_progressText) {
+        m_progressText = text;
+        m_progressMap = starscore::parseProgress(text);
+    }
+
+    // the staves of this score (the full score or a part) as the full score's part id and staff within the part
+    std::vector<std::string> staffKeys(score->nstaves());
+    for (staff_idx_t i = 0; i < score->nstaves(); ++i) {
+        const Staff* st = score->staff(i);
+        const Staff* ms = score == master ? st : st->findLinkedInScore(master);
+        if (ms && ms->part()) {
+            staffKeys[i] = ms->part()->id().toStdString() + "|" + std::to_string(ms->rstaff());
+        }
+    }
+
+    // see-through, so the music stays readable under them
+    static const Color GREEN(40, 170, 60, 70);
+    static const Color ORANGE(255, 140, 0, 85);
+    static const Color RED(225, 30, 30, 70);
+    for (const Page* page : score->pages()) {
+        if (!page->canvasBoundingRect().intersects(logicalRect)) {
+            continue;
+        }
+        for (const System* sys : page->systems()) {
+            for (const MeasureBase* mb : sys->measures()) {
+                if (!mb->isMeasure()) {
+                    continue;
+                }
+                const Measure* m = toMeasure(mb);
+                const Measure* mm = score == master ? m : master->tick2measure(m->tick());
+                if (!mm) {
+                    continue;
+                }
+                const EID eid = mm->eid();
+                if (!eid.isValid()) {
+                    continue;
+                }
+                const std::string eidText = eid.toStdString();
+                for (staff_idx_t i = 0; i < score->nstaves() && i < sys->staves().size(); ++i) {
+                    if (staffKeys[i].empty() || !sys->staff(i)->show()) {
+                        continue;
+                    }
+                    auto it = m_progressMap.find(eidText + "|" + staffKeys[i]);
+                    if (it == m_progressMap.end()) {
+                        continue;
+                    }
+                    const Color& c = it->second == 'g' ? GREEN : it->second == 'o' ? ORANGE : RED;
+                    const RectF r = m->staffPageBoundingRect(i).translated(page->pos()).adjusted(0, -1.0 * m->spatium(), 0,
+                                                                                                    1.0 * m->spatium());
+                    painter->fillRect(r, c);
+                }
+            }
+        }
     }
 }
 

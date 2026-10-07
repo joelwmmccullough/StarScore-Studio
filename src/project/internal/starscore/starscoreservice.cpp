@@ -5,6 +5,7 @@
  */
 #include <QSettings>
 #include "starscoreservice.h"
+#include "engraving/dom/starscoreprogress.h"
 #include "settings.h"
 #include "starscorehouse.h"
 #include "starscorepdf.h"
@@ -82,6 +83,7 @@ StarScoreService::StarScoreService(const modularity::ContextPtr& iocCtx)
 void StarScoreService::init()
 {
     installBuiltinDefaultStyle();
+    mu::engraving::starscore::progressColorsShown() = progressColorsShown();
 
     // the library's files under the standard name, once StarScore has started (and opened whatever it reopens)
     QTimer::singleShot(4000, &m_timerGuard, [this]() { renameLibraryFilesToCodes(); });
@@ -2865,6 +2867,8 @@ Ret StarScoreService::exportArrangement(const QString& arrangementId, const io::
     engraving::MasterScore* ms = master->masterScore();
     // part books number their bars like the main score
     starscore::syncBarNumbering(ms, starscore::BarNumberingSync::Direct);
+    // progress colors are for working on the song only, never in an export
+    ms->metaTags().erase(String(mu::engraving::starscore::PROGRESS_TAG));
 
     // Part books: keep those whose instruments all belong to the arrangement
     ExcerptNotationList keptExcerpts;

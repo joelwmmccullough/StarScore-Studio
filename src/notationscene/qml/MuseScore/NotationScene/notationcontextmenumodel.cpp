@@ -138,6 +138,15 @@ MenuItemList NotationContextMenuModel::makeMeasureItems()
     }
     items << makeMenuItem("make-into-system", TranslatableString("notation", "Create system from selection"));
     items << makeSeparator();
+    // StarScore progress colors (Joel, 7 Oct 2026)
+    items << makeMenu(TranslatableString("notation", "Progress color"), {
+        makeMenuItem("starscore-progress-finished"),
+        makeMenuItem("starscore-progress-review"),
+        makeMenuItem("starscore-progress-unfinished"),
+        makeMenuItem("starscore-progress-clear"),
+        makeSeparator(),
+        makeMenuItem("starscore-progress-colors"),
+    });
     items << makeMenuItem("measure-properties");
 
     return items;

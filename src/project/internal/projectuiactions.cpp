@@ -160,6 +160,38 @@ const UiActionList ProjectUiActions::m_actions = {
              TranslatableString("action", "Show/hide the StarScore panel above the score"),
              Checkable::Yes
              ),
+    UiAction("starscore-progress-colors",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Show progress colors"),
+             TranslatableString("action", "Show or hide the finished / needs review / unfinished colors on measures. "
+                                          "Hiding them keeps them. They never appear in exports."),
+             Checkable::Yes
+             ),
+    UiAction("starscore-progress-finished",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Mark finished (green)"),
+             TranslatableString("action", "Color the selected measures green: finished")
+             ),
+    UiAction("starscore-progress-review",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Mark needs review (orange)"),
+             TranslatableString("action", "Color the selected measures orange: needs review")
+             ),
+    UiAction("starscore-progress-unfinished",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Mark unfinished (red)"),
+             TranslatableString("action", "Color the selected measures red: unfinished")
+             ),
+    UiAction("starscore-progress-clear",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Clear progress color"),
+             TranslatableString("action", "Take the progress color off the selected measures")
+             ),
     UiAction("starscore-voice-order",
              mu::context::UiCtxProjectOpened,
              mu::context::CTX_ANY,
@@ -285,6 +317,9 @@ ProjectUiActions::ProjectUiActions(std::shared_ptr<ProjectActionsController> con
         starScoreService()->panelVisibleChanged().onNotify(this, [this]() {
             m_actionCheckedChanged.send({ "starscore-toggle-panel" });
         });
+        starScoreService()->progressColorsShownChanged().onNotify(this, [this]() {
+            m_actionCheckedChanged.send({ "starscore-progress-colors" });
+        });
     }
 }
 
@@ -306,6 +341,9 @@ bool ProjectUiActions::actionChecked(const UiAction& act) const
 {
     if (act.code == "starscore-toggle-panel") {
         return starScoreService() ? starScoreService()->isPanelVisible() : true;
+    }
+    if (act.code == "starscore-progress-colors") {
+        return starScoreService() && starScoreService()->progressColorsShown();
     }
     return false;
 }

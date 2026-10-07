@@ -37,6 +37,7 @@ class StarScoreBarModel : public QObject, public muse::Contextable, public muse:
     Q_PROPERTY(bool isSoloView READ isSoloView NOTIFY changed)
     Q_PROPERTY(bool canAddSolos READ canAddSolos NOTIFY changed)
     Q_PROPERTY(bool decoOn READ decoOn NOTIFY changed)
+    Q_PROPERTY(bool progressShown READ progressShown NOTIFY changed)
 
     QML_ELEMENT
 
@@ -68,6 +69,9 @@ public:
     Q_INVOKABLE void setHoldUpdates(bool hold);
     Q_INVOKABLE void hidePanel();
     Q_INVOKABLE void toggleDeco();
+    bool progressShown() const;
+    //! a progress-color action code (starscore-progress-…)
+    Q_INVOKABLE void runAction(const QString& code);
     bool panelVisible() const;
 
     Q_INVOKABLE void showArrangement(const QString& id);

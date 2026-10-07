@@ -174,6 +174,20 @@ void ProjectActionsController::init()
     dispatcher()->reg(this, "starscore-toggle-panel", [this]() {
         starScoreService()->setPanelVisible(!starScoreService()->isPanelVisible());
     });
+    dispatcher()->reg(this, "starscore-progress-colors", [this]() {
+        starScoreService()->setProgressColorsShown(!starScoreService()->progressColorsShown());
+    });
+    for (const auto& [code, mark] : std::vector<std::pair<const char*, char> > {
+            { "starscore-progress-finished", 'g' }, { "starscore-progress-review", 'o' },
+            { "starscore-progress-unfinished", 'r' }, { "starscore-progress-clear", 0 } }) {
+        const char m = mark;
+        dispatcher()->reg(this, code, [this, m]() {
+            const QString problem = starScoreService()->markProgress(m);
+            if (!problem.isEmpty()) {
+                interactive()->info(muse::trc("starscore", "Progress colors"), problem.toStdString());
+            }
+        });
+    }
     dispatcher()->reg(this, "starscore-voice-order", [this]() {
         interactive()->open(Uri("musescore://starscore/voiceorder"));
     });

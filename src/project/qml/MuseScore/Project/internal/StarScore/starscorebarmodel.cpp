@@ -28,6 +28,9 @@ StarScoreBarModel::StarScoreBarModel(QObject* parent)
 
 void StarScoreBarModel::load()
 {
+    starScore()->progressColorsShownChanged().onNotify(this, [this]() {
+        emit changed();
+    });
     starScore()->changed().onNotify(this, [this]() {
         if (m_holdUpdates) {
             m_pendingUpdate = true;
@@ -80,6 +83,16 @@ void StarScoreBarModel::toggleDeco()
 {
     starScore()->toggleDeco();
     emit changed();
+}
+
+bool StarScoreBarModel::progressShown() const
+{
+    return starScore()->progressColorsShown();
+}
+
+void StarScoreBarModel::runAction(const QString& code)
+{
+    dispatcher()->dispatch(code.toStdString());
 }
 
 bool StarScoreBarModel::hasScore() const

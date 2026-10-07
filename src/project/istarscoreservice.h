@@ -766,6 +766,15 @@ public:
     virtual void setPanelVisible(bool visible) = 0;
     virtual muse::async::Notification panelVisibleChanged() const = 0;
 
+    // --- Progress colors (View › Progress colors): measures on a staff marked finished (green), needs review
+    // (orange) or unfinished (red). Drawn only on screen, never in exports; hiding them keeps the marks.
+    virtual bool progressColorsShown() const = 0;
+    virtual void setProgressColorsShown(bool shown) = 0;
+    virtual muse::async::Notification progressColorsShownChanged() const = 0;
+    //! Marks the selected measures: 'g' finished, 'o' needs review, 'r' unfinished, 0 clears. Returns a problem to
+    //! show, or nothing.
+    virtual QString markProgress(char code) = 0;
+
     //! Save a .mscz holding only the instruments and part books of this arrangement's sections.
     virtual muse::Ret exportArrangement(const QString& arrangementId, const muse::io::path_t& msczPath) = 0;
 

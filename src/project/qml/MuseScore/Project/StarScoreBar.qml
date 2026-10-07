@@ -315,6 +315,59 @@ Rectangle {
             }
         }
 
+        // --- Progress colors (Joel, 7 Oct 2026): select measures, then click a color ---
+        RowLayout {
+            Layout.fillWidth: true
+            visible: !root.collapsed
+            spacing: 8
+
+            StyledTextLabel {
+                Layout.preferredWidth: 96
+                Layout.alignment: Qt.AlignTop | Qt.AlignLeft
+                Layout.topMargin: 5
+                horizontalAlignment: Text.AlignLeft
+                text: qsTrc("starscore", "Progress")
+                font: ui.theme.bodyBoldFont
+            }
+
+            Flow {
+                Layout.fillWidth: true
+                Layout.preferredWidth: 1
+                spacing: 6
+
+                StarScoreChip {
+                    text: barModel.progressShown ? qsTrc("starscore", "Colors shown") : qsTrc("starscore", "Colors hidden")
+                    active: barModel.progressShown
+                    showDot: false
+                    toolTip: qsTrc("starscore", "Show or hide the progress colors. Hiding them keeps them.\nThey never appear in exports.")
+                    onLeftClicked: function(mouse) {
+                        barModel.runAction("starscore-progress-colors")
+                    }
+                }
+
+                Repeater {
+                    model: [
+                        { code: "starscore-progress-finished", name: qsTrc("starscore", "Finished"), color: "#28AA3C" },
+                        { code: "starscore-progress-review", name: qsTrc("starscore", "Needs review"), color: "#FF8C00" },
+                        { code: "starscore-progress-unfinished", name: qsTrc("starscore", "Unfinished"), color: "#E11E1E" },
+                        { code: "starscore-progress-clear", name: qsTrc("starscore", "Clear"), color: "transparent" }
+                    ]
+
+                    delegate: StarScoreChip {
+                        required property var modelData
+
+                        text: modelData.name
+                        showDot: modelData.color !== "transparent"
+                        dotColor: modelData.color
+                        toolTip: qsTrc("starscore", "Select measures (click, then Shift+click), then click here to color them.")
+                        onLeftClicked: function(mouse) {
+                            barModel.runAction(modelData.code)
+                        }
+                    }
+                }
+            }
+        }
+
         // --- Solos ---
         RowLayout {
             Layout.fillWidth: true

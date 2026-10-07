@@ -115,6 +115,7 @@ target_sources(project PRIVATE
     internal/starscore/starscoreupdate.cpp
     internal/starscore/starscoredoubletime.cpp
     internal/starscore/starscorestandardize.cpp
+    internal/starscore/starscoreprogress.cpp
     internal/starscore/starscorepdf.cpp
     internal/starscore/starscorepdf.h
     internal/starscore/starscoreengraving.h

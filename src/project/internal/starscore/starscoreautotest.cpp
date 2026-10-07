@@ -35,6 +35,7 @@
  * Everything is logged to log.txt.
  */
 #include "starscoreservice.h"
+#include "engraving/dom/starscoreprogress.h"
 #include "starscoreengraving.h"
 #include "starscorechordchart.h"
 
@@ -959,6 +960,39 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             }
         }
         autotestLog(QString("  changed %1 chord symbols").arg(changed));
+    } else if (step.startsWith("progressshow:")) {
+        // progressshow:1 / progressshow:0: View › Progress colors › Show progress colors
+        setProgressColorsShown(step.endsWith("1"));
+        autotestLog(QString("  shown: %1").arg(progressColorsShown()));
+    } else if (step.startsWith("progress:")) {
+        // progress:CODE:S1-S2:B1-B2 marks staves S1..S2 (0-based, in the score on screen) of bars B1..B2 (1-based):
+        // CODE g, o, r, or c (clear)
+        const QStringList a = step.split(':');
+        INotationPtr n = globalContext()->currentNotation();
+        engraving::Score* sc = n ? n->elements()->msScore() : nullptr;
+        if (a.size() == 4 && sc) {
+            const int s1 = a[2].section('-', 0, 0).toInt(), s2 = a[2].section('-', 1, 1).toInt();
+            const int b1 = a[3].section('-', 0, 0).toInt(), b2 = a[3].section('-', 1, 1).toInt();
+            engraving::Measure* m1 = sc->crMeasure(b1 - 1);
+            engraving::Measure* m2 = sc->crMeasure(b2 - 1);
+            if (m1 && m2) {
+                sc->selection().setRangeTicks(m1->tick(), m2->endTick(), engraving::staff_idx_t(s1), engraving::staff_idx_t(s2 + 1));
+                sc->selection().updateSelectedElements();
+                const char code = a[1] == "c" ? 0 : a[1].at(0).toLatin1();
+                const QString problem = markProgress(code);
+                autotestLog("  " + (problem.isEmpty() ? QString("marked") : problem));
+            } else {
+                autotestLog("  no such bars");
+            }
+        }
+        const QString tag = masterScore()->metaTag(String(engraving::starscore::PROGRESS_TAG)).toQString();
+        autotestLog(QString("  %1 marks: %2").arg(tag.isEmpty() ? 0 : tag.count(';') + 1).arg(tag.left(300)));
+    } else if (step == "undo") {
+        if (INotationPtr n = globalContext()->currentNotation()) {
+            n->undoStack()->undo(nullptr);
+        }
+        const QString tag = masterScore()->metaTag(String(engraving::starscore::PROGRESS_TAG)).toQString();
+        autotestLog(QString("  after undo %1 marks").arg(tag.isEmpty() ? 0 : tag.count(';') + 1));
     } else if (step == "save") {
         INotationProjectPtr project = globalContext()->currentProject();
         const Ret r = project ? project->save(io::path_t(autotestDir() + "/saved.starscore"), SaveMode::SaveCopy, false)

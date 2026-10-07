@@ -216,6 +216,10 @@ public:
     bool isPanelVisible() const override;
     void setPanelVisible(bool visible) override;
     muse::async::Notification panelVisibleChanged() const override;
+    bool progressColorsShown() const override;
+    void setProgressColorsShown(bool shown) override;
+    muse::async::Notification progressColorsShownChanged() const override;
+    QString markProgress(char code) override;
     std::vector<StarScoreVoiceSection> checkVoiceOrder() const override;
     bool minMajSymbolInCurrentScore() const override;
     void setMinMajSymbolInCurrentScore(bool on) override;
@@ -437,6 +441,7 @@ private:
 
     muse::async::Notification m_changed;
     muse::async::Notification m_panelVisibleChanged;
+    muse::async::Notification m_progressColorsShownChanged;
 
     std::shared_ptr<INotationProject> m_mainProject;
     std::map<QString, std::shared_ptr<INotationProject> > m_soloProjects;
