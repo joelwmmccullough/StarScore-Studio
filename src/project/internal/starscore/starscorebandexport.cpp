@@ -1931,17 +1931,23 @@ static std::vector<int> starscoreJoinSystems(const INotationPtr& n)
         if (!first) {
             continue;
         }
+        // Each try is laid out as MuseScore lays out after an edit: from the system before the two, until the
+        // systems after them fall back into line with the layout before. The whole Score laid out after each try
+        // (two layouts a break) took 47 s on Branston Pickle's 7-Horn Score; the systems come out the same.
+        auto relayout = [&]() {
+            sc->doLayoutRange(first->tick(), last->endTick());
+        };
         n->undoStack()->prepareChanges(TranslatableString::untranslatable("Join systems"));
         m->undoSetBreak(false, mu::engraving::LayoutBreakType::LINE);
         n->undoStack()->commitChanges();
-        sc->doLayout();
+        relayout();
         if (starscoreSystemOf(first) && starscoreSystemOf(first) == starscoreSystemOf(last)) {
             continue;   // joined; the next break tries to join the next system onto this one
         }
         n->undoStack()->prepareChanges(TranslatableString::untranslatable("Join systems"));
         m->undoSetBreak(true, mu::engraving::LayoutBreakType::LINE);
         n->undoStack()->commitChanges();
-        sc->doLayout();
+        relayout();
     }
     for (const mu::engraving::Measure* m = sc->firstMeasure(); m; m = m->nextMeasure()) {
         if (m->lineBreak()) {
