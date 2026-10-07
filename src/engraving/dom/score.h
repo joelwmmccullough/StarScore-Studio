@@ -595,6 +595,7 @@ public:
     void endCmd(bool rollback = false, bool layoutAllParts = false); // end undoable command
     void update() { update(true); }
     void lockUpdates(bool locked);
+    bool updatesLocked() const { return m_updatesLocked; }
     void undoRedo(bool undo, EditData*);
 
     virtual muse::async::Channel<ScoreChanges> changesChannel() const;

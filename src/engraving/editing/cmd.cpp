@@ -484,6 +484,9 @@ void Score::update(bool resetCmdState, bool layoutAllParts)
                 if (s != this && !s->isOpen() && ms->scoreList().size() > 1 && !layoutAllParts) {
                     continue;
                 }
+                if (s != this && s->m_updatesLocked) {
+                    continue;   // StarScore: a score whose updates are held isn't laid out by another score's edit either
+                }
                 s->doLayoutRange(cs.startTick(), cs.endTick());
             }
             updateAll = true;

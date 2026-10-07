@@ -20,6 +20,7 @@
 #include <QJsonObject>
 #include <QSet>
 #include <QDir>
+#include <QElapsedTimer>
 
 #include "settings.h"
 
@@ -1910,6 +1911,8 @@ void StarScoreService::tidyOpenedScore()
     if (!master || !ms || load().sections.empty()) {
         return;
     }
+    QElapsedTimer clock;   // how long the tidying takes, in the log
+    clock.start();
     showOldAlternates();   // may store, so the data is read after it
 
     // A damaged score (opened with "Open anyway"): rests on top of notes, as The Courier's bar 60 had, are taken out
@@ -1990,6 +1993,7 @@ void StarScoreService::tidyOpenedScore()
     standardizeHornNames();
     renamePersonNamedPartScores();
     labelPartBooks();
+    LOGI() << "[starscore] tidied the opened score in " << clock.elapsed() << " ms";
 }
 
 //! Joel, 6 Oct 2026: part scores named after the player who read them (G.I. Jorge's "Cory", "Harley", "Katelyn"…)

@@ -271,7 +271,20 @@ void Writer::write(Score* score, XmlWriter& xml, WriteContext& ctx, compat::Writ
     xml.endElement(); // score
 
     if (unhide) {
+        // StarScore: only this score was changed (and changes back here); the other scores keep their layout
+        // instead of being laid out again with it (with 24 part score tabs open, saving Branston Pickle spent
+        // 11 s laying them all out four times over)
+        std::vector<Score*> held;
+        for (Score* s : score->masterScore()->scoreList()) {
+            if (s != score && !s->updatesLocked()) {
+                s->lockUpdates(true);
+                held.push_back(s);
+            }
+        }
         score->endCmd(true);
+        for (Score* s : held) {
+            s->lockUpdates(false);
+        }
     }
 }
 
