@@ -167,6 +167,7 @@ public:
     StarScoreExportProgress exportProgress() const override;
     std::vector<StarScoreOutdatedSong> outdatedSongs() const override;
     muse::RetVal<QString> updateCurrentSongSheets() override;
+    muse::RetVal<QString> convertFromDoubleTime() override;
     void startUpdateAllSheets(const QStringList& paths) override;
     void startApplyStylesToAll(const QStringList& paths) override;
     void cancelUpdateAllSheets() override;

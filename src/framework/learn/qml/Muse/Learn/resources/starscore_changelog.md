@@ -4,6 +4,12 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.23
+
+- **Convert from double time** (Format menu). Rewrites a song written in double time in standard time: every note, rest and marking half as long, the tempo halved (♩ = 216 becomes ♩ = 108), so it sounds the same. In 4/4 two bars become one, counted within each stretch between rehearsal marks, repeats and double barlines; a bar left over keeps its length (G.I. Jorge's fermata bar). In 7/8 each bar becomes a bar of 7/16 (Shatter). Bar repeat signs are written out; rehearsal marks, system texts, repeats, barlines, ties, rit. lines and fermatas come through. Hand-placed system breaks in the parts are dropped. One step: Undo puts it all back.
+- **Crash fix: opening songs one after another.** A song closed before the audio engine had answered its player's first requests could crash StarScore (seen while opening songs in a row and while making audio demos).
+- **Paste half/double duration** pastes any number of whole bars, and no longer crashes on markings placed between notes.
+
 ## 1.18.22
 
 - **Section Scores in their own subfolder.** Each part folder (4H…, Big Band, the String sections…) keeps its Scores in "Section Scores". The Flexible 2H and 3H folders have a subfolder per horn ("Horn 1", "Horn 2"…) plus "Section Scores". Sheets already exported are moved there the next time the song is exported or "Update all sheets" reaches it: same files, same versions, nothing archived. The sheet record and the folder colours follow.

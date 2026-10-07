@@ -575,6 +575,8 @@ public:
     //! come out differently are written (the old file to Version History) with their version's last number raised;
     //! the others are left as they are. Then the song's record is marked up to date. Returns a one-line summary.
     virtual muse::RetVal<QString> updateCurrentSongSheets() = 0;
+    //! The open song rewritten from double time into standard time (see starscoredoubletime.cpp); one undo step
+    virtual muse::RetVal<QString> convertFromDoubleTime() = 0;
     //! Opens each song in turn, updates it (updateCurrentSongSheets), saves it, goes on to the next
     virtual void startUpdateAllSheets(const QStringList& paths) = 0;
     //! The same run, but each song gets its part styles applied (Format › Part Styles › Apply to open score now) and is

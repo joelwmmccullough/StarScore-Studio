@@ -379,7 +379,9 @@ bool Read460::pasteStaff(XmlReader& e, Segment* dst, staff_idx_t dstStaff, Fract
         }
         if (doScale) {
             Fraction tickLenStretched = tickLen * timeStretch;
-            if (!TDuration(tickLenStretched).isValid()) {
+            // StarScore (6 Oct 2026): a stretch of whole bars pasted at half or double length can be any number of
+            // whole notes ("Convert from double time" pastes a song's bars at half length); each note is still checked
+            if (!TDuration(tickLenStretched).isValid() && tickLenStretched < Fraction(1, 1)) {
                 LOGD("Can't paste: invalid duration %d/%d", tickLenStretched.numerator(), tickLenStretched.denominator());
                 return false;
             }
@@ -457,8 +459,13 @@ bool Read460::pasteStaff(XmlReader& e, Segment* dst, staff_idx_t dstStaff, Fract
                     TRead::read(&loc, e, ctx);
                     ctx.setLocation(loc);
                     if (loc.isTimeTick()) {
-                        Measure* measure = score->tick2measure(ctx.tick());
-                        EditTimeTickAnchors::createTimeTickAnchor(measure, ctx.tick() - measure->tick(), track2staff(ctx.track()));
+                        // StarScore (6 Oct 2026): at the scaled tick, as everything else pasted at half or double length
+                        // (the unscaled tick could lie past the end of the score: no bar there, and a crash)
+                        const Fraction tick = doScale ? (ctx.tick() - dstTick) * scale + dstTick : ctx.tick();
+                        Measure* measure = score->tick2measure(tick);
+                        if (measure) {
+                            EditTimeTickAnchors::createTimeTickAnchor(measure, tick - measure->tick(), track2staff(ctx.track()));
+                        }
                     }
                 } else if (tag == "Tuplet") {
                     Tuplet* oldTuplet = tuplet;

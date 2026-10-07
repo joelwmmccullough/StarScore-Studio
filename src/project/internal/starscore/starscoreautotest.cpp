@@ -635,6 +635,10 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         }
         autotestLog(QString("  %1 song(s): %2").arg(paths.size()).arg(paths.join(", ")));
         startUpdateAllSheets(paths);
+    } else if (step == "doubletime") {
+        // doubletime: "Convert from double time" on the open song
+        const RetVal<QString> r = convertFromDoubleTime();
+        autotestLog("  " + (r.ret ? r.val : QString::fromStdString(r.ret.toString())));
     } else if (step.startsWith("renamelib:")) {
         // renamelib:<Projects and Sheets folder>: what StarScore does when it starts (Title.starscore -> CODE - Title)
         const QString band = qEnvironmentVariable("STARSCORE_AUTOTEST_BAND");

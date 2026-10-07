@@ -372,6 +372,7 @@ MenuItem* AppMenuModel::makeFormatMenu()
         makeMenuItem("starscore-layout-to"),
         makeMenuItem("starscore-part-styles"),
         makeMenuItem("starscore-additive-timesig"),
+        makeMenuItem("starscore-convert-double-time"),
         makeMenuItem("starscore-add-solo"),
         makeMenuItem("starscore-compare-parts"),
         makeMenuItem("starscore-voice-order"),

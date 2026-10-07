@@ -135,6 +135,12 @@ const UiActionList ProjectUiActions::m_actions = {
              TranslatableString("action", "Compare parts…"),
              TranslatableString("action", "See which bars differ between parts on the same instrument")
              ),
+    UiAction("starscore-convert-double-time",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Convert from double time…"),
+             TranslatableString("action", "Rewrite a song written in double time in standard time: every note half as long, two bars become one, the tempo halved")
+             ),
     UiAction("starscore-toggle-minmaj",
              mu::context::UiCtxProjectOpened,
              mu::context::CTX_ANY,

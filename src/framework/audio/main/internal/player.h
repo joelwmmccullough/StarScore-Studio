@@ -37,6 +37,7 @@ class Player : public IPlayer, public async::Asyncable, public Contextable
 
 public:
     Player(const TrackSequenceId sequenceId, const muse::modularity::ContextPtr& iocCtx);
+    ~Player() override;
 
     void init();
 
@@ -63,6 +64,10 @@ public:
 private:
 
     TrackSequenceId m_sequenceId = -1;
+    //! StarScore (6 Oct 2026): false once the player is gone. The audio engine answers init()'s requests later; a song
+    //! closed before the answer came (opening songs one after another, making audio demos) left the answer running on a
+    //! deleted player, and StarScore crashed.
+    std::shared_ptr<bool> m_alive = std::make_shared<bool>(true);
     PlaybackStatus m_playbackStatus = PlaybackStatus::Stopped;
     async::Channel<PlaybackStatus> m_playbackStatusChanged;
 
