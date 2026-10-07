@@ -1490,6 +1490,9 @@ bool Score::makeGap1(const Fraction& baseTick, staff_idx_t staffIdx, const Fract
         }
         Fraction tick = baseTick + actualTicks(voiceOffset[track - strack], nullptr, staff(staffIdx)->timeStretch(baseTick));
         Measure* tm   = tick2measure(tick);
+        if (!tm) {   // StarScore: a voice starting past the end of the score (nothing to clear there)
+            continue;
+        }
         if ((track % VOICES) && !tm->hasVoices(staffIdx)) {
             continue;
         }

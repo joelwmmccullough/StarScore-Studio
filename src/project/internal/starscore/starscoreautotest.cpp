@@ -800,9 +800,10 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
                             .arg(removed).arg(spannersBefore).arg(ms->spanner().size()));
             }
         }
-    } else if (step == "todouble") {
-        // todouble: the open song rewritten at twice its note lengths (what the Double-Time sheets are made from)
-        const RetVal<QString> r = convertTimeOf(globalContext()->currentProject(), true, true);
+    } else if (step == "todouble" || step == "todouble:keepnumbers") {
+        // todouble: the open song rewritten at twice its note lengths (a song written in half time made standard);
+        // todouble:keepnumbers: numbered like the original bars (what the Double-Time sheets are made from)
+        const RetVal<QString> r = convertTimeOf(globalContext()->currentProject(), true, step.endsWith("keepnumbers"));
         autotestLog("  " + (r.ret ? r.val : QString::fromStdString(r.ret.toString())));
     } else if (step == "doubletime") {
         // doubletime: "Convert from double time" on the open song

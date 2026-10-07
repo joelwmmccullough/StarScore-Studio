@@ -4,6 +4,15 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.25
+
+- **Half-time and double-time sheets.** Export to Sheets and Demos has two new ticks for each song: "Export half-time version" and "Export double-time version". Each is remembered for that song until you untick it. A ticked one makes the ticked sheets a second time from a copy of the song with every note half as long (half-time) or twice as long (double-time), the tempo changed to match, into a "Half-Time" or "Double-Time" subfolder of each part folder ("4H/Double-Time/CODE - Trumpet.pdf"). With both ticked, three sets of sheets come out. Their bar numbers match the standard sheets: in double time both halves of a bar carry its number; in half time a bar made of two carries the first one's number and the numbering skips the second. These sheets have no version numbers or changelog of their own; a new export replaces them. The song itself is never changed.
+- **Convert from double time** now changes every number in a tempo marking ("♩ = 133–153"), not only the first.
+- **Apply default style settings** is at the bottom of the Format menu, with Load style and Save style.
+- **Crash fix: StarScore crashed on every start** after its saved panel layout was damaged (7 Oct). A panel that can't go back where it was is now put beside the score.
+- **Crash reports are copied to "StarScore Studio/Logs/Crash Reports"** each time StarScore starts (the newest 20), next to the logs, so they can be read from there.
+- **Standardize this song** keeps showing the sections that were showing before, instead of switching to the first arrangement.
+
 ## 1.18.24
 
 - **Standardize this song** (Format menu). Gives an older song the standard layout: the "2-Horn / 3-Horn Any (all keys)" and "Flexible (all keys)" sections become the standard 2-Horn and 3-Horn Flexible sections (each chair gets the music, part score layout and status of its old "in C" part, or the "in Bass Clef" part for a trombone chair); "Strings & Extras" becomes a String Duo, Trio, Quartet or Quintet section and its other instruments are removed; "Horn Section (full score)", "Player Lead Sheets", "Full Score" and other arrangements not made from a template are removed; a 3-Horn Flexible section's old hidden "Horn 1 (Flute)" chair goes; part scores of several instruments that aren't an arrangement's score, empty ones and second part scores of the same instrument are removed. It lists every change first, and copies the file as it was to Version History/Before standardizing (date). All songs in Projects and Sheets were standardized this way on 7 October 2026 (originals in each song's Version History/Before standardizing 2026-10-06).

@@ -588,6 +588,12 @@ QStringList StarScoreService::standardizeSong(bool apply)
 
     // --- doing it ---------------------------------------------------------------------------------------------------
     const QString wasActive = activeArrangementId();
+    std::set<QString> wasOn;
+    for (const StarScoreSection& s : sections()) {
+        if (s.on) {
+            wasOn.insert(s.id);
+        }
+    }
 
     LOGI() << "[starscore] standardize: 1. the standard Flexible sections";
     // 1. the standard Flexible sections, with the music of the old "in C" parts
@@ -821,12 +827,27 @@ QStringList StarScoreService::standardizeSong(bool apply)
     labelPartBooks();
 
     const Data after = load();
-    QString show = wasActive;
-    if (std::none_of(after.arrangements.begin(), after.arrangements.end(), [&](const StarScoreArrangement& a) { return a.id == show; })) {
-        show = after.arrangements.empty() ? QString() : after.arrangements.front().id;
+    // the sections that were showing before stay showing, the others hidden (Joel, 7 Oct 2026: IPDW opened on an
+    // arrangement with no music after standardizing, and looked empty); with none of them left, the first arrangement
+    bool anyOn = false;
+    for (const StarScoreSection& s : after.sections) {
+        anyOn = anyOn || wasOn.count(s.id) > 0;
     }
-    if (!show.isEmpty()) {
-        showArrangement(show);
+    if (anyOn) {
+        for (const StarScoreSection& s : sections()) {
+            const bool on = wasOn.count(s.id) > 0;
+            if (s.on != on) {
+                setSectionOn(s.id, on);
+            }
+        }
+    } else {
+        QString show = wasActive;
+        if (std::none_of(after.arrangements.begin(), after.arrangements.end(), [&](const StarScoreArrangement& a) { return a.id == show; })) {
+            show = after.arrangements.empty() ? QString() : after.arrangements.front().id;
+        }
+        if (!show.isEmpty()) {
+            showArrangement(show);
+        }
     }
     if (INotationProjectPtr project = globalContext()->currentProject()) {
         project->markAsUnsaved();

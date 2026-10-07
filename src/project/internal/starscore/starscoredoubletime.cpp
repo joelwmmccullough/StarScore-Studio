@@ -540,13 +540,37 @@ RetVal<QString> StarScoreService::convertTimeOf(const INotationProjectPtr& proje
         if (a.tempo) {
             // at half the tempo (twice it for double time), and the number in the marking too ("= 216" becomes "= 108")
             const double factor = toDouble ? 2.0 : 0.5;
-            static const QRegularExpression number("=\\s*(\\d+(?:\\.\\d+)?)");
+            // every number after the "=" ("= 133-153" becomes "= 266-306")
+            static const QRegularExpression number("(\\d+(?:\\.\\d+)?)");
             QString text = a.xml.toQString();
-            const QRegularExpressionMatch nm = number.match(text);
-            if (nm.hasMatch()) {
-                const double bpm = nm.captured(1).toDouble() * factor;
-                const QString half = bpm == std::floor(bpm) ? QString::number(int(bpm)) : QString::number(bpm, 'f', 1);
-                text.replace(nm.capturedStart(1), nm.capturedLength(1), half);
+            const int eq = text.indexOf('=');
+            if (eq >= 0) {
+                // (only in the words: the tags, e.g. <font size="10"/>, keep their numbers)
+                static const QRegularExpression tag("<[^>]*>");
+                const QString tail = text.mid(eq);
+                QString out;
+                auto scaled = [&](const QString& words) {
+                    QString r;
+                    int last = 0;
+                    QRegularExpressionMatchIterator it = number.globalMatch(words);
+                    while (it.hasNext()) {
+                        const QRegularExpressionMatch nm = it.next();
+                        const double bpm = nm.captured(1).toDouble() * factor;
+                        r += words.mid(last, nm.capturedStart(1) - last);
+                        r += bpm == std::floor(bpm) ? QString::number(int(bpm)) : QString::number(bpm, 'f', 1);
+                        last = nm.capturedEnd(1);
+                    }
+                    return r + words.mid(last);
+                };
+                int last = 0;
+                QRegularExpressionMatchIterator tags = tag.globalMatch(tail);
+                while (tags.hasNext()) {
+                    const QRegularExpressionMatch tm = tags.next();
+                    out += scaled(tail.mid(last, tm.capturedStart() - last)) + tm.captured();
+                    last = tm.capturedEnd();
+                }
+                out += scaled(tail.mid(last));
+                text = text.left(eq) + out;
             }
             TempoText* tt = a.clone && a.clone->isTempoText() ? toTempoText(a.clone) : Factory::createTempoText(seg);
             tt->setTrack(a.track);

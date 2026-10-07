@@ -447,7 +447,9 @@ bool Read460::pasteStaff(XmlReader& e, Segment* dst, staff_idx_t dstStaff, Fract
                         }
                         voice_idx_t voiceId = static_cast<voice_idx_t>(e.intAttribute("id", -1));
                         assert(voiceId < VOICES);
-                        voiceOffset[voiceId] = Fraction::fromTicks(e.readInt()) * timeStretch;
+                        // StarScore: at the paste's scale too (a half-length paste of a staff whose second voice starts late made
+                        // its gap past the end of the score and crashed)
+                        voiceOffset[voiceId] = Fraction::fromTicks(e.readInt()) * timeStretch * scale;
                     }
                     if (!score->makeGap1(dstTick, dstStaffIdx, tickLen * timeStretch, voiceOffset)) {
                         LOGD() << "cannot make gap in staff " << dstStaffIdx << " at tick " << dstTick.ticks();

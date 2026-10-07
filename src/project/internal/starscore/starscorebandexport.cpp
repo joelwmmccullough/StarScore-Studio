@@ -3491,12 +3491,17 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         for (const INotationPtr& n : touchedBooks) {
             n->notationChanged().notify();
         }
+        if (!variant.isEmpty()) {
+            // (a sheet that couldn't be made is reported, the others are there)
+            QString line = muse::qtrc("starscore", "%1: wrote %2 PDF(s), %3 the same as before.").arg(variant).arg(written.size())
+                           .arg(unchanged.size());
+            if (!problems.isEmpty()) {
+                line += " " + muse::qtrc("starscore", "Not made: %1").arg(problems.join("; "));
+            }
+            return RetVal<QString>::make_ok(line);
+        }
         if (!problems.isEmpty()) {
             return RetVal<QString>::make_ret(Ret::Code::UnknownError, problems.join("; ").toStdString());
-        }
-        if (!variant.isEmpty()) {
-            return RetVal<QString>::make_ok(muse::qtrc("starscore", "%1: wrote %2 PDF(s), %3 the same as before.")
-                                            .arg(variant).arg(written.size()).arg(unchanged.size()));
         }
         return RetVal<QString>::make_ok(QString("%1 would change, %2 the same").arg(m_dryRunChanged.size()).arg(unchanged.size()));
     }
