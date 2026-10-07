@@ -21,6 +21,10 @@
  */
 #include "globalmodule.h"
 
+#include <QDateTime>
+
+#include <QFile>
+
 #include <QDir>
 #include <QFileInfo>
 
@@ -218,6 +222,28 @@ void GlobalModule::onPreInit(const IApplication::RunMode& mode)
             logger->addDest(new FileLogDest(mirrorFile.toStdString(),
                                             LogLayout("${datetime} | ${type|5} | ${thread|15} | ${tag|15} | ${message}")));
             LOGI() << "log copy: " << mirrorFile;
+
+            //! and the crash reports (minidumps) from earlier runs, into Logs/Crash Reports, the newest 20 kept
+            //! (Joel, 7 Oct 2026: the crash reports folder is out of Claude's reach)
+            const QString dumpsDir = logPath.toQString() + "/dumps";
+            const QString crashDir = starscoreDir + "/Logs/Crash Reports";
+            QFileInfoList dumps;
+            for (const char* sub : { "pending", "completed", "new" }) {
+                dumps << QDir(dumpsDir + "/" + sub).entryInfoList({ "*.dmp" }, QDir::Files);
+            }
+            if (!dumps.isEmpty()) {
+                QDir().mkpath(crashDir);
+                for (const QFileInfo& fi : dumps) {
+                    const QString target = crashDir + "/" + fi.lastModified().toString("yyMMdd_HHmmss") + " " + fi.fileName();
+                    if (!QFileInfo::exists(target)) {
+                        QFile::copy(fi.absoluteFilePath(), target);
+                    }
+                }
+                QFileInfoList copies = QDir(crashDir).entryInfoList({ "*.dmp" }, QDir::Files, QDir::Name | QDir::Reversed);
+                for (int i = 20; i < copies.size(); ++i) {
+                    QFile::remove(copies.at(i).absoluteFilePath());
+                }
+            }
         }
     }
 #endif // end of not MUSE_CONFIGURATION_IS_WEB

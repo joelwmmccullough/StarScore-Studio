@@ -638,7 +638,15 @@ void DockWindow::handleUnknownDock(const DockPageView* page, DockBase* unknownDo
 
     holder->open(); // init the frame...
 
-    KDDockWidgets::Frame* frame = holder->dockWidget()->frame();
+    // StarScore (7 Oct 2026): a saved layout that doesn't fit the page can leave the holder without a frame; StarScore
+    // then crashed on every start. The panel is added next to the score instead.
+    KDDockWidgets::Frame* frame = holder->dockWidget() ? holder->dockWidget()->frame() : nullptr;
+    if (!frame) {
+        LOGW() << "no frame to put the panel " << unknownPanel->objectName() << " in; added beside the score";
+        holder->close();
+        addDock(unknownDock, unknownDock->location(), page->centralDock());
+        return;
+    }
     frame->addWidget(unknownPanel->dockWidget());
 
     holder->close();
