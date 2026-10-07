@@ -140,11 +140,6 @@
     <name>starscore-minmaj</name>
     <render>m:0.05:0 sc:0.71 m:0:-0.5 diamin m:0:0.5 sc:1.408451</render>
     </token>
-  <!-- diminished-major seventh: one symbol, a diamond (replaces o^ / dim^) -->
-  <token class="quality">
-    <name>starscore-dimmaj</name>
-    <render>m:0.05:0 sc:0.71 m:0:-0.5 diadim m:0:0.5 sc:1.408451</render>
-    </token>
   <token class="quality">
     <name>-</name>
     <render>m:0.05:0 sc:1.05 m:0:-0.38 minus m:0:0.38 sc:0.952381 m:0.02:0</render>
