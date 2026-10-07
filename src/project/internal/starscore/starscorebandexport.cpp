@@ -73,7 +73,13 @@
 #include "organizer/orgplatform.h"
 
 #include "io/buffer.h"
+#include "io/file.h"
 #include "global/serialization/zipreader.h"
+#include "engraving/infrastructure/mscwriter.h"
+#include "engraving/rw/rwregister.h"
+#include "engraving/rw/inoutdata.h"
+#include "engraving/dom/chordlist.h"
+#include "engraving/dom/imageStore.h"
 #include "translation.h"
 #include "log.h"
 
@@ -2551,6 +2557,114 @@ void StarScoreService::setBandExportUnticked(const QString& code, const QStringL
     saveStyleSettings(settings);
 }
 
+namespace {
+//! The export's throwaway copies of the song, written straight from the open score: `strippedPath` holds the song
+//! without its part books, `chairsPath` (when given) the song with only the `chairs` books. What MscSaver writes
+//! for a save, less the thumbnail (two full layouts of the score for a picture nothing looks at); the song's own
+//! part books other than the chairs aren't written. The main score is written once, for both files: writing it
+//! lays the score out with every part showing (MuseScore's rule for a score with multimeasure rests), 5 s on a big
+//! song. Before, the copies came from a full save of the song, loaded, stripped and saved twice more: 44 s of a
+//! Branston Pickle export. Returns false, with nothing kept, when a file couldn't be written.
+bool starscoreWriteCopies(mu::engraving::MasterScore* ms, const std::vector<mu::engraving::Excerpt*>& chairs,
+                          const QString& strippedPath, const QString& chairsPath)
+{
+    using namespace mu::engraving;
+    if (!ms) {
+        return false;
+    }
+    ByteArray styleData;
+    {
+        muse::io::Buffer buf(&styleData);
+        buf.open(muse::io::IODevice::WriteOnly);
+        ms->style().write(&buf);
+    }
+    rw::WriteInOutData out(ms);
+    ByteArray scoreData;
+    {
+        muse::io::Buffer buf(&scoreData);
+        buf.open(muse::io::IODevice::ReadWrite);
+        rw::RWRegister::writer(ms->iocContext())->writeScore(ms, &buf, &out);
+    }
+    ByteArray chordListData;
+    if (ms->chordList()->customChordList() && !ms->chordList()->empty()) {
+        muse::io::Buffer buf(&chordListData);
+        buf.open(muse::io::IODevice::WriteOnly);
+        ms->chordList()->write(&buf);
+    }
+    std::vector<std::pair<String, ByteArray> > images;
+    for (ImageStoreItem* ip : imageStore) {
+        if (ip->isUsed(ms)) {
+            images.emplace_back(String::fromStdString(ip->hashName()), ip->buffer());
+        }
+    }
+    auto write = [&](const QString& path, const std::vector<Excerpt*>& excerpts) {
+        muse::io::File file(path);
+        MscWriter::Params params;
+        params.device = &file;
+        params.filePath = path;
+        params.mainFileName = QFileInfo(path).completeBaseName() + ".mscx";
+        params.mode = MscIoMode::Zip;
+        MscWriter writer(params);
+        if (!writer.open()) {
+            return false;
+        }
+        writer.writeStyleFile(styleData);
+        writer.writeScoreFile(scoreData);
+        for (size_t i = 0; i < excerpts.size(); ++i) {
+            Score* es = excerpts[i]->excerptScore();
+            if (!es) {
+                continue;
+            }
+            // named as a save names them (the number keeps the order; MuseScore lists a file's books in file order)
+            const String name = String(u"%1_%2").arg(String::number(i), muse::io::escapeFileName(excerpts[i]->name()).toString());
+            ByteArray exStyle;
+            {
+                muse::io::Buffer buf(&exStyle);
+                buf.open(muse::io::IODevice::WriteOnly);
+                es->style().write(&buf);
+            }
+            writer.addExcerptStyleFile(name, exStyle);
+            ByteArray exData;
+            {
+                muse::io::Buffer buf(&exData);
+                buf.open(muse::io::IODevice::ReadWrite);
+                rw::RWRegister::writer(es->iocContext())->writeScore(es, &buf, &out);
+            }
+            writer.addExcerptFile(name, exData);
+        }
+        if (!chordListData.empty()) {
+            writer.writeChordListFile(chordListData);
+        }
+        for (const auto& [name, data] : images) {
+            writer.addImageFile(name, data);
+        }
+        writer.close();
+        return !writer.hasError() && file.exists();
+    };
+    if (!write(strippedPath, {})) {
+        QFile::remove(strippedPath);
+        return false;
+    }
+    if (!chairsPath.isEmpty() && !write(chairsPath, chairs)) {
+        QFile::remove(chairsPath);
+        QFile::remove(strippedPath);
+        return false;
+    }
+    return true;
+}
+
+//! A score not laid out after each edit while this lives (Score::update does nothing): for a throwaway copy that is
+//! laid out by hand, where it is measured or printed
+struct UpdatesLock {
+    mu::engraving::Score* s;
+    explicit UpdatesLock(mu::engraving::Score* sc)
+        : s(sc) { s->lockUpdates(true); }
+    ~UpdatesLock() { s->lockUpdates(false); }
+    UpdatesLock(const UpdatesLock&) = delete;
+    UpdatesLock& operator=(const UpdatesLock&) = delete;
+};
+}
+
 RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPaths)
 {
     // The plan is made once: the sheets to write come from it, and so do the archiving of sheets under older names
@@ -2655,13 +2769,12 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     // Sheets that aren't one of the song's own part books are made from throwaway copies of the song without its
     // part books: the Scores (a copy with only the score's instruments showing), the Flexible version sheets (a chair
     // re-written for one instrument, as a fresh part book) and the sheet of a part that has no part book yet (the
-    // book MuseScore would make, made in the copy so nothing is left behind in the open score). The song is saved
-    // once, loaded once, stripped of its part books and saved again as the file the copies load: each load of the
-    // full file read all 74 part books (and every edit in such a copy laid them all out again), and a Balkan Wedding
-    // export loaded it once per version sheet (16 times) and once more for the Scores; that was most of its ten
-    // minutes. The copies are loaded fresh from the stripped file (a fraction of the full load): a copy edited for
-    // one version sheet isn't reused for the next.
-    const QString copyPath = tmpDir + "/copy.mscz";
+    // book MuseScore would make, made in the copy so nothing is left behind in the open score). The song without its
+    // part books is written once (starscoreWriteCopies) as the file the copies load: each load of the full file read
+    // all 74 part books (and every edit in such a copy laid them all out again), and a Balkan Wedding export loaded
+    // it once per version sheet (16 times) and once more for the Scores; that was most of its ten minutes. The
+    // copies are loaded fresh from the stripped file (a fraction of the full load): a copy edited for one version
+    // sheet isn't reused for the next.
     const QString strippedPath = tmpDir + "/copy-noparts.mscz";
     // A Flexible version sheet is printed from the chair's own part book (its hidden texts, bar widths, text positions,
     // spacers…), re-pitched for the instrument: a copy keeping only those books is saved alongside the stripped one
@@ -2694,41 +2807,54 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     };
     bool strippedSaved = false;
     bool strippedFailed = false;
-    auto loadProject = [&](const QString& path) -> INotationProjectPtr {
+    QElapsedTimer stepClock;   // where a sheet's time goes, in the log
+    stepClock.start();
+    auto lapTime = [&](const QString& rel, const char* what) {
+        LOGI() << "[starscore] sheet time " << rel << " " << what << " " << stepClock.restart() << " ms";
+    };
+    // skipLayout: the copy's main score isn't laid out on loading (for a copy whose main score is never printed or
+    // measured; the Scores' copies are judged on the layout from loading on, so theirs is)
+    auto loadProject = [&](const QString& path, bool skipLayout = false) -> INotationProjectPtr {
         INotationProjectPtr p = projectCreator()->newProject(iocContext());
-        if (!p->load(io::path_t(path)) || !p->masterNotation() || !p->masterNotation()->masterScore()) {
+        OpenParams params;
+        params.skipLayout = skipLayout;
+        if (!p->load(io::path_t(path), params) || !p->masterNotation() || !p->masterNotation()->masterScore()) {
             return nullptr;
         }
         return p;
     };
-    auto loadStripped = [&]() -> INotationProjectPtr {
+    // the stripped copy (and the chairs copy) written, once; false when that failed
+    auto ensureCopies = [&]() -> bool {
         if (strippedFailed) {
-            return nullptr;
+            return false;
         }
         if (!strippedSaved) {
-            INotationProjectPtr p = project->save(io::path_t(copyPath), SaveMode::SaveCopy, false) ? loadProject(copyPath) : nullptr;
-            if (p) {
-                if (!chairPids.empty()) {
-                    ExcerptNotationList keep;
-                    for (const QString& pid : chairPids) {
-                        if (IExcerptNotationPtr b = bookOfPart(p->masterNotation(), pid)) {
-                            keep.push_back(b);
-                        }
-                    }
-                    if (!keep.empty()) {
-                        p->masterNotation()->setExcerpts(keep);
-                        chairsSaved = bool(p->save(io::path_t(chairsPath), SaveMode::SaveCopy, false));
-                    }
+            stepClock.restart();
+            std::vector<engraving::Excerpt*> chairs;
+            for (const QString& pid : chairPids) {
+                IExcerptNotationPtr b = bookOfPart(master, pid);
+                engraving::Score* bs = b && b->notation() && b->notation()->elements() ? b->notation()->elements()->msScore() : nullptr;
+                if (bs && bs->excerpt()) {
+                    chairs.push_back(bs->excerpt());
                 }
-                p->masterNotation()->setExcerpts({});
-                strippedSaved = bool(p->save(io::path_t(strippedPath), SaveMode::SaveCopy, false));
             }
+            strippedSaved = starscoreWriteCopies(ms, chairs, strippedPath, chairs.empty() ? QString() : chairsPath);
+            chairsSaved = strippedSaved && !chairs.empty();
+            lapTime("copies", "write the copies");
             if (!strippedSaved) {
                 strippedFailed = true;
-                return nullptr;
+                return false;
             }
         }
+        return true;
+    };
+    auto loadStripped = [&]() -> INotationProjectPtr {
+        if (!ensureCopies()) {
+            return nullptr;
+        }
+        stepClock.restart();
         INotationProjectPtr p = loadProject(strippedPath);
+        lapTime("copies", "load the stripped copy");
         if (!p) {
             strippedFailed = true;
         }
@@ -2793,14 +2919,26 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     // A Flexible chair re-written for one transposition and clef, as a part book of its own
     auto writeVersion = [&](const StarScoreBandFile& file, QByteArray& pdf) -> Ret {
         const bool brass = starscore::isBrassSheet(file.sheetLeft);
-        // From the chair's own part book: everything set in it carries over
-        if (loadStripped() /* makes the copies */ && chairsSaved) {
-            INotationProjectPtr p = loadProject(chairsPath);
+        // From the chair's own part book: everything set in it carries over. (Making the copies loaded the stripped
+        // copy for nothing, 2 s a sheet.)
+        if (ensureCopies() && chairsSaved) {
+            stepClock.restart();
+            INotationProjectPtr p = loadProject(chairsPath, true);
+            lapTime(file.relativePath, "load the chairs copy");
             IMasterNotationPtr vm = p ? p->masterNotation() : nullptr;
             engraving::Part* part = vm ? vm->masterScore()->partById(ID(file.partIds.value(0))) : nullptr;
             IExcerptNotationPtr book = part ? bookOfPart(vm, file.partIds.value(0)) : nullptr;
             INotationPtr n = book ? book->notation() : nullptr;
             if (n && part->instrument()) {
+                // Neither score is laid out after each edit here (the copy's main score, never printed, was laid
+                // out in continuous view with every part after every edit: most of a version sheet's 10 s). The book
+                // is laid out by hand where MuseScore laid it out when its tab was open: after the pitch change, after
+                // the instrument change, and when it's printed. The number of layouts matters: a tie's end is set
+                // from the next tie's last layout, and the sheet of a book whose tab was closed when the song was
+                // saved printed its ties half a point shorter.
+                engraving::Score* bookScore = n->elements()->msScore();
+                UpdatesLock mainLock(vm->masterScore());
+                UpdatesLock bookLock(bookScore);
                 vm->setExcerpts({ book });
                 if (!part->show()) {
                     vm->parts()->setPartsVisible({ { part->id(), true } }, TranslatableString::untranslatable("Show"));
@@ -2809,13 +2947,20 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                 n->undoStack()->prepareChanges(TranslatableString::untranslatable("Concert pitch"));
                 n->style()->setStyleValue(StyleId::concertPitch, false);
                 n->undoStack()->commitChanges();
+                bookScore->setLayoutAll();
+                bookScore->doLayout();
                 starscoreRewritePartInstrument(vm, part, file.transposeDiatonic, file.transposeChromatic, file.clef, false);
+                bookScore->setLayoutAll();
+                bookScore->doLayout();
+                lapTime(file.relativePath, "rewrite the instrument");
                 n->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
                 if (!brass) {
                     starscore::hideMuteMarkings(n->elements()->msScore());
                 }
                 const Ret ret = starscorePrintSheet(writer, n, file.sheetLeft, file.sheetRight, true, pdf);
+                lapTime(file.relativePath, "print");
                 n->undoStack()->commitChanges();
+                lapTime(file.relativePath, "commit");
                 return ret;
             }
         }
@@ -2878,16 +3023,12 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         if (!p) {
             return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "couldn't make the score copy"));
         }
+        lap("copy");
         engraving::MasterScore* cs = p->masterNotation()->masterScore();
         // (Joel, 6 Oct 2026: exports took long) MuseScore lays the copy out again after every edit, and most steps
         // below then lay it out themselves to measure it: while a Score is made, the copy is laid out only where
         // something is measured (each step lays out first), about half the layouts
-        struct UpdatesLock {
-            engraving::Score* s;
-            explicit UpdatesLock(engraving::Score* sc)
-                : s(sc) { s->lockUpdates(true); }
-            ~UpdatesLock() { s->lockUpdates(false); }
-        } updatesLock(cs);
+        UpdatesLock updatesLock(cs);
         std::set<int> refSystemEnds;   // the reference part's systems, when the Score takes its systems from a part
         QString refPartName;
         if (reuse) {
@@ -2918,6 +3059,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         }
         if (!reuse && layout.valid) {
             starscoreApplyScoreLayout(p->masterNotation(), layout);
+            lap("order and brackets");
 
             // Its systems (Joel, 5 Oct 2026): the arrangement's own score in the song when it was formatted by hand
             // (it has system or page breaks or system locks); otherwise the system breaks of the part on this Score
@@ -3036,6 +3178,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                 }
                 p->masterNotation()->notation()->undoStack()->commitChanges();
             }
+            lap("systems");
         }
         if (!reuse) {
             std::vector<std::pair<muse::ID, bool> > vis;
@@ -3073,6 +3216,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                     }
                 }
             }
+            lap("visibility and names");
             // kept as it is now, for the folder's next Scores
             if (layout.valid) {
                 scoreCopy = ScoreCopy();
@@ -3121,8 +3265,10 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                     starscoreRewritePartInstrument(p->masterNotation(), part, v.diatonic, v.chromatic, v.clef, false);
                 }
             }
+            lap("pitch");
             // a style change goes through the laid-out systems, so the copy is laid out once after the edits above
             cs->doLayout();
+            lap("layout");
             if (layout.valid) {
                 const PointF pos = cs->style().styleV(engraving::Sid::measureNumberPosAbove).value<PointF>();
                 n->undoStack()->prepareChanges(TranslatableString::untranslatable("Measure numbers"));
@@ -3139,6 +3285,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         lap("prepared");
         // every system on its page: big Scores (orchestra, marching band) at a smaller staff size
         starscoreFitSystemsOnPages(p->masterNotation()->notation());
+        lap("fit");
         // Repeated sections kept on one page where they fit (titled first: the label can move the composer credit)
         if (layout.valid) {
             INotationPtr n = p->masterNotation()->notation();

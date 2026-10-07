@@ -210,6 +210,8 @@ Ret NotationProject::doLoad(const muse::io::path_t& path, const OpenParams& open
         masterScore = original->unrollRepeats();
         delete original;
         m_engravingProject->setMasterScore(masterScore);
+    } else if (openParams.skipLayout) {
+        masterScore->lockUpdates(false);   // StarScore: a throwaway copy, laid out where it's printed
     } else {
         masterScore->lockUpdates(false);
         masterScore->setLayoutAll();

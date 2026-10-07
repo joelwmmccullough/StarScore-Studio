@@ -40,6 +40,7 @@
 #include <QImage>
 #include <QQuickWindow>
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
@@ -153,6 +154,8 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         return;
     }
     autotestLog("step: " + step);
+    QElapsedTimer stepClock;   // how long the step took, in the log (for timing changes)
+    stepClock.start();
     IMasterNotationPtr master = globalContext()->currentMasterNotation();
     engraving::MasterScore* ms = masterScore();
     if (!master || !ms) {
@@ -838,6 +841,7 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
     } else {
         autotestLog("  unknown step");
     }
+    autotestLog(QString("  took %1 ms").arg(stepClock.elapsed()));
 
     QTimer::singleShot(500, &m_timerGuard, [this, steps, reportNumber]() { runAutotestSteps(steps, reportNumber); });
 }

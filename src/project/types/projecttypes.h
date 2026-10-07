@@ -62,6 +62,9 @@ struct OpenParams {
     bool forceMode = false;
     bool forcePageMode = false;
     bool unrollRepeats = false;
+    // StarScore: the main score isn't laid out when the file is loaded (a throwaway copy whose part score is
+    // printed; the copy's main score, in continuous view with every part, took most of the loading time)
+    bool skipLayout = false;
 };
 
 struct MigrationOptions
