@@ -2029,7 +2029,15 @@ static int starscoreTightenWrappedSystems(const INotationPtr& n)
         if (!any) {
             break;
         }
-        sc->doLayout();
+        // Each run sits between two breaks, so its systems depend on its bars alone: each is laid out on its own,
+        // from the system before it until the systems after its break line up again with the layout before
+        // (MuseScore's layout after an edit), not the whole Score for every step (140 s of The Courier's export,
+        // 44 Scores). The decisions are the same; the Score is laid out whole once at the end.
+        for (Run& r : runs) {
+            if (!r.kept) {
+                sc->doLayoutRange(r.bars.front()->tick(), r.bars.back()->endTick());
+            }
+        }
         for (Run& r : runs) {
             if (!r.kept && systemsOf(r.bars) < r.before) {
                 r.kept = true;   // the loosest spacing that saves a system
@@ -2037,22 +2045,18 @@ static int starscoreTightenWrappedSystems(const INotationPtr& n)
         }
     }
     int tightened = 0;
-    bool restore = false;
     n->undoStack()->prepareChanges(TranslatableString::untranslatable("Tighter spacing"));
     for (Run& r : runs) {
         if (r.kept) {
             ++tightened;
             continue;
         }
-        restore = true;
         for (size_t i = 0; i < r.bars.size(); ++i) {
             r.bars[i]->undoChangeProperty(Pid::USER_STRETCH, r.original[i]);
         }
     }
     n->undoStack()->commitChanges();
-    if (restore) {
-        sc->doLayout();
-    }
+    sc->doLayout();   // (the steps above laid out only the runs; what follows measures the whole page)
     return tightened;
 }
 
@@ -4119,6 +4123,10 @@ void StarScoreService::setScoreVersion(const QString& version)
     data.version = version;
     storeTo(ms, data, project);
 
+    // Each edit's end lays out every open score (the main score and each open part score): a new version number
+    // on Branston Pickle's 25 scores, with their tabs open, meant hundreds of layouts (and a minute or more before
+    // every export, which sets the version first). Each score is laid out once, on its own, and only when its
+    // footer changed.
     auto update = [&](INotationPtr n) {
         if (!n) {
             return;
