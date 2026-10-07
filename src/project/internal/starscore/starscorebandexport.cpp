@@ -625,7 +625,21 @@ void StarScoreService::setSongRecordings(const QJsonObject& recordings)
 
 INotationProjectPtr StarScoreService::exportSourceProject() const
 {
+    if (m_exportSource) {
+        return m_exportSource;   // a half-time or double-time copy being exported (exportTimeVariants)
+    }
     return m_mainProject ? m_mainProject : globalContext()->currentProject();
+}
+
+//! A Half-Time or Double-Time sheet's place: in a subfolder of its part folder ("4H/Double-Time/CODE - Trumpet.pdf",
+//! "4H/Double-Time/Section Scores/…"); a file at the top of the song folder goes into the subfolder there
+static QString starscoreVariantPath(const QString& rel, const QString& variant)
+{
+    if (variant.isEmpty()) {
+        return rel;
+    }
+    const int slash = rel.indexOf('/');
+    return slash < 0 ? variant + "/" + rel : rel.left(slash) + "/" + variant + rel.mid(slash);
 }
 
 RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
@@ -2692,10 +2706,12 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     }
     const StarScoreBandExportPlan& full = fullPlan.val;
     StarScoreBandExportPlan plan = full;
-    if (!onlyPaths.isEmpty()) {
+    const QString variant = m_exportVariant;   // "Half-Time" / "Double-Time" (a converted copy), or "" for the song itself
+    if (!onlyPaths.isEmpty() || !variant.isEmpty()) {
         std::vector<StarScoreBandFile> chosen;
         for (const StarScoreBandFile& f : full.files) {
-            if (onlyPaths.contains(f.relativePath)) {
+            // (a reference PDF is copied as it is: not one of the converted sheets)
+            if ((onlyPaths.isEmpty() || onlyPaths.contains(f.relativePath)) && (variant.isEmpty() || f.sourceFile.isEmpty())) {
                 chosen.push_back(f);
             }
         }
@@ -2749,7 +2765,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     const QString songDir = plan.bandFolder + "/" + plan.songFolder;
     // sheets exported under an older path or name go to their place now first (every sheet of the song, ticked or
     // not; none is made again for that)
-    if (!m_exportDryRun) {
+    if (!m_exportDryRun && variant.isEmpty()) {
         moveSheetsToCurrentPaths(full);
     }
     const QString today = QDate::currentDate().toString(Qt::ISODate);
@@ -3426,7 +3442,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
             continue;
         }
 
-        const QString target = songDir + "/" + file.relativePath;
+        const QString target = songDir + "/" + starscoreVariantPath(file.relativePath, variant);
         // the same pages as the file already there (a re-export with nothing changed in this sheet):
         // the existing file stays, and nothing is archived
         if (QFileInfo::exists(target) && starscoreSamePdf(pdf, target)) {
@@ -3448,7 +3464,8 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
             continue;
         }
         QString archivedTo;
-        if (!supersede(file.relativePath, &archivedTo)) {
+        // (a Half-Time or Double-Time sheet simply replaces the one there: it has no versions of its own)
+        if (variant.isEmpty() && !supersede(file.relativePath, &archivedTo)) {
             out.cancelWriting();
             continue;
         }
@@ -3464,8 +3481,9 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         written << file.relativePath;
     }
 
-    // a dry run ends here: nothing archived, recorded, or written beside the sheets
-    if (m_exportDryRun) {
+    // a dry run ends here: nothing archived, recorded, or written beside the sheets; so does a Half-Time or Double-Time
+    // export (its sheets aren't in the sheet record, the organizer or the to-do list)
+    if (m_exportDryRun || !variant.isEmpty()) {
         QDir(tmpDir).removeRecursively();
         if (masterChanged) {
             master->notation()->notationChanged().notify();
@@ -3475,6 +3493,10 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         }
         if (!problems.isEmpty()) {
             return RetVal<QString>::make_ret(Ret::Code::UnknownError, problems.join("; ").toStdString());
+        }
+        if (!variant.isEmpty()) {
+            return RetVal<QString>::make_ok(muse::qtrc("starscore", "%1: wrote %2 PDF(s), %3 the same as before.")
+                                            .arg(variant).arg(written.size()).arg(unchanged.size()));
         }
         return RetVal<QString>::make_ok(QString("%1 would change, %2 the same").arg(m_dryRunChanged.size()).arg(unchanged.size()));
     }
@@ -4713,4 +4735,71 @@ RetVal<std::vector<StarScoreSongbookSheet> > StarScoreService::songbookChartShee
         }
     }
     return Out::make_ok(sheets);
+}
+
+// ---------------------------------------------------------------------------
+//  Half-Time and Double-Time sheets (Joel, 7 Oct 2026: "export half-time version?" and "export double-time version?"
+//  for each song, exported alongside the standard sheets)
+//
+//  The song as it is now is saved to a temporary copy (under its own file name, so the export finds the same song
+//  folder and code), the copy is loaded out of sight, rewritten at half or twice its note lengths (convertTimeOf),
+//  and exported like the song itself, each sheet into a "Half-Time" or "Double-Time" subfolder of its part folder.
+//  Those sheets have no versions, sheet record or changelog of their own: a sheet there is simply replaced. The open
+//  song is never changed.
+// ---------------------------------------------------------------------------
+
+RetVal<QString> StarScoreService::exportTimeVariants(const QStringList& onlyPaths, bool halfTime, bool doubleTime)
+{
+    INotationProjectPtr project = exportSourceProject();
+    if (!project || (!halfTime && !doubleTime)) {
+        return RetVal<QString>::make_ok(QString());
+    }
+    const QString fileName = QFileInfo(project->path().toQString()).fileName();
+    QStringList lines;
+    QStringList problems;
+    for (const bool toDouble : { false, true }) {
+        if ((toDouble && !doubleTime) || (!toDouble && !halfTime)) {
+            continue;
+        }
+        const QString variant = toDouble ? QString("Double-Time") : QString("Half-Time");
+        reportExportProgress(variant, 0, 1, muse::qtrc("starscore", "Converting the song"));
+        const QString dir = QDir::tempPath() + "/StarScoreTime-" + QUuid::createUuid().toString(QUuid::Id128);
+        QDir().mkpath(dir);
+        const QString copyPath = dir + "/" + fileName;
+        Ret ret = project->save(io::path_t(copyPath), SaveMode::SaveCopy, false);
+        INotationProjectPtr copy;
+        if (ret) {
+            copy = projectCreator()->newProject(iocContext());
+            ret = copy->load(io::path_t(copyPath));
+        }
+        if (!ret || !copy || !copy->masterNotation()) {
+            problems << muse::qtrc("starscore", "%1: the song couldn't be copied (%2).").arg(variant, QString::fromStdString(ret.toString()));
+            QDir(dir).removeRecursively();
+            continue;
+        }
+        const RetVal<QString> converted = convertTimeOf(copy, toDouble, true);
+        LOGI() << "[starscore] " << variant << ": " << converted.val;
+        if (!converted.ret) {
+            problems << muse::qtrc("starscore", "%1: the song couldn't be converted (%2).").arg(variant, QString::fromStdString(converted.ret.toString()));
+            QDir(dir).removeRecursively();
+            continue;
+        }
+        m_exportSource = copy;
+        m_exportVariant = variant;
+        const RetVal<QString> done = exportToBandFolder(onlyPaths);
+        m_exportSource.reset();
+        m_exportVariant.clear();
+        copy.reset();
+        QDir(dir).removeRecursively();
+        if (done.ret) {
+            lines << done.val;
+        } else {
+            problems << muse::qtrc("starscore", "%1: %2").arg(variant, QString::fromStdString(done.ret.toString()));
+        }
+    }
+    endExportProgress();
+    if (!problems.isEmpty()) {
+        return RetVal<QString>::make_ret(Ret::Code::UnknownError, (lines + problems).join("\n").toStdString());
+    }
+    return RetVal<QString>::make_ok(lines.join("\n"));
 }

@@ -185,6 +185,7 @@ void BandExportModel::load()
         m_heading = muse::qtrc("starscore", "New song in Sheets and Demos");
     } else {
         m_code = plan.val.code;
+        emit timeVariantsChanged();
         m_heading = muse::qtrc("starscore", "Sheets and Demos / %1").arg(plan.val.songFolder);
         m_notes = plan.val.notes.join("\n");
         // which version number this export should raise, from what changed since the last export
@@ -379,6 +380,15 @@ QString BandExportModel::exportNow()
         }
         text = summary.val + "\n\n"
                + muse::qtrc("starscore", "Sheets are marked Version %1. Save the .starscore to keep this version number.").arg(version);
+        // the same sheets at half and/or twice their note lengths, in Half-Time / Double-Time subfolders
+        if (exportHalfTime() || exportDoubleTime()) {
+            const muse::RetVal<QString> variants = starScore()->exportTimeVariants(paths, exportHalfTime(), exportDoubleTime());
+            const QString line = variants.ret ? variants.val
+                                 : muse::qtrc("starscore", "Half-time / double-time sheets: %1").arg(QString::fromStdString(variants.ret.toString()));
+            if (!line.isEmpty()) {
+                text += "\n\n" + line;
+            }
+        }
     }
     if (m_exportDemos) {
         muse::RetVal<QString> demos = starScore()->exportAudioDemos();
@@ -402,6 +412,32 @@ void BandExportModel::setExportDemos(bool on)
         m_exportDemos = on;
         emit exportDemosChanged();
     }
+}
+
+bool BandExportModel::exportHalfTime() const
+{
+    return !m_code.isEmpty() && QSettings().value("StarScore/timeVariants/" + m_code + "/half", false).toBool();
+}
+
+void BandExportModel::setExportHalfTime(bool on)
+{
+    if (!m_code.isEmpty()) {
+        QSettings().setValue("StarScore/timeVariants/" + m_code + "/half", on);
+    }
+    emit timeVariantsChanged();
+}
+
+bool BandExportModel::exportDoubleTime() const
+{
+    return !m_code.isEmpty() && QSettings().value("StarScore/timeVariants/" + m_code + "/double", false).toBool();
+}
+
+void BandExportModel::setExportDoubleTime(bool on)
+{
+    if (!m_code.isEmpty()) {
+        QSettings().setValue("StarScore/timeVariants/" + m_code + "/double", on);
+    }
+    emit timeVariantsChanged();
 }
 
 bool BandExportModel::runOrganizer() const

@@ -370,7 +370,6 @@ MenuItem* AppMenuModel::makeFormatMenu()
         makeMenuItem("edit-style"),
         makeMenuItem("page-settings"),
         makeMenuItem("starscore-layout-to"),
-        makeMenuItem("starscore-part-styles"),
         makeMenuItem("starscore-additive-timesig"),
         makeMenuItem("starscore-convert-double-time"),
         makeMenuItem("starscore-standardize"),
@@ -392,7 +391,9 @@ MenuItem* AppMenuModel::makeFormatMenu()
         makeMenuItem("reset-to-default-layout"),
         makeSeparator(),
         makeMenuItem("load-style"),
-        makeMenuItem("save-style")
+        makeMenuItem("save-style"),
+        // with Load and Save style (Joel, 7 Oct 2026)
+        makeMenuItem("starscore-part-styles")
     };
 
     return makeMenu(TranslatableString("appshell/menu/format", "F&ormat"), formatItems, "menu-format");

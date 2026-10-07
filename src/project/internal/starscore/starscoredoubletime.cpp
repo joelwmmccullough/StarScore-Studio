@@ -18,6 +18,7 @@
  */
 
 #include "starscoreservice.h"
+#include "starscoreengraving.h"
 
 #include <QRegularExpression>
 
@@ -59,6 +60,7 @@ struct OldBar {
     int repeatCount = 2;
     BarLineType endType = BarLineType::NORMAL;
     bool startsMark = false;
+    int no = 0;   // its bar number (Measure::no(), 0-based)
 };
 
 struct NewBar {
@@ -142,7 +144,14 @@ size_t measuresFrom(Measure* m)
 
 RetVal<QString> StarScoreService::convertFromDoubleTime()
 {
-    INotationProjectPtr project = globalContext()->currentProject();
+    return convertTimeOf(globalContext()->currentProject(), false, false);
+}
+
+//! toDouble false: "Convert from double time" (every note half as long, two bars of x/4 become one, x/8 -> x/16, the
+//! tempo halved). toDouble true, the other way (1.18.25, for the export's Double-Time sheets): every note twice as long,
+//! a bar of x/4 becomes two, x/8 -> x/4, x/16 -> x/8, the tempo doubled. Works on any loaded song, shown or not.
+RetVal<QString> StarScoreService::convertTimeOf(const INotationProjectPtr& project, bool toDouble, bool keepBarNumbers)
+{
     IMasterNotationPtr master = project ? project->masterNotation() : nullptr;
     MasterScore* ms = master ? master->masterScore() : nullptr;
     if (!ms || !ms->firstMeasure()) {
@@ -150,7 +159,7 @@ RetVal<QString> StarScoreService::convertFromDoubleTime()
     }
     INotationPtr n = master->notation();
     const size_t nstaves = ms->nstaves();
-    n->undoStack()->prepareChanges(TranslatableString::untranslatable("Convert from double time"));
+    n->undoStack()->prepareChanges(TranslatableString::untranslatable(toDouble ? "Convert to double time" : "Convert from double time"));
     // multimeasure rests off while the bars are copied and rebuilt (put back at the end)
     const bool mmRests = ms->style().styleB(Sid::createMultiMeasureRests);
     if (mmRests) {
@@ -202,6 +211,7 @@ RetVal<QString> StarScoreService::convertFromDoubleTime()
         b.repeatEnd = m->repeatEnd();
         b.repeatCount = m->repeatCount();
         b.endType = m->endBarLineType();
+        b.no = m->no();
         for (Segment* seg = m->first(SegmentType::ChordRest); seg; seg = seg->next(SegmentType::ChordRest)) {
             for (EngravingItem* a : seg->annotations()) {
                 // the copy on the top staff (MuseScore shows system objects on more staves itself)
@@ -238,7 +248,29 @@ RetVal<QString> StarScoreService::convertFromDoubleTime()
                || (a.endType != BarLineType::NORMAL && a.endType != BarLineType::BROKEN && a.endType != BarLineType::DOTTED)
                || a.len != a.sig || b.len != b.sig;
     };
-    for (size_t i = 0; i < old.size(); ++i) {
+    for (size_t i = 0; toDouble && i < old.size(); ++i) {
+        // every bar at twice its length: x/4 (and x/2) bars become two bars of the same time signature; an odd-length
+        // bar (a pickup) becomes one bar twice as long; x/8 and shorter become one bar of the next longer note
+        const OldBar& b = old[i];
+        const Fraction two(2, 1);
+        if (b.sig.denominator() >= 8) {
+            bars.push_back({ Fraction(b.sig.numerator(), b.sig.denominator() / 2), b.tick, b.len, two, Fraction() });
+            continue;
+        }
+        if (b.len == b.sig) {
+            const Fraction half = b.len / 2;
+            bars.push_back({ b.sig, b.tick, half, two, Fraction() });
+            bars.push_back({ b.sig, b.tick + half, half, two, Fraction() });
+            continue;
+        }
+        // the new length counted in the old time signature's beats (a 1/4 pickup in 4/4 becomes a 2/4 bar)
+        const Fraction doubled = b.len * 2;
+        const int beats = (doubled * b.sig.denominator()).numerator() / std::max(1, (doubled * b.sig.denominator()).denominator());
+        const Fraction sig = beats > 0 && Fraction(beats, b.sig.denominator()) == doubled ? Fraction(beats, b.sig.denominator())
+                             : doubled.reduced();
+        bars.push_back({ sig, b.tick, b.len, two, Fraction() });
+    }
+    for (size_t i = 0; !toDouble && i < old.size(); ++i) {
         if (!endsRun(i)) {
             continue;
         }
@@ -506,12 +538,13 @@ RetVal<QString> StarScoreService::convertFromDoubleTime()
             continue;
         }
         if (a.tempo) {
-            // at half the tempo, and the number in the marking too ("= 216" becomes "= 108")
+            // at half the tempo (twice it for double time), and the number in the marking too ("= 216" becomes "= 108")
+            const double factor = toDouble ? 2.0 : 0.5;
             static const QRegularExpression number("=\\s*(\\d+(?:\\.\\d+)?)");
             QString text = a.xml.toQString();
             const QRegularExpressionMatch nm = number.match(text);
             if (nm.hasMatch()) {
-                const double bpm = nm.captured(1).toDouble() / 2.0;
+                const double bpm = nm.captured(1).toDouble() * factor;
                 const QString half = bpm == std::floor(bpm) ? QString::number(int(bpm)) : QString::number(bpm, 'f', 1);
                 text.replace(nm.capturedStart(1), nm.capturedLength(1), half);
             }
@@ -519,7 +552,7 @@ RetVal<QString> StarScoreService::convertFromDoubleTime()
             tt->setTrack(a.track);
             tt->setParent(seg);
             tt->setXmlText(String::fromQString(text));
-            tt->setTempo(BeatsPerSecond(a.beatsPerSecond / 2.0));
+            tt->setTempo(BeatsPerSecond(a.beatsPerSecond * factor));
             tt->setFollowText(a.followText);
             ms->undoAddElement(tt);
             ++temposHalved;
@@ -593,6 +626,38 @@ RetVal<QString> StarScoreService::convertFromDoubleTime()
         }
     }
 
+    // 10. keepBarNumbers (the Half-Time and Double-Time sheets, Joel 7 Oct 2026): each new bar numbered like the bar of
+    // the song it starts in, so the sheets' bar numbers match the standard sheets. Both halves of a doubled bar carry
+    // its number (the first is left out of the count), and a bar made of two counts as both (the next bar skips one).
+    if (keepBarNumbers) {
+        ms->setLayoutAll();
+        ms->doLayout();
+        int counter = 0;   // what MuseScore would number the next bar (renumbering: no = counter + offset; a bar left
+                           // out of the count doesn't move the counter on)
+        Measure* m = ms->firstMeasure();
+        for (size_t i = 0; i < bars.size() && m; ++i, m = m->nextMeasure()) {
+            auto wanted = [&](size_t k) {
+                int no = 0;
+                for (const OldBar& b : old) {
+                    if (b.tick <= bars[k].oldTick) {
+                        no = b.no;
+                    }
+                }
+                return no;
+            };
+            const int want = wanted(i);
+            const bool shared = i + 1 < bars.size() && wanted(i + 1) == want;   // the next new bar has the same number
+            if (m->irregular() != shared) {
+                m->undoChangeProperty(Pid::IRREGULAR, shared);
+            }
+            if (m->noOffset() != want - counter) {
+                m->undoChangeProperty(Pid::NO_OFFSET, want - counter);
+            }
+            counter = shared ? want : want + 1;
+        }
+        starscore::syncBarNumbering(ms, starscore::BarNumberingSync::Undoable);
+    }
+
     if (mmRests) {
         ms->undoChangeStyleVal(Sid::createMultiMeasureRests, true);
     }
@@ -604,7 +669,7 @@ RetVal<QString> StarScoreService::convertFromDoubleTime()
     n->notationChanged().notify();
 
     const QString summary = muse::qtrc("starscore", "%1 bars became %2 (%3 bar repeat sign(s) written out, %4 tempo marking(s) "
-                                                    "halved, %5 of %6 stretch(es) of music pasted, %7 tie(s), line(s) and "
+                                                    "changed, %5 of %6 stretch(es) of music pasted, %7 tie(s), line(s) and "
                                                     "fermata(s) put back at their edges).")
                             .arg(old.size()).arg(bars.size()).arg(writtenOut).arg(temposHalved).arg(pasted).arg(chunks.size())
                             .arg(edgesRestored);

@@ -168,6 +168,9 @@ public:
     std::vector<StarScoreOutdatedSong> outdatedSongs() const override;
     muse::RetVal<QString> updateCurrentSongSheets() override;
     muse::RetVal<QString> convertFromDoubleTime() override;
+    //! The song (shown or not) rewritten at half (toDouble false) or twice (true) its note lengths (starscoredoubletime.cpp);
+    //! keepBarNumbers: its bars numbered like the original's
+    muse::RetVal<QString> convertTimeOf(const INotationProjectPtr& project, bool toDouble, bool keepBarNumbers);
     //! Makes an older song standard (starscorestandardize.cpp): with apply false, only lists what it would change
     QStringList standardizeSong(bool apply) override;
     void startUpdateAllSheets(const QStringList& paths) override;
@@ -191,6 +194,7 @@ public:
     muse::RetVal<QString> exportArrangementsAsMscz(const QString& folder) override;
     muse::RetVal<QString> exportToBandFolder(const QStringList& onlyPaths) override;
     muse::RetVal<QString> exportAudioDemos() override;
+    muse::RetVal<QString> exportTimeVariants(const QStringList& onlyPaths, bool halfTime, bool doubleTime) override;
     QStringList bandExportUnticked(const QString& code) const override;
     void setBandExportUnticked(const QString& code, const QStringList& paths) override;
 
@@ -474,6 +478,8 @@ private:
     muse::async::Notification m_listeningChanged;
     StarScoreExportProgress m_exportProgress;
     // "Update all sheets"
+    INotationProjectPtr m_exportSource;   // a converted copy being exported (exportTimeVariants), else none
+    QString m_exportVariant;              // "Half-Time" / "Double-Time" while that copy is exported
     bool m_exportDryRun = false;          // the export writes nothing; m_dryRunChanged gets the sheets that would change
     QStringList m_dryRunChanged;
     QStringList m_updateQueue;

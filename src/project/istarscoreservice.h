@@ -714,6 +714,9 @@ public:
     //! arrangement's sections except the Lead Sheet; stand-in versions (a 7th horn's Bari Sax…, a piccolo's flute)
     //! and every chord-symbol track except on keys and guitar are muted. Flexible arrangements get none.
     virtual muse::RetVal<QString> exportAudioDemos() = 0;
+    //! The ticked sheets again from a copy of the song at half and/or twice its note lengths, into "Half-Time" and
+    //! "Double-Time" subfolders of each part folder (after the standard export)
+    virtual muse::RetVal<QString> exportTimeVariants(const QStringList& onlyPaths, bool halfTime, bool doubleTime) = 0;
 
     // --- Version number ("Version 4.0.1" in the copyright text, printed at the bottom of every page)
     virtual QString scoreVersion() const = 0;                 // from the score, or the starting version for this song

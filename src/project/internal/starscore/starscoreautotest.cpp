@@ -29,6 +29,8 @@
  *                 URLs come from STARSCORE_AUTOTEST_FONTS ("modernoir;jost;bravura"), else the app's embedded ones.
  *   standardize   makes the song standard (standardize:plan only lists what it would change), then lists its
  *                 sections, arrangements and part scores
+ *   timevariants:half|double|both   the Half-Time / Double-Time sheets (every sheet) into STARSCORE_AUTOTEST_BAND
+ *   todouble      the open song rewritten at twice its note lengths
  *   save          saves a copy of the song as saved.starscore
  * Everything is logged to log.txt.
  */
@@ -684,6 +686,21 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
                 autotestLog("  part scores: " + names.join(" | "));
             }
         }
+    } else if (step.startsWith("timevariants:")) {
+        // timevariants:half|double|both: the Half-Time / Double-Time sheets (every sheet) into STARSCORE_AUTOTEST_BAND
+        const QString band = qEnvironmentVariable("STARSCORE_AUTOTEST_BAND");
+        if (!band.isEmpty()) {
+            setBandFolder(band);
+        }
+        const QString which = step.mid(13);
+        const RetVal<QString> r = exportTimeVariants({}, which != "double", which != "half");
+        QString text = r.ret ? r.val : QString::fromStdString(r.ret.toString());
+        text.replace("\n", "\n  ");
+        autotestLog("  " + text);
+    } else if (step == "todouble") {
+        // todouble: the open song rewritten at twice its note lengths (what the Double-Time sheets are made from)
+        const RetVal<QString> r = convertTimeOf(globalContext()->currentProject(), true, true);
+        autotestLog("  " + (r.ret ? r.val : QString::fromStdString(r.ret.toString())));
     } else if (step == "doubletime") {
         // doubletime: "Convert from double time" on the open song
         const RetVal<QString> r = convertFromDoubleTime();

@@ -42,6 +42,9 @@ class BandExportModel : public QAbstractListModel, public muse::Contextable
     Q_PROPERTY(bool runOrganizer READ runOrganizer WRITE setRunOrganizer NOTIFY runOrganizerChanged)
     //! "Export Audio Demos": off each time the window opens
     Q_PROPERTY(bool exportDemos READ exportDemos WRITE setExportDemos NOTIFY exportDemosChanged)
+    // also a Half-Time / Double-Time set of the ticked sheets; remembered for each song (by its code)
+    Q_PROPERTY(bool exportHalfTime READ exportHalfTime WRITE setExportHalfTime NOTIFY timeVariantsChanged)
+    Q_PROPERTY(bool exportDoubleTime READ exportDoubleTime WRITE setExportDoubleTime NOTIFY timeVariantsChanged)
     Q_PROPERTY(QString result READ result NOTIFY resultChanged)         // what exportNow() reported
 
     QML_ELEMENT
@@ -74,6 +77,10 @@ public:
     bool runOrganizer() const;
     void setRunOrganizer(bool on);
     bool exportDemos() const { return m_exportDemos; }
+    bool exportHalfTime() const;
+    void setExportHalfTime(bool on);
+    bool exportDoubleTime() const;
+    void setExportDoubleTime(bool on);
     void setExportDemos(bool on);
     QString result() const;
 
@@ -103,6 +110,7 @@ signals:
     void bumpChanged();
     void runOrganizerChanged();
     void exportDemosChanged();
+    void timeVariantsChanged();
     void resultChanged();
 
 private:

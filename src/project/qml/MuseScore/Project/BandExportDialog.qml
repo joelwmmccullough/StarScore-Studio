@@ -283,6 +283,30 @@ StyledDialogView {
         }
 
         CheckBox {
+            visible: root.listMode && !root.done && !exportModel.newSong
+            text: qsTrc("starscore", "Export half-time version")
+            checked: exportModel.exportHalfTime
+            onClicked: exportModel.exportHalfTime = !checked
+        }
+
+        CheckBox {
+            visible: root.listMode && !root.done && !exportModel.newSong
+            text: qsTrc("starscore", "Export double-time version")
+            checked: exportModel.exportDoubleTime
+            onClicked: exportModel.exportDoubleTime = !checked
+        }
+
+        StyledTextLabel {
+            Layout.fillWidth: true
+            visible: root.listMode && !root.done && (exportModel.exportHalfTime || exportModel.exportDoubleTime)
+            horizontalAlignment: Text.AlignLeft
+            wrapMode: Text.WordWrap
+            color: ui.theme.fontSecondaryColor
+            text: qsTrc("starscore", "The ticked sheets are also made with every note half as long (half-time) or twice as long "
+                        + "(double-time), into a \"Half-Time\" or \"Double-Time\" subfolder of each part folder. Remembered for this song.")
+        }
+
+        CheckBox {
             visible: root.listMode && !root.done
             text: qsTrc("starscore", "Export Audio Demos")
             checked: exportModel.exportDemos
