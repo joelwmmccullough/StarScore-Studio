@@ -4124,16 +4124,23 @@ void StarScoreService::setScoreVersion(const QString& version)
     storeTo(ms, data, project);
 
     // Each edit's end lays out every open score (the main score and each open part score): a new version number
-    // on Branston Pickle's 25 scores, with their tabs open, meant hundreds of layouts (and a minute or more before
-    // every export, which sets the version first). Each score is laid out once, on its own, and only when its
-    // footer changed.
+    // on Branston Pickle's 53 scores, with their tabs open, meant thousands of layouts, 9 min 20 s before every
+    // export (which sets the version first). Each score is laid out once, on its own, and only when its footer
+    // changed: 35 s.
     auto update = [&](INotationPtr n) {
         if (!n) {
             return;
         }
+        engraving::Score* score = n->elements()->msScore();
+        score->lockUpdates(true);
         n->undoStack()->prepareChanges(TranslatableString::untranslatable("Version"));
-        starscore::applyVersionFooter(n->elements()->msScore(), version);
+        const bool changed = starscore::applyVersionFooter(score, version);
         n->undoStack()->commitChanges();
+        score->lockUpdates(false);
+        if (changed) {
+            score->setLayoutAll();
+            score->doLayout();
+        }
         n->notationChanged().notify();
     };
 

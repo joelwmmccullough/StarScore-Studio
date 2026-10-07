@@ -21,6 +21,7 @@
  *   new:KEY[:DOUBLER[:LOW]]   makes a new StarScore from an arrangement template, replacing the open song, and logs
  *                 its parts and sections (new:7-horn-standard:bb-clarinet:contrabass-clarinet)
  *   styles        applies the part styles to everything
+ *   version:X     sets the version number (version:1.2.3) in the song and every part score's footer
  *   export        Export to Sheets and Demos into STARSCORE_AUTOTEST_BAND (a copy, never the real folder)
  *   chords        the chord charts' three outputs: chords.json (the lead sheet's form and chords, extract.py's
  *                 JSON), chart.html (the PDF page, without the version footer, as pdfchart.py writes it),
@@ -616,6 +617,10 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         }
     } else if (step == "styles") {
         autotestLog(QString("  restyled %1").arg(applyStyles()));
+    } else if (step.startsWith("version:")) {
+        // version:1.2.3: the version number set in the song and every part score's footer (as an export does first)
+        setScoreVersion(step.mid(8));
+        autotestLog(QString("  version %1").arg(scoreVersion()));
     } else if (step == "export") {
         const QString band = qEnvironmentVariable("STARSCORE_AUTOTEST_BAND");
         if (band.isEmpty() || !QDir(band).exists()) {
