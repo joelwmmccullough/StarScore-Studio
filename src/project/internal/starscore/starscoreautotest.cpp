@@ -374,8 +374,16 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
                 sc->selection().updateSelectedElements();
                 n->interaction()->copySelection();
                 sc->deselectAll();
-                n->interaction()->select({ mc->first(engraving::SegmentType::ChordRest)->element(engraving::staff2track(engraving::staff_idx_t(tt))) },
-                                         SelectType::SINGLE);
+                if (a[3].contains('-')) {
+                    // a range of staves as the target (one staff copied onto several)
+                    const int t1 = a[3].section('-', 0, 0).toInt(), t2 = a[3].section('-', 1, 1).toInt();
+                    engraving::Measure* me = sc->crMeasure(c - 1 + (b2 - b1));
+                    sc->selection().setRangeTicks(mc->tick(), (me ? me : mc)->endTick(), engraving::staff_idx_t(t1), engraving::staff_idx_t(t2 + 1));
+                    sc->selection().updateSelectedElements();
+                } else {
+                    n->interaction()->select({ mc->first(engraving::SegmentType::ChordRest)->element(engraving::staff2track(engraving::staff_idx_t(tt))) },
+                                             SelectType::SINGLE);
+                }
                 n->interaction()->pasteSelection();
                 autotestLog("  pasted");
             }
