@@ -1,0 +1,155 @@
+run 234 commit b050d1679a2968582769616636d4aca4adf85472
+1901:FAILED: [code=1] src/project/CMakeFiles/project.dir/Unity/unity_3_cxx.cxx.o 
+1905:/Users/runner/work/StarScore-Studio/StarScore-Studio/src/project/internal/starscore/../../thirdparty/zstd/zstd.h:18:10: fatal error: 'zstd_errors.h' file not found
+
+---- tail ----
+[2471/2824] Generating .rcc/qmlcache/inspector_qml_common/PropertyCheckBox_qml.cpp, .rcc/qmlcache/inspector_qml_common/PropertyCheckBox_qml.cpp.aotstats
+[2472/2824] Generating .rcc/qmlcache/inspector_qml_common/PropertyResetButton_qml.cpp, .rcc/qmlcache/inspector_qml_common/PropertyResetButton_qml.cpp.aotstats
+[2473/2824] Generating .rcc/qmlcache/inspector_qml_common/PropertyToggle_qml.cpp, .rcc/qmlcache/inspector_qml_common/PropertyToggle_qml.cpp.aotstats
+[2474/2824] Generating .rcc/qmlcache/inspector_qml_common/SpinBoxPropertyView_qml.cpp, .rcc/qmlcache/inspector_qml_common/SpinBoxPropertyView_qml.cpp.aotstats
+[2475/2824] Generating .rcc/qmlcache/inspector_qml_common/TextSection_qml.cpp, .rcc/qmlcache/inspector_qml_common/TextSection_qml.cpp.aotstats
+[2476/2824] Generating .rcc/qmlcache/inspector_qml_emptystaves/EmptyStavesVisibilityInspectorView_qml.cpp, .rcc/qmlcache/inspector_qml_emptystaves/EmptyStavesVisibilityInspectorView_qml.cpp.aotstats
+[2477/2824] Generating .rcc/qmlcache/inspector_qml_common/VoicesAndPositionSection_qml.cpp, .rcc/qmlcache/inspector_qml_common/VoicesAndPositionSection_qml.cpp.aotstats
+[2478/2824] Generating .rcc/qmlcache/inspector_qml_general/appearance/internal/ArrangeSection_qml.cpp, .rcc/qmlcache/inspector_qml_general/appearance/internal/ArrangeSection_qml.cpp.aotstats
+[2479/2824] Generating .rcc/qmlcache/inspector_qml_general/appearance/internal/AppearanceOffsetSection_qml.cpp, .rcc/qmlcache/inspector_qml_general/appearance/internal/AppearanceOffsetSection_qml.cpp.aotstats
+[2480/2824] Generating .rcc/qmlcache/inspector_qml_general/appearance/AppearanceSettings_qml.cpp, .rcc/qmlcache/inspector_qml_general/appearance/AppearanceSettings_qml.cpp.aotstats
+[2481/2824] Generating .rcc/qmlcache/inspector_qml_general/appearance/internal/HorizontalSpacingSection_qml.cpp, .rcc/qmlcache/inspector_qml_general/appearance/internal/HorizontalSpacingSection_qml.cpp.aotstats
+[2482/2824] Generating .rcc/qmlcache/inspector_qml_general/appearance/internal/VerticalSpacingSection_qml.cpp, .rcc/qmlcache/inspector_qml_general/appearance/internal/VerticalSpacingSection_qml.cpp.aotstats
+[2483/2824] Generating .rcc/qmlcache/inspector_qml_general/playback/internal/ArpeggioExpandableBlank_qml.cpp, .rcc/qmlcache/inspector_qml_general/playback/internal/ArpeggioExpandableBlank_qml.cpp.aotstats
+[2484/2824] Generating .rcc/qmlcache/inspector_qml_general/playback/internal/BreathExpandableBlank_qml.cpp, .rcc/qmlcache/inspector_qml_general/playback/internal/BreathExpandableBlank_qml.cpp.aotstats
+[2485/2824] Generating .rcc/qmlcache/inspector_qml_general/playback/internal/FermataExpandableBlank_qml.cpp, .rcc/qmlcache/inspector_qml_general/playback/internal/FermataExpandableBlank_qml.cpp.aotstats
+[2486/2824] Generating .rcc/qmlcache/inspector_qml_general/GeneralInspectorView_qml.cpp, .rcc/qmlcache/inspector_qml_general/GeneralInspectorView_qml.cpp.aotstats
+[2487/2824] Generating .rcc/qmlcache/inspector_qml_general/playback/internal/GlissandoExpandableBlank_qml.cpp, .rcc/qmlcache/inspector_qml_general/playback/internal/GlissandoExpandableBlank_qml.cpp.aotstats
+[2488/2824] Generating .rcc/qmlcache/inspector_qml_general/playback/internal/NoteExpandableBlank_qml.cpp, .rcc/qmlcache/inspector_qml_general/playback/internal/NoteExpandableBlank_qml.cpp.aotstats
+[2489/2824] Generating .rcc/qmlcache/inspector_qml_general/playback/internal/GradualTempoChangeBlank_qml.cpp, .rcc/qmlcache/inspector_qml_general/playback/internal/GradualTempoChangeBlank_qml.cpp.aotstats
+[2490/2824] Generating .rcc/qmlcache/inspector_qml_measures/InsertMeasuresPopup_qml.cpp, .rcc/qmlcache/inspector_qml_measures/InsertMeasuresPopup_qml.cpp.aotstats
+[2491/2824] Generating .rcc/qmlcache/inspector_qml_general/playback/PlaybackSettings_qml.cpp, .rcc/qmlcache/inspector_qml_general/playback/PlaybackSettings_qml.cpp.aotstats
+[2492/2824] Generating .rcc/qmlcache/inspector_qml_measures/MeasuresInspectorView_qml.cpp, .rcc/qmlcache/inspector_qml_measures/MeasuresInspectorView_qml.cpp.aotstats
+[2493/2824] Generating .rcc/qmlcache/inspector_qml_notation/accidentals/AccidentalSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/accidentals/AccidentalSettings_qml.cpp.aotstats
+[2494/2824] Generating .rcc/qmlcache/inspector_qml_notation/articulations/ArticulationSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/articulations/ArticulationSettings_qml.cpp.aotstats
+[2495/2824] Generating .rcc/qmlcache/inspector_qml_notation/ambituses/AmbitusSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/ambituses/AmbitusSettings_qml.cpp.aotstats
+[2496/2824] Generating .rcc/qmlcache/inspector_qml_notation/beams/BeamTypeSelector_qml.cpp, .rcc/qmlcache/inspector_qml_notation/beams/BeamTypeSelector_qml.cpp.aotstats
+[2497/2824] Generating .rcc/qmlcache/inspector_qml_notation/barlines/BarlineSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/barlines/BarlineSettings_qml.cpp.aotstats
+[2498/2824] Generating .rcc/qmlcache/inspector_qml_notation/bends/BendSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/bends/BendSettings_qml.cpp.aotstats
+[2499/2824] Generating .rcc/qmlcache/inspector_qml_notation/brackets/BracketSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/brackets/BracketSettings_qml.cpp.aotstats
+[2500/2824] Generating .rcc/qmlcache/inspector_qml_notation/clefs/ClefSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/clefs/ClefSettings_qml.cpp.aotstats
+[2501/2824] Generating .rcc/qmlcache/inspector_qml_notation/chordsymbols/ChordSymbolSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/chordsymbols/ChordSymbolSettings_qml.cpp.aotstats
+[2502/2824] Generating .rcc/qmlcache/inspector_qml_notation/expressions/ExpressionSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/expressions/ExpressionSettings_qml.cpp.aotstats
+[2503/2824] Generating .rcc/qmlcache/inspector_qml_notation/dynamics/DynamicsSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/dynamics/DynamicsSettings_qml.cpp.aotstats
+[2504/2824] Generating .rcc/qmlcache/inspector_qml_notation/fermatas/FermataSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/fermatas/FermataSettings_qml.cpp.aotstats
+[2505/2824] Generating .rcc/qmlcache/inspector_qml_notation/frames/FretFrameSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/frames/FretFrameSettings_qml.cpp.aotstats
+[2506/2824] Generating .rcc/qmlcache/inspector_qml_notation/frames/HorizontalFrameSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/frames/HorizontalFrameSettings_qml.cpp.aotstats
+[2507/2824] Generating .rcc/qmlcache/inspector_qml_notation/frames/internal/FretFrameAlignmentSection_qml.cpp, .rcc/qmlcache/inspector_qml_notation/frames/internal/FretFrameAlignmentSection_qml.cpp.aotstats
+[2508/2824] Generating .rcc/qmlcache/inspector_qml_notation/frames/internal/FretFrameChordsControlPanel_qml.cpp, .rcc/qmlcache/inspector_qml_notation/frames/internal/FretFrameChordsControlPanel_qml.cpp.aotstats
+[2509/2824] Generating .rcc/qmlcache/inspector_qml_notation/frames/internal/FretFrameChordsTab_qml.cpp, .rcc/qmlcache/inspector_qml_notation/frames/internal/FretFrameChordsTab_qml.cpp.aotstats
+[2510/2824] Generating .rcc/qmlcache/inspector_qml_notation/frames/internal/FretFrameChordsView_qml.cpp, .rcc/qmlcache/inspector_qml_notation/frames/internal/FretFrameChordsView_qml.cpp.aotstats
+[2511/2824] Generating .rcc/qmlcache/inspector_qml_notation/frames/internal/FretFrameGapsSection_qml.cpp, .rcc/qmlcache/inspector_qml_notation/frames/internal/FretFrameGapsSection_qml.cpp.aotstats
+[2512/2824] Generating .rcc/qmlcache/inspector_qml_notation/frames/internal/FretFrameScalesSection_qml.cpp, .rcc/qmlcache/inspector_qml_notation/frames/internal/FretFrameScalesSection_qml.cpp.aotstats
+[2513/2824] Generating .rcc/qmlcache/inspector_qml_InspectorForm_qml.cpp, .rcc/qmlcache/inspector_qml_InspectorForm_qml.cpp.aotstats
+[2514/2824] Generating .rcc/qmlcache/inspector_qml_notation/frames/internal/FretFrameSettingsTab_qml.cpp, .rcc/qmlcache/inspector_qml_notation/frames/internal/FretFrameSettingsTab_qml.cpp.aotstats
+[2515/2824] Generating .rcc/qmlcache/inspector_qml_InspectorSectionDelegate_qml.cpp, .rcc/qmlcache/inspector_qml_InspectorSectionDelegate_qml.cpp.aotstats
+[2516/2824] Generating .rcc/qmlcache/inspector_qml_notation/frames/internal/HorizontalGapsSection_qml.cpp, .rcc/qmlcache/inspector_qml_notation/frames/internal/HorizontalGapsSection_qml.cpp.aotstats
+[2517/2824] Generating .rcc/qmlcache/inspector_qml_notation/frames/internal/HorizontalMarginsSection_qml.cpp, .rcc/qmlcache/inspector_qml_notation/frames/internal/HorizontalMarginsSection_qml.cpp.aotstats
+[2518/2824] Generating .rcc/qmlcache/inspector_qml_notation/frames/internal/VerticalGapsSection_qml.cpp, .rcc/qmlcache/inspector_qml_notation/frames/internal/VerticalGapsSection_qml.cpp.aotstats
+[2519/2824] Generating .rcc/qmlcache/inspector_qml_notation/frames/internal/VerticalMarginsSection_qml.cpp, .rcc/qmlcache/inspector_qml_notation/frames/internal/VerticalMarginsSection_qml.cpp.aotstats
+[2520/2824] Generating .rcc/qmlcache/inspector_qml_notation/frames/TextFrameSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/frames/TextFrameSettings_qml.cpp.aotstats
+[2521/2824] Generating .rcc/qmlcache/inspector_qml_notation/frames/VerticalFrameSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/frames/VerticalFrameSettings_qml.cpp.aotstats
+[2522/2824] Generating .rcc/qmlcache/inspector_qml_notation/fretdiagrams/internal/FretAdvancedSettingsTab_qml.cpp, .rcc/qmlcache/inspector_qml_notation/fretdiagrams/internal/FretAdvancedSettingsTab_qml.cpp.aotstats
+[2523/2824] Generating .rcc/qmlcache/inspector_qml_notation/fretdiagrams/internal/FretGeneralSettingsTab_qml.cpp, .rcc/qmlcache/inspector_qml_notation/fretdiagrams/internal/FretGeneralSettingsTab_qml.cpp.aotstats
+[2524/2824] Generating .rcc/qmlcache/inspector_qml_notation/fretdiagrams/FretDiagramSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/fretdiagrams/FretDiagramSettings_qml.cpp.aotstats
+[2525/2824] Generating .rcc/qmlcache/inspector_qml_notation/instrumentname/InstrumentNameSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/instrumentname/InstrumentNameSettings_qml.cpp.aotstats
+[2526/2824] Generating .rcc/qmlcache/inspector_qml_notation/fretdiagrams/internal/FretDiagramTabPanel_qml.cpp, .rcc/qmlcache/inspector_qml_notation/fretdiagrams/internal/FretDiagramTabPanel_qml.cpp.aotstats
+[2527/2824] Generating .rcc/qmlcache/inspector_qml_notation/images/ImageSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/images/ImageSettings_qml.cpp.aotstats
+[2528/2824] Generating .rcc/qmlcache/inspector_qml_notation/jumps/JumpSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/jumps/JumpSettings_qml.cpp.aotstats
+[2529/2824] Generating .rcc/qmlcache/inspector_qml_notation/keysignatures/KeySignatureSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/keysignatures/KeySignatureSettings_qml.cpp.aotstats
+[2530/2824] Generating .rcc/qmlcache/inspector_qml_notation/lines/GlissandoSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/lines/GlissandoSettings_qml.cpp.aotstats
+[2531/2824] Generating .rcc/qmlcache/inspector_qml_notation/lines/GradualTempoChangeSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/lines/GradualTempoChangeSettings_qml.cpp.aotstats
+[2532/2824] Generating .rcc/qmlcache/inspector_qml_notation/lines/internal/CrescDimLineStyleSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/lines/internal/CrescDimLineStyleSettings_qml.cpp.aotstats
+[2533/2824] Generating .rcc/qmlcache/inspector_qml_notation/lines/HairpinLineSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/lines/HairpinLineSettings_qml.cpp.aotstats
+[2534/2824] Generating .rcc/qmlcache/inspector_qml_notation/lines/internal/GradualTempoChangePositionSettingsTab_qml.cpp, .rcc/qmlcache/inspector_qml_notation/lines/internal/GradualTempoChangePositionSettingsTab_qml.cpp.aotstats
+[2535/2824] Generating .rcc/qmlcache/inspector_qml_notation/lines/internal/HairpinPositionSettingsTab_qml.cpp, .rcc/qmlcache/inspector_qml_notation/lines/internal/HairpinPositionSettingsTab_qml.cpp.aotstats
+[2536/2824] Generating .rcc/qmlcache/inspector_qml_notation/lines/internal/GradualTempoChangeStyleTab_qml.cpp, .rcc/qmlcache/inspector_qml_notation/lines/internal/GradualTempoChangeStyleTab_qml.cpp.aotstats
+[2537/2824] Generating .rcc/qmlcache/inspector_qml_notation/lines/internal/HooksSection_qml.cpp, .rcc/qmlcache/inspector_qml_notation/lines/internal/HooksSection_qml.cpp.aotstats
+[2538/2824] Generating .rcc/qmlcache/inspector_qml_notation/lines/internal/HairpinStyleSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/lines/internal/HairpinStyleSettings_qml.cpp.aotstats
+[2539/2824] Generating .rcc/qmlcache/inspector_qml_notation/lines/internal/HooksAndArrowsSection_qml.cpp, .rcc/qmlcache/inspector_qml_notation/lines/internal/HooksAndArrowsSection_qml.cpp.aotstats
+[2540/2824] Generating .rcc/qmlcache/inspector_qml_notation/lines/internal/LineStyleSection_qml.cpp, .rcc/qmlcache/inspector_qml_notation/lines/internal/LineStyleSection_qml.cpp.aotstats
+[2541/2824] Generating .rcc/qmlcache/inspector_qml_notation/lines/internal/LineTextSettingsTab_qml.cpp, .rcc/qmlcache/inspector_qml_notation/lines/internal/LineTextSettingsTab_qml.cpp.aotstats
+[2542/2824] Generating .rcc/qmlcache/inspector_qml_notation/lines/internal/LineWithHooksCommonStyleSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/lines/internal/LineWithHooksCommonStyleSettings_qml.cpp.aotstats
+[2543/2824] Generating .rcc/qmlcache/inspector_qml_notation/lines/internal/OttavaStyleSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/lines/internal/OttavaStyleSettings_qml.cpp.aotstats
+[2544/2824] Generating .rcc/qmlcache/inspector_qml_notation/lines/internal/PedalStyleSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/lines/internal/PedalStyleSettings_qml.cpp.aotstats
+[2545/2824] Generating .rcc/qmlcache/inspector_qml_notation/lines/internal/VoltaStyleSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/lines/internal/VoltaStyleSettings_qml.cpp.aotstats
+[2546/2824] Generating .rcc/qmlcache/inspector_qml_notation/lines/SlurAndTieSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/lines/SlurAndTieSettings_qml.cpp.aotstats
+[2547/2824] Generating .rcc/qmlcache/inspector_qml_notation/lines/ChordBracketSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/lines/ChordBracketSettings_qml.cpp.aotstats
+[2548/2824] Generating .rcc/qmlcache/inspector_qml_notation/lines/LineSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/lines/LineSettings_qml.cpp.aotstats
+[2549/2824] Generating .rcc/qmlcache/inspector_qml_notation/lines/VibratoSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/lines/VibratoSettings_qml.cpp.aotstats
+[2550/2824] Generating .rcc/qmlcache/inspector_qml_notation/lines/LyricsLineSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/lines/LyricsLineSettings_qml.cpp.aotstats
+[2551/2824] Generating .rcc/qmlcache/inspector_qml_notation/markers/MarkerSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/markers/MarkerSettings_qml.cpp.aotstats
+[2552/2824] Generating .rcc/qmlcache/inspector_qml_notation/lyrics/LyricsSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/lyrics/LyricsSettings_qml.cpp.aotstats
+[2553/2824] Generating .rcc/qmlcache/inspector_qml_notation/measurerepeats/MeasureRepeatSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/measurerepeats/MeasureRepeatSettings_qml.cpp.aotstats
+[2554/2824] Generating .rcc/qmlcache/inspector_qml_notation/mmrests/MMRestSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/mmrests/MMRestSettings_qml.cpp.aotstats
+[2555/2824] Generating .rcc/qmlcache/inspector_qml_notation/notes/beams/BeamSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/notes/beams/BeamSettings_qml.cpp.aotstats
+[2556/2824] Generating .rcc/qmlcache/inspector_qml_notation/notes/internal/NoteheadGroupSelector_qml.cpp, .rcc/qmlcache/inspector_qml_notation/notes/internal/NoteheadGroupSelector_qml.cpp.aotstats
+[2557/2824] Generating .rcc/qmlcache/inspector_qml_notation/notes/internal/NoteheadTypeSelector_qml.cpp, .rcc/qmlcache/inspector_qml_notation/notes/internal/NoteheadTypeSelector_qml.cpp.aotstats
+[2558/2824] Generating .rcc/qmlcache/inspector_qml_notation/notes/noteheads/HeadSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/notes/noteheads/HeadSettings_qml.cpp.aotstats
+[2559/2824] Generating .rcc/qmlcache/inspector_qml_notation/notes/NoteSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/notes/NoteSettings_qml.cpp.aotstats
+[2560/2824] Generating .rcc/qmlcache/inspector_qml_notation/notes/stems/StemSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/notes/stems/StemSettings_qml.cpp.aotstats
+[2561/2824] Generating .rcc/qmlcache/inspector_qml_notation/ornaments/OrnamentSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/ornaments/OrnamentSettings_qml.cpp.aotstats
+[2562/2824] Generating .rcc/qmlcache/inspector_qml_notation/playcounttext/PlayCountSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/playcounttext/PlayCountSettings_qml.cpp.aotstats
+[2563/2824] Generating .rcc/qmlcache/inspector_qml_notation/NotationInspectorSectionLoader_qml.cpp, .rcc/qmlcache/inspector_qml_notation/NotationInspectorSectionLoader_qml.cpp.aotstats
+[2564/2824] Generating .rcc/qmlcache/inspector_qml_notation/NotationMultiElementView_qml.cpp, .rcc/qmlcache/inspector_qml_notation/NotationMultiElementView_qml.cpp.aotstats
+[2565/2824] Generating .rcc/qmlcache/inspector_qml_notation/NotationSingleElementView_qml.cpp, .rcc/qmlcache/inspector_qml_notation/NotationSingleElementView_qml.cpp.aotstats
+[2566/2824] Generating .rcc/qmlcache/inspector_qml_notation/rests/beams/RestBeamSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/rests/beams/RestBeamSettings_qml.cpp.aotstats
+[2567/2824] Generating .rcc/qmlcache/inspector_qml_notation/sectionbreaks/SectionBreakSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/sectionbreaks/SectionBreakSettings_qml.cpp.aotstats
+[2568/2824] Generating .rcc/qmlcache/inspector_qml_notation/spacers/SpacerSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/spacers/SpacerSettings_qml.cpp.aotstats
+[2569/2824] Generating .rcc/qmlcache/inspector_qml_notation/rests/RestSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/rests/RestSettings_qml.cpp.aotstats
+[2570/2824] Generating .rcc/qmlcache/inspector_qml_notation/stringtunings/StringTuningsSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/stringtunings/StringTuningsSettings_qml.cpp.aotstats
+[2571/2824] Generating .rcc/qmlcache/inspector_qml_notation/stafftype/StaffTypeSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/stafftype/StaffTypeSettings_qml.cpp.aotstats
+[2572/2824] Generating .rcc/qmlcache/inspector_qml_notation/tempos/TempoRestorePreviousSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/tempos/TempoRestorePreviousSettings_qml.cpp.aotstats
+[2573/2824] Generating .rcc/qmlcache/inspector_qml_notation/symbols/SymbolSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/symbols/SymbolSettings_qml.cpp.aotstats
+[2574/2824] Generating .rcc/qmlcache/inspector_qml_notation/tempos/TempoSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/tempos/TempoSettings_qml.cpp.aotstats
+[2575/2824] Generating .rcc/qmlcache/inspector_qml_notation/timesignatures/TimeSignatureSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/timesignatures/TimeSignatureSettings_qml.cpp.aotstats
+[2576/2824] Generating .rcc/qmlcache/inspector_qml_notation/tremolos/TremoloSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/tremolos/TremoloSettings_qml.cpp.aotstats
+[2577/2824] Generating .rcc/qmlcache/inspector_qml_parts/PartsSettings_qml.cpp, .rcc/qmlcache/inspector_qml_parts/PartsSettings_qml.cpp.aotstats
+[2578/2824] Generating .rcc/qmlcache/inspector_qml_notation/tremolobars/TremoloBarSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/tremolobars/TremoloBarSettings_qml.cpp.aotstats
+[2579/2824] Generating .rcc/qmlcache/inspector_qml_notation/tuplets/TupletSettings_qml.cpp, .rcc/qmlcache/inspector_qml_notation/tuplets/TupletSettings_qml.cpp.aotstats
+[2580/2824] Generating .rcc/qmlcache/inspector_qml_score/HideEmptyStavesSettings_qml.cpp, .rcc/qmlcache/inspector_qml_score/HideEmptyStavesSettings_qml.cpp.aotstats
+[2581/2824] Generating .rcc/qmlcache/inspector_qml_score/ScoreDisplayInspectorView_qml.cpp, .rcc/qmlcache/inspector_qml_score/ScoreDisplayInspectorView_qml.cpp.aotstats
+[2582/2824] Generating .rcc/qmlcache/inspector_qml_score/ScoreAppearanceInspectorView_qml.cpp, .rcc/qmlcache/inspector_qml_score/ScoreAppearanceInspectorView_qml.cpp.aotstats
+[2583/2824] Generating .rcc/qmlcache/inspector_qml_text/textstylepopup/FrameSubPopup_qml.cpp, .rcc/qmlcache/inspector_qml_text/textstylepopup/FrameSubPopup_qml.cpp.aotstats
+[2584/2824] Generating .rcc/qmlcache/inspector_qml_text/TextSettings_qml.cpp, .rcc/qmlcache/inspector_qml_text/TextSettings_qml.cpp.aotstats
+[2585/2824] Generating .rcc/qmlcache/inspector_qml_text/TextInspectorView_qml.cpp, .rcc/qmlcache/inspector_qml_text/TextInspectorView_qml.cpp.aotstats
+[2586/2824] Linking CXX static library src/palette/qml/MuseScore/Palette/libpalette_qmlplugin.a
+[2587/2824] Generating .rcc/qmlcache/inspector_qml_text/textstylepopup/TextStylePopup_qml.cpp, .rcc/qmlcache/inspector_qml_text/textstylepopup/TextStylePopup_qml.cpp.aotstats
+[2588/2824] Linking CXX static library src/playback/qml/MuseScore/Playback/libplayback_qmlplugin.a
+[2589/2824] Linking CXX static library src/preferences/qml/MuseScore/Preferences/libpreferences_qmlplugin.a
+[2590/2824] Generating .rcc/qmlcache/inspector_qml_text/textstylepopup/TextStyleSubPopup_qml.cpp, .rcc/qmlcache/inspector_qml_text/textstylepopup/TextStyleSubPopup_qml.cpp.aotstats
+[2591/2824] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_18_cxx.cxx.o
+[2592/2824] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_17_cxx.cxx.o
+[2593/2824] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_16_cxx.cxx.o
+[2594/2824] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_15_cxx.cxx.o
+[2595/2824] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_14_cxx.cxx.o
+[2596/2824] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_13_cxx.cxx.o
+[2597/2824] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_11_cxx.cxx.o
+[2598/2824] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_12_cxx.cxx.o
+[2599/2824] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_9_cxx.cxx.o
+[2600/2824] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_10_cxx.cxx.o
+[2601/2824] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_8_cxx.cxx.o
+[2602/2824] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_7_cxx.cxx.o
+[2603/2824] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_4_cxx.cxx.o
+[2604/2824] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_3_cxx.cxx.o
+[2605/2824] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_6_cxx.cxx.o
+[2606/2824] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_5_cxx.cxx.o
+[2607/2824] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_2_cxx.cxx.o
+[2608/2824] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_1_cxx.cxx.o
+[2609/2824] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_0_cxx.cxx.o
+[2610/2824] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/.qt/rcc/qrc_qmake_MuseScore_Inspector.cpp.o
+[2611/2824] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/.qt/rcc/qrc_inspector_qml_raw_qml_0_extra_qmldirs.cpp.o
+[2612/2824] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/.qt/rcc/qrc_inspector_qml_raw_qml_0.cpp.o
+[2613/2824] Linking CXX static library src/inspector/qml/MuseScore/Inspector/libinspector_qml.a
+[2614/2824] Automatic MOC and UIC for target inspector_qmlplugin
+[2615/2824] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qmlplugin.dir/inspector_qmlplugin_autogen/mocs_compilation.cpp.o
+[2616/2824] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qmlplugin.dir/inspector_qmlplugin_MuseScore_InspectorPlugin.cpp.o
+[2617/2824] Linking CXX static library src/inspector/qml/MuseScore/Inspector/libinspector_qmlplugin.a
+ninja: build stopped: cannot make progress due to previous errors.
+Build failed
+Build failed
