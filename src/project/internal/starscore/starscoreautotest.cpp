@@ -35,6 +35,7 @@
  * Everything is logged to log.txt.
  */
 #include "starscoreservice.h"
+#include "starscoreautoarchive.h"
 #include "engraving/dom/starscoreprogress.h"
 #include "starscoreengraving.h"
 #include "starscorechordchart.h"
@@ -993,6 +994,37 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         }
         const QString tag = masterScore()->metaTag(String(engraving::starscore::PROGRESS_TAG)).toQString();
         autotestLog(QString("  after undo %1 marks").arg(tag.isEmpty() ? 0 : tag.count(';') + 1));
+    } else if (step == "autoarchivesim") {
+        // the autosave archive over 400 simulated days: a save every 5 minutes for 3 hours, 4 days a week (each
+        // save different), then the copies left
+        const QString dir = autotestDir() + "/sim";
+        QDir().mkpath(dir);
+        const QString song = dir + "/SIMU - Simulated.starscore";
+        QDateTime t(QDate(2026, 1, 5), QTime(19, 0));
+        int made = 0;
+        for (int day = 0; day < 400; ++day) {
+            const QDateTime start = QDateTime(QDate(2026, 1, 5).addDays(day), QTime(19, 0));
+            if (day % 7 >= 4) {
+                continue;
+            }
+            for (int m = 0; m < 180; m += 5) {
+                t = start.addSecs(m * 60);
+                QFile f(song);
+                f.open(QIODevice::WriteOnly);
+                f.write(QByteArray(1000, 'x') + t.toString().toUtf8());
+                f.close();
+                if (!mu::project::starscore::archiveBeforeSave(song, t).isEmpty()) {
+                    ++made;
+                }
+            }
+            if (day == 0 || day == 1 || day == 30 || day == 399) {
+                const QStringList left = QDir(mu::project::starscore::autosaveArchiveRoot() + "/SIMU - Simulated")
+                                         .entryList({ "*.starscore" }, QDir::Files, QDir::Name);
+                autotestLog(QString("  day %1: %2 made so far, %3 kept: %4").arg(day).arg(made).arg(left.size())
+                            .arg(left.join(" | ").replace("SIMU - Simulated ", "").replace(".starscore", "")));
+            }
+        }
+        QDir(mu::project::starscore::autosaveArchiveRoot() + "/SIMU - Simulated").removeRecursively();
     } else if (step == "save") {
         INotationProjectPtr project = globalContext()->currentProject();
         const Ret r = project ? project->save(io::path_t(autotestDir() + "/saved.starscore"), SaveMode::SaveCopy, false)

@@ -50,6 +50,7 @@
 #include "projectaudiosettings.h"
 #include "projectfileinfoprovider.h"
 #include "projecterrors.h"
+#include "starscore/starscoreautoarchive.h"
 
 #include "defer.h"
 #include "log.h"
@@ -527,6 +528,12 @@ Ret NotationProject::save(const muse::io::path_t& path, SaveMode saveMode, bool 
         }
 
         std::string suffix = io::suffix(savePath);
+
+        // StarScore: the version being replaced goes to the autosave archive (at most every 10 minutes; see
+        // starscore/starscoreautoarchive.cpp). Not for copies (exports, temporary files).
+        if (saveMode != SaveMode::SaveCopy) {
+            mu::project::starscore::archiveBeforeSave(savePath.toQString());
+        }
 
         // Whether a backup file will be created depends on both the caller's and user's will
         bool shouldCreateBackup = createBackup && configuration()->createBackupBeforeSaving();
