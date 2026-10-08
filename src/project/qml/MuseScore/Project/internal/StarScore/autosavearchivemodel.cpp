@@ -24,16 +24,21 @@ static QString sizeText(qint64 bytes)
     return QString("%1 MB").arg(double(bytes) / (1024.0 * 1024.0), 0, 'f', 1);
 }
 
+static QString countText(qint64 n, const char* one, const char* many)
+{
+    return QString("%1 %2").arg(n).arg(QString::fromUtf8(n == 1 ? one : many));
+}
+
 static QString agoText(const QDateTime& t)
 {
-    const qint64 mins = t.secsTo(QDateTime::currentDateTime()) / 60;
+    const qint64 mins = std::max<qint64>(0, t.secsTo(QDateTime::currentDateTime()) / 60);
     if (mins < 60) {
-        return muse::qtrc("starscore", "%n minute(s) ago", nullptr, int(std::max<qint64>(mins, 0)));
+        return countText(mins, "minute ago", "minutes ago");
     }
     if (mins < 48 * 60) {
-        return muse::qtrc("starscore", "%n hour(s) ago", nullptr, int(mins / 60));
+        return countText(mins / 60, "hour ago", "hours ago");
     }
-    return muse::qtrc("starscore", "%n day(s) ago", nullptr, int(mins / (24 * 60)));
+    return countText(mins / (24 * 60), "day ago", "days ago");
 }
 
 AutosaveArchiveModel::AutosaveArchiveModel(QObject* parent)
@@ -48,7 +53,7 @@ void AutosaveArchiveModel::load()
     for (const QString& s : songs) {
         const auto versions = aa::archivedVersions(s);
         m_songs << QVariantMap { { "name", s },
-            { "info", muse::qtrc("starscore", "%n version(s)", nullptr, int(versions.size())) + " · " + sizeText(aa::archivedBytes(s)) } };
+            { "info", countText(qint64(versions.size()), "version", "versions") + " · " + sizeText(aa::archivedBytes(s)) } };
     }
     emit songsChanged();
 
@@ -70,7 +75,7 @@ void AutosaveArchiveModel::selectSong(const QString& song)
     for (const aa::ArchivedVersion& v : aa::archivedVersions(song)) {
         m_versions << QVariantMap {
             { "time", v.time.toString(Qt::ISODate) },
-            { "label", locale.toString(v.time, "ddd d MMM yyyy, h:mm ap") },
+            { "label", locale.toString(v.time, "d MMM yyyy, h:mm ap") },
             { "ago", agoText(v.time) },
             { "size", v.waiting ? muse::qtrc("starscore", "waiting to be packed") : sizeText(v.storedBytes) },
         };

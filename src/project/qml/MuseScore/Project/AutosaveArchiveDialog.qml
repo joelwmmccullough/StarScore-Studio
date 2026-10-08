@@ -67,7 +67,7 @@ StyledDialogView {
                         anchors.leftMargin: 10
                         width: parent.width - 20
                         StyledTextLabel { width: parent.width; horizontalAlignment: Text.AlignLeft; text: modelData.name; font: ui.theme.bodyBoldFont }
-                        StyledTextLabel { width: parent.width; horizontalAlignment: Text.AlignLeft; text: modelData.info; color: ui.theme.fontSecondaryColor }
+                        StyledTextLabel { width: parent.width; horizontalAlignment: Text.AlignLeft; text: modelData.info; opacity: 0.7 }
                     }
                 }
             }
@@ -98,8 +98,8 @@ StyledDialogView {
                         anchors.leftMargin: 10
                         anchors.rightMargin: 10
                         StyledTextLabel { Layout.fillWidth: true; horizontalAlignment: Text.AlignLeft; text: modelData.label }
-                        StyledTextLabel { Layout.preferredWidth: 130; horizontalAlignment: Text.AlignLeft; text: modelData.ago; color: ui.theme.fontSecondaryColor }
-                        StyledTextLabel { Layout.preferredWidth: 140; horizontalAlignment: Text.AlignRight; text: modelData.size; color: ui.theme.fontSecondaryColor }
+                        StyledTextLabel { Layout.preferredWidth: 110; horizontalAlignment: Text.AlignLeft; text: modelData.ago; opacity: 0.7 }
+                        StyledTextLabel { Layout.preferredWidth: 120; horizontalAlignment: Text.AlignRight; text: modelData.size; opacity: 0.7 }
                     }
                 }
             }
