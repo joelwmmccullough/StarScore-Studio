@@ -135,6 +135,7 @@ void ProjectModule::resolveImports()
         ir->registerQmlUri(Uri("musescore://starscore/updateallsheets"), "MuseScore.Project", "UpdateAllSheetsDialog");
         ir->registerQmlUri(Uri("musescore://starscore/compare"), "MuseScore.Project", "ComparePartsDialog");
         ir->registerQmlUri(Uri("musescore://starscore/voiceorder"), "MuseScore.Project", "VoiceOrderDialog");
+        ir->registerQmlUri(Uri("musescore://starscore/autosavearchive"), "MuseScore.Project", "AutosaveArchiveDialog");
         ir->registerQmlUri(Uri("musescore://starscore/auditlibrary"), "MuseScore.Project", "AuditLibraryDialog");
         ir->registerQmlUri(Uri("musescore://starscore/organizer"), "MuseScore.Project", "OrganizerDialog");
         ir->registerQmlUri(Uri("musescore://starscore/roster"), "MuseScore.Project", "BandRosterDialog");

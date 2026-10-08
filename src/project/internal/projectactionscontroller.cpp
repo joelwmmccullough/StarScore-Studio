@@ -174,6 +174,9 @@ void ProjectActionsController::init()
     dispatcher()->reg(this, "starscore-toggle-panel", [this]() {
         starScoreService()->setPanelVisible(!starScoreService()->isPanelVisible());
     });
+    dispatcher()->reg(this, "starscore-autosave-archive", [this]() {
+        interactive()->open(Uri("musescore://starscore/autosavearchive"));
+    });
     dispatcher()->reg(this, "starscore-progress-colors", [this]() {
         starScoreService()->setProgressColorsShown(!starScoreService()->progressColorsShown());
     });
@@ -293,6 +296,7 @@ bool ProjectActionsController::canReceiveAction(const ActionCode& code) const
             "file-new-musescore",
             "starscore-part-styles",
             "starscore-toggle-panel",
+            "starscore-autosave-archive",
             "starscore-audit-library",
             "starscore-audit-open",
             "starscore-organize",

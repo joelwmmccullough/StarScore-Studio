@@ -178,6 +178,9 @@ set_source_files_properties(internal/starscore/starscoretodo.cpp PROPERTIES SKIP
 set_source_files_properties(internal/starscore/starscoreautotest.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 # StarScore chord charts: its own translation unit (file-local helper types named like the audit's)
 set_source_files_properties(internal/starscore/starscorechordchart.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+# zstd (BSD, facebook/zstd 1.5.7, single-file build) for the autosave archive's packed song histories
+target_sources(project PRIVATE thirdparty/zstd/zstd.c thirdparty/zstd/zstd.h)
+set_source_files_properties(thirdparty/zstd/zstd.c PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON SKIP_PRECOMPILE_HEADERS ON COMPILE_OPTIONS "-w")
 # the StarScore version, for the automatic test run's log
 target_compile_definitions(project PRIVATE STARSCORE_VERSION_STR="${STARSCORE_VERSION}")
 

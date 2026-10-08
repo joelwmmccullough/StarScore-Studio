@@ -160,6 +160,12 @@ const UiActionList ProjectUiActions::m_actions = {
              TranslatableString("action", "Show/hide the StarScore panel above the score"),
              Checkable::Yes
              ),
+    UiAction("starscore-autosave-archive",
+             mu::context::UiCtxAny,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Autosave archive…"),
+             TranslatableString("action", "Open an earlier saved version of a song")
+             ),
     UiAction("starscore-progress-colors",
              mu::context::UiCtxProjectOpened,
              mu::context::CTX_ANY,

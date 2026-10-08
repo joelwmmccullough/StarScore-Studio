@@ -91,6 +91,8 @@ qt_add_qml_module(project_qml
         internal/StarScore/comparepartsmodel.cpp
         internal/StarScore/comparepartsmodel.h
         internal/StarScore/voiceordermodel.cpp
+        internal/StarScore/autosavearchivemodel.cpp
+        internal/StarScore/autosavearchivemodel.h
         internal/StarScore/voiceordermodel.h
         internal/StarScore/importmodel.cpp
         internal/StarScore/importmodel.h
@@ -202,6 +204,7 @@ qt_add_qml_module(project_qml
         RecordingsDialog.qml
         ComparePartsDialog.qml
         VoiceOrderDialog.qml
+        AutosaveArchiveDialog.qml
         StarScoreImportDialog.qml
     RESOURCES
         internal/Migration/migration.png

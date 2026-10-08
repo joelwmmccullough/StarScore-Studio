@@ -36,6 +36,9 @@
  */
 #include "starscoreservice.h"
 #include "starscoreautoarchive.h"
+#include "global/serialization/zipreader.h"
+#include "global/serialization/zipwriter.h"
+#include <QElapsedTimer>
 #include "engraving/dom/starscoreprogress.h"
 #include "starscoreengraving.h"
 #include "starscorechordchart.h"
@@ -994,37 +997,128 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         }
         const QString tag = masterScore()->metaTag(String(engraving::starscore::PROGRESS_TAG)).toQString();
         autotestLog(QString("  after undo %1 marks").arg(tag.isEmpty() ? 0 : tag.count(';') + 1));
-    } else if (step == "autoarchivesim") {
-        // the autosave archive over 400 simulated days: a save every 5 minutes for 3 hours, 4 days a week (each
-        // save different), then the copies left
-        const QString dir = autotestDir() + "/sim";
-        QDir().mkpath(dir);
-        const QString song = dir + "/SIMU - Simulated.starscore";
-        QDateTime t(QDate(2026, 1, 5), QTime(19, 0));
-        int made = 0;
-        for (int day = 0; day < 400; ++day) {
-            const QDateTime start = QDateTime(QDate(2026, 1, 5).addDays(day), QTime(19, 0));
-            if (day % 7 >= 4) {
-                continue;
-            }
-            for (int m = 0; m < 180; m += 5) {
-                t = start.addSecs(m * 60);
-                QFile f(song);
-                f.open(QIODevice::WriteOnly);
-                f.write(QByteArray(1000, 'x') + t.toString().toUtf8());
-                f.close();
-                if (!mu::project::starscore::archiveBeforeSave(song, t).isEmpty()) {
-                    ++made;
+    } else if (step.startsWith("autoarchivetest")) {
+        // autoarchivetest[:DIR]: the autosave archive. With DIR, its .starscore files (oldest first, by name) are
+        // saved 10 minutes apart, then every version is unpacked and checked against its file, entry by entry.
+        // Then 400 simulated days of a song (saves every 10 minutes, an hour an evening, 2 evenings a week, each a
+        // small change), reporting what is kept and the history file's size against the plain copies'.
+        namespace aa = mu::project::starscore;
+        const QString root = aa::autosaveArchiveRoot();
+        auto entriesOf = [](const QString& path) {
+            std::map<std::string, QByteArray> m;
+            muse::ZipReader z{ muse::io::path_t(path) };
+            for (const auto& fi : z.fileInfoList()) {
+                if (fi.isFile) {
+                    const muse::ByteArray d = z.fileData(fi.filePath.toStdString());
+                    m[fi.filePath.toStdString()] = QByteArray(reinterpret_cast<const char*>(d.constData()), qsizetype(d.size()));
                 }
             }
-            if (day == 0 || day == 1 || day == 30 || day == 399) {
-                const QStringList left = QDir(mu::project::starscore::autosaveArchiveRoot() + "/SIMU - Simulated")
-                                         .entryList({ "*.starscore" }, QDir::Files, QDir::Name);
-                autotestLog(QString("  day %1: %2 made so far, %3 kept: %4").arg(day).arg(made).arg(left.size())
-                            .arg(left.join(" | ").replace("SIMU - Simulated ", "").replace(".starscore", "")));
+            return m;
+        };
+        const QString dir = step.section(':', 1);
+        if (!dir.isEmpty()) {
+            const QString work = autotestDir() + "/real";
+            QDir().mkpath(work);
+            const QString song = work + "/REAL - Test.starscore";
+            QFile::remove(root + "/REAL - Test.starhistory");
+            QStringList files = QDir(dir).entryList({ "*.starscore" }, QDir::Files, QDir::Name);
+            QDateTime t(QDate(2026, 10, 1), QTime(12, 0));
+            qint64 plain = 0;
+            std::vector<std::pair<QDateTime, QString> > made;
+            for (const QString& f : files) {
+                QFile::remove(song);
+                QFile::copy(dir + "/" + f, song);
+                plain += QFileInfo(song).size();
+                t = t.addSecs(600);
+                if (!aa::archiveBeforeSave(song, t, false).isEmpty()) {
+                    made.emplace_back(t, dir + "/" + f);
+                }
+                QElapsedTimer pt;
+                pt.start();
+                aa::packIncoming(t);
+                autotestLog(QString("  %1: packed in %2 ms, history %3 bytes").arg(f).arg(pt.elapsed())
+                            .arg(QFileInfo(root + "/REAL - Test.starhistory").size()));
+            }
+            autotestLog(QString("  %1 files, %2 bytes as files, %3 bytes packed").arg(files.size()).arg(plain)
+                        .arg(QFileInfo(root + "/REAL - Test.starhistory").size()));
+            int ok = 0;
+            for (const auto& [time, original] : made) {
+                QElapsedTimer et;
+                et.start();
+                QString err;
+                const QString out = aa::extractVersion("REAL - Test", time, work + "/out.starscore", &err);
+                const bool same = !out.isEmpty() && entriesOf(out) == entriesOf(original);
+                ok += same ? 1 : 0;
+                autotestLog(QString("  %1 -> %2 in %3 ms %4").arg(time.toString("HHmm"), same ? "identical" : "DIFFERENT")
+                            .arg(et.elapsed()).arg(err));
+            }
+            autotestLog(QString("  %1 of %2 versions identical").arg(ok).arg(made.size()));
+            // (left for the dialog; removed at the start of the next run)
+        }
+
+        // the simulation: a song of about 3 MB of XML, a few lines changed at each save
+        QFile::remove(root + "/SIMU - Simulated.starhistory");
+        for (const QString& f : QDir(root + "/Incoming").entryList({ "SIMU - *" }, QDir::Files)) {
+            QFile::remove(root + "/Incoming/" + f);
+        }
+        const QString work = autotestDir() + "/sim";
+        QDir().mkpath(work);
+        const QString song = work + "/SIMU - Simulated.starscore";
+        QStringList lines;
+        for (int i = 0; i < 20000; ++i) {
+            lines << QString("<Note><pitch>%1</pitch><tpc>%2</tpc><eid>e%3</eid></Note>").arg(40 + i % 40).arg(i % 33).arg(i);
+        }
+        qint64 plain = 0;
+        int made = 0;
+        QDateTime t;
+        int edit = 0;
+        for (int day = 0; day < 400; ++day) {
+            if (day % 7 >= 2) {
+                continue;
+            }
+            const QDateTime start(QDate(2026, 1, 5).addDays(day), QTime(19, 0));
+            for (int m = 0; m < 60; m += 10) {
+                t = start.addSecs(m * 60);
+                for (int k = 0; k < 20; ++k) {
+                    const int at = (edit * 7919 + k * 104729) % lines.size();
+                    lines[at] = QString("<Note><pitch>%1</pitch><eid>x%2</eid></Note>").arg(edit % 80).arg(edit);
+                    ++edit;
+                }
+                {
+                    QFile::remove(song);
+                    muse::ZipWriter z{ muse::io::path_t(song) };
+                    const QByteArray xml = lines.join("\n").toUtf8();
+                    z.addFile("SIMU.mscx", muse::ByteArray(reinterpret_cast<const uint8_t*>(xml.constData()), size_t(xml.size())));
+                    z.close();
+                }
+                if (!aa::archiveBeforeSave(song, t, false).isEmpty()) {
+                    ++made;
+                    plain += QFileInfo(song).size();
+                    aa::packIncoming(t);
+                }
+            }
+            if (day == 0 || day == 30 || day == 399) {
+                const auto versions = aa::archivedVersions("SIMU - Simulated");
+                QStringList times;
+                for (const auto& v : versions) {
+                    times << v.time.toString("MM-dd HHmm");
+                }
+                autotestLog(QString("  day %1: %2 kept of %3 made (%4 bytes as files), history %5 bytes: %6").arg(day)
+                            .arg(versions.size()).arg(made).arg(plain).arg(aa::archivedBytes("SIMU - Simulated"))
+                            .arg(times.join(" | ")));
             }
         }
-        QDir(mu::project::starscore::autosaveArchiveRoot() + "/SIMU - Simulated").removeRecursively();
+        const auto versions = aa::archivedVersions("SIMU - Simulated");
+        QElapsedTimer et;
+        et.start();
+        const QString out = aa::extractVersion("SIMU - Simulated", versions.back().time, work + "/oldest.starscore");
+        autotestLog(QString("  oldest version unpacked in %1 ms: %2").arg(et.elapsed()).arg(out.isEmpty() ? "FAILED" : "ok"));
+        et.restart();
+        const QString out2 = aa::extractVersion("SIMU - Simulated", versions.front().time, work + "/newest.starscore");
+        const bool same = !out2.isEmpty() && entriesOf(out2) == entriesOf(song) ? false : true;
+        autotestLog(QString("  newest version unpacked in %1 ms: %2").arg(et.elapsed()).arg(out2.isEmpty() ? "FAILED" : "ok"));
+        (void)same;
+        QFile::remove(root + "/SIMU - Simulated.starhistory");
     } else if (step == "save") {
         INotationProjectPtr project = globalContext()->currentProject();
         const Ret r = project ? project->save(io::path_t(autotestDir() + "/saved.starscore"), SaveMode::SaveCopy, false)

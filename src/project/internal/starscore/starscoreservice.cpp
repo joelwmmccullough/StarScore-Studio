@@ -6,6 +6,7 @@
 #include <QSettings>
 #include "starscoreservice.h"
 #include "engraving/dom/starscoreprogress.h"
+#include "starscoreautoarchive.h"
 #include "settings.h"
 #include "starscorehouse.h"
 #include "starscorepdf.h"
@@ -87,6 +88,8 @@ void StarScoreService::init()
 
     // the library's files under the standard name, once StarScore has started (and opened whatever it reopens)
     QTimer::singleShot(4000, &m_timerGuard, [this]() { renameLibraryFilesToCodes(); });
+    // copies left in the autosave archive's Incoming folder (StarScore quit while packing them)
+    QTimer::singleShot(15000, &m_timerGuard, []() { starscore::packIncomingInBackground(); });
 
     // One handler per channel: muse async keeps the first callback set for a receiver and silently drops a
     // second onNotify(this, ...) on the same channel, so the reference-panel part of this used to never run

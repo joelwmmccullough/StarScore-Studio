@@ -201,6 +201,7 @@ MenuItem* AppMenuModel::makeFileMenu()
         makeMenuItem("file-new-musescore"),
         makeMenuItem("file-open"),
         makeMenu(TranslatableString("appshell/menu/file", "Open &recent"), recentScoresList, "menu-file-open", openRecentEnabled),
+        makeMenuItem("starscore-autosave-archive"),
         makeMenuItem("starscore-audit-library"),
         makeMenuItem("file-close"),
         makeSeparator(),
