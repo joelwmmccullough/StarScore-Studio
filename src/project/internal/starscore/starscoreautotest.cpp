@@ -36,6 +36,9 @@
  */
 #include "starscoreservice.h"
 #include "starscoreautoarchive.h"
+#include "engraving/dom/system.h"
+#include "engraving/dom/textbase.h"
+#include "engraving/dom/page.h"
 #include "global/serialization/zipreader.h"
 #include "global/serialization/zipwriter.h"
 #include <QElapsedTimer>
@@ -336,6 +339,137 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         // uri:<uri>: opens it (uri:muse://preferences); not waited for
         interactive()->open(UriQuery(step.mid(4).toStdString()));
         autotestLog("  opened " + step.mid(4));
+    } else if (step.startsWith("horncopy:")) {
+        // horncopy:<from section template key>:<to section template key>: the parts on matching instruments copied,
+        // as "Copy the parts" does after a new horn arrangement (no question)
+        const QString fromKey = step.section(':', 1, 1), toKey = step.section(':', 2, 2);
+        QString fromId, toId;
+        for (const StarScoreSection& s : load().sections) {
+            fromId = s.templateKey == fromKey ? s.id : fromId;
+            toId = s.templateKey == toKey ? s.id : toId;
+        }
+        const auto pairs = matchingHornParts(fromId, toId);
+        for (const auto& [a, b] : pairs) {
+            autotestLog("  " + partScoreName(a) + " -> " + partScoreName(b));
+        }
+        autotestLog(QString("  copied %1").arg(copyHornParts(pairs)));
+        const auto st = partStatuses();
+        for (const auto& [a, b] : pairs) {
+            autotestLog(QString("  %1 status %2").arg(partScoreName(b)).arg(st.count(b) ? int(st.at(b)) : -1));
+        }
+    } else if (step.startsWith("copytexts:")) {
+        // copytexts:<part score A>|<part score B>: copyTextPositions from A to B (one undo step); how many changed
+        const QString an = step.mid(10).section('|', 0, 0), bn = step.mid(10).section('|', 1);
+        INotationPtr A, B;
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            A = e->name() == an ? e->notation() : A;
+            B = e->name() == bn ? e->notation() : B;
+        }
+        if (A && B) {
+            B->undoStack()->prepareChanges(TranslatableString::untranslatable("copy texts"));
+            const int n = starscore::copyTextPositions(A->elements()->msScore(), B->elements()->msScore());
+            B->undoStack()->commitChanges();
+            autotestLog(QString("  %1 changed").arg(n));
+        }
+    } else if (step.startsWith("formatdiff:")) {
+        // formatdiff:<part score A>|<part score B>: how B's formatting differs from A's: system and page breaks,
+        // bar widths, texts (offset, alignment, font, placement, visibility; matched by place and words), frames
+        const QString an = step.mid(11).section('|', 0, 0), bn = step.mid(11).section('|', 1);
+        engraving::Score* A = nullptr;
+        engraving::Score* B = nullptr;
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            if (e->name() == an && e->notation()) {
+                A = e->notation()->elements()->msScore();
+            }
+            if (e->name() == bn && e->notation()) {
+                B = e->notation()->elements()->msScore();
+            }
+        }
+        if (!A || !B) {
+            autotestLog("  part score not found");
+        } else {
+            A->doLayout();
+            B->doLayout();
+            int breaks = 0, widths = 0, texts = 0, textsMissing = 0, frames = 0, systemsA = 0, systemsB = 0;
+            for (engraving::Measure* m = A->firstMeasure(); m; m = m->nextMeasure()) {
+                engraving::Measure* o = B->tick2measure(m->tick());
+                if (!o) {
+                    continue;
+                }
+                breaks += (m->lineBreak() != o->lineBreak()) + (m->pageBreak() != o->pageBreak());
+                widths += m->userStretch() != o->userStretch();
+            }
+            for (engraving::Page* pg : A->pages()) {
+                systemsA += int(pg->systems().size());
+            }
+            for (engraving::Page* pg : B->pages()) {
+                systemsB += int(pg->systems().size());
+            }
+            std::multimap<std::pair<int, QString>, engraving::EngravingItem*> bt;
+            for (engraving::Segment* seg = B->firstSegment(engraving::SegmentType::ChordRest); seg; seg = seg->next1(engraving::SegmentType::ChordRest)) {
+                for (engraving::EngravingItem* e : seg->annotations()) {
+                    if (e->isTextBase()) {
+                        bt.emplace(std::make_pair(seg->tick().ticks(), e->isHarmony() ? QString("#h%1").arg(int(engraving::toTextBase(e)->textStyleType())) : engraving::toTextBase(e)->plainText().toQString()), e);
+                    }
+                }
+            }
+            QStringList examples;
+            for (engraving::Segment* seg = A->firstSegment(engraving::SegmentType::ChordRest); seg; seg = seg->next1(engraving::SegmentType::ChordRest)) {
+                for (engraving::EngravingItem* e : seg->annotations()) {
+                    if (!e->isTextBase()) {
+                        continue;
+                    }
+                    auto r = bt.equal_range(std::make_pair(seg->tick().ticks(), e->isHarmony() ? QString("#h%1").arg(int(engraving::toTextBase(e)->textStyleType())) : engraving::toTextBase(e)->plainText().toQString()));
+                    if (r.first == r.second) {
+                        ++textsMissing;
+                        continue;
+                    }
+                    engraving::EngravingItem* o = nullptr;
+                    for (auto it = r.first; it != r.second; ++it) {
+                        if (it->second->type() == e->type() && it->second->getProperty(engraving::Pid::OFFSET) == e->getProperty(engraving::Pid::OFFSET)) {
+                            o = it->second;
+                        }
+                    }
+                    if (!o) {
+                        for (auto it = r.first; it != r.second; ++it) {
+                            o = it->second->type() == e->type() && !o ? it->second : o;
+                        }
+                    }
+                    if (!o) {
+                        ++textsMissing;
+                        continue;
+                    }
+                    for (engraving::Pid pid : e->isHarmony() ? std::vector<engraving::Pid> { engraving::Pid::OFFSET, engraving::Pid::PLACEMENT, engraving::Pid::VISIBLE }
+                                              : std::vector<engraving::Pid> { engraving::Pid::OFFSET, engraving::Pid::ALIGN, engraving::Pid::PLACEMENT,
+                                                engraving::Pid::VISIBLE, engraving::Pid::FONT_SIZE, engraving::Pid::FONT_FACE }) {
+                        if (e->getProperty(pid) != o->getProperty(pid)) {
+                            ++texts;
+                            if (examples.size() < 6) {
+                                examples << QString("%1 %2 \"%3\" %4 vs %5").arg(engraving::propertyName(pid)).arg(e->typeName()).arg(engraving::toTextBase(e)->plainText().toQString().left(20)).arg(e->getProperty(pid).value<engraving::PointF>().y()).arg(o->getProperty(pid).value<engraving::PointF>().y()) + QString(" cand %1 tick %2 track %3/%4 autoplace %5/%6").arg(std::distance(r.first, r.second)).arg(seg->tick().ticks()).arg(e->track()).arg(o->track()).arg(e->autoplace()).arg(o->autoplace());
+                            }
+                        }
+                    }
+                }
+            }
+            std::vector<engraving::Box*> ba, bb;
+            for (engraving::MeasureBase* mb = A->first(); mb; mb = mb->next()) {
+                if (mb->isVBox()) {
+                    ba.push_back(engraving::toBox(mb));
+                }
+            }
+            for (engraving::MeasureBase* mb = B->first(); mb; mb = mb->next()) {
+                if (mb->isVBox()) {
+                    bb.push_back(engraving::toBox(mb));
+                }
+            }
+            for (size_t i = 0; i < ba.size() && i < bb.size(); ++i) {
+                frames += ba[i]->getProperty(engraving::Pid::BOX_HEIGHT) != bb[i]->getProperty(engraving::Pid::BOX_HEIGHT);
+            }
+            autotestLog(QString("  %1 vs %2: systems %3/%4, break differences %5, bar widths %6, text properties %7 (%8), "
+                                "texts missing %9, frames %10")
+                        .arg(an, bn).arg(systemsA).arg(systemsB).arg(breaks).arg(widths).arg(texts).arg(examples.join("; "))
+                        .arg(textsMissing).arg(frames));
+        }
     } else if (step.startsWith("finish:")) {
         // finish:<part name>: that part marked Finished, as the status menu does (1-Horn Trumpet: makes the others)
         const QString name = step.mid(7);

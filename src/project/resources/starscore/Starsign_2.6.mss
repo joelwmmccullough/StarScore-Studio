@@ -319,7 +319,7 @@
     <chordSymbolAFrameFgColor r="0" g="0" b="0" a="255"/>
     <chordSymbolAFrameBgColor r="255" g="255" b="255" a="0"/>
     <chordSymbolBFontFace>Finale Broadway Text</chordSymbolBFontFace>
-    <chordSymbolBFontSize>10</chordSymbolBFontSize>
+    <chordSymbolBFontSize>11</chordSymbolBFontSize>
     <chordSymbolBLineSpacing>1</chordSymbolBLineSpacing>
     <chordSymbolBFontSpatiumDependent>1</chordSymbolBFontSpatiumDependent>
     <chordSymbolBFontStyle>2</chordSymbolBFontStyle>
@@ -1825,7 +1825,7 @@
     <articulationMusicalSymbolSize>8</articulationMusicalSymbolSize>
     <bendMusicalSymbolSize>8</bendMusicalSymbolSize>
     <chordSymbolAMusicalSymbolSize>15</chordSymbolAMusicalSymbolSize>
-    <chordSymbolBMusicalSymbolSize>10</chordSymbolBMusicalSymbolSize>
+    <chordSymbolBMusicalSymbolSize>11</chordSymbolBMusicalSymbolSize>
     <composerMusicalSymbolSize>10</composerMusicalSymbolSize>
     <copyrightMusicalSymbolSize>9</copyrightMusicalSymbolSize>
     <defaultMusicalSymbolSize>10</defaultMusicalSymbolSize>

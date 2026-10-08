@@ -72,6 +72,7 @@ public:
     bool progressShown() const;
     //! a progress-color action code (starscore-progress-…)
     Q_INVOKABLE void runAction(const QString& code);
+    QStringList sectionIds() const;
     bool panelVisible() const;
 
     Q_INVOKABLE void showArrangement(const QString& id);

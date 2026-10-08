@@ -227,11 +227,16 @@ bool NewStarScoreModel::addArrangement(const QString& arrangementKey, const QStr
 {
     const QString doubler = hasDoubler(arrangementKey) ? doublerInstrumentId : QString();
     const QString low = hasLowHorn(arrangementKey) ? lowHornInstrumentId : QString();
+    QStringList before;
+    for (const StarScoreSection& s : starScore()->sections()) {
+        before << s.id;
+    }
     const muse::RetVal<QString> ret = starScore()->createArrangementFromTemplate(arrangementKey, doubler, low);
     if (!ret.ret) {
         LOGE() << ret.ret.toString();
         return false;
     }
+    starScore()->offerMatchingHornParts(before);
     // remembered like the New StarScore choices
     QSettings settings;
     if (!doublerInstrumentId.isEmpty()) {

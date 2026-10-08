@@ -49,9 +49,11 @@ int tidyTempoAndFrames(mu::engraving::MasterScore* master, bool apply);
 //! command. Returns how many locks and breaks were added.
 int lockSheetLayout(mu::engraving::Score* score);
 
-//! Copies where the texts sit (staff and system text, tempo marks, rehearsal marks, expressions) from one part score
-//! to another holding the same music: a text in the target at the same place in the song with the same words gets
-//! the source's position (offset and placement). Call inside a command. Returns how many texts moved.
+//! Copies where the texts sit and how they look from one part score to another holding the same music: staff and
+//! system text, tempo marks, rehearsal marks, expressions, dynamics and chord symbols (matched by place in the song and
+//! words), codas and jumps, the frames' heights and their texts (title, composer… matched by kind), and lines
+//! (hairpins, 8va, text lines). Offset, placement, visibility, alignment, font and frame. Lays the target out.
+//! Call inside a command. Returns how many things changed.
 int copyTextPositions(const mu::engraving::Score* source, mu::engraving::Score* target);
 //! Each bar's width ("stretch", Format › Stretch) from one score to another, bars matched by position in the song.
 //! Undoable (inside a command). Returns how many bars changed.

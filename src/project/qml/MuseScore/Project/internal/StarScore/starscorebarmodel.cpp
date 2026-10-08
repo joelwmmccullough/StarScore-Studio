@@ -627,6 +627,15 @@ void StarScoreBarModel::exportArrangement(const QString& id)
     }
 }
 
+QStringList StarScoreBarModel::sectionIds() const
+{
+    QStringList ids;
+    for (const StarScoreSection& s : starScore()->sections()) {
+        ids << s.id;
+    }
+    return ids;
+}
+
 void StarScoreBarModel::handleMenuItem(const QString& itemId)
 {
     const int colon = itemId.indexOf(':');
@@ -684,9 +693,12 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
             query.addParam("arrangementKey", Val(arg.toStdString()));
             interactive()->open(query);
         } else {
+            const QStringList before = sectionIds();
             RetVal<QString> ret = starScore()->createArrangementFromTemplate(arg);
             if (!ret.ret) {
                 interactive()->error(muse::trc("starscore", "Couldn't create the arrangement"), ret.ret.toString());
+            } else {
+                starScore()->offerMatchingHornParts(before);
             }
         }
     } else if (action == "sec-flexsheet") {
@@ -790,9 +802,12 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
         // a 3- to 7-Horn Section: the doubler plays what it plays in the song's other horn sections (Joel, 5 Oct 2026)
         static const QRegularExpression hornKey("^[3-7]-horn$");
         const QString doubler = hornKey.match(arg).hasMatch() ? starScore()->songDoublerInstrumentId() : QString();
+        const QStringList before = sectionIds();
         RetVal<QString> ret = starScore()->createSectionFromTemplate(arg, doubler);
         if (!ret.ret) {
             interactive()->error(muse::trc("starscore", "Couldn't create the section"), ret.ret.toString());
+        } else {
+            starScore()->offerMatchingHornParts(before);
         }
     } else if (action == "sec-new-custom") {
         createCustomSection();

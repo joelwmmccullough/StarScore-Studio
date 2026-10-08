@@ -220,6 +220,11 @@ public:
     void setProgressColorsShown(bool shown) override;
     muse::async::Notification progressColorsShownChanged() const override;
     QString markProgress(char code) override;
+    void offerMatchingHornParts(const QStringList& sectionIdsBefore) override;
+    //! (source part id, new part id) pairs, instrument by instrument in score order
+    std::vector<std::pair<QString, QString> > matchingHornParts(const QString& fromSectionId, const QString& toSectionId) const;
+    int copyHornParts(const std::vector<std::pair<QString, QString> >& pairs);
+    QString partScoreName(const QString& partId) const;
     std::vector<StarScoreVoiceSection> checkVoiceOrder() const override;
     bool minMajSymbolInCurrentScore() const override;
     void setMinMajSymbolInCurrentScore(bool on) override;

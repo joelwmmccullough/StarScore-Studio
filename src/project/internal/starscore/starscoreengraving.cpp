@@ -23,6 +23,10 @@
 #include "engraving/dom/textbase.h"
 #include "engraving/dom/tempotext.h"
 #include "engraving/dom/box.h"
+#include "engraving/dom/spanner.h"
+#include "engraving/editing/editproperty.h"
+#include "engraving/dom/marker.h"
+#include "engraving/dom/jump.h"
 #include "engraving/dom/page.h"
 #include "engraving/dom/system.h"
 #include "engraving/dom/instrument.h"
@@ -670,27 +674,55 @@ int mu::project::starscore::copyTextPositions(const Score* source, Score* target
     if (!source || !target) {
         return 0;
     }
+    // where a text sits, whether it shows, and how it looks: alignment, font, frame (Joel, 7 Oct 2026: a copied part
+    // keeps the source part's text alignment too)
+    static const std::vector<Pid> TEXT_PROPS { Pid::OFFSET, Pid::PLACEMENT, Pid::AUTOPLACE, Pid::VISIBLE, Pid::ALIGN,
+                                               Pid::FONT_FACE, Pid::FONT_SIZE, Pid::FONT_STYLE, Pid::FRAME_TYPE };
+    int moved = 0;
+    // Changed on this one item only. undoChangeProperty would pass a text's font or alignment set in a part score on
+    // to the main score and every other part (a system text is in all of them), and the next copy would undo it.
+    auto copyProps = [&](const EngravingItem* from, EngravingItem* to, const std::vector<Pid>& props) {
+        bool changed = false;
+        for (Pid pid : props) {
+            const PropertyValue v = from->getProperty(pid);
+            if (v.isValid() && to->getProperty(pid) != v) {
+                to->score()->undo(new ChangeProperty(to, pid, v, from->propertyFlags(pid)));
+                if (!to->score()->isMaster()) {
+                    to->unlinkPropertyFromMaster(pid);
+                }
+                changed = true;
+            }
+        }
+        moved += changed ? 1 : 0;
+    };
+
+    // texts attached to the music: staff and system text, tempo, rehearsal marks, expressions, dynamics, chord symbols
     auto movable = [](const EngravingItem* e) {
         return e && (e->isStaffText() || e->isSystemText() || e->isTempoText() || e->isRehearsalMark() || e->isExpression()
                      || e->isPlayTechAnnotation() || e->isDynamic() || e->isHarmony());
+    };
+    // the words that identify a text; a chord symbol by its kind (main or alternate) instead, since a transposing
+    // instrument's chords read differently
+    auto words = [](const EngravingItem* e) {
+        return e->isHarmony() ? QString("#harmony %1").arg(int(toTextBase(e)->textStyleType()))
+               : toTextBase(e)->plainText().toQString();
     };
     // the target's texts by place in the song and words
     std::multimap<std::pair<int, QString>, EngravingItem*> targetTexts;
     for (Segment* seg = target->firstSegment(SegmentType::ChordRest); seg; seg = seg->next1(SegmentType::ChordRest)) {
         for (EngravingItem* e : seg->annotations()) {
             if (movable(e)) {
-                targetTexts.emplace(std::make_pair(seg->tick().ticks(), toTextBase(e)->plainText().toQString()), e);
+                targetTexts.emplace(std::make_pair(seg->tick().ticks(), words(e)), e);
             }
         }
     }
-    int moved = 0;
     std::set<EngravingItem*> used;
     for (const Segment* seg = source->firstSegment(SegmentType::ChordRest); seg; seg = seg->next1(SegmentType::ChordRest)) {
         for (const EngravingItem* e : seg->annotations()) {
             if (!movable(e)) {
                 continue;
             }
-            const auto key = std::make_pair(seg->tick().ticks(), toTextBase(e)->plainText().toQString());
+            const auto key = std::make_pair(seg->tick().ticks(), words(e));
             auto range = targetTexts.equal_range(key);
             for (auto it = range.first; it != range.second; ++it) {
                 EngravingItem* t = it->second;
@@ -698,18 +730,94 @@ int mu::project::starscore::copyTextPositions(const Score* source, Score* target
                     continue;
                 }
                 used.insert(t);
-                bool changed = false;
-                // where it sits, and whether it shows (a text hidden in the source stays hidden)
-                for (Pid pid : { Pid::OFFSET, Pid::PLACEMENT, Pid::AUTOPLACE, Pid::VISIBLE }) {
-                    const PropertyValue v = e->getProperty(pid);
-                    if (t->getProperty(pid) != v) {
-                        t->undoChangeProperty(pid, v, e->propertyFlags(pid));
-                        changed = true;
-                    }
-                }
-                moved += changed ? 1 : 0;
+                // a chord symbol's font comes from its own chord style: only where it sits and whether it shows
+                copyProps(e, t, e->isHarmony() ? std::vector<Pid> { Pid::OFFSET, Pid::PLACEMENT, Pid::AUTOPLACE, Pid::VISIBLE } : TEXT_PROPS);
                 break;
             }
+        }
+    }
+
+    // texts that belong to a bar: codas, segnos, D.S. al Coda, Fine…
+    for (const Measure* m = source->firstMeasure(); m; m = m->nextMeasure()) {
+        Measure* tm = target->tick2measure(m->tick());
+        if (!tm || tm->tick() != m->tick()) {
+            continue;
+        }
+        std::set<EngravingItem*> taken;
+        for (const EngravingItem* e : m->el()) {
+            if (!e || !(e->isMarker() || e->isJump())) {
+                continue;
+            }
+            for (EngravingItem* t : tm->el()) {
+                if (t && !taken.count(t) && t->type() == e->type()
+                    && toTextBase(t)->plainText() == toTextBase(e)->plainText()) {
+                    taken.insert(t);
+                    copyProps(e, t, TEXT_PROPS);
+                    break;
+                }
+            }
+        }
+    }
+
+    // frames (the title frame first): their height and gaps, and where each of their texts sits, matched by kind
+    // (title, subtitle, composer, instrument name…), never the words
+    std::vector<const Box*> sourceBoxes;
+    std::vector<Box*> targetBoxes;
+    for (const MeasureBase* mb = source->first(); mb; mb = mb->next()) {
+        if (mb->isVBox()) {
+            sourceBoxes.push_back(toBox(mb));
+        }
+    }
+    for (MeasureBase* mb = target->first(); mb; mb = mb->next()) {
+        if (mb->isVBox()) {
+            targetBoxes.push_back(toBox(mb));
+        }
+    }
+    for (size_t i = 0; i < sourceBoxes.size() && i < targetBoxes.size(); ++i) {
+        copyProps(sourceBoxes[i], targetBoxes[i], { Pid::BOX_HEIGHT, Pid::TOP_GAP, Pid::BOTTOM_GAP });
+        std::set<EngravingItem*> taken;
+        for (const EngravingItem* e : sourceBoxes[i]->el()) {
+            if (!e || !e->isTextBase()) {
+                continue;
+            }
+            for (EngravingItem* t : targetBoxes[i]->el()) {
+                if (t && t->isTextBase() && !taken.count(t) && toTextBase(t)->textStyleType() == toTextBase(e)->textStyleType()) {
+                    taken.insert(t);
+                    copyProps(e, t, { Pid::OFFSET, Pid::ALIGN });
+                    break;
+                }
+            }
+        }
+    }
+
+    // lines (hairpins, 8va, text lines, voltas…): placement, and each piece's offsets when both are laid out in as
+    // many pieces (the breaks are the same after copyLayout)
+    target->doLayout();
+    std::multimap<std::tuple<int, int, int, int>, Spanner*> targetLines;
+    for (const auto& [tick, sp] : target->spanner()) {
+        if (sp && !sp->isSlur() && !sp->isTie()) {
+            targetLines.emplace(std::make_tuple(int(sp->type()), sp->tick().ticks(), sp->tick2().ticks(), int(sp->track())), sp);
+        }
+    }
+    std::set<Spanner*> usedLines;
+    for (const auto& [tick, sp] : source->spanner()) {
+        if (!sp || sp->isSlur() || sp->isTie()) {
+            continue;
+        }
+        auto range = targetLines.equal_range(std::make_tuple(int(sp->type()), sp->tick().ticks(), sp->tick2().ticks(), int(sp->track())));
+        for (auto it = range.first; it != range.second; ++it) {
+            Spanner* t = it->second;
+            if (usedLines.count(t)) {
+                continue;
+            }
+            usedLines.insert(t);
+            copyProps(sp, t, { Pid::PLACEMENT, Pid::AUTOPLACE, Pid::VISIBLE });
+            if (sp->spannerSegments().size() == t->spannerSegments().size()) {
+                for (size_t k = 0; k < sp->spannerSegments().size(); ++k) {
+                    copyProps(sp->spannerSegments()[k], t->spannerSegments()[k], { Pid::OFFSET, Pid::OFFSET2, Pid::AUTOPLACE });
+                }
+            }
+            break;
         }
     }
     return moved;

@@ -775,6 +775,11 @@ public:
     //! show, or nothing.
     virtual QString markProgress(char code) = 0;
 
+    //! After a horn section was made (sectionIdsBefore: the sections before): when the song has a horn section with
+    //! one horn more or fewer, asks whether to copy the parts on the same instruments into the new one (music, part
+    //! score formatting and text positions; marked Sketch). Asks after the current dialog has closed.
+    virtual void offerMatchingHornParts(const QStringList& sectionIdsBefore) = 0;
+
     //! Save a .mscz holding only the instruments and part books of this arrangement's sections.
     virtual muse::Ret exportArrangement(const QString& arrangementId, const muse::io::path_t& msczPath) = 0;
 
