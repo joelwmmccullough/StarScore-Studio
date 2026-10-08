@@ -20,6 +20,8 @@
 #include "starscoreservice.h"
 #include "starscoreengraving.h"
 
+#include <cmath>
+
 #include <QRegularExpression>
 
 #include "engraving/dom/masterscore.h"
@@ -541,7 +543,7 @@ RetVal<QString> StarScoreService::convertTimeOf(const INotationProjectPtr& proje
         if (a.tempo) {
             // at half the tempo (twice it for double time), and the number in the marking too ("= 216" becomes "= 108")
             const double factor = toDouble ? 2.0 : 0.5;
-            // every number after the "=" ("= 133-153" becomes "= 266-306")
+            // every number after the "=" ("= 133-153" becomes "= 266-306"), rounded to a whole number
             static const QRegularExpression number("(\\d+(?:\\.\\d+)?)");
             QString text = a.xml.toQString();
             const int eq = text.indexOf('=');
@@ -558,7 +560,8 @@ RetVal<QString> StarScoreService::convertTimeOf(const INotationProjectPtr& proje
                         const QRegularExpressionMatch nm = it.next();
                         const double bpm = nm.captured(1).toDouble() * factor;
                         r += words.mid(last, nm.capturedStart(1) - last);
-                        r += bpm == std::floor(bpm) ? QString::number(int(bpm)) : QString::number(bpm, 'f', 1);
+                        // whole numbers (Joel, 8 Oct 2026: "= 66.5-76.5" read as "= 67-77")
+                        r += QString::number(std::lround(bpm));
                         last = nm.capturedEnd(1);
                     }
                     return r + words.mid(last);

@@ -262,7 +262,8 @@ bool readHistoryIndex(const QString& path, std::vector<Version>& versions)
     return f.open(QIODevice::ReadOnly) && readIndex(f, versions, start);
 }
 
-bool readHistory(const QString& path, History& h)
+//! lenient: frames past the end of a cut-short file are marked unreadable (length -1) instead of failing
+bool readHistory(const QString& path, History& h, bool lenient = false)
 {
     QFile f(path);
     qint64 start = 0;
@@ -270,9 +271,12 @@ bool readHistory(const QString& path, History& h)
         return false;
     }
     h.frames = f.readAll();
-    for (const Version& v : h.versions) {
-        if (v.offset < 0 || v.offset + v.length > h.frames.size()) {
-            return false;
+    for (Version& v : h.versions) {
+        if (v.offset < 0 || v.length < 0 || v.offset + v.length > h.frames.size()) {
+            if (!lenient) {
+                return false;
+            }
+            v.length = -1;
         }
     }
     return true;
@@ -384,10 +388,18 @@ std::map<QString, std::vector<Waiting> > waitingCopies()
 int packSong(const QString& song, const std::vector<Waiting>& waiting, const QDateTime& now)
 {
     const QString path = historyPath(song);
+    // A damaged history is repaired (Joel, 8 Oct 2026): the versions that still unpack are kept and the history is
+    // written again without the others; the damaged file is kept beside it (".damaged-<time>"). When not even its
+    // list of versions can be read, it is moved aside and a new history starts.
     History old;
-    if (QFile::exists(path) && !readHistory(path, old)) {
-        LOGE() << "autosave archive: couldn't read " << path.toStdString() << "; left as it is";
-        return -1;
+    const QString damagedCopy = path + ".damaged-" + now.toString("yyyyMMdd-HHmm");
+    if (QFile::exists(path) && !readHistory(path, old, true)) {
+        LOGE() << "autosave archive: " << path.toStdString() << " can't be read; moved aside, a new history starts";
+        QFile::remove(damagedCopy);
+        if (!QFile::rename(path, damagedCopy)) {
+            return -1;
+        }
+        old = History();
     }
 
     // everything, oldest first: the versions already in the history, then the waiting copies
@@ -421,16 +433,22 @@ int packSong(const QString& song, const std::vector<Waiting>& waiting, const QDa
     int chain = 0;              // patches since the last whole version
     qint64 lastWholeSize = 0;
     int added = 0;
+    int dropped = 0;            // versions of a damaged history that no longer unpack
+    bool prevOldOk = true;
     for (size_t i = 0; i < items.size(); ++i) {
         const Item& it = items[i];
         QByteArray raw;
         Version v;
         if (it.oldIndex >= 0) {
             v = old.versions[it.oldIndex];
-            const QByteArray frame = old.frames.mid(v.offset, v.length);
-            if (!decompress(frame, v.ref >= 0 ? &prevOldRaw : nullptr, v.rawSize, raw) || sha1Of(raw) != v.rawSha1) {
-                LOGE() << "autosave archive: " << path.toStdString() << " is damaged; left as it is";
-                return -1;
+            const bool ok = v.length >= 0 && (v.ref < 0 || prevOldOk)
+                            && decompress(old.frames.mid(v.offset, v.length), v.ref >= 0 ? &prevOldRaw : nullptr, v.rawSize, raw)
+                            && sha1Of(raw) == v.rawSha1;
+            prevOldOk = ok;
+            if (!ok) {
+                ++dropped;
+                prevOldRaw.clear();
+                continue;
             }
             prevOldRaw = raw;
         } else {
@@ -496,6 +514,12 @@ int packSong(const QString& song, const std::vector<Waiting>& waiting, const QDa
     }
 
     QDir().mkpath(autosaveArchiveRoot());
+    if (dropped > 0) {
+        LOGE() << "autosave archive: " << path.toStdString() << " was damaged: " << dropped
+               << " version(s) couldn't be unpacked and were left out; the damaged file is kept as " << damagedCopy.toStdString();
+        QFile::remove(damagedCopy);
+        QFile::copy(path, damagedCopy);
+    }
     if (!writeHistory(path, out)) {
         LOGE() << "autosave archive: couldn't write " << path.toStdString();
         return -1;

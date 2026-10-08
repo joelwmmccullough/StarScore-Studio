@@ -6,6 +6,10 @@ Version numbers: the first number changes when files stop being compatible, the 
 
 ## 1.18.26
 
+- **Converted tempo markings are whole numbers.** Half-time and double-time sheets and Convert from double time round each tempo to a whole number ("♩ = 133-153" in half time is "♩ = 67-77", not "66.5-76.5").
+- **The horn-copy question only comes up when there is music to copy.** A new horn arrangement next to an empty one is made without asking, and only parts with notes are listed.
+- **A damaged autosave history repairs itself.** The versions that still unpack are kept, the history is written again, and the new save goes in; the damaged file is kept beside it ("….starhistory.damaged-<date>"). Before, every later save piled up as a full-size copy that was never packed.
+- **The autosave archive window no longer freezes** while it unpacks a version or saves every version as files; it says what it is doing at the bottom.
 - **Bars with slashes and rests keep their rests** in the half-time and double-time sheets and in Convert from double time. 1.18.25 turned such a bar into slashes all the way through (G.I. Jorge's "half rest, then four eighth-note slashes" became four quarter-note slashes in half time, so the bar's rests were lost). Now only the slashes are rewritten, one per beat over the beats they cover, and the rests stay.
 
 ## 1.18.25

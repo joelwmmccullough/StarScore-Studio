@@ -9,6 +9,9 @@
 #include <QFileInfo>
 #include <QLocale>
 #include <QUrl>
+#include <QPointer>
+#include <QThreadPool>
+#include <QCoreApplication>
 
 #include "project/internal/starscore/starscoreautoarchive.h"
 #include "translation.h"
@@ -83,26 +86,63 @@ void AutosaveArchiveModel::selectSong(const QString& song)
     emit currentSongChanged();
 }
 
-bool AutosaveArchiveModel::openVersion(const QString& time)
+void AutosaveArchiveModel::setBusy(const QString& text)
 {
-    QString error;
-    const QString path = aa::extractVersion(m_currentSong, QDateTime::fromString(time, Qt::ISODate), QString(), &error);
-    if (path.isEmpty()) {
-        interactive()->error(muse::trc("starscore", "Autosave archive"), error.toStdString());
-        return false;
+    if (m_busyText != text) {
+        m_busyText = text;
+        emit busyChanged();
     }
-    dispatcher()->dispatch("file-open", muse::actions::ActionData::make_arg1<QUrl>(QUrl::fromLocalFile(path)));
-    return true;
+}
+
+// Unpacking a version of a big song takes a few seconds: done in the background, so the window doesn't freeze
+void AutosaveArchiveModel::openVersion(const QString& time)
+{
+    if (!m_busyText.isEmpty()) {
+        return;
+    }
+    setBusy(muse::qtrc("starscore", "Unpacking the version…"));
+    const QString song = m_currentSong;
+    QPointer<AutosaveArchiveModel> self(this);
+    QThreadPool::globalInstance()->start([self, song, time]() {
+        QString error;
+        const QString path = aa::extractVersion(song, QDateTime::fromString(time, Qt::ISODate), QString(), &error);
+        QMetaObject::invokeMethod(qApp, [self, path, error]() {
+            if (!self) {
+                return;
+            }
+            self->setBusy(QString());
+            if (path.isEmpty()) {
+                self->interactive()->error(muse::trc("starscore", "Autosave archive"), error.toStdString());
+                return;
+            }
+            self->dispatcher()->dispatch("file-open", muse::actions::ActionData::make_arg1<QUrl>(QUrl::fromLocalFile(path)));
+            emit self->versionOpened();
+        }, Qt::QueuedConnection);
+    });
 }
 
 void AutosaveArchiveModel::saveAllVersions()
 {
-    const QString folder = aa::autosaveArchiveRoot() + "/Unpacked/" + m_currentSong;
-    const int n = aa::extractAllVersions(m_currentSong, folder);
-    if (n > 0) {
-        interactive()->revealInFileBrowser(muse::io::path_t(folder + "/" + QDir(folder).entryList({ "*.starscore" }, QDir::Files,
-                                                                                                    QDir::Name).value(0)));
+    if (!m_busyText.isEmpty()) {
+        return;
     }
+    setBusy(muse::qtrc("starscore", "Unpacking every version…"));
+    const QString song = m_currentSong;
+    const QString folder = aa::autosaveArchiveRoot() + "/Unpacked/" + song;
+    QPointer<AutosaveArchiveModel> self(this);
+    QThreadPool::globalInstance()->start([self, song, folder]() {
+        const int n = aa::extractAllVersions(song, folder);
+        QMetaObject::invokeMethod(qApp, [self, n, folder]() {
+            if (!self) {
+                return;
+            }
+            self->setBusy(QString());
+            if (n > 0) {
+                self->interactive()->revealInFileBrowser(muse::io::path_t(folder + "/" + QDir(folder).entryList(
+                                                                              { "*.starscore" }, QDir::Files, QDir::Name).value(0)));
+            }
+        }, Qt::QueuedConnection);
+    });
 }
 
 void AutosaveArchiveModel::showArchiveFolder()

@@ -12,6 +12,8 @@
 #include "starscoreservice.h"
 #include "starscoreengraving.h"
 
+#include <tuple>
+
 #include <QDir>
 #include <QFile>
 #include <QRegularExpression>
@@ -98,6 +100,19 @@ std::vector<std::pair<QString, QString> > StarScoreService::matchingHornParts(co
     return pairs;
 }
 
+//! Whether any part of the section has notes
+bool StarScoreService::sectionHasMusic(const StarScoreSection& section) const
+{
+    engraving::MasterScore* ms = masterScore();
+    for (const QString& pid : section.partIds) {
+        const engraving::Part* p = ms ? ms->partById(ID(pid)) : nullptr;
+        if (p && starscore::partHasNotes(p)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void StarScoreService::offerMatchingHornParts(const QStringList& sectionIdsBefore)
 {
     // after the dialog that made the section has closed
@@ -112,21 +127,32 @@ void StarScoreService::offerMatchingHornParts(const QStringList& sectionIdsBefor
             if (sectionIdsBefore.contains(made.id) || n == 0) {
                 continue;
             }
-            // the neighbour: the most finished (N-1)- or (N+1)-horn section, the smaller one when even
+            // the neighbour: one with music first, then the most finished, then the smaller
             const StarScoreSection* from = nullptr;
+            auto rank = [&](const StarScoreSection& s) {
+                return std::make_tuple(sectionHasMusic(s) ? 1 : 0, int(s.status), -hornCount(s.templateKey));
+            };
             for (const StarScoreSection& s : all) {
                 const int k = hornCount(s.templateKey);
                 if (!sectionIdsBefore.contains(s.id) || (k != n - 1 && k != n + 1)) {
                     continue;
                 }
-                if (!from || int(s.status) > int(from->status) || (s.status == from->status && k < hornCount(from->templateKey))) {
+                if (!from || rank(s) > rank(*from)) {
                     from = &s;
                 }
             }
             if (!from) {
                 continue;
             }
-            const auto pairs = matchingHornParts(from->id, made.id);
+            // only parts with music to copy; nothing asked when the neighbouring section is empty (Joel, 8 Oct 2026)
+            std::vector<std::pair<QString, QString> > pairs;
+            engraving::MasterScore* ms = masterScore();
+            for (const auto& pair : matchingHornParts(from->id, made.id)) {
+                const engraving::Part* p = ms ? ms->partById(ID(pair.first)) : nullptr;
+                if (p && starscore::partHasNotes(p)) {
+                    pairs.push_back(pair);
+                }
+            }
             if (pairs.empty()) {
                 continue;
             }

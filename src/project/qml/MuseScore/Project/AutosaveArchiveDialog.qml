@@ -24,6 +24,7 @@ StyledDialogView {
 
     AutosaveArchiveModel {
         id: archiveModel
+        onVersionOpened: root.hide()
     }
 
     Component.onCompleted: archiveModel.load()
@@ -87,11 +88,7 @@ StyledDialogView {
                     height: 36
                     isSelected: modelData.time === root.selectedTime
                     onClicked: root.selectedTime = modelData.time
-                    onDoubleClicked: {
-                        if (archiveModel.openVersion(modelData.time)) {
-                            root.hide()
-                        }
-                    }
+                    onDoubleClicked: archiveModel.openVersion(modelData.time)
 
                     RowLayout {
                         anchors.fill: parent
@@ -121,11 +118,15 @@ StyledDialogView {
             }
             FlatButton {
                 text: qsTrc("starscore", "Save all versions as files")
-                enabled: archiveModel.currentSong !== ""
+                enabled: archiveModel.currentSong !== "" && archiveModel.busyText === ""
                 toolTipTitle: qsTrc("starscore", "Unpacks every version of this song into Autosave Archive/Unpacked, as normal song files")
                 onClicked: archiveModel.saveAllVersions()
             }
-            Item { Layout.fillWidth: true }
+            StyledTextLabel {
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignHCenter
+                text: archiveModel.busyText
+            }
             FlatButton {
                 text: qsTrc("global", "Close")
                 onClicked: root.hide()
@@ -133,12 +134,8 @@ StyledDialogView {
             FlatButton {
                 text: qsTrc("starscore", "Open this version")
                 accentButton: true
-                enabled: root.selectedTime !== ""
-                onClicked: {
-                    if (archiveModel.openVersion(root.selectedTime)) {
-                        root.hide()
-                    }
-                }
+                enabled: root.selectedTime !== "" && archiveModel.busyText === ""
+                onClicked: archiveModel.openVersion(root.selectedTime)
             }
         }
     }

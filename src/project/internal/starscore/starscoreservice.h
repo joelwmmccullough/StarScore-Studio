@@ -225,6 +225,7 @@ public:
     std::vector<std::pair<QString, QString> > matchingHornParts(const QString& fromSectionId, const QString& toSectionId) const;
     int copyHornParts(const std::vector<std::pair<QString, QString> >& pairs);
     QString partScoreName(const QString& partId) const;
+    bool sectionHasMusic(const StarScoreSection& section) const;
     std::vector<StarScoreVoiceSection> checkVoiceOrder() const override;
     bool minMajSymbolInCurrentScore() const override;
     void setMinMajSymbolInCurrentScore(bool on) override;

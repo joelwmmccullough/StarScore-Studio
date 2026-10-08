@@ -339,6 +339,82 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         // uri:<uri>: opens it (uri:muse://preferences); not waited for
         interactive()->open(UriQuery(step.mid(4).toStdString()));
         autotestLog("  opened " + step.mid(4));
+    } else if (step == "progresslist") {
+        // progresslist: each colored bar as "<part> bar N: code"
+        const auto map = engraving::starscore::parseProgress(masterScore()->metaTag(String(engraving::starscore::PROGRESS_TAG)).toStdString());
+        QStringList out;
+        for (engraving::Measure* m = ms->firstMeasure(); m; m = m->nextMeasure()) {
+            if (!m->eid().isValid()) {
+                continue;
+            }
+            for (const engraving::Part* p : ms->parts()) {
+                for (size_t k = 0; k < p->nstaves(); ++k) {
+                    auto it = map.find(engraving::starscore::progressKey(m->eid().toStdString(), p->id().toStdString(), k));
+                    if (it != map.end()) {
+                        out << QString("%1 bar %2: %3").arg(p->partName().toQString()).arg(m->no() + 1).arg(QChar(it->second));
+                    }
+                }
+            }
+        }
+        autotestLog("  " + out.join(" | "));
+    } else if (step.startsWith("copyrange:")) {
+        // copyrange:S:B1-B2:T:C: staff S (0-based) bars B1..B2 copied and pasted on staff T at bar C, as Copy and Paste
+        // do (the score on screen)
+        const QStringList a = step.split(':');
+        INotationPtr n = globalContext()->currentNotation();
+        engraving::Score* sc = n ? n->elements()->msScore() : nullptr;
+        if (a.size() == 5 && sc) {
+            const int st = a[1].toInt(), b1 = a[2].section('-', 0, 0).toInt(), b2 = a[2].section('-', 1, 1).toInt();
+            const int tt = a[3].toInt(), c = a[4].toInt();
+            engraving::Measure* m1 = sc->crMeasure(b1 - 1);
+            engraving::Measure* m2 = sc->crMeasure(b2 - 1);
+            engraving::Measure* mc = sc->crMeasure(c - 1);
+            if (m1 && m2 && mc) {
+                sc->selection().setRangeTicks(m1->tick(), m2->endTick(), engraving::staff_idx_t(st), engraving::staff_idx_t(st + 1));
+                sc->selection().updateSelectedElements();
+                n->interaction()->copySelection();
+                sc->deselectAll();
+                n->interaction()->select({ mc->first(engraving::SegmentType::ChordRest)->element(engraving::staff2track(engraving::staff_idx_t(tt))) },
+                                         SelectType::SINGLE);
+                n->interaction()->pasteSelection();
+                autotestLog("  pasted");
+            }
+        }
+        const QString tag = masterScore()->metaTag(String(engraving::starscore::PROGRESS_TAG)).toQString();
+        autotestLog(QString("  %1 marks").arg(tag.isEmpty() ? 0 : tag.count(';') + 1));
+    } else if (step.startsWith("removepart:")) {
+        // removepart:<words>: parts whose instrument's long name contains the words (case ignored) removed, as the
+        // Instruments panel's delete does; then the part scores left
+        const QString words = step.mid(11);
+        muse::IDList ids;
+        for (const engraving::Part* p : ms->parts()) {
+            if (p->longName().toQString().contains(words, Qt::CaseInsensitive)) {
+                ids.push_back(p->id());
+                autotestLog(QString("  removing %1 (%2, %3)").arg(idText(p), p->partName().toQString(), p->longName().toQString()));
+            }
+        }
+        if (!ids.empty()) {
+            master->parts()->removeParts(ids);
+            store(load());
+        }
+        // part scores left with no instrument (as deleting an instrument leaves its part score) taken out
+        ExcerptNotationList kept;
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            engraving::Score* es = e && e->notation() && e->notation()->elements() ? e->notation()->elements()->msScore() : nullptr;
+            if (es && es->parts().empty()) {
+                autotestLog("  empty part score removed: " + e->name());
+            } else {
+                kept.push_back(e);
+            }
+        }
+        if (kept.size() != master->excerpts().size()) {
+            master->setExcerpts(kept);
+        }
+        QStringList books;
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            books << e->name();
+        }
+        autotestLog("  part scores: " + books.join(" | "));
     } else if (step.startsWith("horncopy:")) {
         // horncopy:<from section template key>:<to section template key>: the parts on matching instruments copied,
         // as "Copy the parts" does after a new horn arrangement (no question)
@@ -1131,6 +1207,77 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         }
         const QString tag = masterScore()->metaTag(String(engraving::starscore::PROGRESS_TAG)).toQString();
         autotestLog(QString("  after undo %1 marks").arg(tag.isEmpty() ? 0 : tag.count(';') + 1));
+    } else if (step.startsWith("archiverepairtest:")) {
+        // archiverepairtest:DIR: DIR's .starscore files saved 10 minutes apart into a history; the history file then
+        // damaged (a byte flipped in the 2nd version's frame, or cut short: archiverepairtest:DIR:cut); one more save
+        // packed; reports what is left and checks every remaining version unpacks identical
+        namespace aa = mu::project::starscore;
+        const QString root = aa::autosaveArchiveRoot();
+        const QString dir = step.section(':', 1, 1);
+        const bool cut = step.section(':', 2, 2) == "cut";
+        const QString work = autotestDir() + "/repair";
+        QDir().mkpath(work);
+        const QString song = work + "/RPAR - Repair.starscore";
+        const QString hist = root + "/RPAR - Repair.starhistory";
+        QFile::remove(hist);
+        const QStringList files = QDir(dir).entryList({ "*.starscore" }, QDir::Files, QDir::Name);
+        QDateTime t(QDate(2026, 10, 1), QTime(12, 0));
+        std::map<QDateTime, QString> made;
+        for (int i = 0; i + 1 < files.size(); ++i) {
+            QFile::remove(song);
+            QFile::copy(dir + "/" + files[i], song);
+            t = t.addSecs(600);
+            if (!aa::archiveBeforeSave(song, t, false).isEmpty()) {
+                made[t] = dir + "/" + files[i];
+            }
+            aa::packIncoming(t);
+        }
+        // damage it
+        {
+            QFile f(hist);
+            f.open(QIODevice::ReadWrite);
+            QByteArray all = f.readAll();
+            if (cut) {
+                all.truncate(all.size() * 2 / 3);
+            } else {
+                all[all.size() / 3] = char(all[all.size() / 3] ^ 0x5a);
+            }
+            f.resize(0);
+            f.seek(0);
+            f.write(all);
+        }
+        QFile::remove(song);
+        QFile::copy(dir + "/" + files.last(), song);
+        t = t.addSecs(600);
+        if (!aa::archiveBeforeSave(song, t, false).isEmpty()) {
+            made[t] = dir + "/" + files.last();
+        }
+        const int packed = aa::packIncoming(t);
+        const auto versions = aa::archivedVersions("RPAR - Repair");
+        QStringList damaged = QDir(root).entryList({ "RPAR - Repair.starhistory.damaged-*" }, QDir::Files);
+        int same = 0;
+        for (const auto& v : versions) {
+            const QString out = aa::extractVersion("RPAR - Repair", v.time, work + "/out.starscore");
+            auto entries = [](const QString& path) {
+                std::map<std::string, QByteArray> m;
+                muse::ZipReader z{ muse::io::path_t(path) };
+                for (const auto& fi : z.fileInfoList()) {
+                    if (fi.isFile) {
+                        const muse::ByteArray d = z.fileData(fi.filePath.toStdString());
+                        m[fi.filePath.toStdString()] = QByteArray(reinterpret_cast<const char*>(d.constData()), qsizetype(d.size()));
+                    }
+                }
+                return m;
+            };
+            same += !out.isEmpty() && made.count(v.time) && entries(out) == entries(made[v.time]);
+        }
+        autotestLog(QString("  %1 saves; after damage: packed %2, %3 versions left, %4 identical, waiting in Incoming %5, damaged copies kept %6")
+                    .arg(made.size()).arg(packed).arg(versions.size()).arg(same)
+                    .arg(QDir(root + "/Incoming").entryList({ "RPAR - *" }, QDir::Files).size()).arg(damaged.join(", ")));
+        QFile::remove(hist);
+        for (const QString& d : damaged) {
+            QFile::remove(root + "/" + d);
+        }
     } else if (step.startsWith("autoarchivetest")) {
         // autoarchivetest[:DIR]: the autosave archive. With DIR, its .starscore files (oldest first, by name) are
         // saved 10 minutes apart, then every version is unpacked and checked against its file, entry by entry.
