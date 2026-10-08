@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.26
+
+- **Bars with slashes and rests keep their rests** in the half-time and double-time sheets and in Convert from double time. 1.18.25 turned such a bar into slashes all the way through (G.I. Jorge's "half rest, then four eighth-note slashes" became four quarter-note slashes in half time, so the bar's rests were lost). Now only the slashes are rewritten, one per beat over the beats they cover, and the rests stay.
+
 ## 1.18.25
 
 - **Half-time and double-time sheets.** Export to Sheets and Demos has two new ticks for each song: "Export half-time version" and "Export double-time version". Each is remembered for that song until you untick it. A ticked one makes the ticked sheets a second time from a copy of the song with every note half as long (half-time) or twice as long (double-time), the tempo changed to match, into a "Half-Time" or "Double-Time" subfolder of each part folder ("4H/Double-Time/CODE - Trumpet.pdf"). With both ticked, three sets of sheets come out. Their bar numbers match the standard sheets: in double time both halves of a bar carry its number; in half time a bar made of two carries the first one's number and the numbering skips the second. These sheets have no version numbers or changelog of their own; a new export replaces them. The song itself is never changed.

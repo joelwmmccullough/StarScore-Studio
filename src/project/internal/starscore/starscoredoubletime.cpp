@@ -669,7 +669,6 @@ RetVal<QString> StarScoreService::convertTimeOf(const INotationProjectPtr& proje
             continue;   // a pickup or other odd-length bar: left as it is
         }
         const bool cut = sig == Fraction(2, 2);
-        const int count = cut ? 4 : sig.numerator();
         const Fraction beat = cut ? Fraction(1, 4) : Fraction(1, sig.denominator());
         for (track_idx_t track = 0; track < ms->ntracks(); ++track) {
             std::vector<ChordRest*> crs;
@@ -691,48 +690,65 @@ RetVal<QString> StarScoreService::convertTimeOf(const INotationProjectPtr& proje
             if (other || !slashes) {
                 continue;
             }
-            const bool already = int(crs.size()) == count && std::all_of(crs.begin(), crs.end(), [&](const ChordRest* cr) {
-                return cr->isChord() && cr->ticks() == beat;
-            });
-            if (already) {
-                continue;
-            }
-            // the slashes' note (pitch and spelling), as the first one had it
-            const Note* model = nullptr;
-            for (const ChordRest* cr : crs) {
-                if (cr->isChord()) {
-                    model = toChord(cr)->notes().front();
-                    break;
-                }
-            }
-            NoteVal nv(model->pitch());
-            nv.tpc1 = model->tpc1();
-            nv.tpc2 = model->tpc2();
-            nv.headGroup = NoteHeadGroup::HEAD_SLASH;
-            for (ChordRest* cr : crs) {
-                ms->undoRemoveElement(cr);
-            }
-            ms->setRest(m->tick(), track, m->ticks(), false, nullptr, true);
-            for (int i = 0; i < count; ++i) {
-                Measure* mm = ms->tick2measure(m->tick());
-                Segment* seg = mm->undoGetSegment(SegmentType::ChordRest, m->tick() + beat * i);
-                seg = ms->setNoteRest(seg, track, nv, beat);
-                Chord* c = seg && seg->element(track) && seg->element(track)->isChord() ? toChord(seg->element(track)) : nullptr;
-                if (!c) {
+            // Each stretch of slashes in a row, between rests (1.18.26: a bar with rests among its slashes, GIJO's "half
+            // rest, four eighth-note slashes", lost its rests and became slashes all through). A stretch that starts and
+            // ends on a beat gets one slash per beat over the same beats; the rests stay where they are. A stretch off
+            // the beat is left as it is.
+            for (size_t i = 0; i < crs.size();) {
+                if (!crs[i]->isChord()) {
+                    ++i;
                     continue;
                 }
-                if (c->links()) {
-                    for (EngravingObject* l : *c->links()) {
-                        toChord(l)->setSlash(true, true);
-                    }
-                } else {
-                    c->setSlash(true, true);
+                size_t j = i + 1;
+                while (j < crs.size() && crs[j]->isChord() && crs[j - 1]->tick() + crs[j - 1]->ticks() == crs[j]->tick()) {
+                    ++j;
                 }
+                const Fraction start = crs[i]->tick() - m->tick();
+                const Fraction end = crs[j - 1]->tick() + crs[j - 1]->ticks() - m->tick();
+                const Fraction first = (start / beat).reduced();
+                const Fraction last = (end / beat).reduced();
+                const int beats = first.denominator() == 1 && last.denominator() == 1 ? last.numerator() - first.numerator() : 0;
+                bool already = int(j - i) == beats;
+                for (size_t k = i; k < j && already; ++k) {
+                    already = crs[k]->ticks() == beat;
+                }
+                const bool wholeBar = start.isZero() && end == m->ticks();
+                if (beats <= 0 || already) {
+                    i = j;
+                    continue;
+                }
+                // the slashes' note (pitch and spelling), as the first one had it
+                const Note* model = toChord(crs[i])->notes().front();
+                NoteVal nv(model->pitch());
+                nv.tpc1 = model->tpc1();
+                nv.tpc2 = model->tpc2();
+                nv.headGroup = NoteHeadGroup::HEAD_SLASH;
+                for (size_t k = i; k < j; ++k) {
+                    ms->undoRemoveElement(crs[k]);
+                }
+                ms->setRest(m->tick() + start, track, end - start, false, nullptr, wholeBar);
+                for (int b = 0; b < beats; ++b) {
+                    Measure* mm = ms->tick2measure(m->tick());
+                    Segment* seg = mm->undoGetSegment(SegmentType::ChordRest, m->tick() + start + beat * b);
+                    seg = ms->setNoteRest(seg, track, nv, beat);
+                    Chord* c = seg && seg->element(track) && seg->element(track)->isChord() ? toChord(seg->element(track)) : nullptr;
+                    if (!c) {
+                        continue;
+                    }
+                    if (c->links()) {
+                        for (EngravingObject* l : *c->links()) {
+                            toChord(l)->setSlash(true, true);
+                        }
+                    } else {
+                        c->setSlash(true, true);
+                    }
+                }
+                ++slashBars;
+                i = j;
             }
-            ++slashBars;
         }
     }
-    LOGI() << "[starscore] double time: " << slashBars << " bar(s) of slashes made one slash per beat again";
+    LOGI() << "[starscore] double time: " << slashBars << " stretch(es) of slashes made one slash per beat again";
 
     // 10. keepBarNumbers (the Half-Time and Double-Time sheets, Joel 7 Oct 2026): each new bar numbered like the bar of
     // the song it starts in, so the sheets' bar numbers match the standard sheets. Both halves of a doubled bar carry
