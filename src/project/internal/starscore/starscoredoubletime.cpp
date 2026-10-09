@@ -153,7 +153,11 @@ RetVal<QString> StarScoreService::convertFromDoubleTime()
 //! toDouble false: "Convert from double time" (every note half as long, two bars of x/4 become one, x/8 -> x/16, the
 //! tempo halved). toDouble true, the other way (1.18.25, for the export's Double-Time sheets): every note twice as long,
 //! a bar of x/4 becomes two, x/8 -> x/4, x/16 -> x/8, the tempo doubled. Works on any loaded song, shown or not.
-RetVal<QString> StarScoreService::convertTimeOf(const INotationProjectPtr& project, bool toDouble, bool keepBarNumbers)
+//! throwawayCopy: a copy nobody will undo in (the export's Half-Time and Double-Time sheets): the song's old bars,
+//! which the undo step would hold on to, are let go as soon as they are out of the score (they are as much music again
+//! as the song, in every part book: Dream of Mushroom's export peaked at 3.8 GB)
+RetVal<QString> StarScoreService::convertTimeOf(const INotationProjectPtr& project, bool toDouble, bool keepBarNumbers,
+                                                bool throwawayCopy)
 {
     IMasterNotationPtr master = project ? project->masterNotation() : nullptr;
     MasterScore* ms = master ? master->masterScore() : nullptr;
@@ -424,6 +428,17 @@ RetVal<QString> StarScoreService::convertTimeOf(const INotationProjectPtr& proje
     }
     ms->setLayoutAll();
     ms->doLayout();
+    if (throwawayCopy) {
+        // the edits so far closed as a step of their own and forgotten, with the old bars they hold; the rest of the
+        // conversion is a new step. The score isn't laid out again for the closing (its updates are held): the layouts
+        // the conversion makes stay the same ones, so the sheets come out the same.
+        ms->lockUpdates(true);
+        n->undoStack()->commitChanges();
+        ms->undoStack()->clearHistory();
+        n->undoStack()->prepareChanges(TranslatableString::untranslatable(toDouble ? "Convert to double time" : "Convert from double time"));
+        ms->lockUpdates(false);
+        LOGI() << "[starscore] double time: the old bars let go";
+    }
 
     LOGI() << "[starscore] double time: after the new bars " << stageInfo(ms);
     {

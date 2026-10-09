@@ -9,6 +9,7 @@ Version numbers: the first number changes when files stop being compatible, the 
 - **Exports are faster: the throwaway copies of the song no longer build playback data.** The Scores and version sheets are made from copies of the song; each copy built the notes as the synthesizer would play them, and every edit to a system break or style value rebuilt that for the whole copy: a third of a big song's export. The sheets are identical.
 - **Text is measured once.** Measurements of chord symbols, titles, lyrics and other texts are remembered instead of being worked out again at every layout: a quarter of an export's remaining time, and a little off opening, Apply default style settings and every redraw. Together with the change above, Branston Pickle's export went from 254 s to 135 s and Dream of Mushroom's from 561 s to 298 s on the test machine; every sheet, report and saved file came out identical on 15 songs.
 - **Apply default style settings is faster.** The song's playback data is rebuilt once at the end instead of once per part score (Last Pint's 45 scores: 107 s to 34 s). The same applies while an export edits the sheet titles.
+- **Half-time and double-time exports use less memory and time.** The converted copy lets go of the song's old bars as soon as they are out of the score, and its sheets aren't laid out a second time after printing (Dream of Mushroom's half-time export: 3.8 GB peak before, 3.4 GB now; 369 s to 277 s; sheets identical).
 
 ## 1.18.26
 

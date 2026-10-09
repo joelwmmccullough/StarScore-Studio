@@ -194,7 +194,8 @@ public:
     muse::RetVal<QString> convertFromDoubleTime() override;
     //! The song (shown or not) rewritten at half (toDouble false) or twice (true) its note lengths (starscoredoubletime.cpp);
     //! keepBarNumbers: its bars numbered like the original's
-    muse::RetVal<QString> convertTimeOf(const INotationProjectPtr& project, bool toDouble, bool keepBarNumbers);
+    muse::RetVal<QString> convertTimeOf(const INotationProjectPtr& project, bool toDouble, bool keepBarNumbers,
+                                        bool throwawayCopy = false);
     //! Makes an older song standard (starscorestandardize.cpp): with apply false, only lists what it would change
     QStringList standardizeSong(bool apply) override;
     void startUpdateAllSheets(const QStringList& paths) override;

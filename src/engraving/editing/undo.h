@@ -305,6 +305,9 @@ public:
 
     void mergeCommands(size_t startIdx);
     void cleanRedoStack() { remove(m_currentIndex); }
+    //! StarScore: forgets every command (nothing to undo or redo), freeing what they hold (removed measures and
+    //! elements): for a throwaway copy of a song after a big rewrite
+    void clearHistory() { remove(0); }
 
 private:
     void remove(size_t idx);

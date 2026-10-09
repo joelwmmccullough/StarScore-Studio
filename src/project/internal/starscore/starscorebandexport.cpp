@@ -2381,8 +2381,10 @@ static void starscoreClearMinMajNote(mu::engraving::Score* score)
     score->metaTags().erase(u"starscoreFooterNotePage2");
 }
 
+//! restoreView false: the sheet stays in page view afterwards (a throwaway copy nobody looks at; going back to
+//! continuous view laid the whole sheet out once more for nothing)
 static Ret starscorePrintSheet(const INotationWriterPtr& writer, const INotationPtr& notation, const QString& left,
-                               const QString& right, bool partSheet, QByteArray& pdf)
+                               const QString& right, bool partSheet, QByteArray& pdf, bool restoreView = true)
 {
     mu::engraving::Score* score = notation && notation->elements() ? notation->elements()->msScore() : nullptr;
     if (!score) {
@@ -2411,7 +2413,7 @@ static Ret starscorePrintSheet(const INotationWriterPtr& writer, const INotation
         score->setLayoutAll();
         score->doLayout();
     }
-    if (oldMode != ViewMode::PAGE) {
+    if (restoreView && oldMode != ViewMode::PAGE) {
         notation->painting()->setViewMode(oldMode);
     }
     return ret;
@@ -2947,7 +2949,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         if (oneHornSax.match(file.relativePath).hasMatch()) {
             starscore::hideMuteMarkings(book->elements()->msScore());
         }
-        const Ret ret = starscorePrintSheet(writer, book, file.sheetLeft, file.sheetRight, true, pdf);
+        const Ret ret = starscorePrintSheet(writer, book, file.sheetLeft, file.sheetRight, true, pdf, variant.isEmpty());
         book->undoStack()->commitChanges();
         bookScore->lockUpdates(false);
         touchedBooks.push_back(book);
@@ -2971,7 +2973,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
             return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "no part book for this instrument"));
         }
         n->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
-        const Ret ret = starscorePrintSheet(writer, n, file.sheetLeft, file.sheetRight, true, pdf);
+        const Ret ret = starscorePrintSheet(writer, n, file.sheetLeft, file.sheetRight, true, pdf, false);
         n->undoStack()->commitChanges();
         return ret;
     };
@@ -3017,7 +3019,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                 if (!brass) {
                     starscore::hideMuteMarkings(n->elements()->msScore());
                 }
-                const Ret ret = starscorePrintSheet(writer, n, file.sheetLeft, file.sheetRight, true, pdf);
+                const Ret ret = starscorePrintSheet(writer, n, file.sheetLeft, file.sheetRight, true, pdf, false);
                 lapTime(file.relativePath, "print");
                 n->undoStack()->commitChanges();
                 lapTime(file.relativePath, "commit");
@@ -3049,7 +3051,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         if (!brass) {
             starscore::hideMuteMarkings(n->elements()->msScore());
         }
-        const Ret ret = starscorePrintSheet(writer, n, file.sheetLeft, file.sheetRight, true, pdf);
+        const Ret ret = starscorePrintSheet(writer, n, file.sheetLeft, file.sheetRight, true, pdf, false);
         n->undoStack()->commitChanges();
         return ret;
     };
@@ -4822,13 +4824,15 @@ RetVal<QString> StarScoreService::exportTimeVariants(const QStringList& onlyPath
             QDir(dir).removeRecursively();
             continue;
         }
-        const RetVal<QString> converted = convertTimeOf(copy, toDouble, true);
+        const RetVal<QString> converted = convertTimeOf(copy, toDouble, true, true);
         LOGI() << "[starscore] " << variant << ": " << converted.val;
         if (!converted.ret) {
             problems << muse::qtrc("starscore", "%1: the song couldn't be converted (%2).").arg(variant, QString::fromStdString(converted.ret.toString()));
             QDir(dir).removeRecursively();
             continue;
         }
+        // nothing in this copy is ever undone: what the conversion's steps hold is let go (see convertTimeOf)
+        copy->masterNotation()->masterScore()->undoStack()->clearHistory();
         m_exportSource = copy;
         m_exportVariant = variant;
         const RetVal<QString> done = exportToBandFolder(onlyPaths);
