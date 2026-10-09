@@ -390,6 +390,92 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         }
         const QString tag = masterScore()->metaTag(String(engraving::starscore::PROGRESS_TAG)).toQString();
         autotestLog(QString("  %1 marks").arg(tag.isEmpty() ? 0 : tag.count(';') + 1));
+    } else if (step == "bookaudit" || step == "bookaudit:fix") {
+        // bookaudit[:fix]: part scores that hold more than they should. A part score that isn't an arrangement's
+        // score holds one instrument: extra instruments in it (an instrument added to it by mistake) are listed and,
+        // with :fix, taken out of that part score only; empty part scores and second part scores of the same
+        // instrument (same name) are listed and removed.
+        const bool fix = step.endsWith(":fix");
+        std::set<QString> arrangementScores;
+        for (const StarScoreArrangement& a : load().arrangements) {
+            if (!a.scoreName.isEmpty()) {
+                arrangementScores.insert(a.scoreName);
+            }
+        }
+        QStringList issues;
+        ExcerptNotationList kept;
+        std::set<std::pair<QString, QString> > seen;   // (name, part id) of single-part scores
+        std::vector<std::pair<INotationPtr, std::vector<muse::ID> > > strays;
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            INotationPtr n = e ? e->notation() : nullptr;
+            engraving::Score* es = n && n->elements() ? n->elements()->msScore() : nullptr;
+            if (!es) {
+                kept.push_back(e);
+                continue;
+            }
+            const QString name = e->name();
+            if (es->parts().empty()) {
+                issues << QString("\"%1\": empty part score%2").arg(name, fix ? " (removed)" : "");
+                if (!fix) {
+                    kept.push_back(e);
+                }
+                continue;
+            }
+            if (arrangementScores.count(name) || es->parts().size() == 1) {
+                if (es->parts().size() == 1) {
+                    const engraving::Part* mp = masterPartsOf(es, ms).empty() ? nullptr : masterPartsOf(es, ms).front();
+                    const auto key = std::make_pair(name, mp ? idText(mp) : QString());
+                    if (mp && seen.count(key)) {
+                        issues << QString("\"%1\": a second identical part score of %2%3").arg(name, mp->partName().toQString(), fix ? " (removed)" : "");
+                        if (!fix) {
+                            kept.push_back(e);
+                        }
+                        continue;
+                    }
+                    seen.insert(key);
+                }
+                kept.push_back(e);
+                continue;
+            }
+            // which instrument is the part score's own: the one it is named after, else the one it was made for
+            const std::vector<engraving::Part*> mps = masterPartsOf(es, ms);
+            int own = -1;
+            for (size_t i = 0; i < es->parts().size(); ++i) {
+                if (es->parts()[i]->partName().toQString() == name || (i < mps.size() && mps[i] && mps[i]->partName().toQString() == name)) {
+                    own = int(i);
+                }
+            }
+            QStringList names;
+            for (const engraving::Part* p : es->parts()) {
+                names << p->partName().toQString();
+            }
+            if (own < 0) {
+                issues << QString("\"%1\": holds %2; not an arrangement score and not named after one of them (left as it is)")
+                          .arg(name, names.join(", "));
+                kept.push_back(e);
+                continue;
+            }
+            std::vector<muse::ID> extra;
+            QStringList extraNames;
+            for (size_t i = 0; i < es->parts().size(); ++i) {
+                if (int(i) != own) {
+                    extra.push_back(es->parts()[i]->id());
+                    extraNames << es->parts()[i]->partName().toQString();
+                }
+            }
+            issues << QString("\"%1\": also holds %2%3").arg(name, extraNames.join(", "), fix ? " (taken out of this part score)" : "");
+            strays.emplace_back(n, extra);
+            kept.push_back(e);
+        }
+        if (fix) {
+            for (auto& [n, ids] : strays) {
+                n->parts()->removeParts(ids);
+            }
+            if (kept.size() != master->excerpts().size()) {
+                master->setExcerpts(kept);
+            }
+        }
+        autotestLog(QString("  %1 issue(s)%2").arg(issues.size()).arg(issues.isEmpty() ? QString() : "\n    - " + issues.join("\n    - ")));
     } else if (step.startsWith("clearpart:")) {
         // clearpart:<part name>: every bar of the part's staves emptied (rests), one undo step
         const QString name = step.mid(10);
