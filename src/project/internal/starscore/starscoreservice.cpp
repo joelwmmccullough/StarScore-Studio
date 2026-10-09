@@ -2860,7 +2860,9 @@ Ret StarScoreService::exportArrangement(const QString& arrangementId, const io::
     }
 
     INotationProjectPtr copy = projectCreator()->newProject(iocContext());
-    ret = copy->load(tmpPath);
+    OpenParams copyParams;
+    copyParams.skipPlaybackModel = true;   // edited and saved, never played
+    ret = copy->load(tmpPath, copyParams);
     if (!ret) {
         QFile::remove(tmpPath);
         return ret;
@@ -3772,7 +3774,9 @@ RetVal<StarScoreSoloPlan> StarScoreService::planSolo(const io::path_t& soloFile,
     }
 
     INotationProjectPtr probe = projectCreator()->newProject(iocContext());
-    Ret ret = probe->load(soloFile);
+    OpenParams probeParams;
+    probeParams.skipPlaybackModel = true;   // only read
+    Ret ret = probe->load(soloFile, probeParams);
     if (!ret) {
         return RetVal<StarScoreSoloPlan>::make_ret(ret);
     }

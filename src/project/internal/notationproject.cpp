@@ -244,6 +244,9 @@ Ret NotationProject::doLoad(const muse::io::path_t& path, const OpenParams& open
     }
 
     // Set current if all success
+    if (openParams.skipPlaybackModel) {
+        static_cast<MasterNotation*>(m_masterNotation.get())->m_skipPlaybackModel = true;   // StarScore (a copy)
+    }
     m_masterNotation->setMasterScore(masterScore);
 
     // Load view settings & solo-mute states (needs to be done after notations are created)

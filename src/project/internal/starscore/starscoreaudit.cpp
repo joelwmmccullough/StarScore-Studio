@@ -2135,7 +2135,9 @@ StarScoreAuditFileSummary StarScoreService::auditFile(const QString& path, bool 
         summary.error = muse::qtrc("starscore", "Couldn't read the file");
     } else {
         INotationProjectPtr project = projectCreator()->newProject(iocContext());
-        const Ret ret = project->load(io::path_t(tmp));
+        OpenParams params;
+        params.skipPlaybackModel = true;   // only read
+        const Ret ret = project->load(io::path_t(tmp), params);
         if (!ret || !project->masterNotation() || !project->masterNotation()->masterScore()) {
             summary.error = muse::qtrc("starscore", "Couldn't open the file: %1").arg(QString::fromStdString(ret.toString()));
         } else {

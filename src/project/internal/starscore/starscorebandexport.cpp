@@ -2875,6 +2875,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         INotationProjectPtr p = projectCreator()->newProject(iocContext());
         OpenParams params;
         params.skipLayout = skipLayout;
+        params.skipPlaybackModel = true;   // a copy that is only printed (see OpenParams)
         if (!p->load(io::path_t(path), params) || !p->masterNotation() || !p->masterNotation()->masterScore()) {
             return nullptr;
         }
@@ -4433,7 +4434,9 @@ void StarScoreService::songbookRenderSheets(const QString& songPath, std::vector
     }
     auto load = [&]() -> INotationProjectPtr {
         INotationProjectPtr p = projectCreator()->newProject(iocContext());
-        if (!p->load(io::path_t(copyPath))) {
+        OpenParams params;
+        params.skipPlaybackModel = true;   // only rendered
+        if (!p->load(io::path_t(copyPath), params)) {
             return nullptr;
         }
         // part books number their bars like the main score (see exportToBandFolder)
@@ -4706,7 +4709,9 @@ RetVal<std::vector<StarScoreSongbookSheet> > StarScoreService::songbookChartShee
         return Out::make_ret(Ret::Code::UnknownError, muse::trc("starscore", "couldn't read the file"));
     }
     INotationProjectPtr p = projectCreator()->newProject(iocContext());
-    if (!p->load(io::path_t(copyPath)) || !p->masterNotation()) {
+    OpenParams params;
+    params.skipPlaybackModel = true;   // only read
+    if (!p->load(io::path_t(copyPath), params) || !p->masterNotation()) {
         QDir(tmpDir).removeRecursively();
         return Out::make_ret(Ret::Code::UnknownError, muse::trc("starscore", "couldn't open the file"));
     }
@@ -4806,7 +4811,9 @@ RetVal<QString> StarScoreService::exportTimeVariants(const QStringList& onlyPath
         INotationProjectPtr copy;
         if (ret) {
             copy = projectCreator()->newProject(iocContext());
-            ret = copy->load(io::path_t(copyPath));
+            OpenParams params;
+            params.skipPlaybackModel = true;   // converted and printed, never played
+            ret = copy->load(io::path_t(copyPath), params);
         }
         if (!ret || !copy || !copy->masterNotation()) {
             problems << muse::qtrc("starscore", "%1: the song couldn't be copied (%2).").arg(variant, QString::fromStdString(ret.toString()));

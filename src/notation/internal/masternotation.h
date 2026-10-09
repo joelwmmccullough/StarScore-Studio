@@ -94,6 +94,7 @@ private:
     void markScoreAsNeedToSave();
 
     project::INotationProject* m_project = nullptr;
+    bool m_skipPlaybackModel = false;   // StarScore: set by the project before the score is set (OpenParams)
 
     ExcerptNotationList m_excerpts;
     muse::async::Notification m_excerptsChanged;

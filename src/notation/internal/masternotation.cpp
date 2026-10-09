@@ -143,7 +143,9 @@ void MasterNotation::initAfterSettingScore(const MasterScore* score)
         }
     });
 
-    m_notationPlayback->init();
+    if (!m_skipPlaybackModel) {
+        m_notationPlayback->init();
+    }
     initExcerptNotations(score->excerpts());
 }
 
