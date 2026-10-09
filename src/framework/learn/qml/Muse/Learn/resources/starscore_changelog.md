@@ -7,6 +7,7 @@ Version numbers: the first number changes when files stop being compatible, the 
 ## 1.18.27
 
 - **Exports are faster: the throwaway copies of the song no longer build playback data.** The Scores and version sheets are made from copies of the song; each copy built the notes as the synthesizer would play them, and every edit to a system break or style value rebuilt that for the whole copy: a third of a big song's export. The sheets are identical.
+- **Text is measured once.** Measurements of chord symbols, titles, lyrics and other texts are remembered instead of being worked out again at every layout: a quarter of an export's remaining time, and a little off opening, Apply default style settings and every redraw. Together with the change above, Branston Pickle's export went from 254 s to 135 s and Dream of Mushroom's from 561 s to 298 s on the test machine; every sheet, report and saved file came out identical on 15 songs.
 
 ## 1.18.26
 

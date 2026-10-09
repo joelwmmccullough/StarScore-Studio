@@ -20,6 +20,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include "fontsdatabase.h"
+#include "qfontprovider.h"
 
 #include "muse_framework_config.h"
 
@@ -75,6 +76,7 @@ int FontsDatabase::addFont(const FontDataKey& key, const io::path_t& path)
 
 #ifdef MUSE_MODULE_DRAW_USE_QTFONTMETRICS
     QFontDatabase::addApplicationFont(path.toQString());
+    clearFontMetricsCache();   // StarScore: measurements made while this family fell back to another font
 #endif
 
     return s_fontID;

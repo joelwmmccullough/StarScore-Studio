@@ -28,6 +28,8 @@
 #include <QRawFont>
 #include <QPainterPath>
 
+#include <mutex>
+
 using namespace muse;
 using namespace muse::draw;
 
@@ -54,40 +56,116 @@ protected:
 
 static FontPaintDevice device;
 
+// StarScore: text measurements cached per font and text. Qt shapes the text (HarfBuzz) on every call, and a layout
+// measures the same chord symbols, lyrics and texts again and again: a quarter of an export's time went here. A
+// measurement depends only on the font's settings, the text and the installed fonts, so the result is the same each
+// time; the cache is forgotten when a font is added (clearFontMetricsCache).
+namespace {
+struct MetricsCache {
+    std::mutex mutex;
+    QHash<QString, RectF> tightRects;
+    QHash<QString, RectF> rects;
+    QHash<QString, double> advances;
+    QHash<QString, double> fontValues;   // "<font>\x1fcap" etc.
+    static constexpr int LIMIT = 200000;   // entries per table; forgotten when reached (a few dozen MB at most)
+};
+
+MetricsCache& metricsCache()
+{
+    static MetricsCache cache;
+    return cache;
+}
+
+QString fontKey(const Font& f)
+{
+    QString key = f.family().id().toQString();
+    key += QChar(0x1f);
+    key += QString::number(f.pointSizeF(), 'g', 17);
+    key += QChar(0x1f);
+    key += QString::number(f.pixelSize());
+    key += QChar(0x1f);
+    key += QString::number(int(f.weight()));
+    key += QChar(0x1f);
+    key += QChar(QLatin1Char('0' + (f.bold() ? 1 : 0) + (f.italic() ? 2 : 0) + (f.underline() ? 4 : 0)));
+    key += QChar(QLatin1Char('0' + (f.strike() ? 1 : 0) + (f.noFontMerging() ? 2 : 0)));
+    key += QChar(QLatin1Char('0' + int(f.hinting())));
+    key += QChar(QLatin1Char('0' + int(f.type())));
+    return key;
+}
+
+template<typename T, typename Compute>
+T cached(QHash<QString, T>& table, const QString& key, Compute compute)
+{
+    MetricsCache& cache = metricsCache();
+    {
+        std::lock_guard<std::mutex> lock(cache.mutex);
+        auto it = table.constFind(key);
+        if (it != table.constEnd()) {
+            return it.value();
+        }
+    }
+    const T value = compute();
+    std::lock_guard<std::mutex> lock(cache.mutex);
+    if (table.size() >= MetricsCache::LIMIT) {
+        table.clear();
+    }
+    table.insert(key, value);
+    return value;
+}
+
+double cachedFontValue(const Font& f, const char* what, double (*compute)(const QFont&))
+{
+    const QString key = fontKey(f) + QChar(0x1f) + QLatin1String(what);
+    return cached(metricsCache().fontValues, key, [&]() { return compute(f.toQFont()); });
+}
+}
+
+void muse::draw::clearFontMetricsCache()
+{
+    MetricsCache& cache = metricsCache();
+    std::lock_guard<std::mutex> lock(cache.mutex);
+    cache.tightRects.clear();
+    cache.rects.clear();
+    cache.advances.clear();
+    cache.fontValues.clear();
+}
+
 int QFontProvider::addSymbolFont(const String& family, const io::path_t& path)
 {
     m_symbolsFonts[family] = path;
-    return QFontDatabase::addApplicationFont(path.toQString());
+    const int id = QFontDatabase::addApplicationFont(path.toQString());
+    clearFontMetricsCache();
+    return id;
 }
 
 double QFontProvider::lineSpacing(const Font& f) const
 {
-    return QFontMetricsF(f.toQFont(), &device).lineSpacing();
+    return cachedFontValue(f, "lineSpacing", [](const QFont& qf) -> double { return QFontMetricsF(qf, &device).lineSpacing(); });
 }
 
 double QFontProvider::xHeight(const Font& f) const
 {
-    return QFontMetricsF(f.toQFont(), &device).xHeight();
+    return cachedFontValue(f, "xHeight", [](const QFont& qf) -> double { return QFontMetricsF(qf, &device).xHeight(); });
 }
 
 double QFontProvider::height(const Font& f) const
 {
-    return QFontMetricsF(f.toQFont(), &device).height();
+    return cachedFontValue(f, "height", [](const QFont& qf) -> double { return QFontMetricsF(qf, &device).height(); });
 }
 
 double QFontProvider::capHeight(const Font& f) const
 {
-    return QFontMetrics(f.toQFont(), &device).capHeight();
+    return cachedFontValue(f, "capHeight", [](const QFont& qf) -> double { return QFontMetrics(qf, &device).capHeight(); });
 }
 
 double QFontProvider::ascent(const Font& f) const
 {
-    return QFontMetricsF(f.toQFont(), &device).ascent();
+    return cachedFontValue(f, "ascent", [](const QFont& qf) -> double { return QFontMetricsF(qf, &device).ascent(); });
 }
 
 double QFontProvider::descent(const Font& f) const
 {
-    return QFontMetricsF(f.toQFont(), &device).descent();
+    return cachedFontValue(f, "descent", [](const QFont& qf) -> double { return QFontMetricsF(qf, &device).descent(); });
 }
 
 bool QFontProvider::inFont(const Font& f, char32_t ucs4) const
@@ -111,21 +189,30 @@ bool QFontProvider::inFont(const Font& f, char32_t ucs4) const
 
 double QFontProvider::horizontalAdvance(const Font& f, const String& string) const
 {
-    return QFontMetricsF(f.toQFont(), &device).horizontalAdvance(string);
+    return cached(metricsCache().advances, fontKey(f) + QChar(0x1f) + string.toQString(), [&]() {
+        return QFontMetricsF(f.toQFont(), &device).horizontalAdvance(string);
+    });
 }
 
 double QFontProvider::horizontalAdvance(const Font& f, char32_t ucs4) const
 {
     if (Char::requiresSurrogates(ucs4)) {
-        return QFontMetricsF(f.toQFont(), &device).horizontalAdvance(String::fromUcs4(ucs4));
+        return cached(metricsCache().advances, fontKey(f) + QChar(0x1f) + String::fromUcs4(ucs4).toQString(), [&]() {
+            return QFontMetricsF(f.toQFont(), &device).horizontalAdvance(String::fromUcs4(ucs4));
+        });
     }
 
-    return QFontMetricsF(f.toQFont(), &device).horizontalAdvance(static_cast<char16_t>(ucs4));
+    // (its own key: Qt measures a lone character without shaping, so it can differ from the one-character string)
+    return cached(metricsCache().advances, fontKey(f) + QChar(0x1e) + QChar(static_cast<char16_t>(ucs4)), [&]() {
+        return QFontMetricsF(f.toQFont(), &device).horizontalAdvance(static_cast<char16_t>(ucs4));
+    });
 }
 
 RectF QFontProvider::boundingRect(const Font& f, const String& string) const
 {
-    return RectF::fromQRectF(QFontMetricsF(f.toQFont(), &device).boundingRect(string));
+    return cached(metricsCache().rects, fontKey(f) + QChar(0x1f) + string.toQString(), [&]() {
+        return RectF::fromQRectF(QFontMetricsF(f.toQFont(), &device).boundingRect(string));
+    });
 }
 
 RectF QFontProvider::boundingRect(const Font& f, char32_t ucs4) const
@@ -153,10 +240,12 @@ RectF QFontProvider::boundingRect(const Font& f, char32_t ucs4) const
 
 RectF QFontProvider::tightBoundingRect(const Font& f, const String& string) const
 {
-    auto boundingRect = QFontMetricsF(f.toQFont(), &device).tightBoundingRect(string);
-    if (!boundingRect.isValid()) {
-        // fix for https://github.com/musescore/MuseScore/issues/19503 - Qt can return garbage bounding rectangles that corrupt layout
-        return RectF();
-    }
-    return RectF::fromQRectF(boundingRect);
+    return cached(metricsCache().tightRects, fontKey(f) + QChar(0x1f) + string.toQString(), [&]() {
+        auto boundingRect = QFontMetricsF(f.toQFont(), &device).tightBoundingRect(string);
+        if (!boundingRect.isValid()) {
+            // fix for https://github.com/musescore/MuseScore/issues/19503 - Qt can return garbage bounding rectangles that corrupt layout
+            return RectF();
+        }
+        return RectF::fromQRectF(boundingRect);
+    });
 }

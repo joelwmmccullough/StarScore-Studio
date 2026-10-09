@@ -26,6 +26,10 @@
 #include "../ifontprovider.h"
 
 namespace muse::draw {
+//! StarScore: forgets the cached text measurements (after a font is added to the application, so a family that
+//! fell back to another font before is measured again)
+void clearFontMetricsCache();
+
 class FontEngineFT;
 class QFontProvider : public IFontProvider
 {
