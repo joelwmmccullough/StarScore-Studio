@@ -40,6 +40,10 @@ void NotationPlaybackStub::reload()
 {
 }
 
+void NotationPlaybackStub::setScoreChangesDeferred(bool)
+{
+}
+
 void NotationPlaybackStub::setSendEventsOnScoreChange(const InstrumentTrackId&, bool)
 {
 }

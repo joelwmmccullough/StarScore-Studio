@@ -126,6 +126,11 @@ void NotationPlayback::reload()
     m_playbackModel.reload();
 }
 
+void NotationPlayback::setScoreChangesDeferred(bool deferred)
+{
+    m_playbackModel.setScoreChangesDeferred(deferred);
+}
+
 void NotationPlayback::setSendEventsOnScoreChange(const InstrumentTrackId& trackId, bool send)
 {
     m_playbackModel.setSendEventsOnScoreChange(trackId, send);

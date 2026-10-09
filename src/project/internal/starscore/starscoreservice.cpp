@@ -3064,6 +3064,7 @@ int StarScoreService::applyStylesOnly(const QStringList& partIds, const Data& da
     }
 
     syncMinMajDefaults(data);
+    const StarScorePlaybackDeferred playbackDeferred(master);   // one rebuild of the playback events at the end
 
     const StyleSettings settings = loadStyleSettings();
     const QString version = scoreVersion();

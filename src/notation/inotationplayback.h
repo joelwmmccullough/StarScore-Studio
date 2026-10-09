@@ -39,6 +39,8 @@ public:
 
     virtual void init() = 0;
     virtual void reload() = 0;
+    //! StarScore: see engraving PlaybackModel::setScoreChangesDeferred
+    virtual void setScoreChangesDeferred(bool deferred) = 0;
 
     virtual void setSendEventsOnScoreChange(const InstrumentTrackId& trackId, bool send) = 0;
     virtual void sendEventsForChangedTracks() = 0;

@@ -40,6 +40,30 @@ class Measure;
 }
 
 namespace mu::project {
+//! The song's playback events (what the synthesizer plays) aren't rebuilt after each edit while this lives, but once
+//! when it ends. For a run of edits whose every step rebuilds them for the whole song (a style change does: restyling
+//! Last Pint's 45 scores spent half its 100 s there). Nothing plays meanwhile.
+struct StarScorePlaybackDeferred {
+    notation::IMasterNotationPtr master;
+    explicit StarScorePlaybackDeferred(const notation::IMasterNotationPtr& m)
+        : master(m)
+    {
+        if (master && master->playback()) {
+            master->playback()->setScoreChangesDeferred(true);
+        }
+    }
+
+    ~StarScorePlaybackDeferred()
+    {
+        if (master && master->playback()) {
+            master->playback()->setScoreChangesDeferred(false);
+        }
+    }
+
+    StarScorePlaybackDeferred(const StarScorePlaybackDeferred&) = delete;
+    StarScorePlaybackDeferred& operator=(const StarScorePlaybackDeferred&) = delete;
+};
+
 class StarScoreService : public IStarScoreService, public muse::Contextable, public muse::async::Asyncable
 {
     muse::GlobalInject<IProjectCreator> projectCreator;

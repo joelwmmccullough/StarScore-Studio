@@ -80,18 +80,14 @@ void PlaybackModel::load(Score* score)
             return;
         }
 
+        if (m_scoreChangesDeferred) {
+            m_deferredChangesPending = true;   // StarScore: worked in when the deferral ends
+            return;
+        }
+
         const TickBoundaries tickRange = tickBoundaries(changes);
         const TrackBoundaries trackRange = trackBoundaries(changes);
-        ChangedTrackIdSet trackChanges;
-
-        clearExpiredTracks();
-        clearExpiredContexts(trackRange.trackFrom, trackRange.trackTo);
-        clearExpiredEvents(tickRange.tickFrom, tickRange.tickTo, trackRange.trackFrom, trackRange.trackTo, &trackChanges);
-
-        const InstrumentTrackIdSet oldTracks = existingTrackIdSet();
-        update(tickRange.tickFrom, tickRange.tickTo, trackRange.trackFrom, trackRange.trackTo, &trackChanges);
-
-        notifyAboutChanges(oldTracks, trackChanges);
+        applyChanges(tickRange, trackRange);
     });
 
     update(0, m_score->lastMeasure()->endTick().ticks(), 0, m_score->ntracks());
@@ -106,6 +102,44 @@ void PlaybackModel::load(Score* score)
 
     m_tracksDataChanged.send(trackIdSet);
     m_changedTrackIdSet.clear();
+}
+
+void PlaybackModel::applyChanges(const TickBoundaries& tickRange, const TrackBoundaries& trackRange)
+{
+    ChangedTrackIdSet trackChanges;
+
+    clearExpiredTracks();
+    clearExpiredContexts(trackRange.trackFrom, trackRange.trackTo);
+    clearExpiredEvents(tickRange.tickFrom, tickRange.tickTo, trackRange.trackFrom, trackRange.trackTo, &trackChanges);
+
+    const InstrumentTrackIdSet oldTracks = existingTrackIdSet();
+    update(tickRange.tickFrom, tickRange.tickTo, trackRange.trackFrom, trackRange.trackTo, &trackChanges);
+
+    notifyAboutChanges(oldTracks, trackChanges);
+}
+
+void PlaybackModel::setScoreChangesDeferred(bool deferred)
+{
+    if (m_scoreChangesDeferred == deferred) {
+        return;
+    }
+    m_scoreChangesDeferred = deferred;
+    if (deferred || !m_deferredChangesPending) {
+        return;
+    }
+    m_deferredChangesPending = false;
+    if (!m_score) {
+        return;
+    }
+    // the whole score, as a change that has to reload the score is worked in (see tickBoundaries/trackBoundaries)
+    const Measure* lastMeasure = m_score->lastMeasure();
+    TickBoundaries tickRange;
+    tickRange.tickFrom = 0;
+    tickRange.tickTo = lastMeasure ? lastMeasure->endTick().ticks() : 0;
+    TrackBoundaries trackRange;
+    trackRange.trackFrom = 0;
+    trackRange.trackTo = m_score->ntracks();
+    applyChanges(tickRange, trackRange);
 }
 
 void PlaybackModel::reload()

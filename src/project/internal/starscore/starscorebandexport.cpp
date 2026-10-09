@@ -2757,6 +2757,8 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         return RetVal<QString>::make_ret(Ret::Code::InternalError);
     }
     starscore::forgetExportedPdfs();
+    // the song's playback events rebuilt once at the end, not after each sheet's title edit
+    const StarScorePlaybackDeferred playbackDeferred(master);
 
     // The score is shown again once, at the end, whatever changed in it below; a part book that changed is shown
     // again once too (a notification per sheet redrew the app 74 times)

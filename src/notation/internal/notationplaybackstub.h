@@ -31,6 +31,7 @@ public:
 
     void init() override;
     void reload() override;
+    void setScoreChangesDeferred(bool deferred) override;
 
     void setSendEventsOnScoreChange(const InstrumentTrackId& trackId, bool send) override;
     void sendEventsForChangedTracks() override;

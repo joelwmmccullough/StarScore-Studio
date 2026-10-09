@@ -59,6 +59,11 @@ public:
     void load(Score* score);
     void reload();
 
+    //! StarScore: while deferred, the score's changes aren't worked into the playback events; they are noted, and
+    //! when the deferral ends the events are rebuilt once for the whole score (as one change that reloads the score
+    //! does). For a run of many edits whose every step rebuilds everything, such as restyling every part score.
+    void setScoreChangesDeferred(bool deferred);
+
     void setSendEventsOnScoreChange(const InstrumentTrackId& trackId, bool send);
     void sendEventsForChangedTracks();
 
@@ -151,6 +156,7 @@ private:
 
     TrackBoundaries trackBoundaries(const ScoreChanges& changes) const;
     TickBoundaries tickBoundaries(const ScoreChanges& changes) const;
+    void applyChanges(const TickBoundaries& tickRange, const TrackBoundaries& trackRange);
 
     const RepeatList& repeatList() const;
 
@@ -162,6 +168,9 @@ private:
     static void applyTieTickBoundaries(const Tie* tie, TickBoundaries& tickBoundaries);
 
     Score* m_score = nullptr;
+    bool m_scoreChangesDeferred = false;
+    bool m_deferredChangesPending = false;
+
     bool m_expandRepeats = true;
     bool m_playChordSymbols = true;
     bool m_useScoreDynamicsForOffstreamPlayback = true;
