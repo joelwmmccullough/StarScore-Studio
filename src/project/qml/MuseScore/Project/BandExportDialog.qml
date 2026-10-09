@@ -78,7 +78,7 @@ StyledDialogView {
             wrapMode: Text.WordWrap
             color: ui.theme.fontSecondaryColor
             visible: root.listMode
-            text: qsTrc("starscore", "Sheets that already exist are moved to Version History/Superseded <today> first. "
+            text: qsTrc("starscore", "Sheets that already exist are moved to Version History/<today> Superseded first. "
                         + "Your ticks are remembered for this song.")
         }
 

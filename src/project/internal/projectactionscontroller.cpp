@@ -156,8 +156,9 @@ void ProjectActionsController::init()
         const QString path = starScoreService()->mainProjectPath().toQString();
         if (!path.isEmpty() && QFileInfo::exists(path)) {
             const QFileInfo fi(path);
-            const QString dir = fi.absolutePath() + "/Version History/Before standardizing "
-                                + QDate::currentDate().toString("yyyy-MM-dd");
+            // (the date first, so a Version History lists its folders by date; Joel, 9 Oct 2026)
+            const QString dir = fi.absolutePath() + "/Version History/" + QDate::currentDate().toString("yyyy-MM-dd")
+                                + " Before standardizing";
             QDir().mkpath(dir);
             const QString copy = dir + "/" + fi.fileName();
             if (!QFileInfo::exists(copy)) {
@@ -191,6 +192,18 @@ void ProjectActionsController::init()
             }
         });
     }
+    dispatcher()->reg(this, "starscore-annotation-add", [this]() {
+        interactive()->open(Uri("musescore://starscore/annotation?mode=add"));
+    });
+    dispatcher()->reg(this, "starscore-annotation-mark", [this]() {
+        interactive()->open(Uri("musescore://starscore/annotation?mode=mark"));
+    });
+    dispatcher()->reg(this, "starscore-annotation-unmark", [this]() {
+        const QString problem = starScoreService()->unmarkPlayerAnnotations();
+        if (!problem.isEmpty()) {
+            interactive()->info(muse::trc("starscore", "Player annotations"), problem.toStdString());
+        }
+    });
     dispatcher()->reg(this, "starscore-voice-order", [this]() {
         interactive()->open(Uri("musescore://starscore/voiceorder"));
     });

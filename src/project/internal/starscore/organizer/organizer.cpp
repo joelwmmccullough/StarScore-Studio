@@ -48,7 +48,7 @@ Since October 2026 StarScore Studio does all of this. It runs after every "Expor
 "Rebuild everything". Nothing runs on a schedule. The old Python toolkit is in `Deprecated/Retired <date>/`.
 
 ## Rules it keeps
-- Nothing is ever deleted. A sheet that is replaced moves to the song's `Version History/Superseded <date>/`.
+- Nothing is ever deleted. A sheet that is replaced moves to the song's `Version History/<date> Superseded/`.
 - Nothing inside `Version History`, `Old Versions` or `5 Archive` is ever renamed.
 - Log entries (changelogs, the Maintenance Report) are only ever added on top.
 - Every song folder has `1 Lead Sheet`, `1 Rhythm`, `Horn Part Guides` and one `Update Notes yy-mm-dd` folder,
@@ -549,7 +549,7 @@ void Organizer::prepare(std::shared_ptr<Run> r)
                 for (const Player& p : r->roster.players) {
                     const QString f = dir + "/" + s.updateNotes + "/" + s.code + " - Changelog - " + p.name + ".pdf";
                     if (!p.current && QFileInfo::exists(f)) {
-                        const QString to = freeName(dir + "/Version History/Superseded " + paths.todayIso() + "/" + s.updateNotes + "/"
+                        const QString to = freeName(dir + "/Version History/" + paths.todayIso() + " Superseded/" + s.updateNotes + "/"
                                                     + QFileInfo(f).fileName());
                         if (moveItem(f, to)) {
                             formerMoves.append(relativeTo(paths.band, to));

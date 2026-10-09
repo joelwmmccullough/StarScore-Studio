@@ -198,6 +198,25 @@ const UiActionList ProjectUiActions::m_actions = {
              TranslatableString("action", "Clear progress color"),
              TranslatableString("action", "Take the progress color off the selected measures")
              ),
+    UiAction("starscore-annotation-add",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Add player annotation…"),
+             TranslatableString("action", "Add a band member's own note above the selected note or rest, on this sheet only. "
+                                          "Exports print the sheet without it, plus a copy with that player's notes.")
+             ),
+    UiAction("starscore-annotation-mark",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Mark as player annotation…"),
+             TranslatableString("action", "Make the selected markings a band member's own notes on this sheet")
+             ),
+    UiAction("starscore-annotation-unmark",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Unmark player annotation"),
+             TranslatableString("action", "Make the selected annotations ordinary markings of the sheet again")
+             ),
     UiAction("starscore-voice-order",
              mu::context::UiCtxProjectOpened,
              mu::context::CTX_ANY,

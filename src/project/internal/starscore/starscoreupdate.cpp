@@ -202,11 +202,13 @@ RetVal<QString> StarScoreService::updateCurrentSongSheets()
     const QString original = scoreVersion();
     // 1. which of them come out differently, each made with the version already printed on it
     std::map<QString, QStringList> changed;
+    std::map<QString, QStringList> annotatedOnly;   // only their copies with players' annotations would change
     int same = 0;
     for (const auto& [version, paths] : groups) {
         setScoreVersion(version.isEmpty() ? original : version);
         m_exportDryRun = true;
         m_dryRunChanged.clear();
+        m_dryRunAnnotated.clear();
         const RetVal<QString> tried = exportToBandFolder(paths);
         m_exportDryRun = false;
         if (!tried.ret) {
@@ -217,6 +219,11 @@ RetVal<QString> StarScoreService::updateCurrentSongSheets()
         }
         if (!m_dryRunChanged.isEmpty()) {
             changed[version] = m_dryRunChanged;
+        }
+        for (const QString& rel : m_dryRunAnnotated) {
+            if (!m_dryRunChanged.contains(rel)) {
+                annotatedOnly[version] << rel;
+            }
         }
         same += int(paths.size()) - int(m_dryRunChanged.size());
         LOGI() << "[starscore] update " << plan.code << " v" << version << ": " << m_dryRunChanged.size() << " of "
@@ -241,18 +248,30 @@ RetVal<QString> StarScoreService::updateCurrentSongSheets()
             highest = bumped;
         }
     }
+    // 2b. sheets where only a player's annotated copy would change: made again with the version they have (the sheet
+    // itself comes out the same and is left as it is)
+    int annotatedSheets = 0;
+    for (const auto& [version, paths] : annotatedOnly) {
+        setScoreVersion(version.isEmpty() ? original : version);
+        if (exportToBandFolder(paths).ret) {
+            annotatedSheets += int(paths.size());
+        }
+    }
     setScoreVersion(highest);
     endExportProgress();
 
     // 3. the record marked as made with this StarScore (an export already did that; nothing written: done here)
     markCurrent();
 
+    const QString annotatedNote = annotatedSheets > 0
+                                  ? " " + muse::qtrc("starscore", "Players' annotated copies of %1 sheet(s) made again.").arg(annotatedSheets)
+                                  : QString();
     if (written.isEmpty()) {
         return RetVal<QString>::make_ok(muse::qtrc("starscore", "%1: no sheet changed (%2 checked).%3").arg(plan.code).arg(same)
-                                        .arg(renamedNote));
+                                        .arg(renamedNote) + annotatedNote);
     }
     return RetVal<QString>::make_ok(muse::qtrc("starscore", "%1: %2 sheet(s) updated, now up to version %3; %4 unchanged.%5")
-                                    .arg(plan.code).arg(written.size()).arg(highest).arg(same).arg(renamedNote));
+                                    .arg(plan.code).arg(written.size()).arg(highest).arg(same).arg(renamedNote) + annotatedNote);
 }
 
 // ---------------------------------------------------------------------------

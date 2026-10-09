@@ -112,6 +112,7 @@ static const QMap<QString, QString> FOLDER_BLURB {
     { "Demos", "Audio for the tune &mdash; reference recordings and rehearsal tracks." },
     { "Reference PDFs", "Reference material Joel keeps with the tune: transcriptions, original charts, notes." },
     { "Version History", "Every past version of this song, kept forever. Nothing here is current &mdash; do not play from it." },
+    { "Annotated Sheets", "Sheets with one player's own notes on them, kept through every update. The clean sheets are in the other folders." },
     { "Horn Part Guides", "One PDF per horn player explaining exactly how their parts differ between arrangements." },
     { "Update Notes", "Per-player changelogs &mdash; what changed on your sheet, newest first." },
 };
@@ -234,7 +235,7 @@ QString whatsHereHtml(const SongInfo& d, const Roster& roster, const QDate& toda
         rows.push_back({ "Reference PDFs", FOLDER_BLURB["Reference PDFs"], plural(int(d.references.size()), "file") });
     }
     for (const auto& [k, v] : d.other) {
-        rows.push_back({ k, "Additional material.", plural(int(v.size()), "file") });
+        rows.push_back({ k, FOLDER_BLURB.contains(k) ? FOLDER_BLURB[k] : QString("Additional material."), plural(int(v.size()), "file") });
     }
     QStringList guidePlayers;
     for (const QString& g : d.hornGuides) {

@@ -4,6 +4,7 @@
  * StarScore Studio — a MuseScore Studio fork
  */
 #include "starscoreengraving.h"
+#include "starscoreannotations.h"
 
 #include <map>
 #include <set>
@@ -696,9 +697,16 @@ int mu::project::starscore::copyTextPositions(const Score* source, Score* target
         moved += changed ? 1 : 0;
     };
 
+    // a player's annotations are that sheet's own: never matched to another sheet's texts
+    std::set<const EngravingItem*> annotations;
+    for (Score* sc : { const_cast<Score*>(source), target }) {
+        for (const AnnotationItem& a : annotationItems(sc)) {
+            annotations.insert(a.item);
+        }
+    }
     // texts attached to the music: staff and system text, tempo, rehearsal marks, expressions, dynamics, chord symbols
-    auto movable = [](const EngravingItem* e) {
-        return e && (e->isStaffText() || e->isSystemText() || e->isTempoText() || e->isRehearsalMark() || e->isExpression()
+    auto movable = [&annotations](const EngravingItem* e) {
+        return e && !annotations.count(e) && (e->isStaffText() || e->isSystemText() || e->isTempoText() || e->isRehearsalMark() || e->isExpression()
                      || e->isPlayTechAnnotation() || e->isDynamic() || e->isHarmony());
     };
     // the words that identify a text; a chord symbol by its kind (main or alternate) instead, since a transposing

@@ -43,6 +43,12 @@
 #include "global/serialization/zipwriter.h"
 #include <QElapsedTimer>
 #include "engraving/dom/starscoreprogress.h"
+#include "engraving/dom/starscoreannotations.h"
+#include "starscoreannotations.h"
+#include "engraving/dom/breath.h"
+#include "engraving/dom/fingering.h"
+#include "engraving/dom/hairpin.h"
+#include "engraving/dom/articulation.h"
 #include "starscoreengraving.h"
 #include "starscorechordchart.h"
 
@@ -1382,6 +1388,151 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         }
         const QString tag = masterScore()->metaTag(String(engraving::starscore::PROGRESS_TAG)).toQString();
         autotestLog(QString("  %1 marks: %2").arg(tag.isEmpty() ? 0 : tag.count(';') + 1).arg(tag.left(300)));
+    } else if (step.startsWith("partmark:") || step.startsWith("annotate:") || step.startsWith("annotatemark:")
+               || step.startsWith("annotationunmark:")) {
+        // In the score on screen (a part score), bar B (1-based), staff 0:
+        // partmark:B|text|<words>, partmark:B|dynamic|mf, partmark:B|breath, partmark:B|fingering|3, partmark:B|hairpin:
+        //   a marking added as MuseScore adds one (in the full score and other part scores too)
+        // annotate:B|<player>|<words>: Add player annotation… at the bar's first note or rest
+        // annotatemark:B|<player>: every marking in the bar selected, Mark as player annotation…
+        // annotationunmark:B: every marking in the bar selected, Unmark player annotation
+        const QStringList a = step.section(':', 1).split('|');
+        INotationPtr n = globalContext()->currentNotation();
+        engraving::Score* sc = n ? n->elements()->msScore() : nullptr;
+        engraving::Measure* m = sc ? sc->crMeasure(a.value(0).toInt() - 1) : nullptr;
+        engraving::ChordRest* cr = m ? m->first(engraving::SegmentType::ChordRest)->cr(0) : nullptr;
+        if (!cr) {
+            autotestLog("  no such bar");
+        } else if (step.startsWith("partmark:")) {
+            const QString kind = a.value(1);
+            n->undoStack()->prepareChanges(TranslatableString::untranslatable("Autotest marking"));
+            engraving::EngravingItem* e = nullptr;
+            if (kind == "text") {
+                engraving::StaffText* st = engraving::Factory::createStaffText(cr->segment());
+                st->setPlainText(String(a.value(2)));
+                e = st;
+            } else if (kind == "dynamic") {
+                engraving::Dynamic* d = engraving::Factory::createDynamic(cr->segment());
+                d->setDynamicType(String(a.value(2)));
+                e = d;
+            } else if (kind == "breath") {
+                engraving::Segment* bs = m->undoGetSegment(engraving::SegmentType::Breath, cr->endTick());
+                engraving::Breath* b = engraving::Factory::createBreath(bs);
+                b->setSymId(engraving::SymId::breathMarkComma);
+                b->setTrack(cr->track());
+                b->setParent(bs);
+                sc->undoAddElement(b);
+            } else if (kind == "fingering" && cr->isChord()) {
+                engraving::Note* note = engraving::toChord(cr)->upNote();
+                engraving::Fingering* f = engraving::Factory::createFingering(note);
+                f->setPlainText(String(a.value(2)));
+                f->setTrack(cr->track());
+                f->setParent(note);
+                sc->undoAddElement(f);
+            } else if (kind == "hairpin") {
+                // as MuseScore adds one from the palette over the bar
+                engraving::Hairpin* h = engraving::Factory::createHairpin(sc->dummy()->segment());
+                h->setHairpinType(engraving::HairpinType::CRESC_HAIRPIN);
+                engraving::Segment* endSeg = m->nextMeasure() ? m->nextMeasure()->first(engraving::SegmentType::ChordRest) : nullptr;
+                sc->cmdAddSpanner(h, cr->staffIdx(), cr->segment(), endSeg);
+            }
+            if (e) {
+                e->setTrack(cr->track());
+                e->setParent(cr->segment());
+                sc->undoAddElement(e);
+            }
+            n->undoStack()->commitChanges();
+            autotestLog("  added " + kind);
+        } else if (step.startsWith("annotate:")) {
+            // (bar B in a multimeasure rest: the rest shown is selected, as a click on it would)
+            if (m->mmRest() && sc->style().styleB(engraving::Sid::createMultiMeasureRests)) {
+                engraving::Segment* ms0 = m->mmRest()->first(engraving::SegmentType::ChordRest);
+                if (ms0 && ms0->cr(cr->track())) {
+                    cr = ms0->cr(cr->track());
+                    autotestLog("  (the multimeasure rest selected)");
+                }
+            }
+            sc->select(cr, engraving::SelectType::SINGLE);
+            const QString problem = addPlayerAnnotation(a.value(1), a.value(2));
+            autotestLog("  " + (problem.isEmpty() ? QString("added") : problem));
+        } else {
+            std::vector<engraving::EngravingItem*> items;
+            for (engraving::Segment* seg = m->first(); seg; seg = seg->next()) {
+                for (engraving::EngravingItem* e : seg->annotations()) {
+                    items.push_back(e);
+                }
+                for (engraving::EngravingItem* e : seg->elist()) {
+                    if (e && e->isBreath()) {
+                        items.push_back(e);
+                    } else if (e && e->isChord()) {
+                        for (engraving::Articulation* ar : engraving::toChord(e)->articulations()) {
+                            items.push_back(ar);
+                        }
+                        for (engraving::Note* nt : engraving::toChord(e)->notes()) {
+                            for (engraving::EngravingItem* x : nt->el()) {
+                                items.push_back(x);
+                            }
+                        }
+                    }
+                }
+            }
+            for (const auto& [tick, sp] : sc->spanner()) {
+                if (sp->tick() >= m->tick() && sp->tick() < m->endTick() && sp->isHairpin()) {
+                    items.push_back(sp);
+                }
+            }
+            // annotatemark:B|<player>|<type>, annotationunmark:B|<type>: only items of that type (StaffText, Dynamic…)
+            const QString onlyType = step.startsWith("annotatemark:") ? a.value(2) : a.value(1);
+            sc->deselectAll();
+            for (engraving::EngravingItem* e : items) {
+                if (onlyType.isEmpty() || onlyType == e->typeName()) {
+                    sc->select(e, engraving::SelectType::ADD);
+                }
+            }
+            const StarScoreAnnotationTarget t = annotationTarget();
+            autotestLog(QString("  target: sheet '%1' count %2 inOther %3 owners [%4] default '%5' players [%6] problem '%7'")
+                        .arg(t.sheet).arg(t.count).arg(t.inOtherScores).arg(t.owners.join(",")).arg(t.defaultPlayer)
+                        .arg(t.players.join(",")).arg(t.problem));
+            const QString problem = step.startsWith("annotatemark:") ? markPlayerAnnotations(a.value(1)) : unmarkPlayerAnnotations();
+            autotestLog("  " + (problem.isEmpty() ? QString("done") : problem));
+        }
+    } else if (step == "annotations") {
+        // the song's player annotations: the tag, and each part score's, with where its copies are
+        const QString tag = masterScore()->metaTag(String(engraving::starscore::ANNOTATIONS_TAG)).toQString();
+        autotestLog(QString("  tag: %1").arg(tag));
+        for (engraving::Excerpt* ex : ms->excerpts()) {
+            for (const starscore::AnnotationItem& ai : starscore::annotationItems(ex->excerptScore())) {
+                const engraving::Measure* mm = ai.item->findMeasure();
+                QString text = ai.item->isTextBase() ? engraving::toTextBase(ai.item)->plainText().toQString() : QString();
+                int linked = 0;
+                for (const engraving::EngravingObject* l : ai.item->linkList()) {
+                    if (l != ai.item) {
+                        ++linked;
+                        engraving::Score* ls = const_cast<engraving::EngravingObject*>(l)->score();
+                        const engraving::EngravingItem* li = static_cast<const engraving::EngravingItem*>(l);
+                        autotestLog(QString("    (this track %1 tick %2; linked track %3 tick %4 same parent %5)").arg(ai.item->track())
+                                    .arg(ai.item->tick().ticks()).arg(li->track()).arg(li->tick().ticks())
+                                    .arg(li->explicitParent() == ai.item->explicitParent()));
+                        autotestLog(QString("    linked: %1 in %2, parent %3").arg(l->typeName())
+                                    .arg(ls == ms ? QString("full score") : ls && ls->excerpt() ? ls->excerpt()->name().toQString() : QString("?"))
+                                    .arg(l->explicitParent() ? l->explicitParent()->typeName() : "none"));
+                    }
+                }
+                autotestLog(QString("  %1: %2 '%3' bar %4 by %5, linked copies %6").arg(ex->name().toQString())
+                            .arg(ai.item->typeName()).arg(text).arg(mm ? mm->no() + 1 : (ai.item->isSpanner() ? -2 : -1))
+                            .arg(ai.player).arg(linked));
+            }
+        }
+        // what the full score has (staff texts by words), to see annotations aren't in it
+        QStringList texts;
+        for (engraving::Segment* seg = ms->firstSegment(engraving::SegmentType::ChordRest); seg; seg = seg->next1(engraving::SegmentType::ChordRest)) {
+            for (engraving::EngravingItem* e : seg->annotations()) {
+                if (e->isStaffText()) {
+                    texts << engraving::toTextBase(e)->plainText().toQString();
+                }
+            }
+        }
+        autotestLog(QString("  full score staff texts: %1").arg(texts.join(" | ")));
     } else if (step == "undo") {
         if (INotationPtr n = globalContext()->currentNotation()) {
             n->undoStack()->undo(nullptr);

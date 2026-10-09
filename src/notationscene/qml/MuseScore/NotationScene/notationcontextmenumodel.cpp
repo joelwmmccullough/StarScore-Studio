@@ -292,6 +292,18 @@ MenuItemList NotationContextMenuModel::makeElementItems()
         items << makeMenuItem("edit-element");
     }
 
+    // StarScore player annotations, in part scores (Joel, 9 Oct 2026)
+    const INotationPtr current = globalContext()->currentNotation();
+    if (current && current->elements() && current->elements()->msScore()
+        && !current->elements()->msScore()->isMaster()) {
+        items << makeSeparator();
+        items << makeMenu(TranslatableString("notation", "Player annotation"), {
+            makeMenuItem("starscore-annotation-add"),
+            makeMenuItem("starscore-annotation-mark"),
+            makeMenuItem("starscore-annotation-unmark"),
+        });
+    }
+
     items << makeSeparator()
           << makeEditStyle(element);
 

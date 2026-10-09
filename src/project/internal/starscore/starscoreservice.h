@@ -245,6 +245,10 @@ public:
     void setProgressColorsShown(bool shown) override;
     muse::async::Notification progressColorsShownChanged() const override;
     QString markProgress(char code) override;
+    StarScoreAnnotationTarget annotationTarget() const override;
+    QString addPlayerAnnotation(const QString& player, const QString& text) override;
+    QString markPlayerAnnotations(const QString& player) override;
+    QString unmarkPlayerAnnotations() override;
     void offerMatchingHornParts(const QStringList& sectionIdsBefore) override;
     //! (source part id, new part id) pairs, instrument by instrument in score order
     std::vector<std::pair<QString, QString> > matchingHornParts(const QString& fromSectionId, const QString& toSectionId) const;
@@ -518,6 +522,7 @@ private:
     QString m_exportVariant;              // "Half-Time" / "Double-Time" while that copy is exported
     bool m_exportDryRun = false;          // the export writes nothing; m_dryRunChanged gets the sheets that would change
     QStringList m_dryRunChanged;
+    QStringList m_dryRunAnnotated;        // sheets whose copies with players' annotations would change
     QStringList m_updateQueue;
     bool m_bulkStyles = false;   // the run applies part styles instead of updating sheets
     //! When StarScore starts: songs' files named "Title.starscore" renamed "CODE - Title.starscore"; how many

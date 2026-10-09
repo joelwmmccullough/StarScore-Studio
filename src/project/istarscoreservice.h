@@ -62,6 +62,19 @@ struct StarScoreUpdateAllStatus {
 };
 
 //! Where a running export is (Joel, 6 Oct 2026: a window shows it live instead of a beachball)
+//! The selection a player annotation goes on (see IStarScoreService::annotationTarget)
+struct StarScoreAnnotationTarget {
+    QString problem;          // why nothing can be added or marked here, or nothing
+    QString sheet;            // the part score's name
+    bool canAdd = false;      // a note or rest is selected: a text can be added there
+    int count = 0;            // selected markings that can be annotations
+    int inOtherScores = 0;    // of those, how many are in the full score or other part scores too
+    QStringList owners;       // whose annotations are among them
+    QStringList players;      // the band's current players, then anyone else with annotations in the song
+    QString defaultPlayer;    // who reads this sheet (the roster), or the last player chosen
+    QStringList summary;      // the song's annotations: "Ben: 3 (7H: Tenor Sax 2)"
+};
+
 struct StarScoreExportProgress {
     bool running = false;
     QString phase;   // "Sheets", "Audio demos", "Chord charts"…
@@ -704,7 +717,7 @@ public:
     //! "Export as MuseScore files": each arrangement as its own .mscz in folder, named "CODE - <arrangement>.mscz"
     //! (or "<title> - <arrangement>.mscz" when the song has no code). Returns a summary.
     virtual muse::RetVal<QString> exportArrangementsAsMscz(const QString& folder) = 0;
-    //! Write every PDF in the plan, moving any file it replaces to "Version History/Superseded <date>/".
+    //! Write every PDF in the plan, moving any file it replaces to "Version History/<date> Superseded/".
     //! Returns a summary.
     //! Exports the planned sheets whose relative paths are in onlyPaths (all of them when onlyPaths is empty)
     virtual muse::RetVal<QString> exportToBandFolder(const QStringList& onlyPaths) = 0;
@@ -774,6 +787,20 @@ public:
     //! Marks the selected measures: 'g' finished, 'o' needs review, 'r' unfinished, 0 clears. Returns a problem to
     //! show, or nothing.
     virtual QString markProgress(char code) = 0;
+
+    // --- Player annotations (Add › Player annotations): a band member's own notes on a sheet, kept only in that part
+    // score and marked as theirs. Export to Sheets and Demos leaves them off the sheet and prints one more copy per
+    // player with only their notes, into the song's "Annotated Sheets" folder.
+    //! What the Player annotation dialog works on: the selection in the part score on screen
+    virtual StarScoreAnnotationTarget annotationTarget() const = 0;
+    //! A staff text with these words at the selected note or rest, as the player's annotation. Returns a problem
+    //! to show, or nothing.
+    virtual QString addPlayerAnnotation(const QString& player, const QString& text) = 0;
+    //! The selected markings become the player's annotations (taken out of the full score and other part scores
+    //! when they are there too). Returns a problem to show, or nothing.
+    virtual QString markPlayerAnnotations(const QString& player) = 0;
+    //! The selected annotations become ordinary markings of the sheet again. Returns a message to show, or nothing.
+    virtual QString unmarkPlayerAnnotations() = 0;
 
     //! After a horn section was made (sectionIdsBefore: the sections before): when the song has a horn section with
     //! one horn more or fewer, asks whether to copy the parts on the same instruments into the new one (music, part

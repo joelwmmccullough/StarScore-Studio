@@ -21,6 +21,8 @@
  */
 #include "abstractnotationpaintview.h"
 
+#include <set>
+
 #include <QCursor>
 #include <QPainter>
 #include <QMimeData>
@@ -36,6 +38,7 @@
 #include "engraving/dom/staff.h"
 #include "engraving/dom/system.h"
 #include "engraving/dom/starscoreprogress.h"
+#include "engraving/dom/starscoreannotations.h"
 #include "log.h"
 
 using namespace mu;
@@ -688,6 +691,7 @@ void AbstractNotationPaintView::paint(QPainter* qp)
     notation()->painting()->paintView(painter, toLogical(rect), isPrinting);
     if (!publishMode()) {
         paintStarScoreProgress(toLogical(rect), painter);
+        paintStarScoreAnnotations(toLogical(rect), painter);
     }
 
     const ui::UiContext& uiCtx = uiContextResolver()->currentUiContext();
@@ -785,6 +789,75 @@ void AbstractNotationPaintView::paintStarScoreProgress(const RectF& logicalRect,
                                                                                                     1.0 * m->spatium());
                     painter->fillRect(r, c);
                 }
+            }
+        }
+    }
+}
+
+void AbstractNotationPaintView::paintStarScoreAnnotations(const RectF& logicalRect, Painter* painter)
+{
+    using namespace mu::engraving;
+    if (!notation() || !notation()->elements()) {
+        return;
+    }
+    Score* score = notation()->elements()->msScore();
+    MasterScore* master = score ? score->masterScore() : nullptr;
+    // annotations are only ever in part scores
+    if (!master || score == master) {
+        return;
+    }
+    const std::string text = master->metaTag(String(starscore::ANNOTATIONS_TAG)).toStdString();
+    if (text.empty()) {
+        return;
+    }
+    if (text != m_annotationsText) {
+        m_annotationsText = text;
+        m_annotationsMap = starscore::parseAnnotations(text);
+    }
+    if (m_annotationsMap.empty()) {
+        return;
+    }
+
+    // a color per player, see-through so the music stays readable
+    static const std::vector<Color> COLORS { Color(0, 140, 255, 55), Color(200, 60, 220, 55), Color(0, 170, 140, 60),
+                                             Color(230, 120, 0, 60), Color(220, 40, 90, 50), Color(110, 110, 230, 60) };
+    auto colorOf = [](const std::string& player) {
+        size_t h = 0;
+        for (char c : player) {
+            h = h * 31 + static_cast<unsigned char>(c);
+        }
+        return COLORS[h % COLORS.size()];
+    };
+
+    for (const Page* page : score->pages()) {
+        if (!page->canvasBoundingRect().intersects(logicalRect)) {
+            continue;
+        }
+        std::set<const EngravingItem*> labelled;
+        for (const EngravingItem* e : page->elements()) {
+            const EngravingItem* owner = starscore::mmRestOriginal(starscore::annotationOwner(e));
+            if (!starscore::canBeAnnotation(owner)) {
+                continue;
+            }
+            auto it = m_annotationsMap.find(starscore::annotationKey(owner));
+            if (it == m_annotationsMap.end()) {
+                continue;
+            }
+            const double sp = e->spatium();
+            const RectF r = e->canvasBoundingRect().adjusted(-0.3 * sp, -0.3 * sp, 0.3 * sp, 0.3 * sp);
+            if (!r.intersects(logicalRect)) {
+                continue;
+            }
+            Color c = colorOf(it->second);
+            painter->fillRect(r, c);
+            // the player's name over the first piece of each annotation
+            if (labelled.insert(owner).second) {
+                c.setAlpha(230);
+                Font f(u"Edwin", Font::Type::Text);
+                f.setPointSizeF(6.5 * sp / e->defaultSpatium());
+                painter->setFont(f);
+                painter->setPen(Pen(c));
+                painter->drawText(PointF(r.left(), r.top() - 0.15 * sp), String::fromStdString(it->second));
             }
         }
     }

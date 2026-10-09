@@ -132,8 +132,9 @@ bool isSheetPath(const QString& rel)
         return false;
     }
     for (const QString& s : seg.mid(0, seg.size() - 1)) {
+        // (Annotated Sheets: copies of sheets with a player's own notes, made by the export alongside the sheets)
         if (s == "Version History" || s == "Old Versions" || s.startsWith("Update Notes") || s == "Horn Part Guides"
-            || s.startsWith('.')) {
+            || s == "Annotated Sheets" || s.startsWith('.')) {
             return false;
         }
     }

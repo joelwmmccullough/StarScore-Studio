@@ -270,6 +270,8 @@ private:
     void paintBackground(const muse::RectF& rect, muse::draw::Painter* painter);
     //! StarScore progress colors over the measures (view only, never in exports; see engraving/dom/starscoreprogress.h)
     void paintStarScoreProgress(const muse::RectF& logicalRect, muse::draw::Painter* painter);
+    //! StarScore player annotations highlighted, with the player's name (view only; see starscoreannotations.h)
+    void paintStarScoreAnnotations(const muse::RectF& logicalRect, muse::draw::Painter* painter);
 
     muse::PointF canvasCenter() const;
     std::pair<qreal, qreal> constraintCanvas(qreal dx, qreal dy) const;
@@ -287,6 +289,8 @@ private:
     std::unique_ptr<ContinuousPanel> m_continuousPanel;
     std::string m_progressText;
     std::map<std::string, char> m_progressMap;
+    std::string m_annotationsText;
+    std::map<std::string, std::string> m_annotationsMap;
 
     qreal m_previousVerticalScrollPosition = 0;
     qreal m_previousHorizontalScrollPosition = 0;

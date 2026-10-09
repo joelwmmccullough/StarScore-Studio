@@ -152,7 +152,7 @@ struct BandFiler {
             return QString();
         }
         const QString rel = relativeTo(abs(song), abs(dstRel));
-        const QString tgt = freeName(abs(song + "/Version History/Superseded " + paths.todayIso() + "/" + rel));
+        const QString tgt = freeName(abs(song + "/Version History/" + paths.todayIso() + " Superseded/" + rel));
         if (moveItem(abs(dstRel), tgt)) {
             report.superseded.push_back({ dstRel, relativeTo(paths.band, tgt) });
             return tgt;
@@ -246,7 +246,7 @@ struct BandFiler {
             return place(rel, song, "1 Lead Sheet", code + " - Lead Sheet.pdf");
         }
         if (base.toLower().startsWith("arrangement guide")) {
-            return place(rel, song, "Version History/Superseded Guides", name);
+            return place(rel, song, "Version History/" + paths.todayIso() + " Superseded Guides", name);
         }
         static const QRegularExpression arr("(\\d)\\s*-\\s*Horn[_ ]?Arr(?:angement)?", QRegularExpression::CaseInsensitiveOption);
         const QRegularExpressionMatch m = arr.match(base);
@@ -688,11 +688,11 @@ ProjectsFilingReport fileProjects(const Paths& paths, const std::vector<ProjectT
         QString dst, archive;
         if (fi.suffix().toLower() == "starscore") {
             dst = tune + "/" + fi.fileName();
-            archive = tune + "/Version History/Superseded " + paths.todayIso() + "/" + fi.fileName();
+            archive = tune + "/Version History/" + paths.todayIso() + " Superseded/" + fi.fileName();
         } else {
             const QString sub = purposeOf(rel);
             dst = tune + "/MuseScore Files/" + (sub.isEmpty() ? QString() : sub + "/") + fi.fileName();
-            archive = tune + "/MuseScore Files/Deprecated/Superseded " + paths.todayIso() + "/" + fi.fileName();
+            archive = tune + "/MuseScore Files/Deprecated/" + paths.todayIso() + " Superseded/" + fi.fileName();
         }
         QString old;
         if (QFileInfo::exists(base + "/" + dst)) {

@@ -10,7 +10,8 @@
  *   <N> <Song>/3H Flexible/CODE - Score.pdf, CODE - Horn 1 - Trumpet in Bb.pdf, ... (were "3H Any Horns")
  *   <N> <Song>/Big Band, Full Orchestra, Marching Band, Extras
  *
- * A file that would be replaced is first moved to "<Song>/Version History/Superseded <date>/".
+ * A file that would be replaced is first moved to "<Song>/Version History/<date> Superseded/" (the date first, so
+ * the folders list by date).
  */
 #include "starscoreservice.h"
 
@@ -66,6 +67,7 @@
 #include "notation/inotation.h"
 
 #include "starscoreengraving.h"
+#include "starscoreannotations.h"
 #include "engraving/editing/editpart.h"
 #include "starscorehouse.h"
 #include "starscorechordchart.h"
@@ -97,6 +99,8 @@ static const std::vector<std::pair<QString, QString> > STARSCORE_HORN_ORDER {
 
 //! 7-Horn arrangement: the subfolder for the Bass Trombone and its stand-in versions
 static const QString STARSCORE_BASS_HORNS_FOLDER = QStringLiteral("Bass Horns (Horn #7)");
+//! the sheets with a player's own notes on them (see starscoreannotations.h)
+static const QString STARSCORE_ANNOTATED_FOLDER = QStringLiteral("Annotated Sheets");
 
 //! A Flexible chair as one instrument can play it (Starsign Band Guide, page 3)
 struct StarScoreSeat {
@@ -2383,8 +2387,8 @@ static void starscoreClearMinMajNote(mu::engraving::Score* score)
 
 //! restoreView false: the sheet stays in page view afterwards (a throwaway copy nobody looks at; going back to
 //! continuous view laid the whole sheet out once more for nothing)
-static Ret starscorePrintSheet(const INotationWriterPtr& writer, const INotationPtr& notation, const QString& left,
-                               const QString& right, bool partSheet, QByteArray& pdf, bool restoreView = true)
+static Ret starscorePrintSheetAsIs(const INotationWriterPtr& writer, const INotationPtr& notation, const QString& left,
+                                   const QString& right, bool partSheet, QByteArray& pdf, bool restoreView = true)
 {
     mu::engraving::Score* score = notation && notation->elements() ? notation->elements()->msScore() : nullptr;
     if (!score) {
@@ -2413,6 +2417,67 @@ static Ret starscorePrintSheet(const INotationWriterPtr& writer, const INotation
         score->setLayoutAll();
         score->doLayout();
     }
+    if (restoreView && oldMode != ViewMode::PAGE) {
+        notation->painting()->setViewMode(oldMode);
+    }
+    return ret;
+}
+
+//! A player's sheet with their own notes on it: (player, PDF)
+using StarScoreAnnotatedPdfs = std::vector<std::pair<QString, QByteArray> >;
+
+//! Prints a sheet without its player annotations (Joel, 9 Oct 2026: the sheet stays clean and fresh), as it would
+//! come out had they never been added. With `annotated`, prints it once more for each player with annotations on
+//! it, with only that player's. A sheet without annotations prints as before, laid out once.
+static Ret starscorePrintSheet(const INotationWriterPtr& writer, const INotationPtr& notation, const QString& left,
+                               const QString& right, bool partSheet, QByteArray& pdf, bool restoreView = true,
+                               StarScoreAnnotatedPdfs* annotated = nullptr)
+{
+    mu::engraving::Score* score = notation && notation->elements() ? notation->elements()->msScore() : nullptr;
+    const std::vector<starscore::AnnotationItem> notes = starscore::annotationItems(score);
+    if (!notes.empty()) {
+        LOGI() << "[starscore] sheet with " << notes.size() << " player annotation(s): " << left.toStdString() << " "
+               << right.toStdString();
+    }
+    if (notes.empty()) {
+        return starscorePrintSheetAsIs(writer, notation, left, right, partSheet, pdf, restoreView);
+    }
+    const ViewMode oldMode = notation->painting()->viewMode();
+    QStringList players;
+    std::vector<mu::engraving::EngravingItem*> all;
+    for (const starscore::AnnotationItem& a : notes) {
+        all.push_back(a.item);
+        if (!players.contains(a.player)) {
+            players << a.player;
+        }
+    }
+    Ret ret;
+    {
+        starscore::AnnotationDetacher detacher(score);
+        detacher.detach(all);
+        score->setLayoutAll();
+        ret = starscorePrintSheetAsIs(writer, notation, left, right, partSheet, pdf, false);
+        for (const QString& player : players) {
+            if (!ret || !annotated) {
+                break;
+            }
+            std::vector<mu::engraving::EngravingItem*> theirs;
+            for (const starscore::AnnotationItem& a : notes) {
+                if (a.player == player) {
+                    theirs.push_back(a.item);
+                }
+            }
+            detacher.attach(theirs);
+            score->setLayoutAll();
+            QByteArray their;
+            if (starscorePrintSheetAsIs(writer, notation, left, right, partSheet, their, false)) {
+                annotated->emplace_back(player, their);
+            }
+            detacher.detach(theirs);
+        }
+    }   // (every annotation back)
+    score->setLayoutAll();
+    score->doLayout();
     if (restoreView && oldMode != ViewMode::PAGE) {
         notation->painting()->setViewMode(oldMode);
     }
@@ -2931,6 +2996,10 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         return scratch;
     };
 
+    // each sheet's copies with a player's annotations (none for a Half-Time or Double-Time copy)
+    StarScoreAnnotatedPdfs annotatedPdfs;
+    StarScoreAnnotatedPdfs* const annotatedOut = variant.isEmpty() ? &annotatedPdfs : nullptr;
+
     // One of the song's own part books (kept in the file: the sheet title it gets now stays)
     auto writePartBook = [&](const StarScoreBandFile& file, const INotationPtr& book, QByteArray& pdf) -> Ret {
         // Lead and rhythm sheets have no sheet title to add, but their credit is placed the same way (Balkan Wedding's
@@ -2949,7 +3018,8 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         if (oneHornSax.match(file.relativePath).hasMatch()) {
             starscore::hideMuteMarkings(book->elements()->msScore());
         }
-        const Ret ret = starscorePrintSheet(writer, book, file.sheetLeft, file.sheetRight, true, pdf, variant.isEmpty());
+        const Ret ret = starscorePrintSheet(writer, book, file.sheetLeft, file.sheetRight, true, pdf, variant.isEmpty(),
+                                            annotatedOut);
         book->undoStack()->commitChanges();
         bookScore->lockUpdates(false);
         touchedBooks.push_back(book);
@@ -2973,7 +3043,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
             return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "no part book for this instrument"));
         }
         n->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
-        const Ret ret = starscorePrintSheet(writer, n, file.sheetLeft, file.sheetRight, true, pdf, false);
+        const Ret ret = starscorePrintSheet(writer, n, file.sheetLeft, file.sheetRight, true, pdf, false, annotatedOut);
         n->undoStack()->commitChanges();
         return ret;
     };
@@ -3019,7 +3089,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                 if (!brass) {
                     starscore::hideMuteMarkings(n->elements()->msScore());
                 }
-                const Ret ret = starscorePrintSheet(writer, n, file.sheetLeft, file.sheetRight, true, pdf, false);
+                const Ret ret = starscorePrintSheet(writer, n, file.sheetLeft, file.sheetRight, true, pdf, false, annotatedOut);
                 lapTime(file.relativePath, "print");
                 n->undoStack()->commitChanges();
                 lapTime(file.relativePath, "commit");
@@ -3051,7 +3121,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         if (!brass) {
             starscore::hideMuteMarkings(n->elements()->msScore());
         }
-        const Ret ret = starscorePrintSheet(writer, n, file.sheetLeft, file.sheetRight, true, pdf, false);
+        const Ret ret = starscorePrintSheet(writer, n, file.sheetLeft, file.sheetRight, true, pdf, false, annotatedOut);
         n->undoStack()->commitChanges();
         return ret;
     };
@@ -3419,7 +3489,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         if (!QFileInfo::exists(target)) {
             return true;
         }
-        QString archived = songDir + "/Version History/Superseded " + today + "/" + rel;
+        QString archived = songDir + "/Version History/" + today + " Superseded/" + rel;
         QDir().mkpath(QFileInfo(archived).absolutePath());
         // (the suffix is kept: the chord charts archive .html files through here too)
         const QString suffix = "." + QFileInfo(archived).suffix();
@@ -3449,10 +3519,93 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     QStringList written;
     QStringList unchanged;
 
+    // A sheet's copies with a player's annotations: "Annotated Sheets/<the sheet's folder>/<sheet> (Ben's notes).pdf",
+    // written like the sheets (unchanged ones left, replaced ones to Version History). The copies of players who no
+    // longer have annotations on the sheet go to Version History. They aren't in the sheet record or the changelogs.
+    int annotatedWritten = 0;
+    int annotatedSame = 0;
+    int annotatedArchived = 0;
+    auto writeAnnotated = [&](const StarScoreBandFile& file) {
+        if (!variant.isEmpty() || !file.sourceFile.isEmpty()) {
+            return;
+        }
+        const QString dir = QFileInfo(file.relativePath).path();
+        const QString base = QFileInfo(file.relativePath).completeBaseName();
+        const QString relDir = STARSCORE_ANNOTATED_FOLDER + (dir == "." || dir.isEmpty() ? QString() : "/" + dir);
+        // (a dry run lists them apart: Update all sheets remakes them without raising the sheet's version)
+        auto markChanged = [&]() {
+            if (!m_dryRunAnnotated.contains(file.relativePath)) {
+                m_dryRunAnnotated << file.relativePath;
+            }
+        };
+        QStringList made;
+        for (const auto& [player, apdf] : annotatedPdfs) {
+            const QString rel = relDir + "/" + base + " (" + starscoreSafeFileName(player) + "'s notes).pdf";
+            made << rel;
+            const QString target = songDir + "/" + rel;
+            if (QFileInfo::exists(target) && starscoreSamePdf(apdf, target)) {
+                ++annotatedSame;
+                continue;
+            }
+            if (m_exportDryRun) {
+                markChanged();
+                continue;
+            }
+            QDir().mkpath(QFileInfo(target).absolutePath());
+            QSaveFile out(target);
+            if (!out.open(QIODevice::WriteOnly) || out.write(apdf) != apdf.size()) {
+                out.cancelWriting();
+                problems << muse::qtrc("starscore", "%1: couldn't write the file.").arg(rel);
+                continue;
+            }
+            QString archivedTo;
+            const bool moved = supersede(rel, &archivedTo);
+            archivedPaths.removeAll(rel);
+            if (!moved) {
+                out.cancelWriting();
+                continue;
+            }
+            if (!out.commit()) {
+                if (!archivedTo.isEmpty()) {
+                    QFile::rename(archivedTo, target);
+                }
+                problems << muse::qtrc("starscore", "%1: couldn't write the file.").arg(rel);
+                continue;
+            }
+            ++annotatedWritten;
+        }
+        // copies for players whose notes are no longer on this sheet
+        const QDir d(songDir + "/" + relDir);
+        if (!d.exists()) {
+            return;
+        }
+        const QRegularExpression theirs("^" + QRegularExpression::escape(base) + " \\([^()/]+'s notes\\)\\.pdf$");
+        for (const QString& fileName : d.entryList({ "*.pdf" }, QDir::Files)) {
+            const QString rel = relDir + "/" + fileName;
+            if (made.contains(rel) || !theirs.match(fileName).hasMatch()) {
+                continue;
+            }
+            if (m_exportDryRun) {
+                markChanged();
+                continue;
+            }
+            if (supersede(rel)) {
+                ++annotatedArchived;
+            }
+            archivedPaths.removeAll(rel);
+        }
+        // an emptied folder goes (nothing else in it)
+        QDir(songDir).rmdir(relDir);
+        if (relDir != STARSCORE_ANNOTATED_FOLDER) {
+            QDir(songDir).rmdir(STARSCORE_ANNOTATED_FOLDER);
+        }
+    };
+
     int fileNumber = 0;
     for (const StarScoreBandFile& file : plan.files) {
         QByteArray pdf;
         Ret ret;
+        annotatedPdfs.clear();
         // where the export is: in the log (a crash can be traced to the sheet being made) and in the export window
         reportExportProgress(muse::qtrc("starscore", "Sheets"), fileNumber++, int(plan.files.size()), file.relativePath);
 
@@ -3477,6 +3630,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
             problems << muse::qtrc("starscore", "%1: %2").arg(file.relativePath).arg(QString::fromStdString(ret.toString()));
             continue;
         }
+        writeAnnotated(file);
 
         const QString target = songDir + "/" + starscoreVariantPath(file.relativePath, variant);
         // the same pages as the file already there (a re-export with nothing changed in this sheet):
@@ -3487,7 +3641,9 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         }
         // "Update all sheets" first only finds out which sheets would come out differently, writing nothing
         if (m_exportDryRun) {
-            m_dryRunChanged << file.relativePath;
+            if (!m_dryRunChanged.contains(file.relativePath)) {
+                m_dryRunChanged << file.relativePath;
+            }
             continue;
         }
         // The new file is written under a temporary name next to the target, the old file moves to Version History,
@@ -3863,6 +4019,13 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     if (!written.isEmpty() && !unchanged.isEmpty()) {
         summary += " " + muse::qtrc("starscore", "%1 sheet(s) came out the same as before, so those files were left as they were.")
                    .arg(unchanged.size());
+    }
+    if (annotatedWritten + annotatedSame + annotatedArchived > 0) {
+        summary += " " + muse::qtrc("starscore", "Sheets with players' annotations (in %1): %2 written, %3 the same as before.")
+                   .arg(STARSCORE_ANNOTATED_FOLDER).arg(annotatedWritten).arg(annotatedSame);
+        if (annotatedArchived > 0) {
+            summary += " " + muse::qtrc("starscore", "%1 no longer annotated, moved to Version History.").arg(annotatedArchived);
+        }
     }
     if (chartsTried) {
         QStringList names;
@@ -4357,9 +4520,9 @@ RetVal<QString> StarScoreService::exportArrangementsAsMscz(const QString& folder
             continue;
         }
 
-        // An older copy moves to Version History/Superseded <today>/ instead of being overwritten
+        // An older copy moves to Version History/<today> Superseded/ instead of being overwritten
         if (QFileInfo::exists(target)) {
-            QString archived = folder + "/Version History/Superseded " + today + "/" + name;
+            QString archived = folder + "/Version History/" + today + " Superseded/" + name;
             QDir().mkpath(QFileInfo(archived).absolutePath());
             const QString base = archived.left(archived.length() - 5);
             for (int n = 2; QFileInfo::exists(archived); ++n) {
@@ -4385,7 +4548,7 @@ RetVal<QString> StarScoreService::exportArrangementsAsMscz(const QString& folder
         summary += "\n  • " + w;
     }
     if (!superseded.isEmpty()) {
-        summary += "\n\n" + muse::qtrc("starscore", "Older copies of %1 file(s) moved to Version History/Superseded %2.")
+        summary += "\n\n" + muse::qtrc("starscore", "Older copies of %1 file(s) moved to Version History/%2 Superseded.")
                    .arg(superseded.size()).arg(today);
     }
     if (!unchanged.isEmpty()) {

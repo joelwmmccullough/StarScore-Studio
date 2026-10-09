@@ -362,6 +362,12 @@ MenuItem* AppMenuModel::makeAddMenu()
         makeMenu(TranslatableString("appshell/menu/add", "&Lines"), makeLinesItems(), "menu-lines"),
         makeMenu(TranslatableString("appshell/menu/add", "&Chords and fretboard diagrams"),
                  makeChordAndFretboardDiagramsItems(), "menu-chord-and-frets"),
+        makeSeparator(),
+        makeMenu(TranslatableString("appshell/menu/add", "&Player annotations"), {
+            makeMenuItem("starscore-annotation-add"),
+            makeMenuItem("starscore-annotation-mark"),
+            makeMenuItem("starscore-annotation-unmark"),
+        }, "menu-starscore-annotations"),
     };
 
     return makeMenu(TranslatableString("appshell/menu/add", "&Add"), addItems, "menu-add");
