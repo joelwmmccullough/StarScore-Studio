@@ -230,6 +230,10 @@ bool readIndex(QFile& f, std::vector<Version>& versions, qint64& framesStart)
         return false;
     }
     const QJsonDocument doc = QJsonDocument::fromJson(f.read(len));
+    if (!doc.isObject()) {
+        return false;   // the index itself is damaged or cut short (an unreadable index read as an empty history,
+                        // and the next pack wrote a new history over the frames without keeping the damaged file)
+    }
     framesStart = MAGIC.size() + 8 + len;
     versions.clear();
     for (const QJsonValue& v : doc.object().value("versions").toArray()) {

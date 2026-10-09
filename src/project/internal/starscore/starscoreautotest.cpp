@@ -1304,12 +1304,14 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         autotestLog(QString("  after undo %1 marks").arg(tag.isEmpty() ? 0 : tag.count(';') + 1));
     } else if (step.startsWith("archiverepairtest:")) {
         // archiverepairtest:DIR: DIR's .starscore files saved 10 minutes apart into a history; the history file then
-        // damaged (a byte flipped in the 2nd version's frame, or cut short: archiverepairtest:DIR:cut); one more save
-        // packed; reports what is left and checks every remaining version unpacks identical
+        // damaged (a byte flipped in the 2nd version's frame, or cut short: archiverepairtest:DIR:cut, or cut short
+        // inside its index: archiverepairtest:DIR:cutindex); one more save packed; reports what is left and checks
+        // every remaining version unpacks identical
         namespace aa = mu::project::starscore;
         const QString root = aa::autosaveArchiveRoot();
         const QString dir = step.section(':', 1, 1);
         const bool cut = step.section(':', 2, 2) == "cut";
+        const bool cutIndex = step.section(':', 2, 2) == "cutindex";
         const QString work = autotestDir() + "/repair";
         QDir().mkpath(work);
         const QString song = work + "/RPAR - Repair.starscore";
@@ -1332,7 +1334,9 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             QFile f(hist);
             f.open(QIODevice::ReadWrite);
             QByteArray all = f.readAll();
-            if (cut) {
+            if (cutIndex) {
+                all.truncate(all.indexOf("\"versions\"") + 40);   // inside the JSON index
+            } else if (cut) {
                 all.truncate(all.size() * 2 / 3);
             } else {
                 all[all.size() / 3] = char(all[all.size() / 3] ^ 0x5a);
