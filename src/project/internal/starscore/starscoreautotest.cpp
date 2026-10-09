@@ -390,6 +390,93 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         }
         const QString tag = masterScore()->metaTag(String(engraving::starscore::PROGRESS_TAG)).toQString();
         autotestLog(QString("  %1 marks").arg(tag.isEmpty() ? 0 : tag.count(';') + 1));
+    } else if (step.startsWith("clearpart:")) {
+        // clearpart:<part name>: every bar of the part's staves emptied (rests), one undo step
+        const QString name = step.mid(10);
+        for (engraving::Part* p : ms->parts()) {
+            if (p->partName().toQString() != name || p->staves().empty()) {
+                continue;
+            }
+            const engraving::staff_idx_t s1 = p->staves().front()->idx();
+            const engraving::staff_idx_t s2 = p->staves().back()->idx() + 1;
+            master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Clear part"));
+            ms->selection().setRangeTicks(engraving::Fraction(0, 1), ms->lastMeasure()->endTick(), s1, s2);
+            ms->selection().updateSelectedElements();
+            ms->cmdDeleteSelection();
+            ms->deselectAll();
+            master->notation()->undoStack()->commitChanges();
+            autotestLog(QString("  cleared %1 (%2 staves)").arg(name).arg(s2 - s1));
+        }
+    } else if (step.startsWith("partbook:")) {
+        // partbook:<part name>[|<part score name>]: a part score of its own for the part (named as given)
+        const QString name = step.mid(9).section('|', 0, 0), book = step.mid(9).section('|', 1);
+        for (const engraving::Part* p : ms->parts()) {
+            if (p->partName().toQString() == name) {
+                addPartBooksFor({ idText(p) });
+                if (!book.isEmpty()) {
+                    for (const IExcerptNotationPtr& e : master->excerpts()) {
+                        if (e->name() == name) {
+                            e->setName(book);
+                        }
+                    }
+                }
+            }
+        }
+        QStringList books;
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            books << e->name();
+        }
+        autotestLog("  part scores: " + books.join(" | "));
+    } else if (step.startsWith("addinstrument:")) {
+        // addinstrument:<instrument id>|<part name>|<section id>|<after part name>: a new instrument in the section,
+        // placed after the named part, with its own part score
+        const QStringList a = step.mid(14).split('|');
+        const InstrumentTemplate& tpl = instrumentsRepository()->instrumentTemplate(String::fromQString(a.value(0)));
+        if (tpl.id.isEmpty()) {
+            autotestLog("  unknown instrument " + a.value(0));
+        } else {
+            std::set<QString> before;
+            PartInstrumentList list;
+            for (const engraving::Part* p : ms->parts()) {
+                before.insert(idText(p));
+                PartInstrument pi;
+                pi.isExistingPart = true;
+                pi.partId = p->id();
+                list << pi;
+                if (p->partName().toQString() == a.value(3)) {
+                    PartInstrument ni;
+                    ni.isExistingPart = false;
+                    ni.instrumentTemplate = tpl;
+                    list << ni;
+                }
+            }
+            engraving::ScoreOrder order = master->parts()->scoreOrder();
+            order.customized = true;
+            master->parts()->setParts(list, order);
+            std::vector<engraving::Part*> made;
+            for (engraving::Part* p : ms->parts()) {
+                if (!before.count(idText(p))) {
+                    made.push_back(p);
+                }
+            }
+            StarScoreInstrument inst;
+            inst.instrumentId = a.value(0);
+            inst.partName = a.value(1);
+            const StarScoreSection sec = finishNewParts(made, { inst });
+            Data d = load();
+            for (StarScoreSection& s : d.sections) {
+                if (s.id == a.value(2)) {
+                    for (const QString& pid : sec.partIds) {
+                        s.partIds << pid;
+                        if (!s.shownPartIds.isEmpty()) {
+                            s.shownPartIds << pid;
+                        }
+                    }
+                }
+            }
+            store(d);
+            autotestLog(QString("  added %1 (%2) to %3").arg(a.value(1), sec.partIds.join(","), a.value(2)));
+        }
     } else if (step.startsWith("removepart:")) {
         // removepart:<words>: parts whose instrument's long name contains the words (case ignored) removed, as the
         // Instruments panel's delete does; then the part scores left
