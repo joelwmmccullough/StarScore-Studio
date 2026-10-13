@@ -22,6 +22,8 @@
 
 #include "textedit.h"
 
+#include <regex>
+
 #include "mscoreview.h"
 
 #include "iengravingfont.h"
@@ -240,6 +242,21 @@ void TextBase::endEdit(EditData& ed)
 
         if (isDynamic()) {
             undoChangeProperty(Pid::DYNAMIC_TYPE, actualXmlText);
+        }
+
+        // StarScore (Joel, 13 Oct 2026): mute markings in italics by default: "mute", "(open)", "unmute", "cup mute",
+        // "con sord.", and a mute's own name where a part has several ("harmon", "(plunger)")… typed as staff text. Italic is turned on for the whole text, once (it can be turned off again).
+        if ((isStaffText() || isSystemText() || isExpression() || isPlayTechAnnotation()) && !actualXmlText.contains(u"<i>")) {
+            static const std::wregex muteRe(L"^\\(?\\s*((straight|cup|harmon|plunger|bucket|solotone|pixie|practice|wah|stopping)\\s+)?"
+                                            L"(mute|muted|mute in|mute out|mute on|mute off|unmute|unmuted|open|harmon|plunger|cup|straight|bucket|solotone|pixie|"
+                                            L"derby|hat|in hat|stopping|wah|wah-wah|"
+                                            L"con sord\\.?|senza sord\\.?|con sordino|senza sordino)\\s*\\)?[.!]?$",
+                                            std::regex::icase);
+            const std::wstring plain = actualPlainText.simplified().toStdWString();
+            const int style = getProperty(Pid::FONT_STYLE).toInt();
+            if (std::regex_match(plain, muteRe) && !(style & int(FontStyle::Italic))) {
+                undoChangeProperty(Pid::FONT_STYLE, PropertyValue::fromValue(style | int(FontStyle::Italic)), PropertyFlags::UNSTYLED);
+            }
         }
 
         renderer()->layoutText1(this);

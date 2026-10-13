@@ -753,26 +753,68 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
         }
 
         if (key == "rhythm") {
+            // A part score named for a player's sheet holding several of the instruments ("Keys": Clavinet and Bass
+            // Synth, Joel 13 Oct 2026) is one sheet under that name; every other instrument has a sheet of its own
+            const std::vector<RhythmBook> books = rhythmBooks(ms, sec.partIds);
+            auto bookOf = [&](const QString& pid) -> const RhythmBook* {
+                for (const RhythmBook& b : books) {
+                    if (b.partIds.contains(pid)) {
+                        return &b;
+                    }
+                }
+                return nullptr;
+            };
+            auto ownName = [&](const engraving::Part* p) {
+                return starscoreRhythmName(p->instrumentId().toQString(), p->partName().toQString());
+            };
             std::map<QString, int> counts;
+            std::set<const RhythmBook*> booksCounted;
             for (const QString& pid : sec.partIds) {
-                if (engraving::Part* p = partById(pid)) {
-                    counts[starscoreRhythmName(p->instrumentId().toQString(), p->partName().toQString())]++;
+                if (const RhythmBook* b = bookOf(pid)) {
+                    if (booksCounted.insert(b).second) {
+                        counts[b->name]++;
+                    }
+                } else if (engraving::Part* p = partById(pid)) {
+                    counts[ownName(p)]++;
                 }
             }
+            std::set<const RhythmBook*> booksDone;
             for (const QString& pid : sec.partIds) {
                 engraving::Part* p = partById(pid);
                 if (!p) {
                     continue;
                 }
-                const QString role = starscoreRhythmName(p->instrumentId().toQString(), p->partName().toQString());
+                const RhythmBook* book = bookOf(pid);
+                if (book && !booksDone.insert(book).second) {
+                    continue;   // its book's sheet is planned already
+                }
+                const QString role = book ? book->name : ownName(p);
                 QString name = role;
                 if (counts[name] > 1) {
                     name += " (" + p->partName().toQString() + ")";
                 }
-                addFile("1 Rhythm", name, { pid }, false);
-                const QString former = starscoreRhythmNameBefore11819(p->instrumentId().toQString(), p->partName().toQString());
-                if (!former.isEmpty() && starscoreSafeFileName(former) != starscoreSafeFileName(name)) {
-                    plan.files.back().formerPath = "1 Rhythm/" + code + " - " + starscoreSafeFileName(former) + ".pdf";
+                const QStringList filePids = book ? book->partIds : QStringList { pid };
+                addFile("1 Rhythm", name, filePids, false);
+                // its instruments' sheets under earlier names (an instrument's own sheet before it joined the book;
+                // the names from before 1.18.19) go to Version History once this one is written
+                for (const QString& member : filePids) {
+                    const engraving::Part* mp = partById(member);
+                    if (!mp) {
+                        continue;
+                    }
+                    QStringList formers;
+                    if (book) {
+                        formers << ownName(mp);
+                    }
+                    formers << starscoreRhythmNameBefore11819(mp->instrumentId().toQString(), mp->partName().toQString());
+                    for (const QString& former : formers) {
+                        if (!former.isEmpty() && starscoreSafeFileName(former) != starscoreSafeFileName(name)) {
+                            const QString path = "1 Rhythm/" + code + " - " + starscoreSafeFileName(former) + ".pdf";
+                            if (!plan.files.back().formerPaths.contains(path)) {
+                                plan.files.back().formerPaths << path;
+                            }
+                        }
+                    }
                 }
                 // Finished rhythm section with "No Drums / Percussion / Keys Sheet": that player reads the lead
                 // sheet, so the sheet starts unticked
@@ -780,7 +822,9 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
                 if (sec.status == StarScoreStatus::Finished && !skipSheets.isEmpty()) {
                     const QString id = p->instrumentId().toQString();
                     QString kind;
-                    if (id == "drumset" || id == "drum-kit") {
+                    if (book) {
+                        kind = book->role == "guitar" || book->role == "bass" ? QString() : book->role;
+                    } else if (id == "drumset" || id == "drum-kit") {
                         kind = "drums";
                     } else if (id == "congas" || id == "bongos" || id == "percussion" || id == "timbales" || id == "cajon"
                                || id.contains("shaker") || id.contains("tambourine") || id.contains("cowbell")) {
@@ -1078,6 +1122,50 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
     plan.files = unique;
     plan.anyHornFolders = anyFolders;
     plan.renamedFolders = renamedFolders;
+
+    // A brass part's mutes under its name top left (Joel, 13 Oct 2026): "Trumpet in B♭" / "with Harmon Mute" /
+    // "and Cup Mute". A Flexible chair's mutes only on its sheets for an instrument that takes them, and only the
+    // mutes that instrument has (a tuba sheet shows the straight mute, not the Harmon); a mute typed in by hand on
+    // every such sheet.
+    QStringList standardMutes;
+    for (const char* id : { "trumpet", "trombone", "tuba", "horn" }) {
+        for (const QString& m : starscore::muteOptions(id)) {
+            if (!standardMutes.contains(m)) {
+                standardMutes << m;
+            }
+        }
+    }
+    for (StarScoreBandFile& f : plan.files) {
+        if (f.isScore || f.partIds.size() != 1 || f.sheetLeft.isEmpty()) {
+            continue;
+        }
+        auto it = data.partMutes.find(f.partIds.front());
+        if (it == data.partMutes.end() || it->second.isEmpty()) {
+            continue;
+        }
+        QStringList shown = it->second;
+        if (!starscore::isBrassSheet(f.sheetLeft)) {
+            continue;
+        }
+        if (f.relativePath.contains("Flexible/")) {
+            if (!f.isVersion) {
+                continue;   // (the chair's own concert sheet)
+            }
+            const QStringList has = starscore::muteOptions(f.sheetLeft.toLower().replace(' ', '-'));
+            if (has.isEmpty()) {
+                continue;   // a saxophone, flute, clarinet… sheet
+            }
+            shown.clear();
+            for (const QString& m : it->second) {
+                if (has.contains(m) || !standardMutes.contains(m)) {
+                    shown << m;
+                }
+            }
+        }
+        if (!shown.isEmpty()) {
+            f.sheetLeft += "\n" + starscore::muteLines(shown);
+        }
+    }
 
     return RetVal<StarScoreBandExportPlan>::make_ok(plan);
 }
@@ -3663,6 +3751,27 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
             }
         } else if (file.isVersion) {
             ret = writeVersion(file, pdf);
+        } else if (!file.isScore && file.partIds.size() > 1) {
+            // a rhythm book of several instruments ("Keys"): the part score holding exactly them
+            INotationPtr book;
+            for (const IExcerptNotationPtr& e : excerpts) {
+                INotationPtr n = e->notation();
+                engraving::Score* es = n && n->elements() ? n->elements()->msScore() : nullptr;
+                if (!es || es->parts().size() != size_t(file.partIds.size())) {
+                    continue;
+                }
+                QStringList ids;
+                for (const engraving::Part* p : masterPartsOf(es, ms)) {
+                    ids << idText(p);
+                }
+                if (ids.size() == file.partIds.size()
+                    && std::all_of(ids.begin(), ids.end(), [&](const QString& id) { return file.partIds.contains(id); })) {
+                    book = n;
+                    break;
+                }
+            }
+            ret = book ? writePartBook(file, book, pdf)
+                  : make_ret(Ret::Code::UnknownError, muse::trc("starscore", "the part score of these instruments is missing"));
         } else if (!file.isScore) {
             auto it = bookForPart.find(file.partIds.value(0));
             ret = it != bookForPart.end() && it->second->notation() ? writePartBook(file, it->second->notation(), pdf)
@@ -3941,9 +4050,11 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         // sheets StarScore renamed (Last Pint's "PINT - Accordion.pdf", now "PINT - Keys.pdf"): the old one archived once
         // the new one is written
         for (const StarScoreBandFile& f : full.files) {
-            if (!f.formerPath.isEmpty() && !current.contains(f.formerPath) && QFileInfo::exists(songDir + "/" + f.relativePath)
-                && QFileInfo::exists(songDir + "/" + f.formerPath)) {
-                supersede(f.formerPath);
+            for (const QString& former : f.formerPaths) {
+                if (!current.contains(former) && QFileInfo::exists(songDir + "/" + f.relativePath)
+                    && QFileInfo::exists(songDir + "/" + former)) {
+                    supersede(former);
+                }
             }
         }
         // Scores under their names from before 1.18.17 ("CODE - Score.pdf", "CODE - Score (Transposing).pdf", the Flexible
@@ -4814,9 +4925,12 @@ void StarScoreService::songbookRenderSheets(const QString& songPath, std::vector
                 return sec.partIds.first();
             }
             if (sheet.kind == "rhythm" && (sec.templateKey == "rhythm" || sec.templateKey.endsWith("-rhythm"))) {
+                // (an instrument in a rhythm book, "Keys" holding a Bass Synth, is that book's role)
+                const std::map<QString, QString> bookRoles = rhythmBookRoles(bms, sec.partIds);
                 for (const QString& pid : sec.partIds) {
                     const engraving::Part* p = bms->partById(ID(pid));
-                    if (p && songbookRhythmRole(p->instrumentId().toQString()) == sheet.role
+                    const auto book = bookRoles.find(pid);
+                    if (p && (book != bookRoles.end() ? book->second : songbookRhythmRole(p->instrumentId().toQString())) == sheet.role
                         && (sec.shownPartIds.isEmpty() || sec.shownPartIds.contains(pid))) {
                         return pid;
                     }
@@ -4911,7 +5025,29 @@ void StarScoreService::songbookRenderSheets(const QString& songPath, std::vector
             // The part score as it is (in a fresh copy, so retitling can't touch anything else)
             INotationProjectPtr p = load();
             engraving::Part* part = p ? p->masterNotation()->masterScore()->partById(ID(pid)) : nullptr;
-            INotationPtr n = part ? bookFor(p->masterNotation(), part) : nullptr;
+            INotationPtr n;
+            if (part && sheet.kind == "rhythm") {
+                // a rhythm book ("Keys": Clavinet and Bass Synth) is the player's sheet
+                engraving::MasterScore* pms = p->masterNotation()->masterScore();
+                for (const StarScoreSection& sec : data.sections) {
+                    if (!sec.partIds.contains(pid)) {
+                        continue;
+                    }
+                    for (const RhythmBook& b : rhythmBooks(pms, sec.partIds)) {
+                        if (!b.partIds.contains(pid)) {
+                            continue;
+                        }
+                        for (const IExcerptNotationPtr& e : p->masterNotation()->excerpts()) {
+                            if (e && e->name().trimmed() == b.name && e->notation()) {
+                                n = e->notation();
+                            }
+                        }
+                    }
+                }
+            }
+            if (!n && part) {
+                n = bookFor(p->masterNotation(), part);
+            }
             if (!n && part) {
                 for (const IExcerptNotationPtr& e : p->masterNotation()->potentialExcerpts()) {
                     if (e->name() == part->partName().toQString()) {

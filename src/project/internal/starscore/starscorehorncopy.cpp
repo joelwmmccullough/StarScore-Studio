@@ -246,6 +246,14 @@ int StarScoreService::copyHornParts(const std::vector<std::pair<QString, QString
         }
         if (ok) {
             data.partStatus[dstId] = statusKey(StarScoreStatus::Sketch);
+            // its mutes, to the same kind of instrument only (a 3-Horn trumpet's Harmon to the 4-Horn trumpet; not
+            // the 1-Horn trumpet's to the saxophones and trombone made from it) (Joel, 13 Oct 2026)
+            const QStringList fromMutes = starscore::muteOptions(from->instrumentId().toQString());
+            auto mutes = data.partMutes.find(srcId);
+            if (mutes != data.partMutes.end() && !fromMutes.isEmpty()
+                && fromMutes == starscore::muteOptions(to->instrumentId().toQString())) {
+                data.partMutes[dstId] = mutes->second;
+            }
             ++copied;
         } else {
             LOGW() << "[starscore] copy parts: " << partScoreName(srcId).toStdString() << " not fully copied";

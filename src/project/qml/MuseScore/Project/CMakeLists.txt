@@ -80,6 +80,8 @@ qt_add_qml_module(project_qml
         internal/StarScore/additivetimesigmodel.h
         internal/StarScore/playerannotationmodel.cpp
         internal/StarScore/playerannotationmodel.h
+        internal/StarScore/partmutesmodel.cpp
+        internal/StarScore/partmutesmodel.h
         internal/StarScore/bandexportmodel.cpp
         internal/StarScore/updateallsheetsmodel.cpp
         internal/StarScore/updateallsheetsmodel.h
@@ -200,6 +202,7 @@ qt_add_qml_module(project_qml
         AddSoloDialog.qml
         AdditiveTimeSigDialog.qml
         PlayerAnnotationDialog.qml
+        PartMutesDialog.qml
         BandExportDialog.qml
         UpdateAllSheetsDialog.qml
         OrganizerDialog.qml

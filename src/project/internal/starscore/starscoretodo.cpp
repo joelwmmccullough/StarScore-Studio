@@ -117,8 +117,11 @@ std::vector<StarScoreTodoItem> StarScoreService::todoList(const Data& data) cons
             continue;
         }
         const QStringList& reads = sec.autoStatus ? sec.autoSkipSheets : sec.skipSheets;
+        const std::map<QString, QString> bookRoles = rhythmBookRoles(ms, sec.partIds);   // ("Keys" holding a Bass Synth)
         for (const QString& pid : sec.partIds) {
-            const QString role = rhythmRole(instrumentOf(pid));   // the classifier the section status uses
+            // the classifier the section status uses
+            const auto book = bookRoles.find(pid);
+            const QString role = book != bookRoles.end() ? book->second : rhythmRole(instrumentOf(pid));
             if ((role == "drums" || role == "keys" || role == "percussion") && reads.contains(role)
                 && data.partStatus.find(pid) == data.partStatus.end()) {
                 readsLead.insert(role);

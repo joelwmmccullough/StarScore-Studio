@@ -62,6 +62,16 @@ struct StarScoreUpdateAllStatus {
 };
 
 //! Where a running export is (Joel, 6 Oct 2026: a window shows it live instead of a beachball)
+//! The part the Mutes dialog is for (see IStarScoreService::muteTarget)
+struct StarScoreMuteTarget {
+    QString problem;        // why there's nothing to set (no brass part open), or empty
+    QString partId;
+    QString partName;       // "3H: Trumpet"
+    QStringList options;    // the mutes offered, most used first ("Straight Mute", "Cup Mute"…)
+    QStringList chosen;     // the part's mutes now (a typed-in one too)
+    bool flexible = false;  // a Flexible chair: shown only on its sheets for brass instruments
+};
+
 //! The selection a player annotation goes on (see IStarScoreService::annotationTarget)
 struct StarScoreAnnotationTarget {
     QString problem;          // why nothing can be added or marked here, or nothing
@@ -336,9 +346,10 @@ struct StarScoreBandFile
     //! the octave that suits its notes). Drums, percussion and instruments of two staves stay as they are. Empty for
     //! every other file.
     QString scoreKey;
-    //! The same sheet's name before StarScore renamed it ("1 Rhythm/PINT - Accordion.pdf" for "1 Rhythm/PINT - Keys.pdf"):
+    //! The same sheet's names before StarScore renamed it ("1 Rhythm/PINT - Accordion.pdf" for "1 Rhythm/PINT - Keys.pdf")
+    //! or put it on a sheet with another instrument ("1 Rhythm/GIJO - Bass Synth.pdf", now on "GIJO - Keys.pdf"):
     //! archived once the sheet is written under its new name
-    QString formerPath;
+    QStringList formerPaths;
 };
 
 //! Export to Sheets and Demos: which version number to raise for this export, judged from what changed in the music
@@ -561,6 +572,10 @@ public:
     virtual void setSectionAutoStatus(const QString& sectionId) = 0;
     //! Completion tag of each part (instrument); parts without a tag are missing from the map
     virtual std::map<QString, StarScoreStatus> partStatuses() const = 0;
+    //! A brass part's mutes (Joel, 13 Oct 2026): printed under the instrument name top left of its sheets ("with
+    //! Harmon Mute", "and Cup Mute"). Copied with the part to the same instrument in another arrangement.
+    virtual QStringList partMutes(const QString& partId) const = 0;
+    virtual void setPartMutes(const QString& partId, const QStringList& mutes) = 0;
     virtual void setPartStatus(const QString& partId, int status) = 0;   // -1 = no tag
     //! Offers to make the stand-in versions the section's main parts don't have yet (see versionMains).
     virtual void makeBassHornVersions(const QString& sectionId) = 0;
@@ -745,6 +760,9 @@ public:
 
     // --- Each arrangement's own score
     virtual void syncArrangementScores() = 0;                 // create / update / rename them to match the arrangements
+    //! The rhythm section's keyboard instruments in one part score named "Keys" (a bass synth too when the section
+    //! has another bass): the first one's part score gets the others. What was done, for a message.
+    virtual QString makeKeysPart() = 0;
     virtual void openArrangementScore(const QString& arrangementId) = 0;
 
     // --- Compare parts on the same instrument across sections
@@ -795,6 +813,8 @@ public:
     // player with only their notes, into the song's "Annotated Sheets" folder.
     //! What the Player annotation dialog works on: the selection in the part score on screen
     virtual StarScoreAnnotationTarget annotationTarget() const = 0;
+    //! The brass part open (its part score, or the part of the selection in the full score) for the Mutes dialog
+    virtual StarScoreMuteTarget muteTarget() const = 0;
     //! A staff text with these words at the selected note or rest, as the player's annotation. Returns a problem
     //! to show, or nothing.
     virtual QString addPlayerAnnotation(const QString& player, const QString& text) = 0;

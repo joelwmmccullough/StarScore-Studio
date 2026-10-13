@@ -275,12 +275,14 @@ void StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, const 
             addUnique(section3, filesOf(sec.partIds, &sec));
         } else if (sec.templateKey == "rhythm") {
             const QStringList& reads = sec.autoStatus ? sec.autoSkipSheets : sec.skipSheets;
+            const std::map<QString, QString> bookRoles = rhythmBookRoles(ms, sec.partIds);   // ("Keys" holding a Bass Synth)
             for (const QString& pid : sec.partIds) {
                 const engraving::Part* p = ms->partById(ID(pid));
                 if (!p) {
                     continue;
                 }
-                const QString role = rhythmRole(p->instrumentId().toQString());
+                const auto book = bookRoles.find(pid);
+                const QString role = book != bookRoles.end() ? book->second : rhythmRole(p->instrumentId().toQString());
                 if (role == "percussion") {
                     continue;   // left out of every colour rule
                 }

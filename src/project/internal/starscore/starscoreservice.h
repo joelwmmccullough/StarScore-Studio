@@ -119,6 +119,8 @@ public:
     void setSectionStatus(const QString& sectionId, StarScoreStatus status) override;
     void setSectionAutoStatus(const QString& sectionId) override;
     std::map<QString, StarScoreStatus> partStatuses() const override;
+    QStringList partMutes(const QString& partId) const override;
+    void setPartMutes(const QString& partId, const QStringList& mutes) override;
     void setPartStatus(const QString& partId, int status) override;
     int partScoreStatus(const mu::engraving::Score* score) const override;
     void setPartScoreStatus(const mu::engraving::Score* score, int status) override;
@@ -246,6 +248,7 @@ public:
     muse::async::Notification progressColorsShownChanged() const override;
     QString markProgress(char code) override;
     StarScoreAnnotationTarget annotationTarget() const override;
+    StarScoreMuteTarget muteTarget() const override;
     QString addPlayerAnnotation(const QString& player, const QString& text) override;
     QString markPlayerAnnotations(const QString& player) override;
     QString unmarkPlayerAnnotations() override;
@@ -295,6 +298,7 @@ public:
         std::vector<StarScoreReference> references;
         QString version;   // "4.0.1"; printed in the footer
         std::map<QString, QString> partStatus;   // part id -> status key
+        std::map<QString, QStringList> partMutes;   // part id -> its mutes as the sheet names them ("Harmon Mute")
         // Big Band, Orchestra and Marching Band: their full score has a status of its own (arrangement id ->
         // status key); the arrangement is finished only when its full score is marked Finished too
         std::map<QString, QString> scoreStatus;
@@ -347,6 +351,19 @@ public:
     //! Main-score parts of the parts in a part score (each part score staff is linked to a main-score staff);
     //! empty for the main score itself
     static std::vector<mu::engraving::Part*> masterPartsOf(const mu::engraving::Score* score, const mu::engraving::MasterScore* ms);
+
+    //! A part score of two or more rhythm-section instruments named for a player's sheet: "Keys", "Drums",
+    //! "Percussion", "Guitar" or "Bass" (Joel, 13 Oct 2026: G.I. Jorge's "Keys" holds the Clavinet and the Bass Synth).
+    //! Its instruments are one player's: exported as one sheet under that name, and counted as that role.
+    struct RhythmBook {
+        QString name;           // "Keys"
+        QString role;           // "keys", "drums", "percussion", "guitar", "bass"
+        QStringList partIds;    // in score order
+    };
+    //! The rhythm books of a section's parts (`sectionPartIds`): only part scores whose instruments are all in it
+    static std::vector<RhythmBook> rhythmBooks(const mu::engraving::MasterScore* ms, const QStringList& sectionPartIds);
+    //! Part id -> its rhythm book's role, for the parts in a rhythm book
+    static std::map<QString, QString> rhythmBookRoles(const mu::engraving::MasterScore* ms, const QStringList& sectionPartIds);
 
 private:
     //! Sheets already exported under an older path or name (see starscoreFormerPathsOf) moved to where the export
@@ -415,6 +432,9 @@ private:
     QStringList onSectionIds(const Data& data) const;
     std::vector<mu::engraving::Part*> masterPartsOf(const mu::engraving::Excerpt* excerpt) const;
     void addPartBooksFor(const QStringList& partIds);
+public:
+    QString makeKeysPart() override;
+private:
     int applyStylesOnly(const QStringList& partIds, const Data& data);
     void syncMinMajDefaults(const Data& data);
     //! Sound, volume, pan, reverb and mute for each instrument, from the defaults in mixer_defaults.json
@@ -533,6 +553,7 @@ private:
     //! Part scores named after a player ("Harley", "Percussionist", "Guest Player: Bassoon") renamed after their
     //! instrument ("Bass (5-String)", "Percussion Lead", "Bassoon"); how many
     int renamePersonNamedPartScores();
+    int renameOffSchemePartScores();
     StarScoreUpdateAllStatus m_updateStatus;
     int m_updateWaits = 0;
     void updateAllNext();

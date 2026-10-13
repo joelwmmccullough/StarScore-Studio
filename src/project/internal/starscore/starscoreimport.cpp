@@ -1995,8 +1995,38 @@ void StarScoreService::tidyOpenedScore()
 
     standardizeHornNames();
     renamePersonNamedPartScores();
+    renameOffSchemePartScores();
     labelPartBooks();
     LOGI() << "[starscore] tidied the opened score in " << clock.elapsed() << " ms";
+}
+
+//! An instrument in the band's words: "Violoncello" -> "Cello", "Tenor Saxophone 1" -> "Tenor Sax 1",
+//! "Trumpet in B♭ 2" -> "Trumpet 2", "Bass Guitar (5-String)" -> "Bass (5-String)", "Drumset" -> "Drums"
+static QString starscoreBandWords(QString name)
+{
+    const int at = name.lastIndexOf(": ");
+    if (at >= 0) {
+        name = name.mid(at + 2);
+    }
+    static const std::vector<std::pair<QRegularExpression, QString> > WORDS {
+        { QRegularExpression("^Violoncello"), "Cello" },
+        { QRegularExpression("^Electric Guitar"), "Guitar" },
+        { QRegularExpression("^(\\d)[- ]String Bass( Guitar)?"), "Bass (\\1-String)" },
+        { QRegularExpression("^Bass Guitar \\((\\d)[- ]String\\)"), "Bass (\\1-String)" },
+        { QRegularExpression("^Bass Guitar 5s"), "Bass (5-String)" },
+        { QRegularExpression("^Bass Guitar"), "Bass" },
+        { QRegularExpression("^Contrabass"), "Double Bass" },
+        { QRegularExpression("^Baritone Saxophone"), "Bari Sax" },
+        { QRegularExpression("Saxophone"), "Sax" },
+        { QRegularExpression(" in B♭| in Bb| in E♭| in Eb"), "" },
+        { QRegularExpression("^(Drumset|Drum Kit|Drum Set|Large Drum Kit)$"), "Drums" },
+        { QRegularExpression("Synthesizer"), "Synth" },
+        { QRegularExpression("^El\\. Pno\\.?$"), "Electric Piano" },
+    };
+    for (const auto& [re, to] : WORDS) {
+        name.replace(re, to);
+    }
+    return name.simplified();
 }
 
 //! Joel, 6 Oct 2026: part scores named after the player who read them (G.I. Jorge's "Cory", "Harley", "Katelyn"…)
@@ -2030,34 +2060,6 @@ int StarScoreService::renamePersonNamedPartScores()
         const QString n = name.trimmed().toLower();
         return people.contains(n) || n.startsWith("guest player");
     };
-    // an instrument in the band's words: "Violoncello" -> "Cello", "Tenor Saxophone 1" -> "Tenor Sax 1",
-    // "Trumpet in B♭ 2" -> "Trumpet 2", "Bass Guitar (5-String)" -> "Bass (5-String)", "Drumset" -> "Drums"
-    auto bandWords = [](QString name) {
-        const int at = name.lastIndexOf(": ");
-        if (at >= 0) {
-            name = name.mid(at + 2);
-        }
-        static const std::vector<std::pair<QRegularExpression, QString> > WORDS {
-            { QRegularExpression("^Violoncello"), "Cello" },
-            { QRegularExpression("^Electric Guitar"), "Guitar" },
-            { QRegularExpression("^(\\d)[- ]String Bass( Guitar)?"), "Bass (\\1-String)" },
-            { QRegularExpression("^Bass Guitar \\((\\d)[- ]String\\)"), "Bass (\\1-String)" },
-            { QRegularExpression("^Bass Guitar 5s"), "Bass (5-String)" },
-            { QRegularExpression("^Bass Guitar"), "Bass" },
-            { QRegularExpression("^Contrabass"), "Double Bass" },
-            { QRegularExpression("^Baritone Saxophone"), "Bari Sax" },
-            { QRegularExpression("Saxophone"), "Sax" },
-            { QRegularExpression(" in B♭| in Bb| in E♭| in Eb"), "" },
-            { QRegularExpression("^(Drumset|Drum Kit|Drum Set|Large Drum Kit)$"), "Drums" },
-            { QRegularExpression("Synthesizer"), "Synth" },
-            { QRegularExpression("^El\\. Pno\\.?$"), "Electric Piano" },
-        };
-        for (const auto& [re, to] : WORDS) {
-            name.replace(re, to);
-        }
-        return name.simplified();
-    };
-
     QSet<QString> taken;
     for (const IExcerptNotationPtr& e : master->excerpts()) {
         taken.insert(e->name().toLower());
@@ -2091,7 +2093,7 @@ int StarScoreService::renamePersonNamedPartScores()
                 leads << (people.contains(who) ? (r != roleOf.end() ? r->second + " Lead" : QString()) : n);
                 continue;
             }
-            n = bandWords(n);
+            n = starscoreBandWords(n);
             if (!n.isEmpty() && !instruments.contains(n)) {
                 instruments << n;
             }
@@ -2112,6 +2114,125 @@ int StarScoreService::renamePersonNamedPartScores()
         LOGI() << "[starscore] part score " << e->name() << " renamed " << unique;
         taken.insert(unique.toLower());
         e->setName(unique);
+        ++renamed;
+    }
+    if (renamed) {
+        if (INotationProjectPtr project = globalContext()->currentProject()) {
+            project->markAsUnsaved();
+        }
+        master->notation()->notationChanged().notify();
+        scheduleChanged();
+    }
+    return renamed;
+}
+
+//! Joel, 13 Oct 2026: part scores still named by an old scheme (Fish Oil's "ignore1", "ignore6"…, Okane's lead sheet
+//! "rad3") get the names StarScore gives them:
+//! - a lead sheet's part score: "Lead Sheet" ("Lead Sheet (<part>)" with several lead sheet parts);
+//! - a horn part's (a part named by the scheme, "6H: Trumpet 1"): the part's name;
+//! - any other part score whose name says nothing about what's in it (no word of the instruments' names, the band's
+//!   words for them, or "Keys", "Drums", "Percussion", "Guitar", "Bass", "Lead"): its instruments in the band's words
+//!   ("Electric Piano", "Drums", "Piano & Hammond Organ"). "Bass (5-String)", "Hammond Organ (1)", "Keys" stay.
+//! The arrangements' own scores are left alone, and a name another part score has already is not given again.
+int StarScoreService::renameOffSchemePartScores()
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    engraving::MasterScore* ms = masterScore();
+    if (!master || !ms) {
+        return 0;
+    }
+    const Data data = load();
+    std::map<QString, const StarScoreSection*> sectionOf;
+    for (const StarScoreSection& s : data.sections) {
+        for (const QString& pid : s.partIds) {
+            if (!sectionOf.count(pid)) {
+                sectionOf[pid] = &s;
+            }
+        }
+    }
+    QSet<QString> arrangementScores;
+    for (const StarScoreArrangement& a : data.arrangements) {
+        arrangementScores.insert(a.scoreName);
+    }
+    QSet<QString> taken;
+    for (const IExcerptNotationPtr& e : master->excerpts()) {
+        taken.insert(e->name().toLower());
+    }
+    auto words = [](const QString& s) {
+        QSet<QString> out;
+        static const QRegularExpression wordRe("[a-z]+");
+        auto it = wordRe.globalMatch(s.toLower());
+        while (it.hasNext()) {
+            const QString w = it.next().captured(0);
+            if (w.size() >= 3) {
+                out.insert(w);
+            }
+        }
+        return out;
+    };
+
+    int renamed = 0;
+    for (const IExcerptNotationPtr& e : master->excerpts()) {
+        const QString name = e->name();
+        if (arrangementScores.contains(name)) {
+            continue;
+        }
+        engraving::Excerpt* ex = importExcerptOf(e);
+        const std::vector<engraving::Part*> ps = ex ? masterPartsOf(ex) : std::vector<engraving::Part*>();
+        if (ps.empty()) {
+            continue;
+        }
+        QString want;
+        if (ps.size() == 1) {
+            const engraving::Part* p = ps.front();
+            const QString partName = p->partName().toQString().trimmed();
+            auto sec = sectionOf.find(idText(p));
+            const QString key = sec != sectionOf.end() ? sec->second->templateKey : QString();
+            const bool rhythm = key == "rhythm" || key.endsWith("-rhythm");
+            if (key == "lead-sheet") {
+                if (name.startsWith("Lead Sheet")) {
+                    continue;
+                }
+                want = sec->second->partIds.size() > 1 ? QString("Lead Sheet (%1)").arg(partName) : QString("Lead Sheet");
+            } else if (sec != sectionOf.end() && !rhythm && partName.contains(": ")) {
+                if (name == partName) {
+                    continue;
+                }
+                want = partName;
+            }
+        }
+        if (want.isEmpty()) {
+            // does the name say what's in it?
+            QSet<QString> known { "keys", "drums", "percussion", "guitar", "bass", "lead", "sheet", "synth", "sax" };
+            QStringList instruments;
+            for (const engraving::Part* p : ps) {
+                QString band = starscoreBandWords(p->partName().toQString());
+                // a rhythm section keyboard's sheet is "Keys", as its exported sheet ("FISH - Keys.pdf")
+                auto sec = sectionOf.find(idText(p));
+                if (sec != sectionOf.end() && (sec->second->templateKey == "rhythm" || sec->second->templateKey.endsWith("-rhythm"))
+                    && rhythmRole(p->instrumentId().toQString()) == "keys") {
+                    band = "Keys";
+                }
+                known += words(p->partName().toQString());
+                known += words(p->longName().toQString());
+                known += words(band);
+                known += words(QString(p->instrumentId().toQString()).replace('-', ' '));
+                if (!band.isEmpty() && !instruments.contains(band)) {
+                    instruments << band;
+                }
+            }
+            if (words(name).intersects(known) || instruments.isEmpty()) {
+                continue;
+            }
+            want = instruments.join(" & ");
+        }
+        if (want == name || taken.contains(want.toLower())) {
+            continue;
+        }
+        LOGI() << "[starscore] part score " << name << " renamed " << want;
+        taken.remove(name.toLower());
+        taken.insert(want.toLower());
+        e->setName(want);
         ++renamed;
     }
     if (renamed) {

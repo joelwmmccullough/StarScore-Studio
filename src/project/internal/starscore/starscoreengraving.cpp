@@ -856,6 +856,43 @@ bool mu::project::starscore::isBrassSheet(const QString& sheetName)
     return brass.match(sheetName).hasMatch();
 }
 
+QStringList mu::project::starscore::muteOptions(const QString& id)
+{
+    if (id.contains("trumpet") || id.contains("cornet") || id.contains("flugelhorn")) {
+        return { "Straight Mute", "Cup Mute", "Harmon Mute", "Harmon Mute (stem out)", "Plunger", "Bucket Mute",
+                 "Solotone Mute", "Pixie Mute", "Derby (Hat)", "Practice Mute" };
+    }
+    if (id.contains("trombone") || id.contains("euphonium") || id.contains("baritone-horn")) {
+        return { "Straight Mute", "Cup Mute", "Harmon Mute", "Harmon Mute (stem out)", "Plunger", "Pixie Mute",
+                 "Bucket Mute", "Solotone Mute", "Derby (Hat)", "Practice Mute" };
+    }
+    if (id.contains("tuba") || id.contains("sousaphone")) {
+        return { "Straight Mute", "Cup Mute", "Practice Mute" };
+    }
+    if (id == "horn" || id.contains("french-horn") || id.startsWith("horn-")) {
+        return { "Straight Mute", "Stopping Mute", "Practice Mute" };
+    }
+    return {};
+}
+
+QString mu::project::starscore::muteLines(const QStringList& mutes)
+{
+    QStringList lines;
+    for (int i = 0; i < mutes.size(); ++i) {
+        QString line = mutes[i];
+        if (i == 0) {
+            line = "with " + line;
+        } else if (i == mutes.size() - 1) {
+            line = "and " + line;
+        }
+        if (mutes.size() > 2 && i < mutes.size() - 1) {
+            line += ",";
+        }
+        lines << line;
+    }
+    return lines.join("\n");
+}
+
 //! Hides the mute and open markings ("mute", "(open)", "cup mute", "con sord."…) in a sheet for an instrument that has
 //! no mute. Only texts that are nothing but such a marking: "Open solos" stays. In a throwaway copy.
 int mu::project::starscore::hideMuteMarkings(Score* score)
@@ -864,7 +901,8 @@ int mu::project::starscore::hideMuteMarkings(Score* score)
         return 0;
     }
     static const QRegularExpression mute("^\\(?\\s*((straight|cup|harmon|plunger|bucket|practice|wah)\\s+)?"
-                                         "(mute|muted|mutes|mute in|mute out|mute on|mute off|open|harmon|plunger|"
+                                         "(mute|muted|mutes|mute in|mute out|mute on|mute off|unmute|unmuted|open|harmon|plunger|cup|straight|bucket|"
+                                         "solotone|pixie|derby|hat|in hat|stopping|wah|wah-wah|"
                                          "con sord\\.?|senza sord\\.?|con sordino|senza sordino)\\s*\\)?[.!]?$",
                                          QRegularExpression::CaseInsensitiveOption);
     std::vector<mu::engraving::EngravingItem*> hide;

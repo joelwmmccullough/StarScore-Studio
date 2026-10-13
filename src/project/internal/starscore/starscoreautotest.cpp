@@ -199,6 +199,15 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         }
         globalContext()->setCurrentNotation(master->notation());
         autotestLog(QString("  viewed %1 part scores").arg(master->excerpts().size()));
+    } else if (step.startsWith("current:")) {
+        // current:<part score name>: that part score open and showing (as clicking its tab)
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            if (e->name() == step.mid(8) && e->notation()) {
+                master->setExcerptIsOpen(e->notation(), true);
+                globalContext()->setCurrentNotation(e->notation());
+                autotestLog("  showing " + e->name());
+            }
+        }
     } else if (step.startsWith("shotdialog:")) {
         // shotdialog:NAME: a picture of each open window other than the main one, as NAME-1.png, NAME-2.png…
         int k = 0;
@@ -616,6 +625,64 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             books << e->name();
         }
         autotestLog("  part scores: " + books.join(" | "));
+    } else if (step.startsWith("setmutes:")) {
+        // setmutes:<part name>|<mute>;<mute>: the part's mutes, then every planned sheet title that shows mutes
+        const QString name = step.mid(9).section('|', 0, 0);
+        const QStringList mutes = step.mid(9).section('|', 1).split(';', Qt::SkipEmptyParts);
+        for (const engraving::Part* p : ms->parts()) {
+            if (p->partName().toQString() == name) {
+                setPartMutes(idText(p), mutes);
+            }
+        }
+        const RetVal<StarScoreBandExportPlan> plan = planBandExport();
+        for (const StarScoreBandFile& f : plan.val.files) {
+            if (f.sheetLeft.contains("\n")) {
+                autotestLog(QString("  %1: %2").arg(f.relativePath, QString(f.sheetLeft).replace("\n", " / ")));
+            }
+        }
+    } else if (step == "partmutes") {
+        const Data d = load();
+        for (const auto& [pid, mutes] : d.partMutes) {
+            const engraving::Part* p = ms->partById(ID(pid));
+            autotestLog(QString("  %1: %2").arg(p ? p->partName().toQString() : pid, mutes.join("; ")));
+        }
+    } else if (step == "makekeys") {
+        autotestLog("  " + makeKeysPart());
+        QStringList books;
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            books << e->name();
+        }
+        autotestLog("  part scores: " + books.join(" | "));
+    } else if (step.startsWith("bookadd:")) {
+        // bookadd:<part score name>|<part name>[|<new part score name>]: the main score's part added to the part score
+        // (as ticking its eye in the part score's Instruments panel does), and the part score renamed
+        const QStringList a = step.mid(8).split('|');
+        IExcerptNotationPtr book;
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            if (e->name() == a.value(0)) {
+                book = e;
+            }
+        }
+        const engraving::Part* add = nullptr;
+        for (const engraving::Part* p : ms->parts()) {
+            if (p->partName().toQString() == a.value(1)) {
+                add = p;
+            }
+        }
+        if (!book || !book->notation() || !add) {
+            autotestLog("  part score or part not found");
+        } else {
+            INotationPartsPtr parts = book->notation()->parts();
+            parts->insertPart(add->clone(), book->notation()->elements()->msScore()->parts().size());
+            if (!a.value(2).isEmpty()) {
+                book->setName(a.value(2));
+            }
+            QStringList names;
+            for (const engraving::Part* p : masterPartsOf(book->notation()->elements()->msScore(), ms)) {
+                names << p->partName().toQString();
+            }
+            autotestLog(QString("  %1: %2").arg(book->name(), names.join(", ")));
+        }
     } else if (step.startsWith("addinstrument:")) {
         // addinstrument:<instrument id>|<part name>|<section id>|<after part name>: a new instrument in the section,
         // placed after the named part, with its own part score
@@ -730,6 +797,50 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             const int n = starscore::copyTextPositions(A->elements()->msScore(), B->elements()->msScore());
             B->undoStack()->commitChanges();
             autotestLog(QString("  %1 changed").arg(n));
+        }
+    } else if (step.startsWith("layoutinfo:") || step.startsWith("mmtoggle:")) {
+        // layoutinfo:<part score>: its multimeasure rest setting, breaks and system locks (bar numbers);
+        // mmtoggle:<part score>: the M key there (Toggle multimeasure rests), then its layout as layoutinfo
+        const QString bn = step.mid(step.indexOf(':') + 1);
+        INotationPtr n;
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            if (e->name() == bn && e->notation()) {
+                n = e->notation();
+            }
+        }
+        engraving::Score* sc = bn == "main" ? ms : n ? n->elements()->msScore() : nullptr;
+        if (!sc) {
+            autotestLog("  part score not found");
+        } else {
+            if (step.startsWith("mmtoggle:")) {
+                INotationPtr target = bn == "main" ? master->notation() : n;
+                target->undoStack()->prepareChanges(TranslatableString::untranslatable("Toggle multimeasure rests"));
+                sc->cmdToggleMmrest();
+                target->undoStack()->commitChanges();
+                target->notationChanged().notify();
+                sc->doLayout();
+            }
+            QStringList lines, pages, locks;
+            for (const engraving::Measure* m = sc->firstMeasure(); m; m = m->nextMeasure()) {
+                if (m->lineBreak()) {
+                    lines << QString::number(m->no() + 1);
+                }
+                if (m->pageBreak()) {
+                    pages << QString::number(m->no() + 1);
+                }
+            }
+            for (const engraving::SystemLock* l : sc->systemLocks()->allLocks()) {
+                locks << QString("%1-%2%3").arg(l->startMB()->no() + 1).arg(l->endMB()->no() + 1)
+                    .arg(l->startMB()->isMeasure() && toMeasure(l->startMB())->isMMRest() ? "(mm)" : "");
+            }
+            autotestLog(QString("  mmrests %1; system breaks %2: %3; page breaks %4: %5; locks %6: %7")
+                        .arg(sc->style().styleB(engraving::Sid::createMultiMeasureRests) ? "on" : "off")
+                        .arg(lines.size()).arg(lines.join(",")).arg(pages.size()).arg(pages.join(","))
+                        .arg(locks.size()).arg(locks.join(",")));
+            const QString memory = sc->metaTag(u"starscoreLockMemory").toQString();
+            if (!memory.isEmpty()) {
+                autotestLog("  lock memory: " + QString(memory).replace('\n', " | "));
+            }
         }
     } else if (step.startsWith("formatdiff:")) {
         // formatdiff:<part score A>|<part score B>: how B's formatting differs from A's: system and page breaks,
@@ -984,6 +1095,21 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         }
         for (const StarScoreArrangement& a : d.arrangements) {
             autotestLog(QString("  arrangement %1: %2").arg(a.name).arg(int(arrangementStatus(a.id))));
+        }
+    } else if (step.startsWith("sectionparts:")) {
+        // sectionparts:<section name>: its parts (shown or not, stand-in or not) with their status tags
+        const Data d = load();
+        for (const StarScoreSection& s : d.sections) {
+            if (s.name != step.mid(13)) {
+                continue;
+            }
+            for (const QString& pid : s.partIds) {
+                const engraving::Part* p = ms->partById(ID(pid));
+                auto it = d.partStatus.find(pid);
+                autotestLog(QString("  %1 (%2, %3)%4%5: %6").arg(p ? p->partName().toQString() : pid, p ? p->instrumentId().toQString() : QString())
+                            .arg(p && p->show() ? "visible" : "hidden").arg(s.shownPartIds.contains(pid) ? " shown" : "")
+                            .arg(s.alternates.count(pid) ? " alternate" : "").arg(it == d.partStatus.end() ? QString("(no tag)") : it->second));
+            }
         }
     } else if (step.startsWith("sectionon:") || step.startsWith("sectionoff:")) {
         // the View panel's switch for one section, then which instruments show

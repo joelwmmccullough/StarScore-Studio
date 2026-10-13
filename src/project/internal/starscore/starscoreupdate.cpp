@@ -179,7 +179,7 @@ RetVal<QString> StarScoreService::updateCurrentSongSheets()
             if (!f.sourceFile.isEmpty()) {
                 continue;   // reference PDFs are copied, not made
             }
-            const bool same = f.relativePath == rel || f.formerPath == rel;   // (or the same sheet under its old name)
+            const bool same = f.relativePath == rel || f.formerPaths.contains(rel);   // (or the same sheet under its old name)
             const bool renamedScore = f.isScore && isOldScoreName(rel)
                                       && starscoreSectionFolderOf(f.relativePath) == starscoreSectionFolderOf(rel);
             if (!same && !renamedScore) {

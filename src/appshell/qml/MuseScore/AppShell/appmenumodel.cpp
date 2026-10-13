@@ -389,6 +389,8 @@ MenuItem* AppMenuModel::makeFormatMenu()
         makeMenuItem("starscore-convert-double-time"),
         makeMenuItem("starscore-standardize"),
         makeMenuItem("starscore-add-solo"),
+        makeMenuItem("starscore-part-mutes"),
+        makeMenuItem("starscore-make-keys"),
         makeMenuItem("starscore-compare-parts"),
         makeMenuItem("starscore-voice-order"),
         makeMenuItem("starscore-audit-library"),

@@ -192,6 +192,12 @@ void ProjectActionsController::init()
             }
         });
     }
+    dispatcher()->reg(this, "starscore-part-mutes", [this]() {
+        interactive()->open(Uri("musescore://starscore/mutes"));
+    });
+    dispatcher()->reg(this, "starscore-make-keys", [this]() {
+        interactive()->info(muse::trc("starscore", "Keys part"), starScoreService()->makeKeysPart().toStdString());
+    });
     dispatcher()->reg(this, "starscore-annotation-add", [this]() {
         interactive()->open(Uri("musescore://starscore/annotation?mode=add"));
     });

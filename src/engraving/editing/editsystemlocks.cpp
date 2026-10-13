@@ -22,6 +22,8 @@
 
 #include "editsystemlocks.h"
 
+#include <algorithm>
+
 #include "undo.h"
 
 #include "../dom/measurebase.h"
@@ -439,19 +441,140 @@ void EditSystemLocks::removeSystemLocksOnRemoveMeasures(Score* score, const Meas
     }
 }
 
+//! StarScore: the bar where a lock really starts or ends: a multimeasure rest's first or last bar
+static MeasureBase* starscoreUnderlying(MeasureBase* mb, bool start)
+{
+    if (mb && mb->isMeasure() && toMeasure(mb)->isMMRest()) {
+        return start ? toMeasure(mb)->mmRestFirst() : toMeasure(mb)->mmRestLast();
+    }
+    return mb;
+}
+
+//---------------------------------------------------------
+//   StarScore (Joel, 13 Oct 2026): where multimeasure rests moved or hid system locks, so switching them off puts the
+//   locks back where they were. Kept in the score's meta tag "starscoreLockMemory" (saved with the file), one line per
+//   lock: "M <start> <end> <original start> <original end>" for a lock moved to <start>-<end> (the ticks of its first
+//   and last bar or multimeasure rest), "H <original start> <original end>" for a lock of rests a multimeasure rest
+//   swallowed. Stale lines are harmless: a line is used only when its bars are still there.
+//---------------------------------------------------------
+
+static const muse::String LOCK_MEMORY_TAG = u"starscoreLockMemory";
+
+struct StarscoreLockMemory {
+    struct Moved {
+        Fraction start, end, origStart, origEnd;
+    };
+    std::vector<Moved> moved;
+    std::vector<std::pair<Fraction, Fraction> > hidden;
+};
+
+static StarscoreLockMemory starscoreReadLockMemory(const Score* score)
+{
+    StarscoreLockMemory mem;
+    for (const muse::String& line : score->metaTag(LOCK_MEMORY_TAG).split(u'\n')) {
+        const muse::StringList w = line.split(u' ');
+        if (w.size() == 5 && w.at(0) == u"M") {
+            mem.moved.push_back({ Fraction::fromString(w.at(1)), Fraction::fromString(w.at(2)),
+                                  Fraction::fromString(w.at(3)), Fraction::fromString(w.at(4)) });
+        } else if (w.size() == 3 && w.at(0) == u"H") {
+            mem.hidden.emplace_back(Fraction::fromString(w.at(1)), Fraction::fromString(w.at(2)));
+        }
+    }
+    return mem;
+}
+
+static void starscoreWriteLockMemory(Score* score, const StarscoreLockMemory& mem)
+{
+    muse::StringList lines;
+    for (const auto& m : mem.moved) {
+        lines << (u"M " + m.start.toString() + u" " + m.end.toString() + u" " + m.origStart.toString() + u" "
+                  + m.origEnd.toString());
+    }
+    for (const auto& [a, b] : mem.hidden) {
+        lines << (u"H " + a.toString() + u" " + b.toString());
+    }
+    const muse::String value = lines.join(u"\n");
+    if (value != score->metaTag(LOCK_MEMORY_TAG)) {
+        score->setMetaTag(LOCK_MEMORY_TAG, value);
+    }
+}
+
+//! A lock moved from `old` to `moved`: remembered at the place it had before its first move
+static void starscoreRememberMove(Score* score, const SystemLock* old, const SystemLock* moved)
+{
+    StarscoreLockMemory mem = starscoreReadLockMemory(score);
+    Fraction origStart = starscoreUnderlying(old->startMB(), true)->tick();
+    Fraction origEnd = starscoreUnderlying(old->endMB(), false)->tick();
+    for (auto it = mem.moved.begin(); it != mem.moved.end(); ++it) {
+        if (it->start == old->startMB()->tick() && it->end == old->endMB()->tick()) {
+            origStart = it->origStart;   // moved before: still from where it first was
+            origEnd = it->origEnd;
+            mem.moved.erase(it);
+            break;
+        }
+    }
+    // (a lock that only now starts or ends at the multimeasure rest on its own first or last bar is where it was)
+    if (origStart != moved->startMB()->tick() || origEnd != moved->endMB()->tick()) {
+        mem.moved.push_back({ moved->startMB()->tick(), moved->endMB()->tick(), origStart, origEnd });
+    }
+    starscoreWriteLockMemory(score, mem);
+}
+
 void EditSystemLocks::removeSystemLocksContainingMMRests(Score* score)
 {
+    // StarScore (Joel, 13 Oct 2026): switching multimeasure rests off keeps the system locks. MuseScore removed every
+    // lock holding a multimeasure rest, so pressing M twice lost the locked systems around rests. A lock that
+    // multimeasure rests moved goes back to where it was, one they swallowed comes back; a lock that otherwise starts
+    // or ends at a multimeasure rest starts at its first bar or ends at its last. The breaks are left as they are.
+    const StarscoreLockMemory mem = starscoreReadLockMemory(score);
+    auto barAt = [&](const Fraction& tick) -> MeasureBase* {
+        Measure* m = score->tick2measure(tick);
+        return m && m->tick() == tick ? m : nullptr;
+    };
     std::vector<const SystemLock*> allLocks = score->systemLocks()->allLocks(); // copy
+    std::vector<std::pair<MeasureBase*, MeasureBase*> > restored;
     for (const SystemLock* lock : allLocks) {
-        for (MeasureBase* mb = lock->startMB(); mb; mb = mb->next()) {
-            if (mb->isMeasure() && toMeasure(mb)->mmRest()) {
-                undoRemoveSystemLock(score, lock);
-                break;
-            }
-            if (mb->isAfter(lock->endMB())) {
+        MeasureBase* start = nullptr;
+        MeasureBase* end = nullptr;
+        for (const auto& m : mem.moved) {
+            if (m.start == lock->startMB()->tick() && m.end == lock->endMB()->tick()) {
+                start = barAt(m.origStart);
+                end = barAt(m.origEnd);
                 break;
             }
         }
+        if (!start || !end || end->isBefore(start)) {
+            start = starscoreUnderlying(lock->startMB(), true);
+            end = starscoreUnderlying(lock->endMB(), false);
+        }
+        if (!start || !end) {
+            undoRemoveSystemLock(score, lock);
+            continue;
+        }
+        if (start != lock->startMB() || end != lock->endMB()) {
+            undoRemoveSystemLock(score, lock);
+            restored.emplace_back(start, end);
+        }
+    }
+    for (const auto& [a, b] : mem.hidden) {
+        MeasureBase* start = barAt(a);
+        MeasureBase* end = barAt(b);
+        if (start && end && !end->isBefore(start)) {
+            restored.emplace_back(start, end);
+        }
+    }
+    // (added after all the removals: a lock put back may reach where a moved neighbour started)
+    for (const auto& [start, end] : restored) {
+        bool overlaps = false;
+        for (const SystemLock* other : score->systemLocks()->allLocks()) {
+            overlaps |= !(other->endMB()->isBefore(start) || end->isBefore(other->startMB()));
+        }
+        if (!overlaps) {
+            score->undo(new AddSystemLock(new SystemLock(start, end)));
+        }
+    }
+    if (!score->metaTag(LOCK_MEMORY_TAG).isEmpty()) {
+        score->setMetaTag(LOCK_MEMORY_TAG, muse::String());
     }
 }
 
@@ -460,7 +583,24 @@ void EditSystemLocks::updateSystemLocksOnCreateMMRests(Score* score, Measure* fi
     // NOTE: this must be done during layout as the mmRests get created.
 
     for (const SystemLock* lock : score->systemLocks()->locksContainedInRange(first, last)) {
-        // These locks are inside the range of the mmRest so remove them
+        // StarScore: a locked system of just these bars of rest becomes a locked system of the multimeasure rest
+        // (MuseScore removed it, and it was gone when multimeasure rests were switched off again); any other lock
+        // inside the multimeasure rest is removed but remembered, and put back when they are switched off
+        const bool whole = lock->startMB()->tick() == first->tick() && lock->endMB()->endTick() == last->endTick();
+        if (whole && first->mmRest()) {
+            SystemLock* moved = new SystemLock(first->mmRest(), first->mmRest());
+            starscoreRememberMove(score, lock, moved);
+            undoRemoveSystemLock(score, lock);
+            score->undo(new AddSystemLock(moved));
+            return;
+        }
+        StarscoreLockMemory mem = starscoreReadLockMemory(score);
+        const std::pair<Fraction, Fraction> h { starscoreUnderlying(lock->startMB(), true)->tick(),
+                                                starscoreUnderlying(lock->endMB(), false)->tick() };
+        if (std::find(mem.hidden.begin(), mem.hidden.end(), h) == mem.hidden.end()) {
+            mem.hidden.push_back(h);
+            starscoreWriteLockMemory(score, mem);
+        }
         undoRemoveSystemLock(score, lock);
     }
 
@@ -482,8 +622,10 @@ void EditSystemLocks::updateSystemLocksOnCreateMMRests(Score* score, Measure* fi
         }
 
         if (startMB != lockOnFirst->startMB() || endMB != lockOnFirst->endMB()) {
+            SystemLock* moved = new SystemLock(startMB, endMB);
+            starscoreRememberMove(score, lockOnFirst, moved);
             undoRemoveSystemLock(score, lockOnFirst);
-            undoAddSystemLock(score, new SystemLock(startMB, endMB));
+            undoAddSystemLock(score, moved);
         }
     }
 
@@ -495,7 +637,9 @@ void EditSystemLocks::updateSystemLocksOnCreateMMRests(Score* score, Measure* fi
     MeasureBase* endMB = lockOnLast->endMB();
     assert(startMB->isAfter(first) && endMB->isAfter(last));
 
-    undoRemoveSystemLock(score, lockOnLast);
     startMB = last->nextMM();
-    undoAddSystemLock(score, new SystemLock(startMB, endMB));
+    SystemLock* moved = new SystemLock(startMB, endMB);
+    starscoreRememberMove(score, lockOnLast, moved);
+    undoRemoveSystemLock(score, lockOnLast);
+    undoAddSystemLock(score, moved);
 }

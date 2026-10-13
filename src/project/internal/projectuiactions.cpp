@@ -198,6 +198,18 @@ const UiActionList ProjectUiActions::m_actions = {
              TranslatableString("action", "Clear progress color"),
              TranslatableString("action", "Take the progress color off the selected measures")
              ),
+    UiAction("starscore-part-mutes",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Mutes for this part…"),
+             TranslatableString("action", "Choose the mutes this brass part plays with; its sheets print them under the instrument name")
+             ),
+    UiAction("starscore-make-keys",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Combine keyboard parts into a Keys part"),
+             TranslatableString("action", "Put the rhythm section's keyboard parts in one part score named Keys, exported as one sheet")
+             ),
     UiAction("starscore-annotation-add",
              mu::context::UiCtxProjectOpened,
              mu::context::CTX_ANY,

@@ -411,6 +411,18 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
     for (auto it = partStatus.begin(); it != partStatus.end(); ++it) {
         data.partStatus[it.key()] = it.value().toString();
     }
+    const QJsonObject partMutes = root.value("partMutes").toObject();
+    for (auto it = partMutes.begin(); it != partMutes.end(); ++it) {
+        QStringList mutes;
+        for (const QJsonValue& v : it.value().toArray()) {
+            if (!v.toString().trimmed().isEmpty()) {
+                mutes << v.toString().trimmed();
+            }
+        }
+        if (!mutes.isEmpty()) {
+            data.partMutes[it.key()] = mutes;
+        }
+    }
     const QJsonObject scoreStatus = root.value("scoreStatus").toObject();
     for (auto it = scoreStatus.begin(); it != scoreStatus.end(); ++it) {
         data.scoreStatus[it.key()] = it.value().toString();
@@ -568,6 +580,15 @@ QString StarScoreService::toJson(const Data& data)
     if (!partStatus.isEmpty()) {
         root["partStatus"] = partStatus;
     }
+    QJsonObject partMutes;
+    for (const auto& [pid, mutes] : data.partMutes) {
+        if (!mutes.isEmpty()) {
+            partMutes[pid] = QJsonArray::fromStringList(mutes);
+        }
+    }
+    if (!partMutes.isEmpty()) {
+        root["partMutes"] = partMutes;
+    }
     QJsonObject scoreStatus;
     for (const auto& [aid, key] : data.scoreStatus) {
         scoreStatus[aid] = key;
@@ -653,6 +674,15 @@ static QString starscoreLeadSheetKind(const QString& id)
     return role == "bass" || role == "guitar" ? QString() : role;
 }
 
+//! The rhythm role a part score's name stands for ("Keys" -> "keys"), or empty
+static QString starscoreRhythmBookRole(const QString& name)
+{
+    static const std::map<QString, QString> roles { { "keys", "keys" }, { "drums", "drums" }, { "percussion", "percussion" },
+        { "guitar", "guitar" }, { "bass", "bass" } };
+    auto it = roles.find(name.trimmed().toLower());
+    return it == roles.end() ? QString() : it->second;
+}
+
 //! What loadFrom's result depends on besides the meta tag: which parts exist and what they play
 static QString starscorePartsFingerprint(const mu::engraving::MasterScore* ms)
 {
@@ -662,6 +692,17 @@ static QString starscorePartsFingerprint(const mu::engraving::MasterScore* ms)
         out += '|';
         out += p->instrumentId().toQString();
         out += ';';
+    }
+    // and the part scores named for a rhythm player's sheet ("Keys" holding two keyboards), which count as one role
+    for (const mu::engraving::Excerpt* ex : ms->excerpts()) {
+        const mu::engraving::Score* es = ex ? ex->excerptScore() : nullptr;
+        if (!es || es->parts().size() < 2 || starscoreRhythmBookRole(ex->name().toQString()).isEmpty()) {
+            continue;
+        }
+        out += QStringLiteral("#") + ex->name().toQString();
+        for (const mu::engraving::Part* p : StarScoreService::masterPartsOf(es, ms)) {
+            out += QStringLiteral("|") + StarScoreService::idTextOf(p);
+        }
     }
     return out;
 }
@@ -744,6 +785,8 @@ StarScoreService::Data StarScoreService::loadFrom(const engraving::MasterScore* 
                 counted << alt;
             }
         }
+        // a part in a rhythm book ("Keys": Clavinet and Bass Synth) counts as the book's role
+        const std::map<QString, QString> bookRoles = rhythm ? rhythmBookRoles(ms, s.partIds) : std::map<QString, QString>();
         StarScoreStatus result = StarScoreStatus::Finished;
         int countedParts = 0;
         for (const QString& pid : counted) {
@@ -753,7 +796,9 @@ StarScoreService::Data StarScoreService::loadFrom(const engraving::MasterScore* 
             const bool untaggedOrEmpty = it == data.partStatus.end() || statusFromKey(it->second) == StarScoreStatus::Empty;
             if (untaggedOrEmpty && rhythm) {
                 const engraving::Part* p = ms->partById(ID(pid));
-                const QString kind = p ? starscoreLeadSheetKind(p->instrumentId().toQString()) : QString();
+                const auto book = bookRoles.find(pid);
+                const QString kind = book != bookRoles.end() ? (book->second == "bass" || book->second == "guitar" ? QString() : book->second)
+                                     : p ? starscoreLeadSheetKind(p->instrumentId().toQString()) : QString();
                 if (!kind.isEmpty()) {
                     if (!s.autoSkipSheets.contains(kind)) {
                         s.autoSkipSheets << kind;
@@ -1650,6 +1695,127 @@ void StarScoreService::addPartBooksFor(const QStringList& partIds)
     }
 }
 
+//! Joel, 13 Oct 2026: "combine existing keyboard parts into one summed keys part" (G.I. Jorge's Clavinet and Bass Synth)
+QString StarScoreService::makeKeysPart()
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    engraving::MasterScore* ms = masterScore();
+    if (!master || !ms) {
+        return muse::qtrc("starscore", "Open a song first.");
+    }
+    const Data data = load();
+    const StarScoreSection* rhythm = nullptr;
+    for (const StarScoreSection& s : data.sections) {
+        if (s.templateKey == "rhythm") {
+            rhythm = &s;
+            break;
+        }
+    }
+    if (!rhythm) {
+        return muse::qtrc("starscore", "This song has no Rhythm Section.");
+    }
+    // the keyboards, in score order; a bass synth too when another instrument plays bass
+    std::vector<engraving::Part*> keys;
+    int basses = 0;
+    for (engraving::Part* p : ms->parts()) {
+        if (rhythm->partIds.contains(idText(p)) && rhythmRole(p->instrumentId().toQString()) == "bass"
+            && !p->instrumentId().contains(u"synth")) {
+            ++basses;
+        }
+    }
+    QStringList names;
+    for (engraving::Part* p : ms->parts()) {
+        if (!rhythm->partIds.contains(idText(p))) {
+            continue;
+        }
+        const QString iid = p->instrumentId().toQString();
+        const QString role = rhythmRole(iid);
+        if (role == "keys" || (role == "bass" && iid.contains("synth") && basses > 0)) {
+            keys.push_back(p);
+            names << p->partName().toQString();
+        }
+    }
+    if (keys.size() < 2) {
+        return muse::qtrc("starscore", "The Rhythm Section has only %1 keyboard part, so there is nothing to combine.")
+               .arg(keys.size());
+    }
+
+    // the part score to build on: an existing "Keys" holding some of them, else the first keyboard's own
+    auto bookParts = [&](const IExcerptNotationPtr& e) {
+        engraving::Excerpt* ex = starscoreExcerptOf(e);
+        return ex ? masterPartsOf(ex) : std::vector<engraving::Part*>();
+    };
+    IExcerptNotationPtr book;
+    for (const IExcerptNotationPtr& e : master->excerpts()) {
+        if (e->name().trimmed().compare("Keys", Qt::CaseInsensitive) == 0) {
+            const std::vector<engraving::Part*> ps = bookParts(e);
+            if (!ps.empty() && std::all_of(ps.begin(), ps.end(), [&](engraving::Part* p) {
+                return std::find(keys.begin(), keys.end(), p) != keys.end();
+            })) {
+                book = e;
+            }
+        }
+    }
+    for (engraving::Part* k : keys) {
+        if (book) {
+            break;
+        }
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            const std::vector<engraving::Part*> ps = bookParts(e);
+            if (ps.size() == 1 && ps.front() == k && (!book || e->name() == k->partName().toQString())) {
+                book = e;
+            }
+        }
+    }
+    if (!book) {
+        addPartBooksFor({ idText(keys.front()) });
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            const std::vector<engraving::Part*> ps = bookParts(e);
+            if (ps.size() == 1 && ps.front() == keys.front()) {
+                book = e;
+            }
+        }
+    }
+    if (!book || !book->notation()) {
+        return muse::qtrc("starscore", "Couldn't make a part score for %1.").arg(keys.front()->partName().toQString());
+    }
+
+    // the others added in score order (as ticking their eye in the part's Instruments panel does)
+    INotationPartsPtr parts = book->notation()->parts();
+    QStringList added;
+    for (engraving::Part* k : keys) {
+        const std::vector<engraving::Part*> have = bookParts(book);
+        if (std::find(have.begin(), have.end(), k) != have.end()) {
+            continue;
+        }
+        auto order = [&](const engraving::Part* p) {
+            const auto& all = ms->parts();
+            return std::find(all.begin(), all.end(), p) - all.begin();
+        };
+        size_t index = 0;
+        for (engraving::Part* h : have) {
+            index += order(h) < order(k) ? 1 : 0;   // (score order)
+        }
+        parts->insertPart(k->clone(), index);
+        added << k->partName().toQString();
+    }
+    const QString oldName = book->name();
+    if (oldName != "Keys") {
+        book->setName("Keys");
+    }
+    if (INotationProjectPtr project = globalContext()->currentProject()) {
+        project->markAsUnsaved();
+    }
+    master->notation()->notationChanged().notify();
+    scheduleChanged();
+    if (added.isEmpty() && oldName == "Keys") {
+        return muse::qtrc("starscore", "The Keys part already holds %1.").arg(names.join(", "));
+    }
+    return muse::qtrc("starscore", "The Keys part score now holds %1 (made from “%2”). Each part's status is kept; "
+                                   "marking the Keys part marks them all. It exports as one sheet, “Keys”.")
+           .arg(names.join(", "), oldName);
+}
+
 StarScoreSection StarScoreService::finishNewParts(const std::vector<engraving::Part*>& newParts,
                                                   const std::vector<StarScoreInstrument>& instruments)
 {
@@ -2231,6 +2397,97 @@ std::map<QString, StarScoreStatus> StarScoreService::partStatuses() const
     return result;
 }
 
+QStringList StarScoreService::partMutes(const QString& partId) const
+{
+    const Data data = load();
+    auto it = data.partMutes.find(partId);
+    return it == data.partMutes.end() ? QStringList() : it->second;
+}
+
+StarScoreMuteTarget StarScoreService::muteTarget() const
+{
+    StarScoreMuteTarget t;
+    notation::INotationPtr n = globalContext()->currentNotation();
+    engraving::Score* score = n && n->elements() ? n->elements()->msScore() : nullptr;
+    engraving::MasterScore* ms = score ? score->masterScore() : nullptr;
+    if (!ms) {
+        t.problem = muse::qtrc("starscore", "Open a song first.");
+        return t;
+    }
+    const engraving::Part* part = nullptr;
+    if (score != ms) {
+        const std::vector<engraving::Part*> ps = masterPartsOf(score, ms);
+        if (ps.size() == 1) {
+            part = ps.front();
+        }
+    } else {
+        // the full score: the part of the selection
+        for (engraving::EngravingItem* e : score->selection().elements()) {
+            if (e && e->part()) {
+                part = e->part();
+                break;
+            }
+        }
+    }
+    if (!part) {
+        t.problem = muse::qtrc("starscore", "Open the part score of a trumpet, trombone or tuba part (or select one of its notes "
+                                            "in the full score), then come back here.");
+        return t;
+    }
+    t.partId = idText(part);
+    t.partName = part->partName().toQString();
+    const Data data = load();
+    for (const StarScoreSection& s : data.sections) {
+        if (s.partIds.contains(t.partId) && s.templateKey.endsWith("-horn-any")) {
+            t.flexible = true;
+        }
+    }
+    if (t.flexible) {
+        // any instrument can read a Flexible chair: every brass mute
+        for (const char* id : { "trumpet", "trombone", "tuba", "horn" }) {
+            for (const QString& m : starscore::muteOptions(id)) {
+                if (!t.options.contains(m)) {
+                    t.options << m;
+                }
+            }
+        }
+    } else {
+        t.options = starscore::muteOptions(part->instrumentId().toQString());
+    }
+    if (t.options.isEmpty()) {
+        t.problem = muse::qtrc("starscore", "%1 isn't a brass part. Mutes can be set for trumpet, trombone, tuba, horn, "
+                                            "euphonium and baritone parts, and the Flexible chairs.").arg(t.partName);
+        return t;
+    }
+    auto it = data.partMutes.find(t.partId);
+    if (it != data.partMutes.end()) {
+        t.chosen = it->second;
+    }
+    return t;
+}
+
+void StarScoreService::setPartMutes(const QString& partId, const QStringList& mutes)
+{
+    Data data = load();
+    QStringList clean;
+    for (const QString& m : mutes) {
+        if (!m.trimmed().isEmpty() && !clean.contains(m.trimmed())) {
+            clean << m.trimmed();
+        }
+    }
+    auto it = data.partMutes.find(partId);
+    if ((it == data.partMutes.end() && clean.isEmpty()) || (it != data.partMutes.end() && it->second == clean)) {
+        return;
+    }
+    if (clean.isEmpty()) {
+        data.partMutes.erase(partId);
+    } else {
+        data.partMutes[partId] = clean;
+    }
+    store(data);
+    labelPartBooks();   // the part score's title shows them
+}
+
 std::vector<mu::engraving::Part*> StarScoreService::masterPartsOf(const engraving::Score* score, const engraving::MasterScore* ms)
 {
     std::vector<engraving::Part*> result;
@@ -2254,6 +2511,53 @@ std::vector<mu::engraving::Part*> StarScoreService::masterPartsOf(const engravin
         }
     }
     return result;
+}
+
+std::vector<StarScoreService::RhythmBook> StarScoreService::rhythmBooks(const engraving::MasterScore* ms,
+                                                                        const QStringList& sectionPartIds)
+{
+    std::vector<RhythmBook> out;
+    if (!ms) {
+        return out;
+    }
+    for (const engraving::Excerpt* ex : ms->excerpts()) {
+        const engraving::Score* es = ex ? ex->excerptScore() : nullptr;
+        if (!es || es->parts().size() < 2) {
+            continue;
+        }
+        const QString role = starscoreRhythmBookRole(ex->name().toQString());
+        if (role.isEmpty()) {
+            continue;
+        }
+        QStringList ids;
+        for (const engraving::Part* p : masterPartsOf(es, ms)) {
+            ids << idTextOf(p);
+        }
+        if (ids.size() < 2 || !std::all_of(ids.begin(), ids.end(), [&](const QString& id) { return sectionPartIds.contains(id); })) {
+            continue;
+        }
+        RhythmBook b;
+        b.name = ex->name().toQString().trimmed();
+        b.role = role;
+        for (const engraving::Part* p : ms->parts()) {   // score order
+            if (ids.contains(idTextOf(p))) {
+                b.partIds << idTextOf(p);
+            }
+        }
+        out.push_back(b);
+    }
+    return out;
+}
+
+std::map<QString, QString> StarScoreService::rhythmBookRoles(const engraving::MasterScore* ms, const QStringList& sectionPartIds)
+{
+    std::map<QString, QString> out;
+    for (const RhythmBook& b : rhythmBooks(ms, sectionPartIds)) {
+        for (const QString& pid : b.partIds) {
+            out[pid] = b.role;
+        }
+    }
+    return out;
 }
 
 //! Main-score part ids of the parts in a part score

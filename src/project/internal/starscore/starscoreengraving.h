@@ -66,6 +66,15 @@ int copyMeasureWidths(const mu::engraving::Score* source, mu::engraving::Score* 
 int setFirstClefs(mu::engraving::Part* part, int concert, int transposing);
 //! Whether a sheet's instrument name ("Trumpet in B♭", "Alto Saxophone") is a brass instrument, the only ones with a mute
 bool isBrassSheet(const QString& sheetName);
+//! The mutes offered for an instrument (Joel, 13 Oct 2026), the most used first, as the sheet names them ("Harmon
+//! Mute"); empty for an instrument that takes no mute. Trumpet, cornet and flugelhorn: straight, cup, Harmon (stem in,
+//! stem out), plunger, bucket, solotone, pixie, derby (hat), practice. Trombone, bass trombone, euphonium, baritone:
+//! the same (pixie and plunger together are the classic trombone "growl"). Tuba and sousaphone: straight, cup, practice.
+//! French horn: straight, stopping (brass) mute, practice.
+QStringList muteOptions(const QString& instrumentId);
+//! The lines under the instrument name for a part's mutes: "with Harmon Mute", "and Cup Mute" ("with A,", "B", "and C"
+//! for three)
+QString muteLines(const QStringList& mutes);
 //! Whether every note of a part (grace notes too) sounds within [lowest, highest] (MIDI pitches)
 bool pitchesWithin(const mu::engraving::Part* part, int lowest, int highest);
 //! A C flute's range, C4 to C7: the Flexible Flute sheet is written an octave up when any note falls outside it
