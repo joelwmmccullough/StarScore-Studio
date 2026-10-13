@@ -3300,10 +3300,10 @@ void StarScoreService::saveStyleSettings(const StyleSettings& settings)
 //! Done once per bundled version. A default the user chose themselves (not an older bundled one) is kept.
 void StarScoreService::installBuiltinDefaultStyle()
 {
-    static const int BUILTIN_STYLE_VERSION = 11;   // 1 = Starsign 2.0, 2 = 2.1, 3 = 2.2, 4 = 2.3, 5 = 2.4, 6 = 2.5, 7 = 2.6, 8 = 2.6 with H-bar 0.7sp, 9 = Futura staff text and text lines, 10 = alternate chord symbols 11pt, 11 = 2.7 (glissando text off)
+    static const int BUILTIN_STYLE_VERSION = 12;   // 1 = Starsign 2.0, 2 = 2.1, 3 = 2.2, 4 = 2.3, 5 = 2.4, 6 = 2.5, 7 = 2.6, 8 = 2.6 with H-bar 0.7sp, 9 = Futura staff text and text lines, 10 = alternate chord symbols 11pt, 11 = 2.7 (glissando text off), 12 = 2.8 (hairpin text Futura 9pt)
 
     const QString dir = globalConfiguration()->userAppDataPath().appendingComponent("StarScoreStyles").toQString();
-    const QString target = dir + "/Starsign 2.7.mss";
+    const QString target = dir + "/Starsign 2.8.mss";
 
     StyleSettings settings = loadStyleSettings();
     const bool newVersion = settings.builtinStyleVersion < BUILTIN_STYLE_VERSION;
@@ -3314,15 +3314,15 @@ void StarScoreService::installBuiltinDefaultStyle()
     QDir().mkpath(dir);
     // a different file already under this name (a style saved there by hand) is kept beside it, never removed
     if (QFileInfo::exists(target)) {
-        QFile mine(":/resources/starscore/Starsign_2.7.mss"), there(target);
+        QFile mine(":/resources/starscore/Starsign_2.8.mss"), there(target);
         const bool same = mine.open(QIODevice::ReadOnly) && there.open(QIODevice::ReadOnly) && mine.readAll() == there.readAll();
         there.close();
         if (!same) {
-            QFile::rename(target, dir + "/Starsign 2.7 (kept " + QDate::currentDate().toString(Qt::ISODate) + ").mss");
+            QFile::rename(target, dir + "/Starsign 2.8 (kept " + QDate::currentDate().toString(Qt::ISODate) + ").mss");
         }
     }
     QFile::remove(target);
-    if (!QFile::copy(":/resources/starscore/Starsign_2.7.mss", target)) {
+    if (!QFile::copy(":/resources/starscore/Starsign_2.8.mss", target)) {
         LOGE() << "Could not install the built-in StarScore style";
         return;
     }

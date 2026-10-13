@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.32
+
+- **Starsign 2.8 house style**: hairpin text (cresc., dim.) in Futura 9 pt instead of Petaluma Script 10 pt. Nothing else changed. Apply default style settings to bring a song's part scores up to it. A different file you saved under the same name in the styles folder is kept beside it.
+
 ## 1.18.31
 
 - **One Harmon mute option.** Mutes for this part… lists "Harmon Mute" once; the separate "Harmon Mute (stem out)" option is gone.

@@ -223,8 +223,8 @@
     <hairpinHeight>1.15</hairpinHeight>
     <hairpinContHeight>0.5</hairpinContHeight>
     <hairpinLineWidth>0.16</hairpinLineWidth>
-    <hairpinFontFace>Petaluma Script</hairpinFontFace>
-    <hairpinFontSize>10</hairpinFontSize>
+    <hairpinFontFace>Futura</hairpinFontFace>
+    <hairpinFontSize>9</hairpinFontSize>
     <hairpinLineSpacing>1</hairpinLineSpacing>
     <hairpinFontSpatiumDependent>1</hairpinFontSpatiumDependent>
     <hairpinFontStyle>2</hairpinFontStyle>
