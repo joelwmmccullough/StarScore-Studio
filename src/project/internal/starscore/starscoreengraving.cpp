@@ -859,11 +859,11 @@ bool mu::project::starscore::isBrassSheet(const QString& sheetName)
 QStringList mu::project::starscore::muteOptions(const QString& id)
 {
     if (id.contains("trumpet") || id.contains("cornet") || id.contains("flugelhorn")) {
-        return { "Straight Mute", "Cup Mute", "Harmon Mute", "Harmon Mute (stem out)", "Plunger", "Bucket Mute",
+        return { "Straight Mute", "Cup Mute", "Harmon Mute", "Plunger", "Bucket Mute",
                  "Solotone Mute", "Pixie Mute", "Derby (Hat)", "Practice Mute" };
     }
     if (id.contains("trombone") || id.contains("euphonium") || id.contains("baritone-horn")) {
-        return { "Straight Mute", "Cup Mute", "Harmon Mute", "Harmon Mute (stem out)", "Plunger", "Pixie Mute",
+        return { "Straight Mute", "Cup Mute", "Harmon Mute", "Plunger", "Pixie Mute",
                  "Bucket Mute", "Solotone Mute", "Derby (Hat)", "Practice Mute" };
     }
     if (id.contains("tuba") || id.contains("sousaphone")) {

@@ -67,8 +67,8 @@ int setFirstClefs(mu::engraving::Part* part, int concert, int transposing);
 //! Whether a sheet's instrument name ("Trumpet in B♭", "Alto Saxophone") is a brass instrument, the only ones with a mute
 bool isBrassSheet(const QString& sheetName);
 //! The mutes offered for an instrument (Joel, 13 Oct 2026), the most used first, as the sheet names them ("Harmon
-//! Mute"); empty for an instrument that takes no mute. Trumpet, cornet and flugelhorn: straight, cup, Harmon (stem in,
-//! stem out), plunger, bucket, solotone, pixie, derby (hat), practice. Trombone, bass trombone, euphonium, baritone:
+//! Mute"); empty for an instrument that takes no mute. Trumpet, cornet and flugelhorn: straight, cup, Harmon,
+//! plunger, bucket, solotone, pixie, derby (hat), practice. Trombone, bass trombone, euphonium, baritone:
 //! the same (pixie and plunger together are the classic trombone "growl"). Tuba and sousaphone: straight, cup, practice.
 //! French horn: straight, stopping (brass) mute, practice.
 QStringList muteOptions(const QString& instrumentId);

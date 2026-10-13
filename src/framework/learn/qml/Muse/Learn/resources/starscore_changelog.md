@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.31
+
+- **One Harmon mute option.** Mutes for this part… lists "Harmon Mute" once; the separate "Harmon Mute (stem out)" option is gone.
+
 ## 1.18.30
 
 - **A rhythm part score can hold more than one instrument.** Name a part score "Keys", "Drums", "Percussion", "Guitar" or "Bass" and put two or more of the rhythm section's instruments in it (in the part, tick the eye of another instrument in the Instruments panel). Those instruments are then one player's: Export to Sheets and Demos prints them on one sheet under that name ("GIJO - Keys.pdf" with the Clavinet and the Bass Synth), and their own sheets from earlier exports go to Version History. Marking the part score marks all of its instruments. For the section's status they count as that role: a "Keys" part with no status reads the lead sheet like any keyboard, so G.I. Jorge's untagged Bass Synth no longer makes the Rhythm Section (and every arrangement) Empty. The to-do list, the sheet record and the Piano, Guitar and Bass songbooks treat them the same way.
