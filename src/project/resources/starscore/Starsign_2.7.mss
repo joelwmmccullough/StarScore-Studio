@@ -1353,7 +1353,7 @@
     <glissandoLineStyle>solid</glissandoLineStyle>
     <glissandoDashLineLen>5</glissandoDashLineLen>
     <glissandoDashGapLen>5</glissandoDashGapLen>
-    <glissandoShowText>1</glissandoShowText>
+    <glissandoShowText>0</glissandoShowText>
     <bendFontFace>Petaluma Script</bendFontFace>
     <bendFontSize>8</bendFontSize>
     <bendLineSpacing>1</bendLineSpacing>

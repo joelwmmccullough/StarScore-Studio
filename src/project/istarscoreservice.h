@@ -545,7 +545,9 @@ public:
     //! What the woodwind doubler plays in the song's 3- to 7-Horn sections (the first one found, 3-Horn first): the
     //! instrument the section has beyond its template's. Empty when the song has none of those sections, or the
     //! doubler plays his chair's own instrument in them (alto in 3-5, soprano in 6-7): the new section's default then.
-    virtual QString songDoublerInstrumentId() const = 0;
+    //! forHorns: the size of the section being made. A 3- to 5-Horn one is never given the Tenor Sax a 6- or 7-Horn
+    //! doubler plays as Tenor Sax 2: with two saxes, alto and tenor cover more range than two tenors (Joel, 13 Oct 2026).
+    virtual QString songDoublerInstrumentId(int forHorns = 0) const = 0;
 
     // --- sections ---
     //! Add the template's instruments (empty, following the score's bars and structure) as a new section.

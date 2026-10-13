@@ -95,6 +95,7 @@
 #include "engraving/style/style.h"
 
 #include "notation/iexcerptnotation.h"
+#include "notation/inotationsolomutestate.h"
 #include "notation/inotationelements.h"
 
 using namespace mu::project;
@@ -316,6 +317,69 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
                 }
             }
             autotestLog(QString("  notes of %1 (%2): %3").arg(name, p->instrumentId().toQString(), out.join(' ')));
+        }
+    } else if (step.startsWith("mimedump:")) {
+        // mimedump:<part name>|B1-B2: the clipboard text of those bars of the part's first staff, to mime-<n>.xml
+        const QString name = step.mid(9).section('|', 0, 0);
+        const QString bars = step.section('|', 1);
+        for (const engraving::Part* p : ms->parts()) {
+            if (p->partName().toQString() != name) {
+                continue;
+            }
+            engraving::Measure* m1 = ms->crMeasure(bars.section('-', 0, 0).toInt() - 1);
+            engraving::Measure* m2 = ms->crMeasure(bars.section('-', 1, 1).toInt() - 1);
+            const engraving::staff_idx_t st = p->staves().front()->idx();
+            ms->selection().setRangeTicks(m1->tick(), m2->endTick(), st, st + 1);
+            ms->selection().updateSelectedElements();
+            const ByteArray mime = ms->selection().mimeData();
+            ms->deselectAll();
+            static int n = 0;
+            QFile f(autotestDir() + QString("/mime-%1.xml").arg(++n));
+            f.open(QIODevice::WriteOnly);
+            f.write(mime.constChar(), mime.size());
+            autotestLog(QString("  wrote mime-%1.xml (%2 bytes)").arg(n).arg(mime.size()));
+        }
+    } else if (step.startsWith("newsection:")) {
+        // newsection:<template key>: a section made as the StarScore panel makes it (the doubler as the song's), then
+        // its parts, each new staff's swing at its first bar, and whether its chord-symbol track starts muted
+        const QString key = step.mid(11);
+        const int horns = key.left(1).toInt();
+        const QString doubler = horns >= 3 && horns <= 7 && key == QString("%1-horn").arg(horns) ? songDoublerInstrumentId(horns) : QString();
+        autotestLog("  doubler: " + (doubler.isEmpty() ? QString("(template's own)") : doubler));
+        const RetVal<QString> made = createSectionFromTemplate(key, doubler);
+        for (int i = 0; i < 30; ++i) {
+            QCoreApplication::processEvents();
+        }
+        for (const StarScoreSection& sec : load().sections) {
+            if (!made.ret || sec.id != made.val) {
+                continue;
+            }
+            for (const QString& pid : sec.partIds) {
+                const engraving::Part* p = masterScore()->partById(ID(pid));
+                if (!p || p->staves().empty()) {
+                    continue;
+                }
+                QStringList swings;
+                for (engraving::Measure* mm = masterScore()->firstMeasure(); mm && swings.size() < 3; mm = mm->nextMeasure()) {
+                    const engraving::SwingParameters sp = p->staves().front()->swing(mm->tick());
+                    if (sp.isOn()) {
+                        swings << QString("bar %1 ratio %2").arg(mm->no() + 1).arg(sp.swingRatio);
+                    }
+                }
+                bool muted = false;
+                if (INotationSoloMuteStatePtr sm = master->notation()->soloMuteState()) {
+                    const engraving::InstrumentTrackId cid { p->id(), String(u"chord_symbols") };
+                    muted = sm->trackSoloMuteStateExists(cid) && sm->trackSoloMuteState(cid).mute;
+                }
+                autotestLog(QString("  %1 (%2): swing %3; chords muted %4").arg(p->partName().toQString(), p->instrumentId().toQString(),
+                                                                             swings.isEmpty() ? QString("none") : swings.join(", "))
+                            .arg(muted ? "yes" : "no"));
+            }
+        }
+        // the swing of an existing staff, for comparison
+        if (!masterScore()->parts().empty()) {
+            const engraving::SwingParameters sp = masterScore()->parts().front()->staves().front()->swing(masterScore()->lastMeasure()->tick());
+            autotestLog(QString("  first staff swing at the end: %1").arg(sp.isOn() ? QString::number(sp.swingRatio) : QString("none")));
         }
     } else if (step.startsWith("section:")) {
         // section:<template key>[:<doubler id>[:<low horn id>]], e.g. section:2-horn-any (a 2-Horn Flexible section) or

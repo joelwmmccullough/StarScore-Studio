@@ -23,6 +23,8 @@
 #include "engraving/dom/masterscore.h"
 #include "engraving/dom/part.h"
 #include "engraving/dom/instrument.h"
+#include "notation/iexcerptnotation.h"
+#include "notation/inotationsolomutestate.h"
 
 #include "log.h"
 
@@ -193,5 +195,40 @@ void StarScoreService::applyMixerDefaults(const QStringList& partIds)
 
     if (!settings.empty()) {
         playbackController()->applyTrackMixSettings(settings);
+    }
+}
+
+void StarScoreService::muteChordSymbolTracks(const QStringList& partIds)
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    if (!master || partIds.isEmpty()) {
+        return;
+    }
+    notation::INotationSoloMuteState::SoloMuteState muted;
+    muted.mute = true;
+    std::vector<notation::INotationPtr> notations { master->notation() };
+    for (const notation::IExcerptNotationPtr& e : master->excerpts()) {
+        if (e && e->notation()) {
+            notations.push_back(e->notation());
+        }
+    }
+    std::map<engraving::InstrumentTrackId, TrackMixSetting> settings;
+    for (const QString& pid : partIds) {
+        const engraving::InstrumentTrackId chordsId { ID(pid), String(u"chord_symbols") };
+        for (const notation::INotationPtr& n : notations) {
+            if (notation::INotationSoloMuteStatePtr sm = n->soloMuteState()) {
+                notation::INotationSoloMuteState::SoloMuteState st = sm->trackSoloMuteStateExists(chordsId)
+                                                                     ? sm->trackSoloMuteState(chordsId) : muted;
+                st.mute = true;
+                sm->setTrackSoloMuteState(chordsId, st);
+            }
+        }
+        TrackMixSetting mute;
+        mute.setMute = true;
+        mute.mute = true;
+        settings[chordsId] = mute;
+    }
+    if (playbackController()) {
+        playbackController()->applyTrackMixSettings(settings);   // (the mixer on screen)
     }
 }

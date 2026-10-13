@@ -801,7 +801,7 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
         }
         // a 3- to 7-Horn Section: the doubler plays what it plays in the song's other horn sections (Joel, 5 Oct 2026)
         static const QRegularExpression hornKey("^[3-7]-horn$");
-        const QString doubler = hornKey.match(arg).hasMatch() ? starScore()->songDoublerInstrumentId() : QString();
+        const QString doubler = hornKey.match(arg).hasMatch() ? starScore()->songDoublerInstrumentId(arg.left(1).toInt()) : QString();
         const QStringList before = sectionIds();
         RetVal<QString> ret = starScore()->createSectionFromTemplate(arg, doubler);
         if (!ret.ret) {

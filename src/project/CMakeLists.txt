@@ -118,6 +118,8 @@ target_sources(project PRIVATE
     internal/starscore/starscoreprogress.cpp
     internal/starscore/starscoreannotations.cpp
     internal/starscore/starscoreannotations.h
+    internal/starscore/starscorecombined.cpp
+    internal/starscore/starscorecombined.h
     internal/starscore/starscorehorncopy.cpp
     internal/starscore/starscoreautoarchive.cpp
     internal/starscore/starscoreautoarchive.h
@@ -231,11 +233,11 @@ if (MUE_BUILD_PROJECT_QML)
     add_subdirectory(qml/MuseScore/Project)
 endif()
 
-# StarScore: built-in default part-score style (Starsign 2.6)
+# StarScore: built-in default part-score style (Starsign 2.7)
 qt_add_resources(project project_starscore_resources
     PREFIX
         /
     FILES
-        resources/starscore/Starsign_2.6.mss
+        resources/starscore/Starsign_2.7.mss
         resources/starscore/mixer_defaults.json
 )

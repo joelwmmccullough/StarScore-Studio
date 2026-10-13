@@ -30,6 +30,7 @@
 #include "engraving/dom/select.h"
 #include "engraving/rw/xmlreader.h"
 #include "engraving/style/style.h"
+#include "io/file.h"
 
 #include "notation/iexcerptnotation.h"
 #include "notation/inotationelements.h"
@@ -206,8 +207,9 @@ int StarScoreService::copyHornParts(const std::vector<std::pair<QString, QString
     }
     Data data = load();
 
-    // the music: each source staff pasted over its partner, as one undo step; multimeasure rests off meanwhile
-    // (selecting bars snaps to them)
+    // Everything below is one undo step (Joel, 13 Oct 2026): the music and every copy's part score formatting.
+    // The music: each source staff pasted over its partner; multimeasure rests off meanwhile (selecting bars snaps
+    // to them)
     const bool mmRests = ms->style().styleB(engraving::Sid::createMultiMeasureRests);
     master->notation()->undoStack()->prepareChanges(TranslatableString("starscore", "Copy parts into the new arrangement"));
     if (mmRests) {
@@ -252,8 +254,6 @@ int StarScoreService::copyHornParts(const std::vector<std::pair<QString, QString
     if (mmRests) {
         ms->undoChangeStyleVal(engraving::Sid::createMultiMeasureRests, true);
     }
-    master->notation()->undoStack()->commitChanges();
-    master->notation()->notationChanged().notify();
     store(data);
 
     // the part scores: style, breaks, text positions and measure widths from the source's part score
@@ -271,6 +271,7 @@ int StarScoreService::copyHornParts(const std::vector<std::pair<QString, QString
         }
         return nullptr;
     };
+    std::vector<INotationPtr> touched;
     const QString mss = QDir::tempPath() + "/starscore-copy-" + QUuid::createUuid().toString(QUuid::Id128) + ".mss";
     for (const auto& [srcId, dstId] : pairs) {
         INotationPtr srcBook = bookOf(srcId);
@@ -278,21 +279,28 @@ int StarScoreService::copyHornParts(const std::vector<std::pair<QString, QString
         if (!srcBook || !dstBook) {
             continue;
         }
-        if (srcBook->style()->saveStyle(io::path_t(mss))) {
-            dstBook->style()->loadStyle(io::path_t(mss), true);
-        }
         engraving::Score* srcScore = srcBook->elements()->msScore();
         engraving::Score* dstScore = dstBook->elements()->msScore();
-        if (srcScore && dstScore) {
-            dstBook->undoStack()->prepareChanges(TranslatableString("starscore", "Formatting from the copied part"));
-            starscore::copyLayout(srcScore, { dstScore }, starscore::LayoutCopyOptions());
-            starscore::copyTextPositions(srcScore, dstScore);
-            starscore::copyMeasureWidths(srcScore, dstScore);
-            dstBook->undoStack()->commitChanges();
-            dstBook->notationChanged().notify();
+        if (!srcScore || !dstScore) {
+            continue;
         }
+        // (the style straight into the part score: NotationStyle::loadStyle would end the undo step here)
+        if (srcBook->style()->saveStyle(io::path_t(mss))) {
+            muse::io::File styleFile { io::path_t(mss) };
+            dstScore->loadStyle(styleFile, true);
+        }
+        starscore::copyLayout(srcScore, { dstScore }, starscore::LayoutCopyOptions());
+        starscore::copyTextPositions(srcScore, dstScore);
+        starscore::copyMeasureWidths(srcScore, dstScore);
+        touched.push_back(dstBook);
     }
     QFile::remove(mss);
+    master->notation()->undoStack()->commitChanges();
+    master->notation()->notationChanged().notify();
+    for (const INotationPtr& b : touched) {
+        b->style()->styleChanged().notify();
+        b->notationChanged().notify();
+    }
     scheduleChanged();
     LOGI() << "[starscore] copy parts: " << copied << " of " << pairs.size() << " copied";
     return copied;

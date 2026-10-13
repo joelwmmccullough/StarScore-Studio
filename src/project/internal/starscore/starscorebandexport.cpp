@@ -68,6 +68,7 @@
 
 #include "starscoreengraving.h"
 #include "starscoreannotations.h"
+#include "starscorecombined.h"
 #include "engraving/editing/editpart.h"
 #include "starscorehouse.h"
 #include "starscorechordchart.h"
@@ -101,6 +102,8 @@ static const std::vector<std::pair<QString, QString> > STARSCORE_HORN_ORDER {
 static const QString STARSCORE_BASS_HORNS_FOLDER = QStringLiteral("Bass Horns (Horn #7)");
 //! the sheets with a player's own notes on them (see starscoreannotations.h)
 static const QString STARSCORE_ANNOTATED_FOLDER = QStringLiteral("Annotated Sheets");
+//! each horn chair's lines from every arrangement on one sheet (see starscorecombined.h)
+static const QString STARSCORE_COMBINED_FOLDER = QStringLiteral("Combined Parts");
 
 //! A Flexible chair as one instrument can play it (Starsign Band Guide, page 3)
 struct StarScoreSeat {
@@ -2653,6 +2656,48 @@ static INotationPtr starscoreMakeVersionBook(const IMasterNotationPtr& vm, mu::e
     return n;
 }
 
+//! A combined part's sheet (see starscorecombined.h): a part score of the copy's combined part, named for the chair,
+//! in the look of the chair's own part score (its style; not its line breaks, as the combined line is busier). A
+//! second staff shows only where it has notes.
+static INotationPtr starscoreMakeCombinedBook(const IMasterNotationPtr& vm, mu::engraving::Part* part, const QString& bookName,
+                                              const INotationPtr& srcBook, const QString& tmpDir, bool secondStaff)
+{
+    const QString oldName = part->partName().toQString();
+    vm->parts()->setInstrumentName(InstrumentKey { part->instrumentId(), part->id(), mu::engraving::Part::MAIN_INSTRUMENT_TICK }, bookName);
+    part->setPartName(String::fromQString(bookName));
+    IExcerptNotationPtr book = starscorePotentialBook(vm, { bookName, oldName });
+    if (!book) {
+        return nullptr;
+    }
+    book->setName(bookName);
+    vm->initExcerpts({ book });
+    INotationPtr n = book->notation();
+    mu::engraving::Score* es = n && n->elements() ? n->elements()->msScore() : nullptr;
+    if (!es) {
+        return nullptr;
+    }
+    if (srcBook) {
+        const QString mss = tmpDir + "/combined.mss";
+        if (srcBook->style()->saveStyle(io::path_t(mss))) {
+            n->style()->loadStyle(io::path_t(mss), true);
+        }
+    }
+    n->undoStack()->prepareChanges(TranslatableString::untranslatable("Combined part style"));
+    n->style()->setStyleValue(StyleId::concertPitch, false);
+    // two voices resting together show one rest
+    n->style()->setStyleValue(StyleId::mergeMatchingRests, true);
+    if (secondStaff && es->nstaves() > 1) {
+        n->style()->setStyleValue(StyleId::hideEmptyStaves, true);
+        n->style()->setStyleValue(StyleId::dontHideStavesInFirstSystem, false);
+        es->staff(0)->setHideWhenEmpty(mu::engraving::AutoOnOff::OFF);
+        for (size_t i = 1; i < es->nstaves(); ++i) {
+            es->staff(i)->setHideWhenEmpty(mu::engraving::AutoOnOff::ON);
+        }
+    }
+    n->undoStack()->commitChanges();
+    return n;
+}
+
 //! The md5 of a PDF the export wrote, remembered for the sheet record (starscoresheetrecord.cpp) so the record
 //! doesn't read the file back from Drive. Defined there; the service header is shared, so it isn't declared in it.
 namespace mu::project::starscore {
@@ -3673,6 +3718,97 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         written << file.relativePath;
     }
 
+    // Combined parts (Joel, 13 Oct 2026): for each horn chair in two or more arrangements with a sheet in this
+    // export, one sheet with every arrangement's line, into "Combined Parts". Made from a copy of the song; written
+    // like the other sheets (unchanged left, replaced to Version History); not in the sheet record or changelogs.
+    int combinedWritten = 0;
+    int combinedSame = 0;
+    if (!m_exportDryRun && variant.isEmpty()) {
+        auto sheetOf = [](const QString& pid, const std::vector<StarScoreBandFile>& files) -> const StarScoreBandFile* {
+            for (const StarScoreBandFile& f : files) {
+                if (!f.isScore && !f.isVersion && f.sourceFile.isEmpty() && f.partIds.size() == 1 && f.partIds.front() == pid) {
+                    return &f;
+                }
+            }
+            return nullptr;
+        };
+        std::vector<starscore::CombinedChair> chairs = starscore::combinedChairs(ms, loadFrom(ms).sections);
+        LOGI() << "[starscore] combined parts: " << chairs.size() << " chair(s) in two or more arrangements";
+        chairs.erase(std::remove_if(chairs.begin(), chairs.end(), [&](const starscore::CombinedChair& c) {
+            return std::none_of(c.sources.begin(), c.sources.end(), [&](const starscore::CombinedSource& src) {
+                return sheetOf(src.partId, plan.files) != nullptr;
+            });
+        }), chairs.end());
+        INotationProjectPtr cp = chairs.empty() ? nullptr : loadStripped();
+        for (size_t ci = 0; ci < chairs.size() && cp; ++ci) {
+            const starscore::CombinedChair& chair = chairs[ci];
+            reportExportProgress(muse::qtrc("starscore", "Combined parts"), int(ci), int(chairs.size()), chair.name);
+            stepClock.restart();
+            const starscore::CombinedResult res = starscore::buildCombinedPart(cp->masterNotation(), chair);
+            lapTime(chair.name, "combine");
+            const QString rel = STARSCORE_COMBINED_FOLDER + "/" + plan.code + " - " + starscoreSafeFileName(chair.name)
+                                + " (All Arrangements).pdf";
+            if (!res.ok) {
+                problems << muse::qtrc("starscore", "%1: %2").arg(rel, res.problem);
+                continue;
+            }
+            engraving::Part* part = cp->masterNotation()->masterScore()->partById(ID(res.targetPartId));
+            const StarScoreBandFile* f = sheetOf(chair.sources.back().partId, full.files);
+            auto src = bookForPart.find(chair.sources.back().partId);
+            INotationPtr n = part ? starscoreMakeCombinedBook(cp->masterNotation(), part, chair.name + " (All Arrangements)",
+                                                              src != bookForPart.end() ? src->second->notation() : nullptr,
+                                                              tmpDir, res.secondStaff) : nullptr;
+            if (!n) {
+                problems << muse::qtrc("starscore", "%1: couldn't make the part").arg(rel);
+                continue;
+            }
+            std::vector<int> horns;
+            for (const starscore::CombinedSource& s : chair.sources) {
+                horns.push_back(s.horns);
+            }
+            const QString left = f ? f->sheetLeft : chair.name;
+            const QString right = muse::qtrc("starscore", "Combined: %1").arg(starscore::arrangementLabel(horns));
+            QByteArray pdf;
+            n->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
+            const Ret ret = starscorePrintSheet(writer, n, left, right, true, pdf, false);
+            n->undoStack()->commitChanges();
+            lapTime(chair.name, "print combined");
+            if (!ret) {
+                problems << muse::qtrc("starscore", "%1: %2").arg(rel, QString::fromStdString(ret.toString()));
+                continue;
+            }
+            LOGI() << "[starscore] combined " << chair.name.toStdString() << ": " << res.passages << " passages, "
+                   << res.splitPassages << " with more than one line" << (res.secondStaff ? ", second staff" : "");
+            const QString target = songDir + "/" + rel;
+            if (QFileInfo::exists(target) && starscoreSamePdf(pdf, target)) {
+                ++combinedSame;
+                continue;
+            }
+            QDir().mkpath(QFileInfo(target).absolutePath());
+            QSaveFile out(target);
+            if (!out.open(QIODevice::WriteOnly) || out.write(pdf) != pdf.size()) {
+                out.cancelWriting();
+                problems << muse::qtrc("starscore", "%1: couldn't write the file.").arg(rel);
+                continue;
+            }
+            QString archivedTo;
+            const bool moved = supersede(rel, &archivedTo);
+            archivedPaths.removeAll(rel);
+            if (!moved) {
+                out.cancelWriting();
+                continue;
+            }
+            if (!out.commit()) {
+                if (!archivedTo.isEmpty()) {
+                    QFile::rename(archivedTo, target);
+                }
+                problems << muse::qtrc("starscore", "%1: couldn't write the file.").arg(rel);
+                continue;
+            }
+            ++combinedWritten;
+        }
+    }
+
     // a dry run ends here: nothing archived, recorded, or written beside the sheets; so does a Half-Time or Double-Time
     // export (its sheets aren't in the sheet record, the organizer or the to-do list)
     if (m_exportDryRun || !variant.isEmpty()) {
@@ -4019,6 +4155,10 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     if (!written.isEmpty() && !unchanged.isEmpty()) {
         summary += " " + muse::qtrc("starscore", "%1 sheet(s) came out the same as before, so those files were left as they were.")
                    .arg(unchanged.size());
+    }
+    if (combinedWritten + combinedSame > 0) {
+        summary += " " + muse::qtrc("starscore", "Combined parts (in %1): %2 written, %3 the same as before.")
+                   .arg(STARSCORE_COMBINED_FOLDER).arg(combinedWritten).arg(combinedSame);
     }
     if (annotatedWritten + annotatedSame + annotatedArchived > 0) {
         summary += " " + muse::qtrc("starscore", "Sheets with players' annotations (in %1): %2 written, %3 the same as before.")

@@ -114,7 +114,7 @@ QString NewStarScoreModel::defaultDoublerId(const QString& arrangementKey, bool 
     // Adding to a song: what the doubler already plays in its other 3- to 7-Horn sections (Joel, 5 Oct 2026)
     const int horns = standardHorns(arrangementKey);
     if (matchSong && horns >= 3 && horns <= 7) {
-        const QString inSong = starScore()->songDoublerInstrumentId();
+        const QString inSong = starScore()->songDoublerInstrumentId(horns);
         if (!inSong.isEmpty()) {
             return inSong;
         }
@@ -129,7 +129,7 @@ QVariantList NewStarScoreModel::doublerChoices(const QString& arrangementKey, bo
     const int horns = standardHorns(arrangementKey);
     // Alto Sax is recommended for 3/4/5-Horn; 6/7-Horn start on Soprano Sax without calling it recommended. Adding to a
     // song: what the doubler plays in its other 3- to 7-Horn sections is the recommended one, for 3- to 7-Horn alike.
-    const QString inSong = matchSong && horns >= 3 && horns <= 7 ? starScore()->songDoublerInstrumentId() : QString();
+    const QString inSong = matchSong && horns >= 3 && horns <= 7 ? starScore()->songDoublerInstrumentId(horns) : QString();
     const QString recommended = !inSong.isEmpty() ? inSong
                                 : horns >= 3 && horns <= 5 ? QString("alto-saxophone") : QString();
     QVariantList list;

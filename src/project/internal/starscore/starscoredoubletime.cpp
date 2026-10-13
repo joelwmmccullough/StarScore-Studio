@@ -595,7 +595,18 @@ RetVal<QString> StarScoreService::convertTimeOf(const INotationProjectPtr& proje
             tt->setTrack(a.track);
             tt->setParent(seg);
             tt->setXmlText(String::fromQString(text));
-            tt->setTempo(BeatsPerSecond(a.beatsPerSecond * factor));
+            // playback at the rounded number too (Joel, 13 Oct 2026; the marking can be changed afterwards as any other):
+            // the first number after the "=", rounded, over the exact one, in the marking's own beat
+            double rounding = 1.0;
+            if (eq >= 0) {
+                static const QRegularExpression tagged("<[^>]*>");
+                const QRegularExpressionMatch first = number.match(QString(a.xml.toQString()).mid(eq).remove(tagged));
+                const double exact = first.hasMatch() ? first.captured(1).toDouble() * factor : 0.0;
+                if (exact > 0.0) {
+                    rounding = double(std::lround(exact)) / exact;
+                }
+            }
+            tt->setTempo(BeatsPerSecond(a.beatsPerSecond * factor * rounding));
             tt->setFollowText(a.followText);
             ms->undoAddElement(tt);
             ++temposHalved;
@@ -671,7 +682,7 @@ RetVal<QString> StarScoreService::convertTimeOf(const INotationProjectPtr& proje
 
     // 9b. bars filled with slashes (Format › Fill with slashes: stemless slash heads) get one slash per beat again, as
     // many as the time signature's top number (4/4: four quarter-note slashes, never two halves); 2/2 also gets four
-    // quarter-note slashes (Joel, 7 Oct 2026: FYKB's section D came out in half-note slashes)
+    // quarter-note slashes (Joel, 7 Oct 2026: FYKB's section D came out in half-note slashes), and so does 8/8
     int slashBars = 0;
     auto isFillSlash = [](const Chord* c) {
         if (!c->noStem() || c->notes().empty()) {
@@ -686,8 +697,10 @@ RetVal<QString> StarScoreService::convertTimeOf(const INotationProjectPtr& proje
         if (m->ticks() != sig) {
             continue;   // a pickup or other odd-length bar: left as it is
         }
-        const bool cut = sig == Fraction(2, 2);
-        const Fraction beat = cut ? Fraction(1, 4) : Fraction(1, sig.denominator());
+        // (2/2, and 8/8, 4/8 and 2/8, are counted in quarter notes: Joel, 13 Oct 2026, 8/8 gets four quarter-note slashes)
+        const bool quarters = sig == Fraction(2, 2)
+                              || (sig.denominator() == 8 && (sig.numerator() == 8 || sig.numerator() == 4 || sig.numerator() == 2));
+        const Fraction beat = quarters ? Fraction(1, 4) : Fraction(1, sig.denominator());
         for (track_idx_t track = 0; track < ms->ntracks(); ++track) {
             std::vector<ChordRest*> crs;
             bool slashes = false;

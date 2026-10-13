@@ -655,7 +655,7 @@ static void starscoreSetChairDisplay(mu::engraving::MasterScore* ms, mu::engravi
     }
 }
 
-QString StarScoreService::songDoublerInstrumentId() const
+QString StarScoreService::songDoublerInstrumentId(int forHorns) const
 {
     engraving::MasterScore* ms = masterScore();
     if (!ms) {
@@ -686,6 +686,9 @@ QString StarScoreService::songDoublerInstrumentId() const
             }
             for (const StarScoreHornChoice& c : doublerChoices()) {
                 if (left.contains(c.instrumentId)) {
+                    if (forHorns >= 3 && forHorns <= 5 && horns >= 6 && c.instrumentId == "tenor-saxophone") {
+                        return QString("alto-saxophone");
+                    }
                     return c.instrumentId;
                 }
             }

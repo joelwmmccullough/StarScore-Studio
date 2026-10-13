@@ -109,7 +109,7 @@ public:
     std::vector<StarScoreHornChoice> doublerChoices() const override;
     std::vector<StarScoreHornChoice> lowHornChoices() const override;
     QString rosterDoublerName() const override;
-    QString songDoublerInstrumentId() const override;
+    QString songDoublerInstrumentId(int forHorns = 0) const override;
 
     muse::RetVal<QString> createSectionFromTemplate(const QString& templateKey, const QString& doublerInstrumentId = {},
                                                     const QString& lowHornInstrumentId = {}) override;
@@ -419,6 +419,9 @@ private:
     void syncMinMajDefaults(const Data& data);
     //! Sound, volume, pan, reverb and mute for each instrument, from the defaults in mixer_defaults.json
     void applyMixerDefaults(const QStringList& partIds);
+    //! The chord-symbol playback of these parts muted, in the main score and every part score's mixer (also before
+    //! the parts have chord symbols: the track then starts muted)
+    void muteChordSymbolTracks(const QStringList& partIds);
     void standardizeImported();
     //! A new "N-Horn Any" section starts with the music of the "N-Horn" section, chair by chair
     void fillAnyHornsFromStandard(const StarScoreSection& anySection);
