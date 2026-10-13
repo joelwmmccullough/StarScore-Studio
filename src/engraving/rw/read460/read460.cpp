@@ -351,6 +351,7 @@ bool Read460::pasteStaff(XmlReader& e, Segment* dst, staff_idx_t dstStaff, Fract
     int staves  = 0;
     bool done   = false;
     bool doScale = (scale != Fraction(1, 1));
+    SegmentType barLineFermata = SegmentType::Invalid;   // StarScore: the next fermata goes on this barline
 
     while (e.readNextStartElement()) {
         if (done) {
@@ -672,6 +673,9 @@ bool Read460::pasteStaff(XmlReader& e, Segment* dst, staff_idx_t dstStaff, Fract
                     harmony->setParent(seg);
                     score->undoAddElement(harmony);
                     pastedHarmony.push_back(harmony);
+                } else if (tag == "starscoreBarLineFermata") {
+                    // StarScore: the next fermata goes on a barline (see TWrite::writeSegments)
+                    barLineFermata = static_cast<SegmentType>(e.readInt());
                 } else if (tag == "Dynamic"
                            || tag == "Expression"
                            || tag == "Symbol"
@@ -700,9 +704,19 @@ bool Read460::pasteStaff(XmlReader& e, Segment* dst, staff_idx_t dstStaff, Fract
 
                     Fraction tick = doScale ? (ctx.tick() - dstTick) * scale + dstTick : ctx.tick();
                     Measure* m = score->tick2measure(tick);
-                    Segment* seg = el->isFretDiagram()
-                                   ? m->undoGetSegment(SegmentType::ChordRest, tick)
-                                   : m->undoGetChordRestOrTimeTickSegment(tick);
+                    Segment* seg = nullptr;
+                    if (el->isFermata() && barLineFermata != SegmentType::Invalid) {
+                        // on the barline: an end barline belongs to the bar that ends at this tick
+                        Measure* bm = barLineFermata == SegmentType::EndBarLine && tick.isNotZero()
+                                      ? score->tick2measure(tick - Fraction::eps()) : m;
+                        seg = bm ? bm->undoGetSegment(barLineFermata, tick) : nullptr;
+                    }
+                    barLineFermata = SegmentType::Invalid;
+                    if (!seg) {
+                        seg = el->isFretDiagram()
+                              ? m->undoGetSegment(SegmentType::ChordRest, tick)
+                              : m->undoGetChordRestOrTimeTickSegment(tick);
+                    }
                     el->setParent(seg);
 
                     // be sure to paste the element in the destination track;

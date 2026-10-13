@@ -39,6 +39,7 @@
 #include "engraving/dom/system.h"
 #include "engraving/dom/textbase.h"
 #include "engraving/dom/page.h"
+#include "engraving/dom/systemlock.h"
 #include "global/serialization/zipreader.h"
 #include "global/serialization/zipwriter.h"
 #include <QElapsedTimer>
@@ -46,6 +47,7 @@
 #include "engraving/dom/starscoreannotations.h"
 #include "starscoreannotations.h"
 #include "engraving/dom/breath.h"
+#include "engraving/dom/fermata.h"
 #include "engraving/dom/fingering.h"
 #include "engraving/dom/hairpin.h"
 #include "engraving/dom/articulation.h"
@@ -427,6 +429,37 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             }
         }
         autotestLog("  " + out.join(" | "));
+    } else if (step.startsWith("barfermata:") || step.startsWith("fermatas:")) {
+        // barfermata:S:B: a fermata on the end barline of bar B (1-based) on staff S (0-based), in the score on screen;
+        // fermatas:S: every fermata on staff S: bar, and whether on a note/rest or a barline
+        const QStringList a = step.split(':');
+        INotationPtr n = globalContext()->currentNotation();
+        engraving::Score* sc = n ? n->elements()->msScore() : nullptr;
+        const engraving::staff_idx_t st = engraving::staff_idx_t(a.value(1).toInt());
+        if (sc && step.startsWith("barfermata:")) {
+            engraving::Measure* m = sc->crMeasure(a.value(2).toInt() - 1);
+            if (m) {
+                n->undoStack()->prepareChanges(TranslatableString::untranslatable("Autotest fermata"));
+                engraving::Segment* seg = m->undoGetSegment(engraving::SegmentType::EndBarLine, m->endTick());
+                engraving::Fermata* f = engraving::Factory::createFermata(seg);
+                f->setTrack(engraving::staff2track(st));
+                f->setParent(seg);
+                sc->undoAddElement(f);
+                n->undoStack()->commitChanges();
+                autotestLog("  added");
+            }
+        } else if (sc) {
+            QStringList out;
+            for (engraving::Segment* seg = sc->firstSegment(engraving::SegmentType::All); seg; seg = seg->next1()) {
+                for (engraving::EngravingItem* e : seg->annotations()) {
+                    if (e->isFermata() && e->staffIdx() == st) {
+                        out << QString("bar %1 %2").arg(seg->measure()->no() + 1)
+                               .arg(seg->isType(engraving::SegmentType::BarLineType) ? "barline" : "note");
+                    }
+                }
+            }
+            autotestLog("  fermatas: " + out.join(", "));
+        }
     } else if (step.startsWith("copyrange:")) {
         // copyrange:S:B1-B2:T:C: staff S (0-based) bars B1..B2 copied and pasted on staff T at bar C, as Copy and Paste
         // do (the score on screen)
@@ -717,11 +750,24 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         } else {
             A->doLayout();
             B->doLayout();
+            for (engraving::Score* sc : { A, B }) {
+                QStringList ls;
+                for (const engraving::SystemLock* l : sc->systemLocks()->allLocks()) {
+                    ls << QString("%1-%2").arg(l->startMB()->isMeasure() ? engraving::toMeasure(l->startMB())->no() + 1 : -1)
+                          .arg(l->endMB()->isMeasure() ? engraving::toMeasure(l->endMB())->no() + 1 : -1);
+                }
+                autotestLog(QString("    locks %1: %2").arg(sc == A ? "A" : "B", ls.join(" ")));
+            }
             int breaks = 0, widths = 0, texts = 0, textsMissing = 0, frames = 0, systemsA = 0, systemsB = 0;
             for (engraving::Measure* m = A->firstMeasure(); m; m = m->nextMeasure()) {
                 engraving::Measure* o = B->tick2measure(m->tick());
                 if (!o) {
                     continue;
+                }
+                if (m->lineBreak() != o->lineBreak() || m->pageBreak() != o->pageBreak()) {
+                    autotestLog(QString("    bar %1: A line %2 page %3 locked %4; B line %5 page %6 locked %7").arg(m->no() + 1)
+                                .arg(m->lineBreak()).arg(m->pageBreak()).arg(A->systemLocks()->lockContaining(m) != nullptr)
+                                .arg(o->lineBreak()).arg(o->pageBreak()).arg(B->systemLocks()->lockContaining(o) != nullptr));
                 }
                 breaks += (m->lineBreak() != o->lineBreak()) + (m->pageBreak() != o->pageBreak());
                 widths += m->userStretch() != o->userStretch();

@@ -12,6 +12,7 @@
 #include "modularity/ioc.h"
 #include "context/iglobalcontext.h"
 #include "notation/inotation.h"
+#include "project/istarscoreservice.h"
 
 namespace mu::project {
 //! "Copy layout breaks to other parts" — copies line breaks, page breaks, "keep together"
@@ -33,6 +34,7 @@ class CopyLayoutModel : public QObject, public muse::Contextable
     QML_ELEMENT
 
     muse::ContextInject<context::IGlobalContext> globalContext = { this };
+    muse::ContextInject<IStarScoreService> starScore = { this };
 
 public:
     explicit CopyLayoutModel(QObject* parent = nullptr);
@@ -64,7 +66,7 @@ private:
     };
 
     std::vector<Entry> m_entries;   // 0 = main score, then part books
-    int m_sourceIndex = 0;
+    int m_sourceIndex = 0;      // -1: none chosen yet
     bool m_fromMode = false;
     int m_currentIndex = 0;     // the part being viewed: in "from" mode, the only one formatting is copied into
 

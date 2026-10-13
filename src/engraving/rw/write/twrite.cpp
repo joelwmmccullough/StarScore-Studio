@@ -3544,6 +3544,11 @@ void TWrite::writeSegments(XmlWriter& xml, WriteContext& ctx, track_idx_t strack
                     voiceTagWritten |= writeVoiceMove(xml, ctx, segment, startTick, track, &lastTrackWritten);
                     needMove = false;
                 }
+                // StarScore: a fermata on a barline says so, or pasting puts it on the note at the barline's tick (or
+                // drops it, at the end of the range) (Joel, 13 Oct 2026)
+                if (ctx.clipboardmode() && e1->isFermata() && segment->isType(SegmentType::BarLineType)) {
+                    xml.tag("starscoreBarLineFermata", static_cast<int>(segment->segmentType()));
+                }
                 TWrite::writeItem(e1, xml, ctx);
             }
             Measure* m = segment->measure();
@@ -3661,6 +3666,30 @@ void TWrite::writeSegments(XmlWriter& xml, WriteContext& ctx, track_idx_t strack
                     ctx.setCurTick(spannerEndTick);
                 }
                 writeSpannerEnd(s, xml, ctx, score->lastMeasure(), track, endTick);
+            }
+            // StarScore: a fermata on the barline that ends the clip region (the region stops just before that
+            // barline, so pasting lost it; Joel, 13 Oct 2026)
+            Measure* lastM = endTick.isNotZero() ? score->tick2measure(endTick - Fraction::eps()) : nullptr;
+            for (Segment* bs = lastM ? lastM->last() : nullptr; bs && bs->tick() == endTick; bs = bs->prev()) {
+                if (!bs->isType(SegmentType::BarLineType)) {
+                    continue;
+                }
+                for (EngravingItem* f : bs->annotations()) {
+                    if (!f->isFermata() || f->generated() || f->track() != track) {
+                        continue;
+                    }
+                    if (endTick != ctx.curTick()) {
+                        Location curr = Location::absolute();
+                        Location dest = Location::absolute();
+                        curr.setFrac(ctx.curTick());
+                        dest.setFrac(endTick);
+                        dest.toRelative(curr);
+                        TWrite::write(&dest, xml, ctx);
+                        ctx.setCurTick(endTick);
+                    }
+                    xml.tag("starscoreBarLineFermata", static_cast<int>(bs->segmentType()));
+                    TWrite::writeItem(f, xml, ctx);
+                }
             }
         }
 

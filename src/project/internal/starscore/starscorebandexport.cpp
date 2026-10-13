@@ -3762,6 +3762,18 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                 problems << muse::qtrc("starscore", "%1: couldn't make the part").arg(rel);
                 continue;
             }
+            // the layout, section by section, from the busiest arrangement's part score there
+            std::vector<starscore::CombinedLayoutSource> layoutSources;
+            for (const starscore::CombinedSource& s : chair.sources) {
+                auto b = bookForPart.find(s.partId);
+                INotationPtr bn = b != bookForPart.end() ? b->second->notation() : nullptr;
+                layoutSources.push_back({ s.horns, bn && bn->elements() ? bn->elements()->msScore() : nullptr,
+                                          ms->partById(ID(s.partId)) });
+            }
+            n->undoStack()->prepareChanges(TranslatableString::untranslatable("Combined part layout"));
+            const QStringList layoutLog = starscore::copySectionLayouts(layoutSources, n->elements()->msScore());
+            n->undoStack()->commitChanges();
+            LOGI() << "[starscore] combined " << chair.name.toStdString() << " layout: " << layoutLog.join("; ").toStdString();
             std::vector<int> horns;
             for (const starscore::CombinedSource& s : chair.sources) {
                 horns.push_back(s.horns);

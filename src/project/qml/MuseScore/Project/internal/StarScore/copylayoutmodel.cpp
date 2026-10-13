@@ -10,6 +10,12 @@
 #include "notation/imasternotation.h"
 #include "notation/iexcerptnotation.h"
 #include "notation/inotationelements.h"
+#include "engraving/dom/masterscore.h"
+#include "engraving/dom/part.h"
+#include "engraving/dom/staff.h"
+
+#include <QRegularExpression>
+#include <algorithm>
 #include "project/internal/starscore/starscoreengraving.h"
 
 using namespace mu::project;
@@ -33,10 +39,65 @@ void CopyLayoutModel::load(const QString& mode)
     }
 
     m_entries.push_back({ muse::qtrc("starscore", "Main score"), master->notation(), false });
-    for (const IExcerptNotationPtr& excerpt : master->excerpts()) {
-        if (excerpt->notation() && excerpt->notation()->elements() && excerpt->notation()->elements()->msScore()) {
-            m_entries.push_back({ excerpt->name(), excerpt->notation(), true });
+    // the part scores in the band's order (Joel, 13 Oct 2026): 1H, 2H, 2H Flexible, 3H, 3H Flexible, 4H to 7H (each
+    // high to low, as in the score), Rhythm, the other sections, Big Band, Marching Band, Orchestra; then the scores
+    // of several instruments
+    engraving::MasterScore* ms = master->masterScore();
+    std::map<QString, int> groupOfPart;
+    if (starScore()) {
+        static const QRegularExpression horn("^([1-7])-horn(-any)?$");
+        for (const StarScoreSection& s : starScore()->sections()) {
+            int g = 11;   // another section (lead sheet, strings, solos…)
+            const QRegularExpressionMatch m = horn.match(s.templateKey);
+            if (m.hasMatch()) {
+                const int n = m.captured(1).toInt();
+                const bool flexible = !m.captured(2).isEmpty();
+                // 1H, 2H, 2HF, 3H, 3HF, 4H, 5H, 6H, 7H
+                g = n == 1 ? 1 : n == 2 ? (flexible ? 3 : 2) : n == 3 ? (flexible ? 5 : 4) : 2 + n;
+            } else if (s.templateKey == "rhythm") {
+                g = 10;
+            } else if (s.templateKey.startsWith("bigband-")) {
+                g = 12;
+            } else if (s.templateKey.startsWith("marching-")) {
+                g = 13;
+            } else if (s.templateKey.startsWith("orch-")) {
+                g = 14;
+            }
+            for (const QString& pid : s.partIds) {
+                groupOfPart[pid] = g;
+            }
         }
+    }
+    struct Keyed {
+        Entry entry;
+        int group = 99;
+        int order = 0;
+    };
+    std::vector<Keyed> books;
+    for (const IExcerptNotationPtr& excerpt : master->excerpts()) {
+        if (!(excerpt->notation() && excerpt->notation()->elements() && excerpt->notation()->elements()->msScore())) {
+            continue;
+        }
+        Keyed k { { excerpt->name(), excerpt->notation(), true }, 99, int(books.size()) };
+        const engraving::Score* es = excerpt->notation()->elements()->msScore();
+        if (ms && es->parts().size() == 1 && !es->parts().front()->staves().empty()) {
+            const engraving::Staff* linked = es->parts().front()->staves().front()->findLinkedInScore(ms);
+            const engraving::Part* p = linked ? linked->part() : nullptr;
+            if (p) {
+                auto it = groupOfPart.find(p->id().toQString());
+                k.group = it != groupOfPart.end() ? it->second : 11;
+                // high to low: the order of the parts in the score
+                const auto& parts = ms->parts();
+                k.order = int(std::find(parts.begin(), parts.end(), p) - parts.begin());
+            }
+        }
+        books.push_back(k);
+    }
+    std::stable_sort(books.begin(), books.end(), [](const Keyed& a, const Keyed& b) {
+        return a.group != b.group ? a.group < b.group : a.order < b.order;
+    });
+    for (const Keyed& k : books) {
+        m_entries.push_back(k.entry);
     }
 
     int currentIndex = 0;
@@ -59,11 +120,13 @@ void CopyLayoutModel::load(const QString& mode)
             m_sourceIndex = 0;
         }
     } else if (mode == "copy") {
-        // Copy part formatting: from the part being viewed (change it in the list), into the parts you tick
-        m_sourceIndex = currentIndex;
+        // Copy part formatting (Joel, 13 Oct 2026): no part to copy from until one is chosen; the part being viewed is
+        // ticked to copy into
+        m_sourceIndex = -1;
         for (Entry& e : m_entries) {
             e.checked = false;
         }
+        m_entries[currentIndex].checked = true;
     } else {
         // The part being viewed is the source; every other part is ticked
         m_sourceIndex = currentIndex;
@@ -144,6 +207,9 @@ QString CopyLayoutModel::apply()
         return QString();
     }
 
+    if (m_sourceIndex < 0 || m_sourceIndex >= int(m_entries.size())) {
+        return muse::qtrc("starscore", "Choose the part to copy from first.");
+    }
     const engraving::Score* source = m_entries[m_sourceIndex].notation->elements()->msScore();
 
     std::vector<engraving::Score*> targets;

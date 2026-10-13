@@ -6,6 +6,7 @@
 #include "starscoreengraving.h"
 #include "starscoreannotations.h"
 
+#include <algorithm>
 #include <map>
 #include <set>
 
@@ -98,21 +99,37 @@ LayoutCopyResult copyLayout(const Score* source, const std::vector<Score*>& targ
             }
         };
 
+        // Bars inside or ending a locked system of the source get no line break or "keep together" here: adding the
+        // lock takes them out again, and a break added and taken out in the same undo step is deleted twice when a
+        // throwaway copy is closed (a crash found with the combined parts, 13 Oct 2026)
+        std::vector<std::pair<int, int> > lockedRanges;
+        if (options.systemLocks) {
+            for (const SystemLock* lock : source->systemLocks()->allLocks()) {
+                lockedRanges.emplace_back(lock->startMB()->tick().ticks(), lock->endMB()->endTick().ticks());
+            }
+        }
+        auto locked = [&](const Measure* m) {
+            return std::any_of(lockedRanges.begin(), lockedRanges.end(), [&](const std::pair<int, int>& r) {
+                return m->tick().ticks() >= r.first && m->tick().ticks() < r.second;
+            });
+        };
         for (Measure* m = target->firstMeasure(); m; m = m->nextMeasure()) {
             auto it = sourceByTick.find(m->tick().ticks());
             if (it == sourceByTick.end()) {
                 continue;
             }
             const Measure* sm = it->second;
+            const bool inLock = locked(m);
 
             if (options.pageBreaks) {
                 applyBreak(m, sm->pageBreak(), m->pageBreak(), LayoutBreakType::PAGE);
             }
+            // (in a locked system only taken away, never added)
             if (options.lineBreaks) {
-                applyBreak(m, sm->lineBreak(), m->lineBreak(), LayoutBreakType::LINE);
+                applyBreak(m, sm->lineBreak() && !inLock, m->lineBreak(), LayoutBreakType::LINE);
             }
             if (options.keepTogether) {
-                applyBreak(m, sm->noBreak(), m->noBreak(), LayoutBreakType::NOBREAK);
+                applyBreak(m, sm->noBreak() && !inLock, m->noBreak(), LayoutBreakType::NOBREAK);
             }
         }
 

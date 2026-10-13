@@ -20,6 +20,7 @@
 #include <QRegularExpression>
 
 #include "engraving/dom/factory.h"
+#include "engraving/dom/fermata.h"
 #include "engraving/dom/hairpin.h"
 #include "engraving/dom/harmony.h"
 #include "engraving/dom/masterscore.h"
@@ -29,6 +30,9 @@
 #include "engraving/dom/select.h"
 #include "engraving/dom/staff.h"
 #include "engraving/dom/stafftext.h"
+#include "engraving/dom/chord.h"
+#include "engraving/dom/systemlock.h"
+#include "engraving/editing/editsystemlocks.h"
 #include "engraving/rw/xmlreader.h"
 #include "engraving/style/style.h"
 
@@ -512,6 +516,21 @@ CombinedResult buildCombinedPart(const mu::notation::IMasterNotationPtr& copy, c
             }
         }
     }
+    // a fermata on a barline that several lines brought in, once
+    for (Measure* m = ms->firstMeasure(); m; m = m->nextMeasure()) {
+        for (Segment* seg = m->first(); seg; seg = seg->next()) {
+            if (!seg->isType(SegmentType::BarLineType)) {
+                continue;
+            }
+            std::set<std::pair<int, int> > seen;
+            for (EngravingItem* e : seg->annotations()) {
+                if (e->isFermata() && e->staffIdx() >= dst0 && e->staffIdx() < dst0 + target->nstaves()
+                    && !seen.insert(std::make_pair(int(e->staffIdx()), int(toFermata(e)->symId()))).second) {
+                    twice.push_back(e);
+                }
+            }
+        }
+    }
     // hairpins and lines (cresc., dim.) the same in several lines, once
     std::set<std::tuple<int, int, int, int> > lines;
     for (const auto& [tick, sp] : ms->spanner()) {
@@ -547,5 +566,126 @@ CombinedResult buildCombinedPart(const mu::notation::IMasterNotationPtr& copy, c
     r.ok = true;
     r.targetPartId = target->id().toQString();
     return r;
+}
+
+QStringList copySectionLayouts(const std::vector<CombinedLayoutSource>& sources, Score* target)
+{
+    QStringList log;
+    if (!target || !target->firstMeasure() || sources.empty()) {
+        return log;
+    }
+    // the sections: from each rehearsal mark to the next (and the bars before the first)
+    std::vector<Fraction> starts { target->firstMeasure()->tick() };
+    for (Measure* m = target->firstMeasure(); m; m = m->nextMeasure()) {
+        bool mark = false;
+        for (Segment* seg = m->first(SegmentType::ChordRest); seg && !mark; seg = seg->next(SegmentType::ChordRest)) {
+            for (const EngravingItem* e : seg->annotations()) {
+                mark = mark || e->isRehearsalMark();
+            }
+        }
+        if (mark && m->tick() != starts.front()) {
+            starts.push_back(m->tick());
+        }
+    }
+    const Fraction end = target->lastMeasure()->endTick();
+    starts.push_back(end);
+
+    // how busy a part is between two ticks: its notes and chords played
+    auto busy = [](const Part* part, const Fraction& from, const Fraction& to) {
+        int count = 0;
+        const Score* sc = part->score();
+        const track_idx_t t0 = part->startTrack(), t1 = part->endTrack();
+        for (const Segment* seg = sc->tick2segment(from, true, SegmentType::ChordRest); seg && seg->tick() < to;
+             seg = seg->next1(SegmentType::ChordRest)) {
+            for (track_idx_t t = t0; t < t1; ++t) {
+                const EngravingItem* e = seg->element(t);
+                if (e && e->isChord()) {
+                    count += 1 + int(toChord(e)->notes().size());
+                }
+            }
+        }
+        return count;
+    };
+
+    // what each bar gets: none of the book's own breaks or locks are kept
+    std::map<int, std::pair<bool, bool> > breaks;   // tick -> (system break, keep together)
+    std::vector<std::pair<Fraction, Fraction> > locks;   // first bar's tick, last bar's end
+    for (size_t si = 0; si + 1 < starts.size(); ++si) {
+        const Fraction from = starts[si], to = starts[si + 1];
+        const CombinedLayoutSource* best = nullptr;
+        int bestCount = -1;
+        for (const CombinedLayoutSource& src : sources) {
+            const int c = src.part ? busy(src.part, from, to) : -1;
+            if (c >= bestCount) {   // (the later, larger arrangement when even)
+                best = &src;
+                bestCount = c;
+            }
+        }
+        const Measure* fm = target->tick2measure(from);
+        const QString where = fm ? QString("bar %1").arg(fm->no() + 1) : QString("?");
+        if (!best || !best->book) {
+            log << QString("%1: no part score to follow").arg(where);
+            continue;
+        }
+        int pageBreaks = 0;
+        for (const Measure* sm = best->book->tick2measure(from); sm && sm->tick() < to; sm = sm->nextMeasure()) {
+            breaks[sm->tick().ticks()] = { sm->lineBreak() || sm->pageBreak(), sm->noBreak() };
+            pageBreaks += sm->pageBreak() ? 1 : 0;
+        }
+        for (const SystemLock* lock : best->book->systemLocks()->allLocks()) {
+            if (lock->startMB()->isMeasure() && lock->endMB()->isMeasure() && lock->startMB()->tick() >= from
+                && lock->endMB()->endTick() <= to) {
+                locks.emplace_back(lock->startMB()->tick(), lock->endMB()->endTick());
+            }
+        }
+        log << QString("%1: from %2H (%3 notes)%4").arg(where).arg(best->horns).arg(bestCount)
+            .arg(pageBreaks ? QString(", %1 page break(s) made system breaks").arg(pageBreaks) : QString());
+    }
+
+    // (no break inside or at the end of a locked system: adding the lock would take it out again, and a break added
+    // and taken out in the same undo step was deleted twice when the copy was closed)
+    auto locked = [&](const Fraction& t) {
+        return std::any_of(locks.begin(), locks.end(), [&](const std::pair<Fraction, Fraction>& l) {
+            return t >= l.first && t < l.second;
+        });
+    };
+    for (Measure* m = target->firstMeasure(); m; m = m->nextMeasure()) {
+        const auto it = breaks.find(m->tick().ticks());
+        const bool line = it != breaks.end() && it->second.first && !locked(m->tick());
+        const bool keep = it != breaks.end() && it->second.second && !locked(m->tick());
+        if (m->pageBreak()) {
+            m->undoSetBreak(false, LayoutBreakType::PAGE);
+        }
+        if (m->lineBreak() != line) {
+            m->undoSetBreak(line, LayoutBreakType::LINE);
+        }
+        if (m->noBreak() != keep) {
+            m->undoSetBreak(keep, LayoutBreakType::NOBREAK);
+        }
+    }
+    if (!target->systemLocks()->allLocks().empty()) {
+        EditSystemLocks::undoRemoveAllLocks(target);
+    }
+    const bool mmrests = target->style().styleB(Sid::createMultiMeasureRests);
+    for (const auto& [a0, b0] : locks) {
+        Measure* a = target->tick2measure(a0);
+        Measure* b = nullptr;
+        for (Measure* m = a; m && m->tick() < b0; m = m->nextMeasure()) {
+            b = m;
+        }
+        if (!a || !b || a->tick() != a0 || b->endTick() != b0) {
+            continue;
+        }
+        if (mmrests) {
+            a = a->coveringMMRestOrThis();
+            b = b->coveringMMRestOrThis();
+        }
+        if (!(a == b || a->isBefore(b)) || target->systemLocks()->lockContaining(a) || target->systemLocks()->lockContaining(b)) {
+            continue;
+        }
+        EditSystemLocks::undoAddSystemLock(target, new SystemLock(a, b));
+    }
+    target->setLayoutAll();
+    return log;
 }
 }

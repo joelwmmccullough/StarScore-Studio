@@ -289,6 +289,11 @@ int StarScoreService::copyHornParts(const std::vector<std::pair<QString, QString
             muse::io::File styleFile { io::path_t(mss) };
             dstScore->loadStyle(styleFile, true);
         }
+        // The part score laid out with its new music and style first: an empty part is one long multimeasure rest
+        // until then, and the system locks and breaks copied onto it went astray (Joel, 13 Oct 2026: a new 2-Horn
+        // copied from the 3-Horn lost some of the 3-Horn's locks and kept breaks at their ends)
+        dstScore->setLayoutAll();
+        dstScore->doLayout();
         starscore::copyLayout(srcScore, { dstScore }, starscore::LayoutCopyOptions());
         starscore::copyTextPositions(srcScore, dstScore);
         starscore::copyMeasureWidths(srcScore, dstScore);

@@ -29,6 +29,11 @@ StyledDialogView {
 
     Component.onCompleted: {
         layoutModel.load(root.mode)
+        // the part being viewed (ticked to copy into) in sight
+        const ticked = layoutModel.targets.findIndex(function(t) { return t.checked })
+        if (ticked > 0) {
+            Qt.callLater(function() { targetList.positionViewAtIndex(ticked, ListView.Center) })
+        }
     }
 
     ColumnLayout {
@@ -51,6 +56,7 @@ StyledDialogView {
             Layout.fillWidth: true
             model: layoutModel.sources.map(function(title, i) { return { "text": title, "value": i } })
             currentIndex: layoutModel.sourceIndex
+            indeterminateText: qsTrc("starscore", "Choose a part…")
 
             onActivated: function(index, value) {
                 layoutModel.sourceIndex = index
