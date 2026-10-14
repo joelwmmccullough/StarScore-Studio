@@ -2146,6 +2146,10 @@ StarScoreAuditFileSummary StarScoreService::auditFile(const QString& path, bool 
         INotationProjectPtr project = projectCreator()->newProject(iocContext());
         OpenParams params;
         params.skipPlaybackModel = true;   // only read
+        // and not laid out: the audit reads notes, ties, articulations, dynamics and rehearsal marks from the
+        // measures, none of which the layout decides (it indexes bars by position, not by their printed number). The
+        // layout of a big song's main score was most of the time a library scan spent on each song.
+        params.skipLayout = !m_autotestAuditWithLayout;
         const Ret ret = project->load(io::path_t(tmp), params);
         if (!ret || !project->masterNotation() || !project->masterNotation()->masterScore()) {
             summary.error = muse::qtrc("starscore", "Couldn't open the file: %1").arg(QString::fromStdString(ret.toString()));

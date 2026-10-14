@@ -543,6 +543,7 @@ private:
     void runAutotestSteps(QStringList steps, int reportNumber);
     void autotestReport(const QString& base);
     bool m_autotestStarted = false;
+    bool m_autotestAuditWithLayout = false;   // the "auditfile:…:layout" step: the library audit's copy laid out on loading, as before
     QJsonObject loadReferenceView() const;
     void recordReferenceView();
     void listenReferencePanel();

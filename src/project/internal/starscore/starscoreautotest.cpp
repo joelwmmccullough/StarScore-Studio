@@ -1296,6 +1296,27 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
                         .arg(a.name, a.column).arg(a.status).arg(a.audited).arg(a.changedSinceAudit).arg(a.openIssues)
                         .arg(a.unfinished.join("; ")));
         }
+    } else if (step.startsWith("auditfile:")) {
+        // auditfile:<path>[:layout]: the Dashboard's audit of another song's file (a copy is loaded, as a library scan
+        // does); ":layout" lays the copy out on loading, as it was before, for comparing the two
+        QString path = step.mid(10);
+        m_autotestAuditWithLayout = path.endsWith(":layout");
+        if (m_autotestAuditWithLayout) {
+            path.chop(7);
+        }
+        const StarScoreAuditFileSummary s = auditFile(path, true);
+        m_autotestAuditWithLayout = false;
+        autotestLog(QString("  %1 error '%2' issues %3 likely %4 arrangements %5 audited %6 changed %7 listen %8/%9")
+                    .arg(path, s.error).arg(s.openIssues).arg(s.likelyErrors).arg(s.arrangements).arg(s.arrangementsAudited)
+                    .arg(s.arrangementsChanged).arg(s.listenApproved).arg(s.listenSteps));
+        for (const StarScoreFileArrangement& a : s.arrangementList) {
+            autotestLog(QString("  arr %1 [%2]: status %3 audited %4 changed %5 issues %6 unfinished %7")
+                        .arg(a.name, a.column).arg(a.status).arg(a.audited).arg(a.changedSinceAudit).arg(a.openIssues)
+                        .arg(a.unfinished.join("; ")));
+        }
+        for (const auto& [key, st] : s.sectionStatus) {
+            autotestLog(QString("  section %1: status %2").arg(key).arg(st));
+        }
     } else if (step == "demos") {
         // Export Audio Demos, as the export window's checkbox does
         const QString band = qEnvironmentVariable("STARSCORE_AUTOTEST_BAND");
