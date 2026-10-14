@@ -4970,7 +4970,11 @@ void StarScoreService::clearComposerInCurrentScore()
     if (!hasTitle) {
         return;
     }
-    score->doLayout();
+    // The texts measured are in the title frame, on the first page: that page is laid out again (as MuseScore lays out
+    // after an edit there), not the whole score. A score never laid out (no pages yet) is laid out whole, as the range
+    // layout then has nothing to stop at. Laying the whole score out on every tab switch cost a second a switch on a
+    // big song's Scores.
+    score->doLayoutRange(engraving::Fraction(0, 1), engraving::Fraction(0, 1));
     n->undoStack()->prepareChanges(TranslatableString::untranslatable("Composer clear of the arrangement label"));
     // the label on the instrument name's line (an export could leave it moved), then the credit clear of it
     starscore::levelArrangementLabel(score);
