@@ -2559,6 +2559,25 @@ std::vector<StarScoreService::RhythmBook> StarScoreService::rhythmBooks(const en
     return out;
 }
 
+std::vector<const mu::engraving::Part*> StarScoreService::leadSheetPartsOf(const engraving::MasterScore* ms) const
+{
+    std::vector<const engraving::Part*> out;
+    if (!ms) {
+        return out;
+    }
+    for (const StarScoreSection& s : loadFrom(ms).sections) {
+        if (s.templateKey != "lead-sheet") {
+            continue;
+        }
+        for (const QString& pid : s.partIds) {
+            if (const engraving::Part* p = ms->partById(ID(pid))) {
+                out.push_back(p);
+            }
+        }
+    }
+    return out;
+}
+
 std::map<QString, QString> StarScoreService::rhythmBookRoles(const engraving::MasterScore* ms, const QStringList& sectionPartIds)
 {
     std::map<QString, QString> out;
@@ -3510,7 +3529,7 @@ int StarScoreService::applyStylesOnly(const QStringList& partIds, const Data& da
     }
 
     // The Keys sheet: empty staves hide (first system included) and the bass staff is set to "Always hide"
-    if (starscore::applyKeysStaffRules(ms) > 0) {
+    if (starscore::applyKeysStaffRules(ms, leadSheetPartsOf(ms)) > 0) {
         if (INotationProjectPtr project = globalContext()->currentProject()) {
             project->markAsUnsaved();
         }

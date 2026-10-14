@@ -1204,6 +1204,22 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             master->notation()->undoStack()->commitChanges();
             autotestLog(QString("  added '%1' to %2").arg(text, partName));
         }
+    } else if (step == "hidesettings") {
+        // hidesettings: each part's lower staves' "Hide when empty" in the full score and in each part score (0 auto,
+        // 1 always, 2 never)
+        for (const engraving::Part* p : ms->parts()) {
+            for (size_t i = 1; i < p->nstaves(); ++i) {
+                const engraving::Staff* st = p->staves().at(i);
+                QStringList where { QString("main %1").arg(int(st->hideWhenEmpty())) };
+                for (const engraving::Staff* l : st->staffList()) {
+                    if (l->score() != ms) {
+                        where << QString("%1 %2").arg(l->score()->excerpt() ? l->score()->excerpt()->name().toQString() : QString("?"))
+                            .arg(int(l->hideWhenEmpty()));
+                    }
+                }
+                autotestLog(QString("  %1 staff %2: %3").arg(p->partName().toQString()).arg(i + 1).arg(where.join(", ")));
+            }
+        }
     } else if (step == "parts") {
         for (const engraving::Part* p : ms->parts()) {
             autotestLog(QString("  %1 (%2)").arg(p->partName().toQString(), p->instrumentId().toQString()));

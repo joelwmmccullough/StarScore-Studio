@@ -3013,7 +3013,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
 
     // The Keys sheet: bass staff "Always hide", empty staves hidden from the first system on (set directly, not
     // through the undo stack; the scores are marked for layout and laid out when printed)
-    if (starscore::applyKeysStaffRules(ms) > 0) {
+    if (starscore::applyKeysStaffRules(ms, leadSheetPartsOf(ms)) > 0) {
         project->markAsUnsaved();
         masterChanged = true;
     }
@@ -3140,6 +3140,8 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         lapTime("copies", "load the stripped copy");
         if (!p) {
             strippedFailed = true;
+        } else if (p->masterNotation()) {
+            starscore::hideEmptyKeysStavesInCopy(p->masterNotation()->masterScore());
         }
         return p;
     };

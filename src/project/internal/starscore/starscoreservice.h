@@ -364,6 +364,8 @@ public:
     static std::vector<RhythmBook> rhythmBooks(const mu::engraving::MasterScore* ms, const QStringList& sectionPartIds);
     //! Part id -> its rhythm book's role, for the parts in a rhythm book
     static std::map<QString, QString> rhythmBookRoles(const mu::engraving::MasterScore* ms, const QStringList& sectionPartIds);
+    //! The lead sheet section's parts
+    std::vector<const mu::engraving::Part*> leadSheetPartsOf(const mu::engraving::MasterScore* ms) const;
 
 private:
     //! Sheets already exported under an older path or name (see starscoreFormerPathsOf) moved to where the export

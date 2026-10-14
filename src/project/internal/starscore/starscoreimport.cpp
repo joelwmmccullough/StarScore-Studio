@@ -1997,6 +1997,13 @@ void StarScoreService::tidyOpenedScore()
     renamePersonNamedPartScores();
     renameOffSchemePartScores();
     labelPartBooks();
+    // the Keys player's bass staff: always in the full score, only where it has music in the part scores
+    if (starscore::applyKeysStaffRules(ms, leadSheetPartsOf(ms)) > 0) {
+        if (INotationProjectPtr project = globalContext()->currentProject()) {
+            project->markAsUnsaved();
+        }
+        master->notation()->notationChanged().notify();
+    }
     LOGI() << "[starscore] tidied the opened score in " << clock.elapsed() << " ms";
 }
 

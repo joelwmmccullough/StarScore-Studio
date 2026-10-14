@@ -116,10 +116,14 @@ enum class BarNumberingSync {
 //! bar numbers run one ahead. Returns the number of part books that differ(ed).
 int syncBarNumbering(mu::engraving::MasterScore* master, BarNumberingSync how);
 
-//! The Keys sheet: every keyboard part's lower staves (bass clef) "Hide when empty: Always" in every score, and the
-//! keyboard's own part book with "Automatically hide all empty staves" on and "Don't hide empty staves in first
-//! system" off. Returns how many settings it changed (0 = already so).
-int applyKeysStaffRules(mu::engraving::MasterScore* master);
+//! The Keys sheet: every keyboard part's lower staves (bass clef) "Hide when empty: Always" in every part score, and
+//! "Never" in the full score (Joel, 13 Oct 2026; the lead sheet's keyboards: "Always" there too); the keyboard's own
+//! part book with "Automatically hide all empty staves" on and "Don't hide empty staves in first system" off.
+//! Returns how many settings it changed (0 = already so).
+int applyKeysStaffRules(mu::engraving::MasterScore* master, const std::vector<const mu::engraving::Part*>& leadSheetParts = {});
+//! In a throwaway copy of the song printed from (the Scores, a part's sheet made fresh): the keyboards' lower staves
+//! "Always hide" in the full score too, so those sheets come out as before
+int hideEmptyKeysStavesInCopy(mu::engraving::MasterScore* master);
 
 //! The band's name for a horn ("Trumpet", "Tenor Sax", "Bari Sax", "Bass Trombone"…), or empty when the instrument
 //! is not a horn

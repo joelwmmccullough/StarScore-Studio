@@ -636,7 +636,7 @@ bool starscoreIsKeyboardPart(const Part* p)
 }
 }
 
-int mu::project::starscore::applyKeysStaffRules(MasterScore* master)
+int mu::project::starscore::applyKeysStaffRules(MasterScore* master, const std::vector<const Part*>& leadSheetParts)
 {
     if (!master) {
         return 0;
@@ -646,13 +646,19 @@ int mu::project::starscore::applyKeysStaffRules(MasterScore* master)
         if (!starscoreIsKeyboardPart(p)) {
             continue;
         }
+        // the Keys player's bass staff stays in the full score, empty or not (Joel, 13 Oct 2026); the lead sheet's
+        // shows only where it has music, there too
+        const bool keepInMain = std::find(leadSheetParts.begin(), leadSheetParts.end(), p) == leadSheetParts.end();
         for (size_t i = 1; i < p->nstaves(); ++i) {
             Staff* lower = p->staves().at(i);
             std::vector<Staff*> all = lower->staffList();
-            all.push_back(lower);
+            if (std::find(all.begin(), all.end(), lower) == all.end()) {
+                all.push_back(lower);
+            }
             for (Staff* st : all) {
-                if (st->hideWhenEmpty() != AutoOnOff::ON) {
-                    st->setHideWhenEmpty(AutoOnOff::ON);
+                const AutoOnOff want = keepInMain && st->score() == master ? AutoOnOff::OFF : AutoOnOff::ON;
+                if (st->hideWhenEmpty() != want) {
+                    st->setHideWhenEmpty(want);
                     ++changed;
                 }
             }
@@ -660,7 +666,12 @@ int mu::project::starscore::applyKeysStaffRules(MasterScore* master)
     }
     for (Excerpt* ex : master->excerpts()) {
         Score* es = ex ? ex->excerptScore() : nullptr;
-        if (!es || es->parts().size() != 1 || !starscoreIsKeyboardPart(es->parts().front())) {
+        // (a part score of keyboards only: one keyboard, or a Keys part score holding several)
+        bool keys = es && !es->parts().empty();
+        for (const Part* ep : es ? es->parts() : std::vector<Part*>()) {
+            keys = keys && (starscoreIsKeyboardPart(ep) || ep->nstaves() == 1);
+        }
+        if (!keys || std::none_of(es->parts().begin(), es->parts().end(), [](const Part* ep) { return starscoreIsKeyboardPart(ep); })) {
             continue;
         }
         if (!es->style().styleB(Sid::hideEmptyStaves)) {
@@ -676,6 +687,26 @@ int mu::project::starscore::applyKeysStaffRules(MasterScore* master)
         for (Score* score : master->scoreList()) {
             score->setLayoutAll();
         }
+    }
+    return changed;
+}
+
+int mu::project::starscore::hideEmptyKeysStavesInCopy(MasterScore* master)
+{
+    int changed = 0;
+    for (Part* p : master ? master->parts() : std::vector<Part*>()) {
+        if (!starscoreIsKeyboardPart(p)) {
+            continue;
+        }
+        for (size_t i = 1; i < p->nstaves(); ++i) {
+            if (p->staves().at(i)->hideWhenEmpty() != AutoOnOff::ON) {
+                p->staves().at(i)->setHideWhenEmpty(AutoOnOff::ON);
+                ++changed;
+            }
+        }
+    }
+    if (changed) {
+        master->setLayoutAll();
     }
     return changed;
 }

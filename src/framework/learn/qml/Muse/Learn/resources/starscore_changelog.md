@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.37
+
+- **The Keys bass staff always shows in the full score.** A rhythm section keyboard's lower (bass clef) staff is set to "Never hide" in the main score, so it is there to write in even when empty, and stays "Always hide" in the part scores, where it shows only on systems with music. The lead sheet's piano keeps "Always hide" everywhere. Set when a song opens, with Apply default style settings, and on export. Exported sheets and Scores come out as before.
+
 ## 1.18.36
 
 - **Additive time signatures keep the song's length.** Adding a time signature one bar at a time re-barred the rest of the stretch at every bar, filling its last bar out with rests (or, in empty bars, cutting it short), so the stretch slowly grew or shrank: on an empty song a pattern stopped early, and deleting it again left a different number of bars. The stretch is now re-barred once, straight into the pattern, with the last bar cut short where the stretch ends. Notes stay where they are and are only tied over the new barlines. Deleting the pattern gives back exactly the bars you had (tested on an empty song and on one full of notes: 32 bars before, after deleting, and after undo; every tie gone again).
