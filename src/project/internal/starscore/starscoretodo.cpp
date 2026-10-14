@@ -421,7 +421,9 @@ QString StarScoreService::todoPdfHtml(const QString& title, const QString& code,
          .arg(done).arg(steps.size()).arg(pct);
     b += QString("<div class=\"tile\"><div class=\"big\">%1<span class=\"of\">/%2</span></div><div class=\"lab\">parts finished</div>"
                  "<div class=\"bar\">").arg(partsDone).arg(parts);
-    for (int st = 4; st >= 0; --st) {
+    // (every status, Finished first: this ran 4..0 and left the Finished share out once "Written, unformatted" made
+    // Finished 5)
+    for (int st = int(StarScoreStatus::Finished); st >= 0; --st) {
         if (byStatus[st] > 0 && parts > 0) {
             b += QString("<i style=\"width:%1%;background:%2;\"></i>").arg(100.0 * byStatus[st] / parts, 0, 'f', 2).arg(todoLook(st).colour);
         }
