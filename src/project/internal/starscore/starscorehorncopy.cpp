@@ -198,6 +198,17 @@ QString StarScoreService::partScoreName(const QString& partId) const
     return p ? p->partName().toQString() : partId;
 }
 
+//! Whether a part is a chair of a Flexible section ("3H Flexible: Horn 2")
+static bool isFlexibleChair(const StarScoreService::Data& data, const QString& partId)
+{
+    for (const StarScoreSection& s : data.sections) {
+        if (s.templateKey.endsWith("-horn-any") && s.partIds.contains(partId)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 int StarScoreService::copyHornParts(const std::vector<std::pair<QString, QString> >& pairs)
 {
     IMasterNotationPtr master = globalContext()->currentMasterNotation();
@@ -246,13 +257,35 @@ int StarScoreService::copyHornParts(const std::vector<std::pair<QString, QString
         }
         if (ok) {
             data.partStatus[dstId] = statusKey(StarScoreStatus::Sketch);
-            // its mutes, to the same kind of instrument only (a 3-Horn trumpet's Harmon to the 4-Horn trumpet; not
-            // the 1-Horn trumpet's to the saxophones and trombone made from it) (Joel, 13 Oct 2026)
+            // its mutes (Joel, 13 Oct 2026): to the same kind of instrument (a 3-Horn trumpet's Harmon to the 4-Horn
+            // trumpet; not the 1-Horn trumpet's to the saxophones and trombone made from it). A Flexible chair takes
+            // every mute (14 Oct: they weren't copied onto the Flexible parts); from a Flexible chair, a brass part
+            // takes the ones it has (and any typed in by hand)
             const QStringList fromMutes = starscore::muteOptions(from->instrumentId().toQString());
+            const QStringList toMutes = starscore::muteOptions(to->instrumentId().toQString());
+            const bool fromFlexible = isFlexibleChair(data, srcId);
+            const bool toFlexible = isFlexibleChair(data, dstId);
             auto mutes = data.partMutes.find(srcId);
-            if (mutes != data.partMutes.end() && !fromMutes.isEmpty()
-                && fromMutes == starscore::muteOptions(to->instrumentId().toQString())) {
-                data.partMutes[dstId] = mutes->second;
+            if (mutes != data.partMutes.end() && !mutes->second.isEmpty()) {
+                QStringList copiedMutes;
+                if (toFlexible && (fromFlexible || !fromMutes.isEmpty())) {
+                    copiedMutes = mutes->second;
+                } else if (fromFlexible && !toMutes.isEmpty()) {
+                    QStringList standard;
+                    for (const char* id : { "trumpet", "trombone", "tuba", "horn" }) {
+                        standard << starscore::muteOptions(id);
+                    }
+                    for (const QString& m : mutes->second) {
+                        if (toMutes.contains(m) || !standard.contains(m)) {
+                            copiedMutes << m;
+                        }
+                    }
+                } else if (!fromMutes.isEmpty() && fromMutes == toMutes) {
+                    copiedMutes = mutes->second;
+                }
+                if (!copiedMutes.isEmpty()) {
+                    data.partMutes[dstId] = copiedMutes;
+                }
             }
             ++copied;
         } else {
@@ -314,6 +347,9 @@ int StarScoreService::copyHornParts(const std::vector<std::pair<QString, QString
         b->style()->styleChanged().notify();
         b->notationChanged().notify();
     }
+    // the part scores' titles: each instrument's own name, and its mutes under it (the text copied with the source's
+    // texts was the source's; Joel, 14 Oct 2026: mutes copied without their lines under the name)
+    labelPartBooks();
     scheduleChanged();
     LOGI() << "[starscore] copy parts: " << copied << " of " << pairs.size() << " copied";
     return copied;

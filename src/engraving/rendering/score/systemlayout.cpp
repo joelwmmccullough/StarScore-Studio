@@ -30,6 +30,7 @@
 #include "dom/barline.h"
 #include "dom/beam.h"
 #include "dom/box.h"
+#include "dom/clef.h"
 #include "dom/bracket.h"
 #include "dom/bracketItem.h"
 #include "dom/chord.h"
@@ -1745,6 +1746,18 @@ void SystemLayout::createSkylines(const ElementsToLayout& elementsToLayout, Layo
                                         staffBbox.setBottom(arpBbox.bottom());
                                     }
                                     shape.add(arpBbox & staffBbox, arp);
+                                }
+                            }
+                            // StarScore (Joel, 14 Oct 2026): a soprano clef is centred on the bottom line, so half of it
+                            // hangs about two spaces below the staff. Only that part is left out of the spacing between
+                            // staves (the Flexible chairs' "range clefs" view shows Horn 2 in it, and the sheets it
+                            // stands for are printed in other clefs).
+                            if (e->isClef() && toClef(e)->clefType() == ClefType::C1 && e->staff()) {
+                                const RectF r = shape.bbox();
+                                const double staffBottom = e->staff()->staffHeight(e->tick()) - e->pos().y();
+                                if (r.bottom() > staffBottom) {
+                                    shape.clear();
+                                    shape.add(RectF(r.x(), r.y(), r.width(), std::max(0.0, staffBottom - r.y())), e);
                                 }
                             }
                             skyline.add(shape.translate(e->pos() + p + offset));

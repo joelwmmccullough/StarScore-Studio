@@ -14,6 +14,7 @@ class Score;
 class MasterScore;
 class Measure;
 class Part;
+class EngravingItem;
 }
 
 namespace mu::project::starscore {
@@ -85,9 +86,15 @@ bool pitchesWithin(const mu::engraving::Part* part, int lowest, int highest);
 //! A C flute's range, C4 to C7: the Flexible Flute sheet is written an octave up when any note falls outside it
 constexpr int FLUTE_LOWEST = 60;
 constexpr int FLUTE_HIGHEST = 96;
-//! Hides the texts that are only a mute or open marking ("mute", "(open)", "cup mute", "con sord."…), for a sheet on
-//! an instrument without a mute; "Open solos" stays. Undoable (inside a command). Returns how many were hidden.
-int hideMuteMarkings(mu::engraving::Score* score);
+//! Whether a text is only a mute or open marking: "mute", "(open)", "harmon", "(plunger)", "Harmon (stem out)",
+//! "w/ plunger", "con sord.", "+ o"… ("Open solos" and "straight 8ths" are not)
+bool isMuteMarking(const QString& text);
+//! Whether an instrument is a woodwind (a saxophone, clarinet, flute, double reed…), which takes no mute
+bool isWoodwindInstrument(const QString& instrumentId);
+//! Hides the mute and open markings in a sheet for an instrument without a mute: the texts that are only such a
+//! marking, and the brass mute symbols on notes. Undoable (inside a command). Returns how many were hidden; `hidden`
+//! gets them (to show them again after printing).
+int hideMuteMarkings(mu::engraving::Score* score, std::vector<mu::engraving::EngravingItem*>* hidden = nullptr);
 //! Whether the part has any note (a rest-only part is empty)
 bool partHasNotes(const mu::engraving::Part* part);
 

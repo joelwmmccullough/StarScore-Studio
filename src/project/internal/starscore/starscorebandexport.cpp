@@ -744,6 +744,7 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
     std::map<QString, QStringList> familyParts;   // "Big Band" etc: all instruments, for one score
     QStringList anyFolders;                        // "NH Any Horns" folders: older sheet names there get archived
     std::map<QString, QString> renamedFolders;     // older horn folder name -> its name now (a Piccolo was a "Flute")
+    std::map<QString, QString> chairOfSheetPart;   // a Flexible sheet made into a part of its own -> its chair's part
 
     for (const StarScoreSection& sec : data.sections) {
         if (sec.partIds.isEmpty()) {
@@ -899,6 +900,7 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
                     auto own = sec.sheetParts.find(name);
                     if (own != sec.sheetParts.end() && partById(own->second)) {
                         f.partIds = { own->second };
+                        chairOfSheetPart[own->second] = pid;
                     } else {
                         f.partIds = { pid };
                         f.isVersion = true;
@@ -1153,6 +1155,11 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
         }
         auto it = data.partMutes.find(f.partIds.front());
         if (it == data.partMutes.end() || it->second.isEmpty()) {
+            // a Flexible sheet made into a part of its own: its chair's mutes (Joel, 14 Oct 2026)
+            auto chair = chairOfSheetPart.find(f.partIds.front());
+            it = chair == chairOfSheetPart.end() ? data.partMutes.end() : data.partMutes.find(chair->second);
+        }
+        if (it == data.partMutes.end() || it->second.isEmpty()) {
             continue;
         }
         QStringList shown = it->second;
@@ -1160,9 +1167,6 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
             continue;
         }
         if (f.relativePath.contains("Flexible/")) {
-            if (!f.isVersion) {
-                continue;   // (the chair's own concert sheet)
-            }
             const QStringList has = starscore::muteOptions(f.sheetLeft.toLower().replace(' ', '-'));
             if (has.isEmpty()) {
                 continue;   // a saxophone, flute, clarinet… sheet
@@ -1399,6 +1403,7 @@ int StarScoreService::labelPartBooks()
     // that can sit in the chair; the part score shows the chair and the arrangement
     std::vector<StarScoreBandFile> files;
     std::set<QString> chairsDone;
+    const std::map<QString, QStringList> partMutes = loadFrom(ms).partMutes;
     static const QRegularExpression chairRe("Horn\\s*(\\d+)");
     for (const StarScoreBandFile& f : plan.val.files) {
         if (!f.isVersion) {
@@ -1412,6 +1417,11 @@ int StarScoreService::labelPartBooks()
         StarScoreBandFile chair = f;
         const QRegularExpressionMatch m = chairRe.match(f.header);
         chair.sheetLeft = m.hasMatch() ? QString("Horn %1").arg(m.captured(1)) : QString();
+        // the chair's mutes under it (Joel, 14 Oct 2026); its sheets show those their instrument takes
+        auto mutes = partMutes.find(f.partIds.front());
+        if (!chair.sheetLeft.isEmpty() && mutes != partMutes.end() && !mutes->second.isEmpty()) {
+            chair.sheetLeft += "\n" + starscore::muteLines(mutes->second);
+        }
         chair.isVersion = false;
         files.push_back(chair);
     }
@@ -3204,11 +3214,20 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         book->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
         // the 1-Horn saxophones, made from the Trumpet: no mute or open markings (Joel, 6 Oct 2026)
         static const QRegularExpression oneHornSax("(^|/)1H/.*Saxophone");
+        std::vector<engraving::EngravingItem*> shownAgain;
         if (oneHornSax.match(file.relativePath).hasMatch()) {
             starscore::hideMuteMarkings(book->elements()->msScore());
+        } else if (bookScore->parts().size() == 1
+                   && starscore::isWoodwindInstrument(bookScore->parts().front()->instrumentId().toQString())) {
+            // any other woodwind sheet (Joel, 14 Oct 2026: no mute text on a sheet for an instrument without a mute):
+            // hidden for the PDF only, the part score keeps them
+            starscore::hideMuteMarkings(bookScore, &shownAgain);
         }
         const Ret ret = starscorePrintSheet(writer, book, file.sheetLeft, file.sheetRight, true, pdf, variant.isEmpty(),
                                             annotatedOut);
+        for (engraving::EngravingItem* e : shownAgain) {
+            e->undoChangeProperty(engraving::Pid::VISIBLE, true);
+        }
         book->undoStack()->commitChanges();
         bookScore->lockUpdates(false);
         touchedBooks.push_back(book);

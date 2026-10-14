@@ -4,6 +4,13 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.41
+
+- **The soprano clef no longer pushes staves apart.** It sits on the bottom line, so it hangs about two spaces below the staff. That overhang is now left out of the spacing between staves, so the Flexible Horn 2 part in the "range clefs" view takes the same room as it does on the exported sheets.
+- **Mutes are copied onto Flexible parts.** A new Flexible section filled from the Standard section takes each part's mutes, and copying parts into a Flexible section copies them too. Copying from a Flexible part to a brass part copies the mutes that instrument has.
+- **The mute lines under the instrument name follow.** After parts are copied, every part score's title is brought up to date, so the "with Harmon Mute" lines appear with the copied mutes. A Flexible chair's part score shows its mutes under "Horn 1" too, and a Flexible sheet made into a part of its own shows its chair's mutes.
+- **No mute text on woodwind sheets.** Every text that is only a mute or open marking ("harmon", "(plunger)", "Harmon (stem out)", "w/ plunger", "to cup", "con sord.", "+ o"…) and the brass mute symbols on notes are left off the exported sheets of saxophones, clarinets, flutes and the other woodwinds, and off the Flexible sheets for instruments without a mute. The part scores keep them. "Open solos" and "straight 8ths" stay.
+
 ## 1.18.40
 
 - **A "Sheet Music" folder in every song folder.** Export to Sheets and Demos now puts every sheet folder inside the song folder's **Sheet Music** folder. That covers 1 Lead Sheet, 1 Rhythm, the horn folders, Extras, String Duo and the like, Combined Parts and Annotated Sheets. Chord Charts, Demos, Reference PDFs, Horn Part Guides, Update Notes and Version History stay at the top of the song folder, next to the What's Here and Recordings PDFs.

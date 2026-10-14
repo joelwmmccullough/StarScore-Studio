@@ -11,6 +11,7 @@
 #include <set>
 
 #include <QRegularExpression>
+#include <QSet>
 #include <QStringList>
 
 #include "engraving/dom/masterscore.h"
@@ -35,6 +36,8 @@
 #include "engraving/dom/accidental.h"
 #include "engraving/dom/clef.h"
 #include "engraving/dom/notedot.h"
+#include "engraving/dom/articulation.h"
+#include "engraving/types/symnames.h"
 #include "engraving/dom/select.h"
 #include "engraving/dom/timesig.h"
 #include "engraving/dom/factory.h"
@@ -1050,18 +1053,60 @@ QString mu::project::starscore::muteLines(const QStringList& mutes)
     return lines.join("\n");
 }
 
-//! Hides the mute and open markings ("mute", "(open)", "cup mute", "con sord."…) in a sheet for an instrument that has
-//! no mute. Only texts that are nothing but such a marking: "Open solos" stays. In a throwaway copy.
-int mu::project::starscore::hideMuteMarkings(Score* score)
+bool mu::project::starscore::isMuteMarking(const QString& text)
+{
+    // (Joel, 14 Oct 2026: every mute text, "harmon" and "plunger" on their own too) A text made only of mute words, with
+    // at least one that names a mute or the change: "mute", "(open)", "Harmon (stem out)", "w/ plunger", "to cup",
+    // "plunger in hat", "con sord.", "+ o" (plunger closed and open). "Open solos" and "straight 8ths" are not.
+    static const QSet<QString> core { "mute", "muted", "mutes", "unmute", "unmuted", "open", "harmon", "plunger", "cup",
+                                      "bucket", "solotone", "pixie", "derby", "hat", "stopping", "stopped", "wah", "wah-wah",
+                                      "sord", "sordino", "sordini" };
+    static const QSet<QString> filler { "straight", "practice", "in", "out", "on", "off", "with", "w", "no", "to", "and",
+                                        "stem", "the", "a", "con", "senza", "half", "closed", "+", "o" };
+    static const QRegularExpression token("[a-z]+(?:-[a-z]+)?|\\+");
+    const QString lower = text.simplified().toLower();
+    QStringList words;
+    for (auto it = token.globalMatch(lower); it.hasNext();) {
+        words << it.next().captured(0);
+    }
+    if (words.isEmpty()) {
+        return false;
+    }
+    // what is left besides the words: brackets, dots, commas, slashes, dashes, arrows
+    QString rest = lower;
+    rest.remove(token);
+    static const QRegularExpression punct("[\\s()\\[\\].,:;!/\\-–—→>]");
+    rest.remove(punct);
+    if (!rest.isEmpty()) {
+        return false;
+    }
+    bool plungerSigns = true;
+    bool any = false;
+    for (const QString& w : words) {
+        if (!core.contains(w) && !filler.contains(w)) {
+            return false;
+        }
+        any |= core.contains(w);
+        plungerSigns &= w == "+" || w == "o";
+    }
+    return any || plungerSigns;
+}
+
+bool mu::project::starscore::isWoodwindInstrument(const QString& id)
+{
+    // (no mute: saxophones, clarinets, flutes, double reeds; an English horn is a woodwind whatever its name)
+    static const QRegularExpression ww("sax|clarinet|flute|piccolo|fife|oboe|english-horn|bassoon|recorder|ocarina|whistle");
+    return ww.match(id).hasMatch();
+}
+
+//! Hides the mute and open markings in a sheet for an instrument that has no mute: every text that is only such a
+//! marking (isMuteMarking), and the brass mute symbols on notes (plunger +/o, Harmon stem). Undoable (inside a
+//! command). Returns how many were hidden; `hidden` gets them, for showing them again.
+int mu::project::starscore::hideMuteMarkings(Score* score, std::vector<mu::engraving::EngravingItem*>* hidden)
 {
     if (!score) {
         return 0;
     }
-    static const QRegularExpression mute("^\\(?\\s*((straight|cup|harmon|plunger|bucket|practice|wah)\\s+)?"
-                                         "(mute|muted|mutes|mute in|mute out|mute on|mute off|unmute|unmuted|open|harmon|plunger|cup|straight|bucket|"
-                                         "solotone|pixie|derby|hat|in hat|stopping|wah|wah-wah|"
-                                         "con sord\\.?|senza sord\\.?|con sordino|senza sordino)\\s*\\)?[.!]?$",
-                                         QRegularExpression::CaseInsensitiveOption);
     std::vector<mu::engraving::EngravingItem*> hide;
     for (mu::engraving::Segment* seg = score->firstSegment(mu::engraving::SegmentType::ChordRest); seg;
          seg = seg->next1(mu::engraving::SegmentType::ChordRest)) {
@@ -1069,13 +1114,27 @@ int mu::project::starscore::hideMuteMarkings(Score* score)
             if (!e || !e->visible() || !(e->isStaffText() || e->isSystemText() || e->isExpression() || e->isPlayTechAnnotation())) {
                 continue;
             }
-            if (mute.match(mu::engraving::toTextBase(e)->plainText().toQString().simplified()).hasMatch()) {
+            if (isMuteMarking(mu::engraving::toTextBase(e)->plainText().toQString())) {
                 hide.push_back(e);
+            }
+        }
+        for (mu::engraving::EngravingItem* e : seg->elist()) {
+            if (!e || !e->isChord()) {
+                continue;
+            }
+            for (mu::engraving::Articulation* a : mu::engraving::toChord(e)->articulations()) {
+                const std::string name = mu::engraving::SymNames::nameForSymId(a->symId()).ascii();
+                if (a->visible() && (name.rfind("brassMute", 0) == 0 || name.rfind("brassHarmonMute", 0) == 0)) {
+                    hide.push_back(a);
+                }
             }
         }
     }
     for (mu::engraving::EngravingItem* e : hide) {
         e->undoChangeProperty(mu::engraving::Pid::VISIBLE, false);
+    }
+    if (hidden) {
+        *hidden = hide;
     }
     return int(hide.size());
 }

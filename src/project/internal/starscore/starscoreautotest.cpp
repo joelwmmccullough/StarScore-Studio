@@ -644,6 +644,58 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
                 autotestLog(QString("  %1: %2").arg(f.relativePath, QString(f.sheetLeft).replace("\n", " / ")));
             }
         }
+    } else if (step.startsWith("addtextat:")) {
+        // addtextat:<part name>|<bar>|<text>: a staff text on the part's first beat of that bar (in the main score)
+        const QStringList a = step.mid(10).split('|');
+        engraving::Measure* m = ms->firstMeasure();
+        for (int i = 1; i < a.value(1).toInt() && m; ++i) {
+            m = m->nextMeasure();
+        }
+        engraving::Segment* seg = m ? m->first(engraving::SegmentType::ChordRest) : nullptr;
+        int added = 0;
+        for (engraving::Part* p : ms->parts()) {
+            if (p->partName().toQString() != a.value(0) || !seg) {
+                continue;
+            }
+            master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Staff text"));
+            engraving::StaffText* t = engraving::Factory::createStaffText(seg);
+            t->setTrack(p->startTrack());
+            t->setParent(seg);
+            t->setXmlText(a.value(2));
+            ms->undoAddElement(t);
+            master->notation()->undoStack()->commitChanges();
+            ++added;
+        }
+        autotestLog(QString("  added %1").arg(added));
+    } else if (step.startsWith("mutetext:")) {
+        // mutetext:<text>|<text>…: whether each counts as a mute marking (hidden on woodwind sheets)
+        for (const QString& t : step.mid(9).split('|')) {
+            autotestLog(QString("  \"%1\": %2").arg(t, starscore::isMuteMarking(t) ? "mute" : "-"));
+        }
+    } else if (step.startsWith("booktitles")) {
+        // booktitles[:<text in the part score name>]: each one-part part score's instrument name text (top left)
+        const QString filter = step.section(':', 1);
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            engraving::Score* es = e->notation() ? e->notation()->elements()->msScore() : nullptr;
+            if (!es || es->parts().size() != 1 || (!filter.isEmpty() && !e->name().contains(filter))) {
+                continue;
+            }
+            QString name;
+            for (engraving::MeasureBase* mb = es->first(); mb && !mb->isMeasure(); mb = mb->next()) {
+                if (!mb->isVBox()) {
+                    continue;
+                }
+                QStringList texts;
+                for (engraving::EngravingItem* t : mb->el()) {
+                    if (t && t->isText()) {
+                        texts << engraving::toTextBase(t)->plainText().toQString().replace("\n", " / ");
+                    }
+                }
+                name = texts.join(" ‖ ");
+                break;
+            }
+            autotestLog(QString("  %1: %2").arg(e->name(), name));
+        }
     } else if (step == "partmutes") {
         const Data d = load();
         for (const auto& [pid, mutes] : d.partMutes) {
@@ -1341,6 +1393,43 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
                 QCoreApplication::processEvents();
                 autotestLog("  opened " + e->name());
                 break;
+            }
+        }
+    } else if (step.startsWith("staffgaps:")) {
+        // staffgaps:<part score name or "main">: laid out, the first three systems' staves (name, y in spaces)
+        const QString bn = step.mid(10);
+        engraving::Score* sc = nullptr;
+        if (bn == "main") {
+            sc = ms;
+        } else {
+            for (const IExcerptNotationPtr& e : master->excerpts()) {
+                if (e->notation() && (e->name() == bn || (!sc && bn.startsWith('~') && e->name().contains(bn.mid(1))))) {
+                    sc = e->notation()->elements()->msScore();
+                    autotestLog("  " + e->name());
+                }
+            }
+        }
+        if (!sc) {
+            autotestLog("  part score not found");
+        } else {
+            sc->doLayout();
+            int shown = 0;
+            for (const engraving::System* sys : sc->systems()) {
+                if (sys->staves().empty() || sys->vbox()) {
+                    continue;
+                }
+                if (++shown > 3) {
+                    break;
+                }
+                QStringList ys;
+                for (size_t i = 0; i < sys->staves().size(); ++i) {
+                    if (sys->staff(i)->show()) {
+                        ys << QString("%1 %2 (reaches %3 below)").arg(sc->staff(i)->part()->partName().toQString())
+                              .arg(sys->staff(i)->y() / sc->style().spatium(), 0, 'f', 2)
+                              .arg(sys->staff(i)->skyline().south().max() / sc->style().spatium(), 0, 'f', 2);
+                    }
+                }
+                autotestLog(QString("  system at %1: ").arg(sys->pagePos().y() / sc->style().spatium(), 0, 'f', 2) + ys.join(" | "));
             }
         }
     } else if (step.startsWith("flexview:")) {

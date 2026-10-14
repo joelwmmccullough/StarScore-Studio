@@ -911,6 +911,23 @@ void StarScoreService::fillAnyHornsFromStandard(const StarScoreSection& anySecti
     master->notation()->undoStack()->commitChanges();
     master->notation()->notationChanged().notify();
 
+    // Each chair takes the mutes of the part it came from (Joel, 14 Oct 2026: they weren't copied onto the Flexible
+    // parts); its sheets show the ones their instrument has
+    {
+        Data withMutes = load();
+        bool any = false;
+        for (const auto& [from, to] : copies) {
+            auto m = withMutes.partMutes.find(idText(from));
+            if (m != withMutes.partMutes.end() && !m->second.isEmpty() && !withMutes.partMutes.count(idText(to))) {
+                withMutes.partMutes[idText(to)] = m->second;
+                any = true;
+            }
+        }
+        if (any) {
+            store(withMutes);
+        }
+    }
+
     // Each chair's part score takes the formatting of the part it came from (Horn 1 = Trumpet, Horn 2 = Alto
     // Sax, …): its style and its system and page breaks
     auto bookOf = [&](const engraving::Part* part) -> INotationPtr {
@@ -951,6 +968,8 @@ void StarScoreService::fillAnyHornsFromStandard(const StarScoreSection& anySecti
         }
     }
     QFile::remove(mss);
+    // the chairs' titles: "Horn 1" and its mutes (the texts copied above were the standard part's)
+    labelPartBooks();
 }
 
 // ---------------------------------------------------------------------------
