@@ -18,7 +18,9 @@
 #include <algorithm>
 #include <cmath>
 #include <map>
+#include <optional>
 #include <set>
+#include <tuple>
 #include <vector>
 
 #include <QDate>
@@ -26,7 +28,6 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QElapsedTimer>
-#include <tuple>
 #include <QCryptographicHash>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -3875,6 +3876,15 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
             });
         }), chairs.end());
         INotationProjectPtr cp = chairs.empty() ? nullptr : loadStripped();
+        // The copy's main score (every part of the song) isn't laid out after each edit made to it or to the combined
+        // part's book: nothing prints it. Each chair's lines are clipped from the one layout buildCombinedPart makes
+        // (multimeasure rests off); the book is laid out by hand where it is measured and printed. Before, every
+        // command in making a combined part laid the whole main score out again (Last Pint: 20 s a chair).
+        // (Declared after cp, so it is released before the copy goes.)
+        std::optional<UpdatesLock> cpLock;
+        if (cp && cp->masterNotation() && cp->masterNotation()->masterScore()) {
+            cpLock.emplace(cp->masterNotation()->masterScore());
+        }
         for (size_t ci = 0; ci < chairs.size() && cp; ++ci) {
             const starscore::CombinedChair& chair = chairs[ci];
             reportExportProgress(muse::qtrc("starscore", "Combined parts"), int(ci), int(chairs.size()), chair.name);
