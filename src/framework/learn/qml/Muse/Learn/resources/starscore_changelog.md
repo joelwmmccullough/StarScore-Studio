@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.42
+
+- **The multimeasure rest number counts bars in an additive time signature.** Six bars of rest in (4+5)/4 now show one multimeasure rest numbered 6 (1.18.36 showed 3, one per composite bar). The rest still starts at the start of the pattern and holds whole patterns only, and the "minimum number of empty measures" setting now counts bars too.
+
 ## 1.18.41
 
 - **The soprano clef no longer pushes staves apart.** It sits on the bottom line, so it hangs about two spaces below the staff. That overhang is now left out of the spacing between staves, so the Flexible Horn 2 part in the "range clefs" view takes the same room as it does on the exported sheets.

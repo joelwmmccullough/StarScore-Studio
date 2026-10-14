@@ -905,7 +905,8 @@ void MeasureLayout::createMultiMeasureRestsIfNeed(MeasureBase* currentMB, Layout
         Fraction len;
 
         // StarScore: in an additive time signature ("4+5/4"), multimeasure rests go by composite bars: they start on a
-        // composite bar's first bar, hold whole composite bars only, and stop where the pattern does
+        // composite bar's first bar, hold whole composite bars only, and stop where the pattern does. The number counts
+        // the bars (Joel, 14 Oct 2026: six bars of "4+5/4" rest show 6)
         int cycleIndex = 0;
         const int cycle = additiveCycle(firstMeasure, &cycleIndex);
         std::vector<Measure*> runMeasures;
@@ -946,7 +947,7 @@ void MeasureLayout::createMultiMeasureRestsIfNeed(MeasureBase* currentMB, Layout
                 }
                 ctx.mutState().setMeasureNo(runMeasureNos[whole - 1]);
             }
-            enough = whole > 0 && whole / cycle >= ctx.conf().styleI(Sid::minEmptyMeasures);
+            enough = whole > 0 && whole >= ctx.conf().styleI(Sid::minEmptyMeasures);
         }
         if (enough) {
             createMMRest(ctx, firstMeasure, lastMeasure, len);
