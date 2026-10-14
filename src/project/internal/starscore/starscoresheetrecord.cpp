@@ -82,25 +82,6 @@ ExportedPdf sizeAndMd5Of(const QString& path)
     return info;
 }
 
-//! A rhythm-section part's role: "drums", "percussion", "keys", "guitar" or "bass"
-QString rhythmRole(const QString& id)
-{
-    if (id.contains("bass")) {          // electric-bass, bass-guitar, bass-synth, contrabass …
-        return "bass";
-    }
-    if (id.contains("guitar")) {
-        return "guitar";
-    }
-    if (id == "drumset" || id == "drum-kit" || id.startsWith("drum")) {
-        return "drums";
-    }
-    if (id == "congas" || id == "bongos" || id == "percussion" || id == "timbales" || id == "cajon"
-        || id.contains("shaker") || id.contains("tambourine") || id.contains("cowbell") || id.contains("conga")) {
-        return "percussion";
-    }
-    return "keys";
-}
-
 QJsonArray toArray(const QStringList& l)
 {
     QJsonArray a;
@@ -297,6 +278,7 @@ QString StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, con
                     continue;
                 }
                 const auto book = bookRoles.find(pid);
+                // (rhythmRole: the service's one classifier, drums before bass, so a bass drum counts as drums)
                 const QString role = book != bookRoles.end() ? book->second : rhythmRole(p->instrumentId().toQString());
                 if (role == "percussion") {
                     continue;   // left out of every colour rule
