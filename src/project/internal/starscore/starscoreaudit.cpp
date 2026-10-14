@@ -35,6 +35,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QRegularExpression>
+#include <QSaveFile>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QTimer>
@@ -1824,10 +1825,14 @@ static void auditFlushCache()
     if (!c.dirty) {
         return;
     }
-    QFile f(auditCachePath());
-    if (f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+    // (written whole through a temporary file: a crash or quit mid-write left a cut-short file, read back as an
+    // empty cache, and the dashboard audited every song again)
+    QSaveFile f(auditCachePath());
+    if (f.open(QIODevice::WriteOnly)) {
         f.write(QJsonDocument(c.entries).toJson(QJsonDocument::Compact));
-        c.dirty = false;
+        if (f.commit()) {
+            c.dirty = false;
+        }
     }
 }
 

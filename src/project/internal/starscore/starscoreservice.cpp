@@ -30,6 +30,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QRegularExpression>
+#include <QSaveFile>
 #include <QUuid>
 #include <QStandardPaths>
 #include <cmath>
@@ -3328,9 +3329,12 @@ void StarScoreService::saveStyleSettings(const StyleSettings& settings)
     root["exportUnticked"] = settings.exportUnticked;
     root["rules"] = rules;
 
-    QFile file(globalConfiguration()->userAppDataPath().appendingComponent("starscore_styles.json").toQString());
-    if (file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+    // (through a temporary file: the band folder, the default style and the export ticks live here, and a quit or
+    // crash while writing left a cut-short file that read back as no settings at all)
+    QSaveFile file(globalConfiguration()->userAppDataPath().appendingComponent("starscore_styles.json").toQString());
+    if (file.open(QIODevice::WriteOnly)) {
         file.write(QJsonDocument(root).toJson());
+        file.commit();
     }
 }
 
