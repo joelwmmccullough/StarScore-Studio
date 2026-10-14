@@ -207,6 +207,17 @@ public:
     //! Records where the export is, logs it, and lets the windows repaint
     void reportExportProgress(const QString& phase, int done, int total, const QString& step);
     void endExportProgress() override;
+    //! The export progress ended when a run of reportExportProgress calls is over, whichever way the function ends.
+    //! (exportToBandFolder itself never ended it: after a plain export the progress read as still running until the
+    //! next "Update all sheets" or half-time export, which showed its last sheet in the update window's status.)
+    struct ExportProgressScope {
+        StarScoreService* service;
+        explicit ExportProgressScope(StarScoreService* s)
+            : service(s) {}
+        ~ExportProgressScope() { service->endExportProgress(); }
+        ExportProgressScope(const ExportProgressScope&) = delete;
+        ExportProgressScope& operator=(const ExportProgressScope&) = delete;
+    };
     int flexibleViewMode() const override;
     void setFlexibleViewMode(int mode) override;
     bool hasFlexibleSections() const override;

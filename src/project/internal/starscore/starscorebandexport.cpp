@@ -2979,6 +2979,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     if (!writer) {
         return RetVal<QString>::make_ret(Ret::Code::InternalError);
     }
+    const ExportProgressScope progressScope(this);   // (the progress reads as finished however this returns)
     starscore::forgetExportedPdfs();
     // the song's playback events rebuilt once at the end, not after each sheet's title edit
     const StarScorePlaybackDeferred playbackDeferred(master);

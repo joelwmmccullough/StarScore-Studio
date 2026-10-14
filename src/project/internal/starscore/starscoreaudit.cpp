@@ -1731,7 +1731,7 @@ void StarScoreService::playListenStep(const StarScoreListenStep& step, bool with
     }
     m_listeningChanged.notify();
 
-    QTimer::singleShot(150, [this]() {
+    QTimer::singleShot(150, &m_timerGuard, [this]() {
         if (m_listening && !playbackController()->isPlaying()) {
             dispatcher()->dispatch("play");
         }

@@ -148,6 +148,7 @@ RetVal<QString> StarScoreService::exportAudioDemos()
 
     const QString demosDir = plan.val.bandFolder + "/" + plan.val.songFolder + "/Demos";
     QDir().mkpath(demosDir);
+    const ExportProgressScope progressScope(this);   // (the progress reads as finished once the demos are done)
 
     // 48 kHz, 24-bit integer WAV (Joel, 5 Oct 2026); the export settings are put back afterwards
     const int oldRate = audioExportConfiguration()->exportSampleRate();

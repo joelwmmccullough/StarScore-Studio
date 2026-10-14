@@ -161,6 +161,12 @@ void StarScoreService::checkIntegrity()
     if (!ms || autotestRequested()) {
         return;
     }
+    // Not in the middle of an export (its progress updates let timers run): the export's own edits to the part
+    // books change the undo stack, and a warning window would have opened over it. Checked once it has finished.
+    if (m_exportProgress.running) {
+        scheduleIntegrityCheck();
+        return;
+    }
     const Ret ret = ms->sanityCheck();
     if (ret) {
         m_integrityBroken = false;
