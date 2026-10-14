@@ -4,6 +4,17 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.39
+
+Overnight bug and speed pass.
+
+- **The To-Do PDF's "parts finished" bar shows the Finished share again.** It went missing in 1.18.38.
+- **Faster exports.** Combined parts (such as Keys) are made about four times faster, and a full export of a big song takes about 15% less time (Last Pint: 10½ minutes, down from 12⅓).
+- **Faster part score tab switching** (about a quarter second less per switch) and **a faster library audit** on the dashboard (about 40% less time per song).
+- **Safer saving.** Saving a song with solos or reference PDFs never leaves the song file missing if something goes wrong partway. StarScore's settings file and the audit cache are written so that a crash while writing can't leave them cut short.
+- **The sheet record is left alone if it can't be read.** Before, an unreadable record was replaced, and the Finder colours of sheets outside that export were lost. The export now reports the problem instead.
+- **The export progress ends when the export does**, and the score integrity check waits until an export has finished instead of opening a warning over it.
+
 ## 1.18.38
 
 - **New part status: "Written, unformatted"** (yellow), between In progress and Needs review: the notes are written but the layout isn't done. It is in every Part status and section Status menu, the part score tab menu, the to-do list and its PDF, and the dashboard. A section or arrangement on Auto shows it when that is its least finished part. In the Finder colours, a sheet folder whose least finished sheet is Written, unformatted is Orange, the same as In progress. Files saved with it open in older StarScore builds as In progress.
