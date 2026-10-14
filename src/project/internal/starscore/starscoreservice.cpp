@@ -4643,10 +4643,21 @@ Ret StarScoreService::injectSolos(const io::path_t& starscorePath)
         }
     }
 
-    QFile::remove(target);
-    if (!QFile::rename(tmp, target)) {
+    // The song file is never gone from disk: the saved file steps aside under a temporary name, the new one takes its
+    // place, and only then is the old one removed. (Removing the target first and then renaming left no song file at
+    // all if the rename failed.)
+    const QString old = target + ".solos-old";
+    QFile::remove(old);
+    if (!QFile::rename(target, old)) {
+        QFile::remove(tmp);
         return make_ret(Ret::Code::UnknownError);
     }
+    if (!QFile::rename(tmp, target)) {
+        QFile::rename(old, target);   // the saved file back where it was
+        QFile::remove(tmp);
+        return make_ret(Ret::Code::UnknownError);
+    }
+    QFile::remove(old);
     return make_ok();
 }
 
