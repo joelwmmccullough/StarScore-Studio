@@ -41,6 +41,7 @@
 #include "engraving/dom/page.h"
 #include "engraving/dom/systemlock.h"
 #include "engraving/dom/tempotext.h"
+#include "engraving/dom/mmrest.h"
 #include "global/serialization/zipreader.h"
 #include "global/serialization/zipwriter.h"
 #include <QElapsedTimer>
@@ -650,7 +651,7 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
     } else if (step.startsWith("additive:")) {
         // additive:<bar>:<4+4+4+3>/<8>: the additive time signature from that bar (as the dialog does), then each bar's
         // time signature in short
-        const int bar = step.section(':', 1, 1).toInt();
+        const int bar = step.section(':', 1, 1).section('-', 0, 0).toInt();
         const QString pattern = step.section(':', 2);
         std::vector<int> nums;
         for (const QString& n : pattern.section('/', 0, 0).split('+')) {
@@ -661,13 +662,77 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             first = first->nextMeasure();
         }
         master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Additive time signature"));
-        const QString err = starscore::applyAdditiveTimeSig(ms, first, nullptr, nums, pattern.section('/', 1).toInt());
+        // additive:<bar>-<last bar>:… : just that range
+        engraving::Measure* lastBar = nullptr;
+        if (step.section(':', 1, 1).contains('-')) {
+            lastBar = ms->firstMeasure();
+            for (int i = 1; i < step.section(':', 1, 1).section('-', 1).toInt() && lastBar; ++i) {
+                lastBar = lastBar->nextMeasure();
+            }
+        }
+        const QString err = starscore::applyAdditiveTimeSig(ms, first, lastBar, nums, pattern.section('/', 1).toInt());
         master->notation()->undoStack()->commitChanges();
         QStringList sigs;
         for (engraving::Measure* m = ms->firstMeasure(); m; m = m->nextMeasure()) {
             sigs << QString("%1/%2").arg(m->ticks().numerator()).arg(m->ticks().denominator());
         }
         autotestLog(QString("  %1 bars: %2%3").arg(sigs.size()).arg(sigs.join(" ")).arg(err.isEmpty() ? QString() : " — " + err));
+    } else if (step.startsWith("mmrests:")) {
+        // mmrests:<part score>: its multimeasure rests: first bar, bars held, the number shown
+        INotationPtr n;
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            if (e->name() == step.mid(8) && e->notation()) {
+                n = e->notation();
+            }
+        }
+        engraving::Score* sc = step.mid(8) == "main" ? ms : n ? n->elements()->msScore() : nullptr;
+        if (sc) {
+            sc->doLayout();
+            QStringList out;
+            for (engraving::Measure* m = sc->firstMeasure(); m; m = m->nextMeasure()) {
+                if (engraving::Measure* mm = m->mmRest()) {
+                    int shown = -1;
+                    for (engraving::Segment* sg = mm->first(engraving::SegmentType::ChordRest); sg; sg = sg->next(engraving::SegmentType::ChordRest)) {
+                        if (sg->element(0) && sg->element(0)->isMMRest()) {
+                            shown = engraving::toMMRest(sg->element(0))->ldata()->number;
+                        }
+                    }
+                    out << QString("at %1 (bar %2): %3 bars, shows %4").arg(m->tick().toString().toQString()).arg(m->no() + 1).arg(mm->mmRestCount()).arg(shown);
+                }
+            }
+            autotestLog("  " + out.join("; "));
+            QStringList sigs;
+            int bar = 0;
+            for (engraving::Measure* m = sc->firstMeasure(); m && bar < 16; m = m->nextMeasure(), ++bar) {
+                engraving::Segment* sg = m->findSegmentR(engraving::SegmentType::TimeSig, engraving::Fraction(0, 1));
+                engraving::EngravingItem* e = sg ? sg->element(0) : nullptr;
+                sigs << (e && e->isTimeSig() ? QString("%1%2").arg(engraving::toTimeSig(e)->numeratorString().toQString())
+                         .arg(e->visible() ? "" : "h") : QString("-"));
+            }
+            autotestLog("  time signatures: " + sigs.join(" "));
+        }
+    } else if (step.startsWith("deltimesigs:")) {
+        // deltimesigs:<bar>+<bar>+…: those bars' time signatures selected together (in that order) and deleted with one
+        // Delete, then each bar's length
+        ms->deselectAll();
+        for (const QString& b : step.mid(12).split('+')) {
+            engraving::Measure* m = ms->firstMeasure();
+            for (int i = 1; i < b.toInt() && m; ++i) {
+                m = m->nextMeasure();
+            }
+            engraving::Segment* seg = m ? m->findSegment(engraving::SegmentType::TimeSig, m->tick()) : nullptr;
+            if (seg && seg->element(0)) {
+                ms->select(seg->element(0), engraving::SelectType::ADD, 0);
+            }
+        }
+        master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Delete"));
+        ms->cmdDeleteSelection();
+        master->notation()->undoStack()->commitChanges();
+        QStringList sigs;
+        for (engraving::Measure* mm = ms->firstMeasure(); mm; mm = mm->nextMeasure()) {
+            sigs << QString("%1/%2").arg(mm->ticks().numerator()).arg(mm->ticks().denominator());
+        }
+        autotestLog(QString("  %1 bars: %2").arg(sigs.size()).arg(sigs.join(" ")));
     } else if (step.startsWith("deltimesig:")) {
         // deltimesig:<bar>: that bar's time signature deleted (as selecting it and pressing Delete), then each bar's
         // length
@@ -689,7 +754,19 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             engraving::Segment* s2 = mm->findSegment(engraving::SegmentType::TimeSig, mm->tick());
             hidden += s2 && s2->element(0) && !s2->element(0)->visible() ? 1 : 0;
         }
-        autotestLog(QString("  %1 bars, %2 hidden time signatures: %3").arg(sigs.size()).arg(hidden).arg(sigs.join(" ")));
+        int notes = 0, tied = 0;
+        for (engraving::Segment* sg = ms->firstSegment(engraving::SegmentType::ChordRest); sg; sg = sg->next1(engraving::SegmentType::ChordRest)) {
+            for (engraving::EngravingItem* e : sg->elist()) {
+                if (e && e->isChord()) {
+                    for (const engraving::Note* n : engraving::toChord(e)->notes()) {
+                        ++notes;
+                        tied += n->tieFor() ? 1 : 0;
+                    }
+                }
+            }
+        }
+        autotestLog(QString("  %1 bars, %2 hidden time signatures, %3 notes (%4 tied on): %5").arg(sigs.size()).arg(hidden)
+                    .arg(notes).arg(tied).arg(sigs.join(" ")));
     } else if (step == "makekeys") {
         autotestLog("  " + makeKeysPart());
         QStringList books;

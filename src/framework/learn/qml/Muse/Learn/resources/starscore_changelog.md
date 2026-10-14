@@ -4,6 +4,13 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.36
+
+- **Additive time signatures keep the song's length.** Adding a time signature one bar at a time re-barred the rest of the stretch at every bar, filling its last bar out with rests (or, in empty bars, cutting it short), so the stretch slowly grew or shrank: on an empty song a pattern stopped early, and deleting it again left a different number of bars. The stretch is now re-barred once, straight into the pattern, with the last bar cut short where the stretch ends. Notes stay where they are and are only tied over the new barlines. Deleting the pattern gives back exactly the bars you had (tested on an empty song and on one full of notes: 32 bars before, after deleting, and after undo; every tie gone again).
+- **A selected range limits the additive time signature.** Select two or more bars (a multimeasure rest counts as one) and the pattern fills just those bars, replacing any time signatures in them; the time signature from before comes back after the range. With one bar selected (or one multimeasure rest), the pattern runs from there until the next time signature change or the end, as before. Applying a new pattern over an old one replaces it, and a single number ("3/4") makes an ordinary time signature.
+- **Multimeasure rests count composite bars in an additive time signature.** In "4+5/4", six empty bars on a part with multimeasure rests on show as one multimeasure rest of 3 (three bars of 9/4), starting on a composite bar's first bar and holding whole composite bars only. Before, the hidden time signature on every bar of the pattern stopped multimeasure rests from forming at all.
+- **Deleting several time signatures at once goes right to left.** Select several time signatures and press Delete once: the last one goes first, so each re-barring only touches bars no later deletion touches again (fewer notes moved and tied). Three patterns deleted together gave back the song's exact 32 bars with no ties.
+
 ## 1.18.35
 
 - **Additive time signatures run on.** An additive time signature now always starts at the first selected bar and continues until the next time signature change or the end of the song. Before, a selection of several bars (such as a 20-bar multimeasure rest) limited it to those bars, and the old time signature came back after them.

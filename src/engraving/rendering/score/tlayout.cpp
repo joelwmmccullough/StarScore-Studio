@@ -3980,6 +3980,14 @@ void TLayout::layoutMMRest(const MMRest* item, MMRest::LayoutData* ldata, const 
 
     //! NOTE This is not look like layout data, perhaps this is should be set not here
     ldata->number = item->measure()->mmRestCount();
+    // StarScore: in an additive time signature, the number counts composite bars (6 bars of "4+5/4" rest: 3)
+    if (item->measure()->isMMRest()) {
+        int index = 0;
+        const int cycle = MeasureLayout::additiveCycle(item->measure()->mmRestFirst(), &index);
+        if (cycle > 1 && index == 0 && ldata->number % cycle == 0) {
+            ldata->number /= cycle;
+        }
+    }
     ldata->setNumberSym(ldata->number);
     ldata->yNumberPos = ctx.conf().styleMM(Sid::mmRestNumberPos);
 

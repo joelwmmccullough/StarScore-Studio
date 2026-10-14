@@ -20,6 +20,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <algorithm>
 #include <map>
 #include <set>
 
@@ -4033,6 +4034,27 @@ void Score::cmdDeleteSelection()
         // deleteItem modifies selection().elements() list,
         // so we need a local copy:
         std::vector<EngravingItem*> el = selection().elements();
+
+        // StarScore (Joel, 13 Oct 2026): several time signatures deleted at once go from right to left, so each
+        // re-barring only touches bars that no later deletion will touch again (fewer notes moved and tied)
+        {
+            std::vector<size_t> positions;
+            std::vector<EngravingItem*> timeSigs;
+            for (size_t i = 0; i < el.size(); ++i) {
+                if (el[i] && el[i]->isTimeSig()) {
+                    positions.push_back(i);
+                    timeSigs.push_back(el[i]);
+                }
+            }
+            if (timeSigs.size() > 1) {
+                std::stable_sort(timeSigs.begin(), timeSigs.end(), [](const EngravingItem* a, const EngravingItem* b) {
+                    return a->tick() > b->tick();
+                });
+                for (size_t i = 0; i < positions.size(); ++i) {
+                    el[positions[i]] = timeSigs[i];
+                }
+            }
+        }
 
         // keep track of linked elements that are deleted implicitly
         // so we don't try to delete them twice if they are also in selection

@@ -74,7 +74,7 @@ struct NewBar {
     Fraction newTick;
 };
 
-struct Annotation {
+struct DoubleTimeAnnotation {
     Fraction oldTick;
     String xml;
     track_idx_t track = 0;
@@ -208,7 +208,7 @@ RetVal<QString> StarScoreService::convertTimeOf(const INotationProjectPtr& proje
     LOGI() << "[starscore] double time: after writing out bar repeats " << stageInfo(ms);
     // 2. the bars as they are: lengths, time signatures, repeats, barlines; rehearsal marks and system texts
     std::vector<OldBar> old;
-    std::vector<Annotation> annotations;
+    std::vector<DoubleTimeAnnotation> annotations;
     for (Measure* m = ms->firstMeasure(); m; m = m->nextMeasure()) {
         OldBar b;
         b.tick = m->tick();
@@ -540,7 +540,7 @@ RetVal<QString> StarScoreService::convertTimeOf(const INotationProjectPtr& proje
         ms->undoAddElement(k.clone);
         ++edgesRestored;
     }
-    for (const Annotation& a : annotations) {
+    for (const DoubleTimeAnnotation& a : annotations) {
         const Fraction at = mapTick(bars, a.oldTick);
         Measure* m = ms->tick2measure(at);
         if (!m) {

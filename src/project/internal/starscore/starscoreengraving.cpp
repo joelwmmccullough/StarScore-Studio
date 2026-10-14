@@ -38,6 +38,10 @@
 #include "engraving/dom/select.h"
 #include "engraving/dom/timesig.h"
 #include "engraving/dom/factory.h"
+#include "engraving/dom/range.h"
+#include "engraving/dom/slur.h"
+#include "engraving/editing/editmeasures.h"
+#include "engraving/editing/editspanner.h"
 #include "engraving/compat/dummyelement.h"
 #include "engraving/dom/systemlock.h"
 #include "engraving/editing/editsystemlocks.h"
@@ -267,6 +271,89 @@ static const TimeSig* starscoreTimeSigAt(const Measure* m)
     return (e && e->isTimeSig()) ? toTimeSig(e) : nullptr;
 }
 
+//! Re-bars the bars first…last in one go into bars of the given lengths (the time signature each bar is written in
+//! and, for a last bar cut short, its real length), keeping every note where it is: as MuseScore's
+//! Score::rewriteMeasures, which only knows one time signature. Barlines move once, so no notes are split and tied at
+//! barlines that then move again. Must be called inside a command on the master score.
+static bool starscoreRebar(MasterScore* score, Measure* first, Measure* last, const std::vector<std::pair<Fraction, Fraction> >& bars)
+{
+    if (!first || !last || bars.empty()) {
+        return false;
+    }
+    const Fraction startTick = first->tick();
+    const Fraction endTick = last->endTick();
+
+    // the old time signatures in the stretch go first, as deleting a time signature does (all scores, through the links):
+    // the first one would otherwise be kept and changed, hidden if it was hidden
+    std::vector<Segment*> oldTimeSigs;
+    for (Measure* m = first; m; m = m->nextMeasure()) {
+        if (Segment* seg = m->findSegment(SegmentType::TimeSig, m->tick())) {
+            oldTimeSigs.push_back(seg);
+        }
+        if (m == last) {
+            break;
+        }
+    }
+    for (Segment* seg : oldTimeSigs) {
+        score->undoRemoveElement(seg);
+    }
+
+    ScoreRange range;
+    Measure* after = last->nextMeasure();
+    range.read(first->first(), after ? after->first() : last->last());
+
+    for (Score* s : score->scoreList()) {
+        Measure* m1 = s->tick2measure(startTick);
+        Measure* m2 = s->tick2measure(last->tick());
+        if (!m1 || !m2) {
+            continue;
+        }
+        auto spanners = s->spannerMap().findOverlapping(startTick.ticks(), endTick.ticks());
+        for (auto it : spanners) {
+            if (it.value->tick() >= startTick && it.value->tick() < endTick) {
+                s->doUndoRemoveElement(it.value);
+            }
+        }
+        s->undoRemoveMeasures(m1, m2, true);
+
+        Measure* newFirst = nullptr;
+        Measure* newLast = nullptr;
+        Fraction tick = startTick;
+        for (const auto& [nominal, actual] : bars) {
+            Measure* m = Factory::createMeasure(s->dummy()->system());
+            m->setPrev(newLast);
+            if (newLast) {
+                newLast->setNext(m);
+            }
+            m->setTimesig(nominal);
+            m->setTicks(actual);
+            m->setTick(tick);
+            tick += actual;
+            newLast = m;
+            if (!newFirst) {
+                newFirst = m;
+            }
+        }
+        newFirst->setPrev(m1->prev());
+        newLast->setNext(m2->next());
+        s->undo(new InsertMeasures(newFirst, newLast));
+    }
+
+    if (!range.write(score, startTick)) {
+        return false;
+    }
+    for (Score* s : score->scoreList()) {
+        s->connectTies(true);
+    }
+    for (auto spanner : score->spannerMap().findOverlapping(startTick.ticks(), endTick.ticks())) {
+        Slur* slur = spanner.value->isSlur() ? toSlur(spanner.value) : nullptr;
+        if (slur && slur->startElement() && slur->endElement()) {
+            score->undo(new ChangeStartEndSpanner(slur, slur->findStartCR(), slur->findEndCR()));
+        }
+    }
+    return true;
+}
+
 QString applyAdditiveTimeSig(MasterScore* score, Measure* start, Measure* last, const std::vector<int>& numerators, int denominator)
 {
     if (!score || !start || numerators.empty() || denominator <= 0) {
@@ -285,26 +372,44 @@ QString applyAdditiveTimeSig(MasterScore* score, Measure* start, Measure* last, 
         start = start->mmRestFirst();
     }
 
-    // Where the pattern stops
-    const Fraction startTick = start->tick();
-    Fraction endTick;
-    Fraction resumeSig;   // time signature to restore after a selected range
-    if (last) {
-        endTick = last->endTick();
-        resumeSig = last->nextMeasure() ? last->nextMeasure()->timesig() : Fraction();
-        if (last->nextMeasure() && starscoreTimeSigAt(last->nextMeasure())) {
-            resumeSig = Fraction();   // a time signature already follows
-        }
-    } else {
-        endTick = score->lastMeasure()->endTick();
+    // The stretch: to the end of a selected range, else to the next bar with a time signature you can see (hidden ones
+    // are an earlier additive pattern's, replaced now) or the end of the song
+    Measure* stretchLast = last;
+    if (!stretchLast) {
+        stretchLast = start;
         for (Measure* m = start->nextMeasure(); m; m = m->nextMeasure()) {
-            if (starscoreTimeSigAt(m)) {
-                endTick = m->tick();
+            if (const TimeSig* ts = starscoreTimeSigAt(m); ts && ts->visible()) {
                 break;
             }
+            stretchLast = m;
         }
     }
+    if (stretchLast->isMMRest()) {
+        stretchLast = stretchLast->mmRestLast();
+    }
+    Measure* resumeBar = stretchLast->nextMeasure();
+    const Fraction resumeSig = resumeBar && !starscoreTimeSigAt(resumeBar) ? resumeBar->timesig() : Fraction();
+    const Fraction startTick = start->tick();
+    const Fraction length = stretchLast->endTick() - startTick;
 
+    // The bars: the pattern over and over, the last one cut short where the stretch ends (Joel, 13 Oct 2026). One
+    // re-barring keeps the stretch exactly as long as it was, with every note where it was: adding a time signature a
+    // bar at a time re-barred the rest of the stretch each time, filling out (or, when it was empty, cutting off) its
+    // last bar, so the stretch grew or shrank and deleting the pattern again left a different number of bars.
+    std::vector<std::pair<Fraction, Fraction> > bars;
+    Fraction sum(0, 1);
+    for (size_t i = 0; sum < length && bars.size() < 10000; ++i) {
+        const Fraction sig(numerators[i % numerators.size()], denominator);
+        const Fraction actual = std::min(sig, length - sum);
+        bars.push_back({ sig, actual });
+        sum += actual;
+    }
+    if (!starscoreRebar(score, start, stretchLast, bars)) {
+        return QString("The bars could not be rewritten");
+    }
+
+    // The time signatures: the visible "4+4+4+3/8" on the first bar, a hidden one on every other bar. The bars are in
+    // place, so adding them changes no barline.
     String numeratorText;
     for (size_t i = 0; i < numerators.size(); ++i) {
         if (i > 0) {
@@ -312,23 +417,22 @@ QString applyAdditiveTimeSig(MasterScore* score, Measure* start, Measure* last, 
         }
         numeratorText += String::number(numerators[i]);
     }
-
     Fraction tick = startTick;
-    size_t i = 0;
-    int guard = 0;
-    while (tick < endTick && guard++ < 10000) {
+    for (size_t i = 0; i < bars.size(); ++i) {
         Measure* m = score->tick2measure(tick);
         if (!m || m->tick() != tick) {
             break;
         }
-        const Fraction sig(numerators[i % numerators.size()], denominator);
-
+        if (i > 0 && numerators.size() == 1 && bars[i].first == bars[0].first) {
+            tick += bars[i].second;   // one number ("3/4"): an ordinary time signature, shown once and nothing hidden
+            continue;
+        }
         TimeSig* ts = Factory::createTimeSig(score->dummy()->segment());
-        ts->setSig(sig);
+        ts->setSig(bars[i].first);
         if (i == 0) {
             if (numerators.size() > 1) {
-                // One time signature: "4+4+4+3" over a single visible denominator. When only the
-                // numerator string is set, MuseScore draws no denominator, so both are set.
+                // One time signature: "4+4+4+3" over a single visible denominator. When only the numerator string is
+                // set, MuseScore draws no denominator, so both are set.
                 ts->setNumeratorString(numeratorText);
                 ts->setDenominatorString(String::number(denominator));
             }
@@ -337,21 +441,32 @@ QString applyAdditiveTimeSig(MasterScore* score, Measure* start, Measure* last, 
             ts->setShowCourtesySig(false);
         }
         score->cmdAddTimeSig(m, 0, ts, false);
-
-        tick += sig;
-        ++i;
+        tick += bars[i].second;
     }
 
+    // after a selected range, the time signature from before comes back (visibly); an earlier additive pattern
+    // carrying on past the range shows its time signature where it carries on
     if (resumeSig.isValid() && !resumeSig.isZero()) {
         if (Measure* m = score->tick2measure(tick); m && m->tick() == tick) {
             TimeSig* ts = Factory::createTimeSig(score->dummy()->segment());
             ts->setSig(resumeSig);
             score->cmdAddTimeSig(m, 0, ts, false);
         }
+    } else if (last) {
+        if (Measure* m = score->tick2measure(tick); m && m->tick() == tick) {
+            if (Segment* seg = m->findSegment(SegmentType::TimeSig, m->tick())) {
+                for (EngravingItem* e : seg->elist()) {
+                    if (e && e->isTimeSig() && !e->visible()) {
+                        e->undoChangeProperty(Pid::VISIBLE, true);
+                        e->undoChangeProperty(Pid::SHOW_COURTESY, true);
+                    }
+                }
+            }
+        }
     }
-
     return QString();
 }
+
 static QString starscoreBarList(const std::set<int>& bars)
 {
     QStringList out;

@@ -24,6 +24,8 @@ AdditiveTimeSigModel::AdditiveTimeSigModel(QObject* parent)
 {
 }
 
+//! The selected bars: `first` the first one; `last` the last one only when the selection is a range of two or more
+//! bars as shown (a multimeasure rest is one) (Joel, 13 Oct 2026), else null
 static void starscoreSelectedMeasures(Score* score, Measure*& first, Measure*& last)
 {
     first = nullptr;
@@ -35,6 +37,12 @@ static void starscoreSelectedMeasures(Score* score, Measure*& first, Measure*& l
         last = end ? end->measure() : score->lastMeasure();
         if (end && last && end->tick() == last->tick() && last->prevMeasure()) {
             last = last->prevMeasure();   // range ends at the start of this bar
+        }
+        // one bar as shown (a bar, or one multimeasure rest): no range
+        const Measure* shownFirst = first ? first->coveringMMRestOrThis() : nullptr;
+        const Measure* shownLast = last ? last->coveringMMRestOrThis() : nullptr;
+        if (first && last && (first == last || shownFirst == shownLast)) {
+            last = nullptr;
         }
     } else if (EngravingItem* e = sel.element()) {
         if (e->findMeasure()) {
@@ -58,6 +66,10 @@ QString AdditiveTimeSigModel::rangeText() const
     Measure* first = nullptr;
     Measure* last = nullptr;
     starscoreSelectedMeasures(notation->elements()->msScore(), first, last);
+    if (first && last) {
+        return muse::qtrc("starscore", "Applies to bars %1–%2 (the selection), replacing any time signatures in them; the "
+                                       "time signature from before comes back after.").arg(first->no() + 1).arg(last->no() + 1);
+    }
     if (first) {
         return muse::qtrc("starscore", "Applies from bar %1 until the next time signature change or the end.").arg(first->no() + 1);
     }
@@ -92,11 +104,12 @@ QString AdditiveTimeSigModel::apply(const QString& numeratorsText, int denominat
 
     // Selections in a part book: use the same bars in the main score
     if (first && first->score() != ms) {
+        Measure* l = last ? ms->tick2measure(last->tick()) : nullptr;
         first = ms->tick2measure(first->tick());
+        last = l;
     }
-    // From the first selected bar until the next time signature change or the end, whatever the selection's length
-    // (Joel, 13 Oct 2026: a selected 20-bar multimeasure rest made the pattern stop after bar 20)
-    last = nullptr;
+    // A range of two or more bars: just those bars. Otherwise from the first selected bar until the next time signature
+    // change or the end (a selected multimeasure rest is one bar: Joel, 13 Oct 2026)
     if (!first) {
         first = ms->firstMeasure();
     }

@@ -810,7 +810,11 @@ static bool breakMultiMeasureRest(const LayoutContext& ctx, Measure* m)
                 return true;
             }
             if (s->isType(SegmentType::KeySig | SegmentType::TimeSig) && m->tick().isNotZero()) {
-                return true;
+                // StarScore: the hidden time signatures of an additive pattern ("4+5/4" shows once) don't end a
+                // multimeasure rest; it goes by the pattern's composite bars (see createMultiMeasureRestsIfNeed)
+                if (!(s->isTimeSigType() && !e->visible())) {
+                    return true;
+                }
             }
             if (s->isClefType()) {
                 if (s->tick() != m->endTick() && m->tick().isNotZero()) {
@@ -900,9 +904,19 @@ void MeasureLayout::createMultiMeasureRestsIfNeed(MeasureBase* currentMB, Layout
         int n       = 0;
         Fraction len;
 
+        // StarScore: in an additive time signature ("4+5/4"), multimeasure rests go by composite bars: they start on a
+        // composite bar's first bar, hold whole composite bars only, and stop where the pattern does
+        int cycleIndex = 0;
+        const int cycle = additiveCycle(firstMeasure, &cycleIndex);
+        std::vector<Measure*> runMeasures;
+        std::vector<int> runMeasureNos;
+
         while (validMMRestMeasure(ctx, measureToBeChecked)) {
             if (n && breakMultiMeasureRest(ctx, measureToBeChecked)) {
                 break;
+            }
+            if (n && (additiveCycle(measureToBeChecked) != cycle)) {
+                break;   // (into or out of an additive pattern)
             }
             if (measureToBeChecked != firstMeasure) {
                 int measureNo = adjustMeasureNo(measureToBeChecked, ctx.state().measureNo());
@@ -911,6 +925,8 @@ void MeasureLayout::createMultiMeasureRestsIfNeed(MeasureBase* currentMB, Layout
             ++n;
             len += measureToBeChecked->ticks();
             lastMeasure = measureToBeChecked;
+            runMeasures.push_back(measureToBeChecked);
+            runMeasureNos.push_back(ctx.state().measureNo());
             MeasureBase* nextMeasureBase = ctx.conf().isShowVBox() ? measureToBeChecked->next() : measureToBeChecked->nextMeasure();
             if (!(nextMeasureBase && nextMeasureBase->isMeasure())) {
                 break;
@@ -918,7 +934,21 @@ void MeasureLayout::createMultiMeasureRestsIfNeed(MeasureBase* currentMB, Layout
             measureToBeChecked = toMeasure(nextMeasureBase);
         }
 
-        if (n >= ctx.conf().styleI(Sid::minEmptyMeasures)) {
+        bool enough = n >= ctx.conf().styleI(Sid::minEmptyMeasures);
+        if (cycle > 1 && n > 0) {
+            const int whole = cycleIndex == 0 ? (n / cycle) * cycle : 0;
+            if (whole > 0 && whole < n) {
+                n = whole;
+                lastMeasure = runMeasures[whole - 1];
+                len = Fraction(0, 1);
+                for (int i = 0; i < whole; ++i) {
+                    len += runMeasures[i]->ticks();
+                }
+                ctx.mutState().setMeasureNo(runMeasureNos[whole - 1]);
+            }
+            enough = whole > 0 && whole / cycle >= ctx.conf().styleI(Sid::minEmptyMeasures);
+        }
+        if (enough) {
             createMMRest(ctx, firstMeasure, lastMeasure, len);
             ctx.mutState().setCurMeasure(firstMeasure->mmRest());
             ctx.mutState().setNextMeasure(ctx.conf().isShowVBox() ? lastMeasure->next() : lastMeasure->nextMeasure());
@@ -939,6 +969,38 @@ void MeasureLayout::createMultiMeasureRestsIfNeed(MeasureBase* currentMB, Layout
             ctx.mutState().setMeasureNo(measureNo);
         }
     }
+}
+
+int MeasureLayout::additiveCycle(const Measure* m, int* index)
+{
+    int steps = 0;
+    for (const Measure* x = m; x && steps < 10000; x = x->prevMeasure(), ++steps) {
+        const Segment* seg = x->findSegmentR(SegmentType::TimeSig, Fraction(0, 1));
+        const TimeSig* ts = nullptr;
+        if (seg) {
+            for (const EngravingItem* e : seg->elist()) {
+                if (e && e->isTimeSig()) {
+                    ts = toTimeSig(e);
+                    break;
+                }
+            }
+        }
+        if (!ts) {
+            return 0;   // a bar without a time signature: not an additive pattern's
+        }
+        if (ts->visible()) {
+            const String top = ts->numeratorString();
+            if (!top.contains(u'+')) {
+                return 0;
+            }
+            const int k = int(top.split(u'+').size());
+            if (index) {
+                *index = k > 0 ? steps % k : 0;
+            }
+            return k;
+        }
+    }
+    return 0;
 }
 
 void MeasureLayout::removeMMRestElements(Measure* mmRestMeasure)

@@ -50,6 +50,11 @@ public:
 
     static void layout2(Measure* item, LayoutContext& ctx);
 
+    //! StarScore (Joel, 13 Oct 2026): the additive time signature ("4+5/4": a visible time signature whose top has a "+",
+    //! then a hidden one on every following bar) a bar is part of: how many bars one composite bar has (2 for 4+5),
+    //! and this bar's place in it (0 = the composite bar's first). 0 when the bar isn't in one.
+    static int additiveCycle(const Measure* m, int* index = nullptr);
+
     static void getNextMeasure(LayoutContext& ctx);
     static void computePreSpacingItems(Measure* m, LayoutContext& ctx);
 
