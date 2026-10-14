@@ -647,6 +647,49 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             const engraving::Part* p = ms->partById(ID(pid));
             autotestLog(QString("  %1: %2").arg(p ? p->partName().toQString() : pid, mutes.join("; ")));
         }
+    } else if (step.startsWith("additive:")) {
+        // additive:<bar>:<4+4+4+3>/<8>: the additive time signature from that bar (as the dialog does), then each bar's
+        // time signature in short
+        const int bar = step.section(':', 1, 1).toInt();
+        const QString pattern = step.section(':', 2);
+        std::vector<int> nums;
+        for (const QString& n : pattern.section('/', 0, 0).split('+')) {
+            nums.push_back(n.toInt());
+        }
+        engraving::Measure* first = ms->firstMeasure();
+        for (int i = 1; i < bar && first; ++i) {
+            first = first->nextMeasure();
+        }
+        master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Additive time signature"));
+        const QString err = starscore::applyAdditiveTimeSig(ms, first, nullptr, nums, pattern.section('/', 1).toInt());
+        master->notation()->undoStack()->commitChanges();
+        QStringList sigs;
+        for (engraving::Measure* m = ms->firstMeasure(); m; m = m->nextMeasure()) {
+            sigs << QString("%1/%2").arg(m->ticks().numerator()).arg(m->ticks().denominator());
+        }
+        autotestLog(QString("  %1 bars: %2%3").arg(sigs.size()).arg(sigs.join(" ")).arg(err.isEmpty() ? QString() : " — " + err));
+    } else if (step.startsWith("deltimesig:")) {
+        // deltimesig:<bar>: that bar's time signature deleted (as selecting it and pressing Delete), then each bar's
+        // length
+        engraving::Measure* m = ms->firstMeasure();
+        for (int i = 1; i < step.mid(11).toInt() && m; ++i) {
+            m = m->nextMeasure();
+        }
+        engraving::Segment* seg = m ? m->findSegment(engraving::SegmentType::TimeSig, m->tick()) : nullptr;
+        engraving::EngravingItem* e = seg ? seg->element(0) : nullptr;
+        if (e && e->isTimeSig()) {
+            master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Delete time signature"));
+            ms->cmdRemoveTimeSig(engraving::toTimeSig(e));
+            master->notation()->undoStack()->commitChanges();
+        }
+        QStringList sigs;
+        int hidden = 0;
+        for (engraving::Measure* mm = ms->firstMeasure(); mm; mm = mm->nextMeasure()) {
+            sigs << QString("%1/%2").arg(mm->ticks().numerator()).arg(mm->ticks().denominator());
+            engraving::Segment* s2 = mm->findSegment(engraving::SegmentType::TimeSig, mm->tick());
+            hidden += s2 && s2->element(0) && !s2->element(0)->visible() ? 1 : 0;
+        }
+        autotestLog(QString("  %1 bars, %2 hidden time signatures: %3").arg(sigs.size()).arg(hidden).arg(sigs.join(" ")));
     } else if (step == "makekeys") {
         autotestLog("  " + makeKeysPart());
         QStringList books;

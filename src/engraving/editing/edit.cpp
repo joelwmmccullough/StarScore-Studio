@@ -1636,6 +1636,27 @@ void Score::cmdRemoveTimeSig(TimeSig* ts)
     }
     Fraction tick = m->tick();
 
+    // StarScore (Joel, 13 Oct 2026): an additive time signature ("4+4+4+3/8") is a visible time signature on its first
+    // bar and a hidden one on each bar after it. Deleting it deletes those hidden ones too, up to the next bar
+    // without one or with a visible one, so the old time signature comes back for the whole stretch.
+    if (ts->numeratorString().contains(u'+')) {
+        Score* root = masterScore();
+        Measure* head = root->tick2measure(m->tick());
+        for (Measure* nm = head ? head->nextMeasure() : nullptr; nm; nm = nm->nextMeasure()) {
+            Segment* seg = nm->findSegment(SegmentType::TimeSig, nm->tick());
+            EngravingItem* e = seg ? seg->element(0) : nullptr;
+            if (!e || !e->isTimeSig() || e->visible() || toTimeSig(e)->numeratorString().contains(u'+')) {
+                break;
+            }
+            if (nm->mmRest()) {
+                if (Segment* mmSeg = nm->mmRest()->findSegment(SegmentType::TimeSig, nm->tick())) {
+                    root->undoRemoveElement(mmSeg);
+                }
+            }
+            root->undoRemoveElement(seg);
+        }
+    }
+
     // if we remove all time sigs from segment, segment will be already removed by now
     // but this would leave us no means of detecting that we have measures in a local timesig
     // in cases where we try deleting the local time sig

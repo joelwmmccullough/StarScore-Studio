@@ -4,6 +4,11 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.35
+
+- **Additive time signatures run on.** An additive time signature now always starts at the first selected bar and continues until the next time signature change or the end of the song. Before, a selection of several bars (such as a 20-bar multimeasure rest) limited it to those bars, and the old time signature came back after them.
+- **Deleting an additive time signature deletes all of it.** Deleting the visible "4+4+4+3/8" also deletes the hidden time signature on each bar after it, so the bars go back to the time signature before it in one step.
+
 ## 1.18.34
 
 - **New scores get a tempo marking in the time signature's beat.** Compound meters (6/8, 9/8, 12/8: a top number above 3 that divides by 3) count the dotted note: 6/8 and 12/8 get "dotted quarter =", 6/4 "dotted half =", 6/16 "dotted eighth =". Simple and odd meters count the bottom note: 4/4, 3/4 and 5/4 get "quarter =", 2/2 and 3/2 "half =", 3/8, 5/8 and 7/8 "eighth =". The number you enter is beats a minute in that note. This applies to New StarScore (its tempo field now says which note it counts in) and to MuseScore's New score wizard, where the tempo note follows the time signature you pick (you can still change it).

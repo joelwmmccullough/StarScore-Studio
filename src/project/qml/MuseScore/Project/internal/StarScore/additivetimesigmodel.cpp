@@ -58,10 +58,6 @@ QString AdditiveTimeSigModel::rangeText() const
     Measure* first = nullptr;
     Measure* last = nullptr;
     starscoreSelectedMeasures(notation->elements()->msScore(), first, last);
-    if (first && last) {
-        return muse::qtrc("starscore", "Applies to bars %1–%2 (the selection); the old time signature resumes after.")
-               .arg(first->no() + 1).arg(last->no() + 1);
-    }
     if (first) {
         return muse::qtrc("starscore", "Applies from bar %1 until the next time signature change or the end.").arg(first->no() + 1);
     }
@@ -96,11 +92,11 @@ QString AdditiveTimeSigModel::apply(const QString& numeratorsText, int denominat
 
     // Selections in a part book: use the same bars in the main score
     if (first && first->score() != ms) {
-        Measure* m = ms->tick2measure(first->tick());
-        Measure* l = last ? ms->tick2measure(last->tick()) : nullptr;
-        first = m;
-        last = l;
+        first = ms->tick2measure(first->tick());
     }
+    // From the first selected bar until the next time signature change or the end, whatever the selection's length
+    // (Joel, 13 Oct 2026: a selected 20-bar multimeasure rest made the pattern stop after bar 20)
+    last = nullptr;
     if (!first) {
         first = ms->firstMeasure();
     }
