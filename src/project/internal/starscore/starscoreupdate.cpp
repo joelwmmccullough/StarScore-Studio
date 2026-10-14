@@ -150,6 +150,9 @@ RetVal<QString> StarScoreService::updateCurrentSongSheets()
     }
     auto markCurrent = [&]() {
         QJsonObject r = readJson(recordPath);
+        if (r.isEmpty()) {
+            return;   // (a record that can't be read now isn't written back as just these two fields)
+        }
         r["sheetFormat"] = STARSCORE_SHEET_FORMAT;
 #ifdef STARSCORE_VERSION_STR
         r["exportedWith"] = QString::fromUtf8(STARSCORE_VERSION_STR);

@@ -4235,7 +4235,10 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         m_lastExport = info;
 
         // --- for the folder colours: each sheet's status as exported, and what each colour needs
-        writeSheetRecord(ms, data, full, written + unchanged);
+        const QString recordProblem = writeSheetRecord(ms, data, full, written + unchanged);
+        if (!recordProblem.isEmpty()) {
+            problems << recordProblem;
+        }
     }
 
     // --- the chord charts (starscorechordchart.cpp): the lead sheet's chords as a phone-sized PDF and as iReal Pro

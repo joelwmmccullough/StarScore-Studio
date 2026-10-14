@@ -391,8 +391,9 @@ private:
     //! Organizer: each exported sheet's status (with size and md5) and the sheets each folder colour needs, in
     //! 6 Inbox/.organizer/sheets/CODE.json (starscoresheetrecord.cpp). onDisk: the sheets this export wrote or left
     //! as they were because they came out the same
-    void writeSheetRecord(const mu::engraving::MasterScore* ms, const Data& data, const StarScoreBandExportPlan& full,
-                          const QStringList& onDisk) const;
+    //! Returns a problem to report ("" when the record was written); the record is left alone when it can't be read
+    QString writeSheetRecord(const mu::engraving::MasterScore* ms, const Data& data, const StarScoreBandExportPlan& full,
+                             const QStringList& onDisk) const;
 
     mu::engraving::MasterScore* masterScore() const;
     void listenCurrentProject();

@@ -33,6 +33,9 @@
 #include "engraving/dom/masterscore.h"
 #include "engraving/dom/part.h"
 
+#include "log.h"
+#include "translation.h"
+
 //! (starscorebandexport.cpp) the section folder a sheet belongs to, above "Section Scores" or "Horn 1"…
 QString starscoreSectionFolderOf(const QString& rel);
 
@@ -173,20 +176,32 @@ StarScoreStatus StarScoreService::exportedSheetStatus(const Data& data, const St
     return f.partIds.isEmpty() ? StarScoreStatus::Empty : s;
 }
 
-void StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, const Data& data, const StarScoreBandExportPlan& full,
-                                        const QStringList& onDisk) const
+QString StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, const Data& data, const StarScoreBandExportPlan& full,
+                                           const QStringList& onDisk) const
 {
     if (!ms || full.code.isEmpty() || full.bandFolder.isEmpty()) {
-        return;
+        return QString();
     }
     const QString songDir = full.bandFolder + "/" + full.songFolder;
     const QString recordPath = full.bandFolder + "/6 Inbox/.organizer/sheets/" + full.code + ".json";
 
+    // The record as it is: the entries of sheets not in this export (unticked, or made by an earlier StarScore) come
+    // from it. A record that is there but can't be read (broken JSON, a read Drive cut short) is left as it is: written
+    // back from empty, every sheet outside this export would have lost its status, and the song folder its colour.
     QJsonObject record;
     {
         QFile f(recordPath);
         if (f.open(QIODevice::ReadOnly)) {
-            record = QJsonDocument::fromJson(f.readAll()).object();
+            const QByteArray bytes = f.readAll();
+            QJsonParseError err;
+            const QJsonDocument doc = QJsonDocument::fromJson(bytes, &err);
+            if (!bytes.trimmed().isEmpty() && (err.error != QJsonParseError::NoError || !doc.isObject())) {
+                LOGW() << "[starscore] sheet record " << recordPath << " can't be read (" << err.errorString()
+                       << "); left as it is";
+                return muse::qtrc("starscore", "The sheet record (%1) couldn't be read, so it wasn't updated; the folder colours "
+                                               "may be behind until the next export.").arg(QFileInfo(recordPath).fileName());
+            }
+            record = doc.object();
         }
     }
 
@@ -559,8 +574,12 @@ void StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, const 
 
     QDir().mkpath(QFileInfo(recordPath).absolutePath());
     QSaveFile out(recordPath);
-    if (out.open(QIODevice::WriteOnly)) {
-        out.write(QJsonDocument(record).toJson(QJsonDocument::Indented));
-        out.commit();
+    if (!out.open(QIODevice::WriteOnly)) {
+        return muse::qtrc("starscore", "The sheet record (%1) couldn't be written.").arg(QFileInfo(recordPath).fileName());
     }
+    out.write(QJsonDocument(record).toJson(QJsonDocument::Indented));
+    if (!out.commit()) {
+        return muse::qtrc("starscore", "The sheet record (%1) couldn't be written.").arg(QFileInfo(recordPath).fileName());
+    }
+    return QString();
 }
