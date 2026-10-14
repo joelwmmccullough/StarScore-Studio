@@ -4,6 +4,12 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.40
+
+- **A "Sheet Music" folder in every song folder.** Export to Sheets and Demos now puts every sheet folder inside the song folder's **Sheet Music** folder. That covers 1 Lead Sheet, 1 Rhythm, the horn folders, Extras, String Duo and the like, Combined Parts and Annotated Sheets. Chord Charts, Demos, Reference PDFs, Horn Part Guides, Update Notes and Version History stay at the top of the song folder, next to the What's Here and Recordings PDFs.
+- **Existing songs are moved over by themselves.** The next folder organization moves every song's sheet folders into Sheet Music, and an export does the same for its song first. Nothing is made again, and the folder colours, the changelogs, the export ticks and the version suggestions carry over. If an older StarScore later exports to the old places, the next organization moves those files in too; of two files with the same name, the older one goes to Version History.
+- What's Here and the Band Guide show the new layout.
+
 ## 1.18.39
 
 Overnight bug and speed pass.

@@ -68,6 +68,7 @@
 #include "notation/inotationelements.h"
 #include "notation/inotationparts.h"
 
+#include "organizer/orgcore.h"
 #include "translation.h"
 #include "log.h"
 
@@ -2544,7 +2545,7 @@ QJsonObject StarScoreService::organizerHornAnalysis(const MasterScore* ms, const
     QJsonArray parts;
     std::set<QString> chairsDone;
     for (const StarScoreBandFile& f : plan.files) {
-        const QString folder = f.relativePath.section('/', 0, 0);
+        const QString folder = starscore::org::withoutSheetMusic(f.relativePath).section('/', 0, 0);   // ("Sheet Music/3H …")
         const QRegularExpressionMatch fm = folderRe.match(folder);
         if (!fm.hasMatch() || f.isScore || !f.sourceFile.isEmpty() || f.partIds.size() != 1) {
             continue;

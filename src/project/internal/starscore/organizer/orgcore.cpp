@@ -9,6 +9,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QRegularExpression>
 #include <QSaveFile>
 
 namespace mu::project::starscore::org {
@@ -195,5 +196,41 @@ QString md5OfFile(const QString& path)
     QCryptographicHash h(QCryptographicHash::Md5);
     h.addData(&f);
     return QString::fromLatin1(h.result().toHex());
+}
+
+const QString SHEET_MUSIC = QStringLiteral("Sheet Music");
+
+bool staysAtSongTop(const QString& folder)
+{
+    static const QStringList TOP { "Sheet Music", "Chord Charts", "Demos", "Reference PDFs", "Horn Part Guides",
+                                   "Version History", "Old Versions" };
+    return TOP.contains(folder) || folder.startsWith("Update Notes") || folder.startsWith('.') || isBundle(folder);
+}
+
+QString songFolderPath(const QString& folder)
+{
+    return folder.isEmpty() || staysAtSongTop(folder.section('/', 0, 0)) ? folder : SHEET_MUSIC + "/" + folder;
+}
+
+QString withoutSheetMusic(const QString& relInSong)
+{
+    return relInSong.startsWith(SHEET_MUSIC + "/") ? relInSong.mid(SHEET_MUSIC.size() + 1) : relInSong;
+}
+
+QString inSheetMusic(const QString& relInSong)
+{
+    // a file at the top of the song folder (no folder) stays there
+    return relInSong.contains('/') ? songFolderPath(relInSong) : relInSong;
+}
+
+QString bandPathInSheetMusic(const QString& rel)
+{
+    static const QRegularExpression songGroup("^[123] ");
+    const QStringList seg = rel.split('/');
+    const int depth = seg[0] == "4 Works In Progress" ? 2 : songGroup.match(seg[0]).hasMatch() ? 1 : 0;
+    if (depth == 0 || seg.size() <= depth + 1) {
+        return rel;
+    }
+    return seg.mid(0, depth).join('/') + "/" + inSheetMusic(seg.mid(depth).join('/'));
 }
 }

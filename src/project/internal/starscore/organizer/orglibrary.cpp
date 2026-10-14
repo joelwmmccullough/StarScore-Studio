@@ -275,6 +275,10 @@ Library buildLibrary(const ScanResult& scan, const std::map<QString, QString>& c
         } else {
             continue;
         }
+        // the sheet folders are inside "Sheet Music" (Joel, 14 Oct 2026): listed by their own names, as before
+        if (rest.size() >= 2 && rest[0] == SHEET_MUSIC) {
+            rest = rest.mid(1);
+        }
         name = songTitleOf(root);
         Raw& r = raw[root];
         r.name = name;
@@ -349,7 +353,7 @@ Library buildLibrary(const ScanResult& scan, const std::map<QString, QString>& c
 
         const std::map<QString, Quality> quality = measureQuality(scan, root);
         auto qualityOf = [&](const QString& folder, const QString& file) {
-            auto it = quality.find(root + "/" + folder + "/" + file);
+            auto it = quality.find(root + "/" + songFolderPath(folder) + "/" + file);
             return it == quality.end() ? Quality::Ok : it->second;
         };
 

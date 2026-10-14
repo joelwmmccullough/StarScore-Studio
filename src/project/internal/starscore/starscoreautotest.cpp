@@ -55,6 +55,8 @@
 #include "engraving/dom/articulation.h"
 #include "starscoreengraving.h"
 #include "starscorechordchart.h"
+#include "organizer/organizer.h"
+#include <QEventLoop>
 
 #include <QCoreApplication>
 #include <QGuiApplication>
@@ -1469,6 +1471,45 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             QString text = r.ret ? r.val : QString::fromStdString(r.ret.toString());
             text.replace("\n", "\n  ");
             autotestLog("  " + text);
+        }
+    } else if (step == "organize" || step == "organize:after") {
+        // organize: "Run Folder Organization" on STARSCORE_AUTOTEST_BAND (organize:after: as after the export just
+        // made), offline, the PDFs written as their HTML (no WebKit here); logs the run's summary
+        const QString band = qEnvironmentVariable("STARSCORE_AUTOTEST_BAND");
+        if (band.isEmpty() || !QDir(band).exists()) {
+            autotestLog("  STARSCORE_AUTOTEST_BAND missing");
+        } else {
+            namespace org = starscore::org;
+            org::RunRequest request;
+            request.online = false;
+            if (step == "organize:after") {
+                request.scope = org::RunRequest::AfterExport;
+                request.exported = takeLastExport();
+            }
+            org::Prompts prompts;
+            prompts.askShows = [](const std::vector<org::NewShow>&, std::function<void(std::vector<org::ShowAnswer>)> answer) { answer({}); };
+            prompts.confirmSongs = [](std::vector<org::ShowVideo>&, const QStringList&, std::function<void()> next) { next(); };
+            org::Fetcher fetch = [](const QString&, bool, std::function<void(const QString&, int)> done) { done(QString(), 0); };
+            std::shared_ptr<org::Organizer> organizer = org::Organizer::create(org::Paths::make(band, QString()), fetch, prompts);
+            organizer->setWriteHtmlInstead(autotestDir() + "/org-html");
+            QEventLoop loop;
+            org::RunSummary result;
+            bool finished = false;
+            organizer->run(request, org::Progress {}, [&](org::RunSummary s) {
+                result = s;
+                finished = true;
+                loop.quit();
+            });
+            if (!finished) {
+                loop.exec();
+            }
+            autotestLog("  " + result.headline);
+            for (const QString& l : result.lines) {
+                autotestLog("  - " + l);
+            }
+            for (const QString& w : result.warnings) {
+                autotestLog("  ! " + w);
+            }
         }
     } else if (step.startsWith("updateall:")) {
         // updateall:<Projects and Sheets folder>: "Update all sheets" on every song it offers (then waitupdate)

@@ -75,6 +75,8 @@
 #include "starscorechordchart.h"
 #include "starscorepdf.h"
 #include "organizer/orgplatform.h"
+#include "organizer/orgcore.h"
+#include "organizer/orgfiling.h"
 
 #include "io/buffer.h"
 #include "io/file.h"
@@ -348,9 +350,12 @@ QString starscoreSectionFolderOf(const QString& rel)
 //! folder (1.18.19 to 1.18.21) and under its 1.18.18 name; a Flexible horn's sheet at the top of the Flexible folder
 static QStringList starscoreFormerPathsOf(const StarScoreBandFile& f)
 {
+    // (worked out inside Sheet Music, where the sheet folders are since 14 Oct 2026; the song folder's own layout
+    // before then is moved there as a whole by moveSongIntoSheetMusic)
+    const QString rel = starscore::org::withoutSheetMusic(f.relativePath);
     QStringList out;
-    const QString folder = f.relativePath.section('/', 0, -2);
-    const QString file = f.relativePath.section('/', -1);
+    const QString folder = rel.section('/', 0, -2);
+    const QString file = rel.section('/', -1);
     static const QString scoresSub = "/Section Scores";
     if (f.isScore && folder.endsWith(scoresSub)) {
         const QString top = folder.left(folder.size() - scoresSub.size()) + "/" + file;
@@ -361,9 +366,12 @@ static QStringList starscoreFormerPathsOf(const StarScoreBandFile& f)
         }
     }
     static const QRegularExpression hornSub("^(\\d+H Flexible)/Horn \\d+/(.+)$");
-    const QRegularExpressionMatch m = hornSub.match(f.relativePath);
+    const QRegularExpressionMatch m = hornSub.match(rel);
     if (m.hasMatch()) {
         out << m.captured(1) + "/" + m.captured(2);
+    }
+    for (QString& o : out) {
+        o = starscore::org::inSheetMusic(o);
     }
     return out;
 }
@@ -646,8 +654,11 @@ static QString starscoreVariantPath(const QString& rel, const QString& variant)
     if (variant.isEmpty()) {
         return rel;
     }
-    const int slash = rel.indexOf('/');
-    return slash < 0 ? variant + "/" + rel : rel.left(slash) + "/" + variant + rel.mid(slash);
+    // (inside Sheet Music: "Sheet Music/4H/Double-Time/…")
+    const QString inner = starscore::org::withoutSheetMusic(rel);
+    const QString outer = rel.left(rel.size() - inner.size());
+    const int slash = inner.indexOf('/');
+    return outer + (slash < 0 ? variant + "/" + inner : inner.left(slash) + "/" + variant + inner.mid(slash));
 }
 
 RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
@@ -1167,6 +1178,23 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
             f.sheetLeft += "\n" + starscore::muteLines(shown);
         }
     }
+
+    // Joel, 14 Oct 2026: the sheet folders are inside the song folder's "Sheet Music" folder ("Sheet Music/1 Rhythm/…");
+    // Reference PDFs stay at the top of the song folder (and Chord Charts and Demos, written apart from the plan)
+    for (StarScoreBandFile& f : plan.files) {
+        f.relativePath = starscore::org::inSheetMusic(f.relativePath);
+        for (QString& former : f.formerPaths) {
+            former = starscore::org::inSheetMusic(former);
+        }
+    }
+    for (QString& folder : plan.anyHornFolders) {
+        folder = starscore::org::songFolderPath(folder);
+    }
+    std::map<QString, QString> renamed;
+    for (const auto& [oldFolder, folder] : plan.renamedFolders) {
+        renamed[starscore::org::songFolderPath(oldFolder)] = starscore::org::songFolderPath(folder);
+    }
+    plan.renamedFolders = renamed;
 
     return RetVal<StarScoreBandExportPlan>::make_ok(plan);
 }
@@ -2821,7 +2849,8 @@ QStringList StarScoreService::bandExportUnticked(const QString& code) const
 {
     QStringList paths;
     for (const QJsonValue& v : loadStyleSettings().exportUnticked.value(code).toArray()) {
-        paths << v.toString();
+        // (a sheet unticked before the sheet folders went into Sheet Music stays unticked)
+        paths << starscore::org::inSheetMusic(v.toString());
     }
     return paths;
 }
@@ -3601,7 +3630,8 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                                                                                   QCryptographicHash::Md5).toHex());
                 Data stored = loadFrom(ms);
                 // one set of systems for a folder's six Scores, worked out on the Concert Score (written first)
-                const QString systemsKey = starscoreSectionFolderOf(file.relativePath) + "/Scores";
+                // (the folder as it was named before the sheet folders went into Sheet Music, so the systems kept stay)
+                const QString systemsKey = starscore::org::withoutSheetMusic(starscoreSectionFolderOf(file.relativePath)) + "/Scores";
                 const QJsonObject cached = stored.scoreSystems.value(systemsKey).toObject();
                 if (cached.value("key").toString() == key) {
                     std::vector<int> ends;
@@ -3691,7 +3721,10 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         }
         const QString dir = QFileInfo(file.relativePath).path();
         const QString base = QFileInfo(file.relativePath).completeBaseName();
-        const QString relDir = STARSCORE_ANNOTATED_FOLDER + (dir == "." || dir.isEmpty() ? QString() : "/" + dir);
+        // ("Sheet Music/Annotated Sheets/1 Rhythm/…": in Sheet Music, the sheet's own folder under it)
+        const QString annotatedRoot = starscore::org::songFolderPath(STARSCORE_ANNOTATED_FOLDER);
+        const QString inner = starscore::org::withoutSheetMusic(dir);
+        const QString relDir = annotatedRoot + (inner == "." || inner.isEmpty() || inner == starscore::org::SHEET_MUSIC ? QString() : "/" + inner);
         // (a dry run lists them apart: Update all sheets remakes them without raising the sheet's version)
         auto markChanged = [&]() {
             if (!m_dryRunAnnotated.contains(file.relativePath)) {
@@ -3756,8 +3789,8 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         }
         // an emptied folder goes (nothing else in it)
         QDir(songDir).rmdir(relDir);
-        if (relDir != STARSCORE_ANNOTATED_FOLDER) {
-            QDir(songDir).rmdir(STARSCORE_ANNOTATED_FOLDER);
+        if (relDir != annotatedRoot) {
+            QDir(songDir).rmdir(annotatedRoot);
         }
     };
 
@@ -3891,7 +3924,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
             stepClock.restart();
             const starscore::CombinedResult res = starscore::buildCombinedPart(cp->masterNotation(), chair);
             lapTime(chair.name, "combine");
-            const QString rel = STARSCORE_COMBINED_FOLDER + "/" + plan.code + " - " + starscoreSafeFileName(chair.name)
+            const QString rel = starscore::org::songFolderPath(STARSCORE_COMBINED_FOLDER) + "/" + plan.code + " - " + starscoreSafeFileName(chair.name)
                                 + " (All Arrangements).pdf";
             if (!res.ok) {
                 problems << muse::qtrc("starscore", "%1: %2").arg(rel, res.problem);
@@ -3998,18 +4031,19 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         for (const StarScoreBandFile& f : full.files) {
             current << f.relativePath;
         }
+        const QString rhythmFolder = starscore::org::songFolderPath("1 Rhythm");   // ("Sheet Music/1 Rhythm")
         // Keyboard sheets under their older names ("Elec Piano", "Organ", "Clavinet", "Piano"), once a Keys sheet is there
         {
-            const QString prefix = "1 Rhythm/" + plan.code + " - Keys";
+            const QString prefix = rhythmFolder + "/" + plan.code + " - Keys";
             const bool keysThere = std::any_of(current.begin(), current.end(), [&](const QString& rel) {
                 return rel.startsWith(prefix) && QFileInfo::exists(songDir + "/" + rel);
             });
             if (keysThere) {
-                const QDir dir(songDir + "/1 Rhythm");
+                const QDir dir(songDir + "/" + rhythmFolder);
                 for (const QString& fileName : dir.entryList({ plan.code + " - Elec Piano*.pdf", plan.code + " - Organ*.pdf",
                                                                plan.code + " - Clavinet*.pdf", plan.code + " - Piano*.pdf" },
                                                              QDir::Files)) {
-                    const QString rel = "1 Rhythm/" + fileName;
+                    const QString rel = rhythmFolder + "/" + fileName;
                     if (!current.contains(rel)) {
                         supersede(rel);
                     }
@@ -4018,16 +4052,16 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         }
         // Percussion sheets under older names ("Congas", "Bongos"…), once a Percussion sheet is there
         {
-            const QString prefix = "1 Rhythm/" + plan.code + " - Percussion";
+            const QString prefix = rhythmFolder + "/" + plan.code + " - Percussion";
             const bool percThere = std::any_of(current.begin(), current.end(), [&](const QString& rel) {
                 return rel.startsWith(prefix) && QFileInfo::exists(songDir + "/" + rel);
             });
             if (percThere) {
-                const QDir dir(songDir + "/1 Rhythm");
+                const QDir dir(songDir + "/" + rhythmFolder);
                 for (const QString& fileName : dir.entryList({ plan.code + " - Congas*.pdf", plan.code + " - Bongos*.pdf",
                                                                plan.code + " - Timbales*.pdf", plan.code + " - Cajon*.pdf" },
                                                              QDir::Files)) {
-                    const QString rel = "1 Rhythm/" + fileName;
+                    const QString rel = rhythmFolder + "/" + fileName;
                     if (!current.contains(rel)) {
                         supersede(rel);
                     }
@@ -4075,7 +4109,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
             }
             const QDir dir(songDir + "/" + folder);
             // (1H: every sheet, as the saxophones' names changed in 1.18.11)
-            const QString pattern = folder == "1H" ? plan.code + " - *.pdf" : plan.code + " - Horn *.pdf";
+            const QString pattern = starscore::org::withoutSheetMusic(folder) == "1H" ? plan.code + " - *.pdf" : plan.code + " - Horn *.pdf";
             for (const QString& fileName : dir.entryList({ pattern }, QDir::Files)) {
                 const QString rel = folder + "/" + fileName;
                 if (!current.contains(rel)) {
@@ -4320,11 +4354,11 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     }
     if (combinedWritten + combinedSame > 0) {
         summary += " " + muse::qtrc("starscore", "Combined parts (in %1): %2 written, %3 the same as before.")
-                   .arg(STARSCORE_COMBINED_FOLDER).arg(combinedWritten).arg(combinedSame);
+                   .arg(starscore::org::songFolderPath(STARSCORE_COMBINED_FOLDER)).arg(combinedWritten).arg(combinedSame);
     }
     if (annotatedWritten + annotatedSame + annotatedArchived > 0) {
         summary += " " + muse::qtrc("starscore", "Sheets with players' annotations (in %1): %2 written, %3 the same as before.")
-                   .arg(STARSCORE_ANNOTATED_FOLDER).arg(annotatedWritten).arg(annotatedSame);
+                   .arg(starscore::org::songFolderPath(STARSCORE_ANNOTATED_FOLDER)).arg(annotatedWritten).arg(annotatedSame);
         if (annotatedArchived > 0) {
             summary += " " + muse::qtrc("starscore", "%1 no longer annotated, moved to Version History.").arg(annotatedArchived);
         }
@@ -4421,6 +4455,17 @@ int StarScoreService::moveSheetsToCurrentPaths(const StarScoreBandExportPlan& pl
         return 0;
     }
     const QString songDir = plan.bandFolder + "/" + plan.songFolder;
+    // a song folder laid out before 14 Oct 2026: its sheet folders into Sheet Music first (and its sheet record)
+    {
+        const starscore::org::SheetMusicMove m = starscore::org::moveSongIntoSheetMusic(
+            plan.bandFolder, plan.songFolder, plan.code, QDate::currentDate().toString(Qt::ISODate));
+        if (!m.moved.isEmpty()) {
+            LOGI() << "[starscore] moved into Sheet Music: " << m.moved.join(", ");
+        }
+        for (const QString& f : m.failed) {
+            LOGW() << "[starscore] couldn't move into Sheet Music: " << f;
+        }
+    }
     std::vector<std::pair<QString, QString> > moved;   // old -> new, relative to the song folder
     for (const StarScoreBandFile& f : plan.files) {
         const QString to = songDir + "/" + f.relativePath;
@@ -4508,7 +4553,7 @@ StarScoreVersionSuggestion StarScoreService::suggestVersionBump(const StarScoreB
         if (name.endsWith(".pdf")) {
             name.chop(4);
         }
-        return rel.section('/', 0, -2) + " / " + name;
+        return starscore::org::withoutSheetMusic(rel).section('/', 0, -2) + " / " + name;
     };
     // sheets the export dialog starts unticked (Percussion, ones unticked before) aren't part of this export
     const QStringList unticked = bandExportUnticked(plan.code);

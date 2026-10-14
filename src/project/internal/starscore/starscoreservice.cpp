@@ -414,7 +414,17 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
         }
         data.decoRestore[it.key()] = fonts;
     }
-    data.exportSignatures = root.value("exportSignatures").toObject();
+    // (by each sheet's path in the song folder; a sheet exported before the sheet folders went into Sheet Music, 14 Oct
+    // 2026, is the same sheet there)
+    {
+        const QJsonObject sigs = root.value("exportSignatures").toObject();
+        for (auto it = sigs.begin(); it != sigs.end(); ++it) {
+            const QString key = starscore::org::inSheetMusic(it.key());
+            if (!data.exportSignatures.contains(key) || key == it.key()) {
+                data.exportSignatures[key] = it.value();
+            }
+        }
+    }
     data.scoreSystems = root.value("scoreSystems").toObject();
     data.recordings = root.value("recordings").toObject();
     const QJsonObject partStatus = root.value("partStatus").toObject();

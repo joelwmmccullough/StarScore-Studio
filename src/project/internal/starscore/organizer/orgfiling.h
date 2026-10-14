@@ -36,7 +36,23 @@ struct BandFilingReport {
     QStringList registered;               // "1 Mxter Shirts -> MXTR"
     QStringList foldersMade;              // "1 Bet/Demos"
     QStringList updateNotesRedated;       // "1 Amplitudes: Update Notes 26-08-19 -> Update Notes 26-10-01"
+    QStringList intoSheetMusic;           // "1 Amplitudes: 1 Lead Sheet, 1 Rhythm, 3H Tpt Alt Ten" (moved into Sheet Music)
 };
+
+//! Joel, 14 Oct 2026: a song's sheet folders (every folder but Chord Charts, Demos, Reference PDFs, Horn Part Guides,
+//! Update Notes and Version History; see staysAtSongTop) go inside "<song>/Sheet Music/". This moves a song folder
+//! laid out the older way: each such folder is moved in whole; one that is already there too (an older StarScore
+//! exported to the old place afterwards) is merged file by file, and of two files with one name the older goes to
+//! Version History. The song's sheet record (6 Inbox/.organizer/sheets/CODE.json) then names the new places. Nothing
+//! is deleted. Run by the folder organization and at the start of every export of the song.
+struct SheetMusicMove {
+    QStringList moved;                    // folder names moved in whole or merged
+    std::vector<Move> superseded;         // files that went to Version History (relative to Sheets and Demos)
+    QStringList failed;                   // what couldn't be moved (left where it was)
+};
+SheetMusicMove moveSongIntoSheetMusic(const QString& band, const QString& songRoot, const QString& code, const QString& todayIso);
+//! A sheet record's paths (its sheets, the colours' lists, the folders) inside Sheet Music
+QJsonObject sheetRecordInSheetMusic(const QJsonObject& record);
 
 //! aliases: recordings.json "aliases" (song name -> code), extended when a song is registered
 BandFilingReport fileBand(const Paths& paths, Codes& codes, const Roster& roster, QJsonObject& aliases, const Progress& progress);

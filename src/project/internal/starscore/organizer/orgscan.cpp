@@ -39,7 +39,11 @@ QString SheetCache::load(const Paths& paths)
             e.glyphs = a.at(4).toInt();
             e.words = a.at(5).toInt();
             e.measured = a.at(6).toBool(true);
-            m_entries[it.key()] = e;
+            // (a sheet measured before its song's sheet folders moved into Sheet Music, 14 Oct 2026, is the same file
+            // there: moving it kept its size and date, so it isn't read again or listed as removed and added)
+            const QString key = bandPathInSheetMusic(it.key());
+            m_dirty |= key != it.key();
+            m_entries[key] = e;
         }
         return QString();
     }

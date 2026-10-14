@@ -78,4 +78,22 @@ bool moveItem(const QString& src, const QString& dst);
 bool isAudio(const QString& fileName);
 bool isBundle(const QString& path);   // .logicx, .mscbackup and other folders that are really one file
 QString md5OfFile(const QString& path);
+
+// --- A song folder's layout (Joel, 14 Oct 2026): every sheet folder (1 Lead Sheet, 1 Rhythm, the horn folders,
+//     Extras, String Duo, Combined Parts…) is inside "<song>/Sheet Music/"; the song folder itself keeps Chord Charts,
+//     Demos, Reference PDFs, Horn Part Guides, Update Notes, Version History and the song's own PDFs.
+extern const QString SHEET_MUSIC;   // "Sheet Music"
+//! A folder that stays at the top of the song folder (not a sheet folder); `folder` is one name, not a path
+bool staysAtSongTop(const QString& folder);
+//! Where a song's folder is, relative to the song folder: "1 Rhythm" -> "Sheet Music/1 Rhythm", "Demos" -> "Demos"
+//! (a path keeps the rest: "4H Tpt/Section Scores" -> "Sheet Music/4H Tpt/Section Scores")
+QString songFolderPath(const QString& folder);
+//! The other way: "Sheet Music/1 Rhythm/X.pdf" -> "1 Rhythm/X.pdf" (a path relative to the song folder)
+QString withoutSheetMusic(const QString& relInSong);
+//! A song-relative path in the layout before 14 Oct 2026 put where it is now ("1 Rhythm/X.pdf" ->
+//! "Sheet Music/1 Rhythm/X.pdf"); paths already inside Sheet Music, and top-level folders, are left as they are
+QString inSheetMusic(const QString& relInSong);
+//! The same for a path relative to Sheets and Demos ("1 Amplitudes/1 Rhythm/X.pdf" -> "1 Amplitudes/Sheet Music/1
+//! Rhythm/X.pdf"); paths outside the song folders (5 Archive, 6 Inbox, the top) are left as they are
+QString bandPathInSheetMusic(const QString& rel);
 }

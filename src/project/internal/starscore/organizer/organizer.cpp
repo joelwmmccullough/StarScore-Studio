@@ -5,6 +5,7 @@
  */
 #include "organizer.h"
 
+#include <algorithm>
 #include <set>
 
 #include <QCoreApplication>
@@ -355,6 +356,12 @@ void Organizer::prepare(std::shared_ptr<Run> r)
             bandActions.append(action("Registered", "change", "New song folders given codes: " + esc(filing.registered.join(", ")) + "."));
             plainLines << "Registered: " + filing.registered.join(", ");
         }
+        if (!filing.intoSheetMusic.isEmpty()) {
+            bandActions.append(action("Sheet Music", "change", QString("Sheet folders moved into each song&rsquo;s "
+                                                                       "<span class=\"mono\">Sheet Music</span> folder (%1): %2.")
+                                      .arg(plural(int(filing.intoSheetMusic.size()), "song"), esc(filing.intoSheetMusic.join("; ")))));
+            plainLines << QString("Moved the sheet folders of %1 into Sheet Music.").arg(plural(int(filing.intoSheetMusic.size()), "song"));
+        }
         if (!filing.inboxFiled.empty()) {
             bandActions.append(action("Inbox", "change", QString("%1 filed: %2.").arg(plural(int(filing.inboxFiled.size()), "file"),
                                                                                        movesHtml(filing.inboxFiled))));
@@ -501,7 +508,10 @@ void Organizer::prepare(std::shared_ptr<Run> r)
             }
             // after an export the song's pages are rebuilt even when no sheet changed: its horn guides come from that export
             const bool exportedSong = r->request.exported && r->request.exported->songRoot == s.root;
-            if (everything || missing || exportedSong || changedRoots.contains(s.root) || r->recordingsChanged.contains(s.code)) {
+            // (a song whose sheet folders just moved into Sheet Music: its What's Here names the new places)
+            const bool moved = std::any_of(filing.intoSheetMusic.begin(), filing.intoSheetMusic.end(),
+                                           [&](const QString& m) { return m.startsWith(s.root + ": "); });
+            if (everything || missing || exportedSong || moved || changedRoots.contains(s.root) || r->recordingsChanged.contains(s.code)) {
                 songsToBuild.insert(s.root);
             }
         }

@@ -55,7 +55,7 @@ static QString partOfFile(const QString& file, const QString& code)
 
 static QStringList readersOfSheet(const QString& relInSong, const QString& code, const Roster& roster)
 {
-    const QString folder = relInSong.section('/', 0, 0);
+    const QString folder = withoutSheetMusic(relInSong).section('/', 0, 0);   // (the sheet folders are in Sheet Music)
     const QString file = relInSong.section('/', -1);
     if (file.contains(" - Score.pdf") || file.contains(" Score (") || file.endsWith(" Score.pdf") || folder == "Reference PDFs") {
         return {};
@@ -77,7 +77,7 @@ static QString fileref(const QString& relInSong)
 
 static QString folderLabel(const QString& relInSong)
 {
-    const QString folder = relInSong.section('/', 0, 0);
+    const QString folder = withoutSheetMusic(relInSong).section('/', 0, 0);
     if (folder == "1 Lead Sheet") {
         return "Lead Sheet";
     }
@@ -133,11 +133,12 @@ int addChangelogEntries(QJsonObject& changelog, const SongInfo& song, const Rost
                 continue;
             }
             const QString arr = c.arrangement.isEmpty() ? folderLabel(c.relativePath) : c.arrangement;
-            const bool lead = c.relativePath.startsWith("1 Lead Sheet/");
+            const QString folder = withoutSheetMusic(c.relativePath).section('/', 0, 0);
+            const bool lead = folder == "1 Lead Sheet";
             // Any Horns: every version of a chair says the same thing; one line per chair
             const QRegularExpressionMatch chair = chairNo.match(c.part);
-            if ((c.relativePath.section('/', 0, 0).contains("Any Horns") || c.relativePath.section('/', 0, 0).contains("Flexible")) && chair.hasMatch()) {
-                const QString key = c.relativePath.section('/', 0, 0) + "|" + chair.captured(1);
+            if ((folder.contains("Any Horns") || folder.contains("Flexible")) && chair.hasMatch()) {
+                const QString key = folder + "|" + chair.captured(1);
                 for (const QString& p : who) {
                     auto& g = chairGroups[{ p, key }];
                     g.change = c;
@@ -206,7 +207,7 @@ int addChangelogEntries(QJsonObject& changelog, const SongInfo& song, const Rost
                 continue;
             }
             const QString arr = folderLabel(rel);
-            if (rel.startsWith("1 Lead Sheet/")) {
+            if (withoutSheetMusic(rel).startsWith("1 Lead Sheet/")) {
                 addFor(who, kind == "added" ? QString("New <b>lead sheet</b>: %1").arg(fileref(rel))
                        : kind == "changed" ? QString("The <b>lead sheet</b> was updated: %1").arg(fileref(rel))
                        : QString("The <b>lead sheet</b> %1 was retired (it&rsquo;s kept in Version History).").arg(fileref(rel)),

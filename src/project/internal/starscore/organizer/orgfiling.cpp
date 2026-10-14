@@ -5,6 +5,7 @@
  */
 #include "orgfiling.h"
 
+#include <algorithm>
 #include <set>
 
 #include <QDateTime>
@@ -136,6 +137,148 @@ static void walkLeaves(const QString& base, const QString& dirRel, QStringList& 
     }
 }
 
+// ------------------------------------------------------------------ Sheet Music (14 Oct 2026)
+QJsonObject sheetRecordInSheetMusic(const QJsonObject& record)
+{
+    auto paths = [](const QJsonValue& v) {
+        QJsonArray out;
+        for (const QJsonValue& p : v.toArray()) {
+            out.append(inSheetMusic(p.toString()));
+        }
+        return out;
+    };
+    QJsonObject r = record;
+    if (record.contains("sheets")) {
+        QJsonObject sheets;
+        const QJsonObject old = record.value("sheets").toObject();
+        for (auto it = old.begin(); it != old.end(); ++it) {
+            const QString key = inSheetMusic(it.key());
+            // (a sheet recorded at both places: the entry at its current place wins)
+            if (!sheets.contains(key) || key == it.key()) {
+                sheets[key] = it.value();
+            }
+        }
+        r["sheets"] = sheets;
+    }
+    if (record.contains("tiers")) {
+        QJsonObject tiers = record.value("tiers").toObject();
+        for (auto it = tiers.begin(); it != tiers.end(); ++it) {
+            QJsonObject t = it.value().toObject();
+            if (t.contains("paths")) {
+                t["paths"] = paths(t.value("paths"));
+            }
+            it.value() = t;
+        }
+        r["tiers"] = tiers;
+    }
+    if (record.contains("folders")) {
+        QJsonObject folders;
+        const QJsonObject old = record.value("folders").toObject();
+        for (auto it = old.begin(); it != old.end(); ++it) {
+            QJsonObject o = it.value().toObject();
+            if (o.contains("required")) {
+                o["required"] = paths(o.value("required"));
+            }
+            if (o.contains("ladder")) {
+                QJsonArray ladder;
+                for (const QJsonValue& step : o.value("ladder").toArray()) {
+                    QJsonObject st = step.toObject();
+                    st["paths"] = paths(st.value("paths"));
+                    ladder.append(st);
+                }
+                o["ladder"] = ladder;
+            }
+            folders[songFolderPath(it.key())] = o;
+        }
+        r["folders"] = folders;
+    }
+    return r;
+}
+
+SheetMusicMove moveSongIntoSheetMusic(const QString& band, const QString& songRoot, const QString& code, const QString& todayIso)
+{
+    SheetMusicMove out;
+    const QString song = band + "/" + songRoot;
+    const QDir dir(song);
+    if (songRoot.isEmpty() || !dir.exists()) {
+        return out;
+    }
+    for (const QFileInfo& fi : dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
+        const QString name = fi.fileName();
+        if (fi.isSymLink() || hidden(name) || staysAtSongTop(name)) {
+            continue;
+        }
+        const QString to = song + "/" + SHEET_MUSIC + "/" + name;
+        if (!QFileInfo::exists(to)) {
+            if (moveItem(fi.filePath(), to)) {
+                out.moved << name;
+            } else {
+                out.failed << songRoot + "/" + name;
+            }
+            continue;
+        }
+        // already there too: file by file, the newer of two files with one name kept
+        QStringList leaves;
+        walkLeaves(fi.filePath(), QString(), leaves);
+        bool any = false;
+        for (const QString& rel : leaves) {
+            const QString src = fi.filePath() + "/" + rel;
+            const QString dst = to + "/" + rel;
+            auto archive = [&](const QString& path) {
+                const QString tgt = freeName(song + "/Version History/" + todayIso + " Superseded/" + relativeTo(song, dst));
+                if (moveItem(path, tgt)) {
+                    out.superseded.push_back({ relativeTo(band, path), relativeTo(band, tgt) });
+                    return true;
+                }
+                return false;
+            };
+            if (QFileInfo::exists(dst)) {
+                const bool srcNewer = QFileInfo(src).lastModified() > QFileInfo(dst).lastModified();
+                if (!srcNewer) {
+                    any |= archive(src);
+                    continue;
+                }
+                if (!archive(dst)) {
+                    out.failed << relativeTo(band, src);
+                    continue;
+                }
+            }
+            if (moveItem(src, dst)) {
+                any = true;
+            } else {
+                out.failed << relativeTo(band, src);
+            }
+        }
+        // the emptied folders go (a folder with anything left in it, a .DS_Store included, stays)
+        QStringList dirs;
+        QDirIterator it(fi.filePath(), QDir::Dirs | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+        while (it.hasNext()) {
+            dirs << it.next();
+        }
+        std::sort(dirs.begin(), dirs.end(), [](const QString& a, const QString& b) { return a.size() > b.size(); });
+        for (const QString& d : dirs) {
+            QDir().rmdir(d);
+        }
+        QDir().rmdir(fi.filePath());
+        if (any) {
+            out.moved << name;
+        }
+    }
+
+    // the sheet record: every path in it where the sheet is now
+    if (!code.isEmpty()) {
+        const QString recordPath = band + "/6 Inbox/.organizer/sheets/" + code + ".json";
+        const JsonRead read = readJsonChecked(recordPath);
+        if (read.ok && read.doc.isObject()) {
+            const QJsonObject now = sheetRecordInSheetMusic(read.doc.object());
+            if (now != read.doc.object()) {
+                writeJson(recordPath, QJsonDocument(now));
+            }
+        }
+    }
+    return out;
+}
+
 // ------------------------------------------------------------------ Sheets and Demos
 namespace {
 struct BandFiler {
@@ -160,9 +303,11 @@ struct BandFiler {
         return QString();
     }
 
+    //! sub: the folder as named in the song ("1 Rhythm", "3H Tpt Alt Ten/Section Scores", "Demos"); a sheet folder is in
+    //! Sheet Music
     void place(const QString& srcRel, const QString& song, const QString& sub, const QString& newName)
     {
-        const QString dst = song + "/" + sub + "/" + newName;
+        const QString dst = song + "/" + songFolderPath(sub) + "/" + newName;
         if (QDir::cleanPath(abs(srcRel)) == QDir::cleanPath(abs(dst))) {
             return;
         }
@@ -186,7 +331,7 @@ struct BandFiler {
     QString existingHornFolder(const QString& song, int n, const QString& inst) const
     {
         QStringList cands;
-        for (const QString& d : QDir(abs(song)).entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
+        for (const QString& d : QDir(abs(song + "/" + SHEET_MUSIC)).entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
             if (d.startsWith(QString("%1H ").arg(n)) || (n == 1 && d == "1H")) {
                 cands << d;
             }
@@ -314,7 +459,7 @@ struct BandFiler {
             const bool numbered = inst != instrumentBase(inst);
             QStringList fits;
             static const QRegularExpression hornFolder("^\\dH ");
-            for (const QString& d : QDir(abs(song)).entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
+            for (const QString& d : QDir(abs(song + "/" + SHEET_MUSIC)).entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
                 if (!hornFolder.match(d).hasMatch() || d.contains("Any") || d.contains("Flexible")) {
                     continue;
                 }
@@ -337,7 +482,7 @@ struct BandFiler {
         if (fam == "strings") {
             QStringList sf;
             static const QRegularExpression stringsFolder("^\\dS ");
-            for (const QString& d : QDir(abs(song)).entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
+            for (const QString& d : QDir(abs(song + "/" + SHEET_MUSIC)).entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
                 if (stringsFolder.match(d).hasMatch()) {
                     sf << d;
                 }
@@ -408,6 +553,20 @@ BandFilingReport fileBand(const Paths& paths, Codes& codes, const Roster& roster
             aliases[songTitleOf(root)] = code;
         }
         report.registered << root + " → " + code;
+    }
+
+    // --- song folders laid out before 14 Oct 2026: their sheet folders into Sheet Music
+    for (const auto& [song, code] : codes.band) {
+        const SheetMusicMove m = moveSongIntoSheetMusic(paths.band, song, code, paths.todayIso());
+        if (!m.moved.isEmpty()) {
+            report.intoSheetMusic << song + ": " + m.moved.join(", ");
+        }
+        for (const Move& s : m.superseded) {
+            report.superseded.push_back(s);
+        }
+        for (const QString& f : m.failed) {
+            report.unrecognised << f + " (couldn't move it into Sheet Music)";
+        }
     }
 
     // --- 6 Inbox
@@ -488,21 +647,31 @@ BandFilingReport fileBand(const Paths& paths, Codes& codes, const Roster& roster
             }
             filer.fileOne(song + "/" + f, song, code);
         }
+        // and loose in Sheet Music
+        for (const QFileInfo& fi : QDir(dir.filePath(SHEET_MUSIC)).entryInfoList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
+            const QString f = fi.fileName();
+            if (fi.isSymLink() || hidden(f) || (fi.isDir() && !isBundle(fi.filePath()))) {
+                continue;
+            }
+            filer.fileOne(song + "/" + SHEET_MUSIC + "/" + f, song, code);
+        }
         // The percussion sheet is called Percussion (it used to be named after the instrument: Congas, Bongos…)
         {
-            const QDir rhythm(dir.filePath("1 Rhythm"));
+            const QDir rhythm(dir.filePath(songFolderPath("1 Rhythm")));
             const QString perc = code + " - Percussion.pdf";
             if (rhythm.exists() && !rhythm.exists(perc)) {
                 for (const QString& old : { code + " - Congas.pdf", code + " - Bongos.pdf", code + " - Timbales.pdf",
                                             code + " - Cajon.pdf" }) {
                     if (rhythm.exists(old) && moveItem(rhythm.filePath(old), rhythm.filePath(perc))) {
-                        report.filed.push_back({ song + "/1 Rhythm/" + old, song + "/1 Rhythm/" + perc });
+                        report.filed.push_back({ song + "/" + songFolderPath("1 Rhythm") + "/" + old,
+                                                 song + "/" + songFolderPath("1 Rhythm") + "/" + perc });
                         break;
                     }
                 }
             }
         }
-        for (const QString& want : QStringList { "1 Lead Sheet", "1 Rhythm", "Horn Part Guides" }) {
+        for (const QString& name : QStringList { "1 Lead Sheet", "1 Rhythm", "Horn Part Guides" }) {
+            const QString want = songFolderPath(name);
             if (!dir.exists(want)) {
                 dir.mkpath(want);
                 report.foldersMade << song + "/" + want;

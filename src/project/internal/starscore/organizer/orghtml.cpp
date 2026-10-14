@@ -259,7 +259,7 @@ QString whatsHereHtml(const SongInfo& d, const Roster& roster, const QDate& toda
     b += "<h2>What is in here</h2><table><tr><th style=\"width:22%\">Folder</th><th>What it is</th>"
          "<th style=\"width:27%\">Contents</th></tr>";
     for (const Row& r : rows) {
-        b += QString("<tr><td class=\"fold mono\">%1</td><td>%2</td><td class=\"dim\">%3</td></tr>").arg(esc(r.folder), r.what, r.contents);
+        b += QString("<tr><td class=\"fold mono\">%1</td><td>%2</td><td class=\"dim\">%3</td></tr>").arg(esc(songFolderPath(r.folder)), r.what, r.contents);   // ("Sheet Music/1 Rhythm")
     }
     b += "</table>";
     if (d.hasRecordingsPdf) {
@@ -291,7 +291,7 @@ QString whatsHereHtml(const SongInfo& d, const Roster& roster, const QDate& toda
             }
             const bool blank = i.quality == Quality::Empty;
             b += QString("<tr><td class=\"fold mono\" style=\"font-size:8.6pt;\">%1</td><td>%2</td><td style=\"color:%3;\">%4</td></tr>")
-                 .arg(esc(i.folder), esc(stripCode(i.file, code)), blank ? red : gold,
+                 .arg(esc(songFolderPath(i.folder)), esc(stripCode(i.file, code)), blank ? red : gold,
                       blank ? QString("Staves and form are laid out, but no music has been written yet.")
                       : QString("Runs fewer pages than the rest of the tune &mdash; may not be finished."));
         }

@@ -33,6 +33,8 @@
 #include "engraving/dom/masterscore.h"
 #include "engraving/dom/part.h"
 
+#include "organizer/orgcore.h"
+#include "organizer/orgfiling.h"
 #include "log.h"
 #include "translation.h"
 
@@ -138,7 +140,7 @@ StarScoreStatus StarScoreService::exportedSheetStatus(const Data& data, const St
     }
     // the Big Band / Marching Band / Orchestra full score: also its own status
     if (f.isScore) {
-        const QString folder = f.relativePath.section('/', 0, -2);
+        const QString folder = starscore::org::withoutSheetMusic(f.relativePath).section('/', 0, -2);
         const QString tpl = folder == "Big Band" ? "big-band" : folder == "Marching Band" ? "marching-band"
                             : folder == "Full Orchestra" ? "orchestra" : QString();
         if (!tpl.isEmpty()) {
@@ -182,7 +184,8 @@ QString StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, con
                 return muse::qtrc("starscore", "The sheet record (%1) couldn't be read, so it wasn't updated; the folder colours "
                                                "may be behind until the next export.").arg(QFileInfo(recordPath).fileName());
             }
-            record = doc.object();
+            // (paths from before the sheet folders went into Sheet Music, 14 Oct 2026, where they are now)
+            record = starscore::org::sheetRecordInSheetMusic(doc.object());
         }
     }
 
@@ -396,7 +399,7 @@ QString StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, con
         }
         if (tpl == "1-horn-standard") {
             for (const QString& horn : ONE_HORN) {
-                const QString want = QString("1H/%1 - %2.pdf").arg(full.code, horn);
+                const QString want = starscore::org::songFolderPath(QString("1H/%1 - %2.pdf").arg(full.code, horn));
                 if (!files.contains(want)) {
                     green.missing << QString("no %1 sheet in 1-Horn Standard").arg(horn);
                 }
@@ -467,7 +470,7 @@ QString StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, con
     };
 
     if (!lead.isEmpty()) {
-        setFolder("1 Lead Sheet", lead, {});
+        setFolder(starscore::org::songFolderPath("1 Lead Sheet"), lead, {});
     }
     if (!roleParts.empty()) {
         // Joel, 5 Oct 2026: the Rhythm folder is green once drums, bass and guitar (a drummer who reads the lead sheet:
@@ -487,11 +490,12 @@ QString StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, con
             mis << "no lead sheet";
         }
         addUnique(req, lead);
-        setFolder("1 Rhythm", req, mis);
+        const QString rhythm = starscore::org::songFolderPath("1 Rhythm");
+        setFolder(rhythm, req, mis);
         // only these sheets decide its colour (not every PDF in the folder)
-        QJsonObject o = folders.value("1 Rhythm").toObject();
+        QJsonObject o = folders.value(rhythm).toObject();
         o["onlyRequired"] = true;
-        folders["1 Rhythm"] = o;
+        folders[rhythm] = o;
     }
     for (const StarScoreSection& sec : data.sections) {
         const QString key = sec.templateKey;
@@ -506,7 +510,7 @@ QString StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, con
         QStringList req = filesOfFolder[folder];   // every sheet the export makes for that folder (not the score)
         if (key == "1-horn") {
             for (const QString& horn : ONE_HORN) {
-                addUnique(req, { QString("1H/%1 - %2.pdf").arg(full.code, horn) });
+                addUnique(req, { starscore::org::songFolderPath(QString("1H/%1 - %2.pdf").arg(full.code, horn)) });
             }
         } else if (key == "7-horn") {
             // the Bass Trombone line in every version StarScore makes, in the bass horns subfolder
