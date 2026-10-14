@@ -26,13 +26,47 @@
 #include "chordlayout.h"
 #include "tlayout.h"
 
+#include <algorithm>
+
 #include "dom/beam.h"
+#include "dom/chord.h"
+#include "dom/measure.h"
+#include "dom/note.h"
+#include "dom/rest.h"
+#include "dom/segment.h"
 #include "dom/system.h"
 
 using namespace muse;
 using namespace mu::engraving;
 
 namespace mu::engraving::rendering::score {
+//! StarScore (Joel, 14 Oct 2026): a rest in a bar where its voice holds rhythm markings (small, silent notes pinned to the
+//! space above or below the staff) goes beside them, beyond the staff on their side: centred 2 spaces above the top
+//! line, or 2 spaces below the bottom line. `below` says which.
+static bool starscoreRhythmMarkingRest(const Rest* rest, bool& below)
+{
+    const Measure* m = rest ? rest->measure() : nullptr;
+    if (!m || rest->isGap()) {
+        return false;
+    }
+    for (const Segment* s = m->first(SegmentType::ChordRest); s; s = s->next(SegmentType::ChordRest)) {
+        const EngravingItem* e = s->element(rest->track());
+        if (!e || !e->isChord()) {
+            continue;
+        }
+        const Chord* c = toChord(e);
+        bool all = !c->notes().empty();
+        for (const Note* n : c->notes()) {
+            all = all && n->fixed() && !n->play() && (n->isSmall() || c->isSmall()) && n->headGroup() != NoteHeadGroup::HEAD_NORMAL;
+        }
+        if (all) {
+            below = c->notes().front()->fixedLine() > 4;
+            return true;
+        }
+    }
+    return false;
+}
+
 void RestLayout::layoutRest(const Rest* item, Rest::LayoutData* ldata, const LayoutContext& ctx)
 {
     if (item->isGap()) {
@@ -127,6 +161,10 @@ void RestLayout::layoutRest(const Rest* item, Rest::LayoutData* ldata, const Lay
     int voiceOffset = computeVoiceOffset(item, ldata); // Measured in 1sp steps
     int wholeRestOffset = computeWholeOrBreveRestOffset(item, voiceOffset, lines);
     int finalLine = naturalLine + voiceOffset + wholeRestOffset;
+    bool rhythmBelow = false;
+    if (starscoreRhythmMarkingRest(item, rhythmBelow)) {
+        finalLine = rhythmBelow ? (lines - 1) + 2 : -2;
+    }
 
     ldata->sym = item->getSymbol(item->durationType().type(), finalLine + userLine, lines);
 
@@ -175,6 +213,11 @@ void RestLayout::resolveVerticalRestConflicts(LayoutContext& ctx, Segment* segme
     std::vector<Chord*> chords;
 
     collectChordsAndRest(segment, staffIdx, chords, rests);
+    // (StarScore: rests beside rhythm markings keep their place, see starscoreRhythmMarkingRest)
+    rests.erase(std::remove_if(rests.begin(), rests.end(), [](Rest* r) {
+        bool below = false;
+        return starscoreRhythmMarkingRest(r, below);
+    }), rests.end());
 
     if (rests.empty()) {
         return;

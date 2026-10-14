@@ -46,7 +46,10 @@ bool instrumentNameOverlapsTitle(mu::engraving::Score* score);
 
 //! Writes "Version x.y.z" into the footer text (Starsign 2.3 has "Version 1.0.0" in the right-hand box),
 //! replacing the version already there, or adding it to the right-hand box. Must be called inside a command.
-bool applyVersionFooter(mu::engraving::Score* score, const QString& version);   // true when a footer changed
+//! true when a footer changed. direct: the style set without the undo stack and without Score::styleChanged (which
+//! walks every element of the score, the stale ones of a part score not laid out since too: Drum Battle's export
+//! crashed there, 14 Oct 2026); the caller lays the score out.
+bool applyVersionFooter(mu::engraving::Score* score, const QString& version, bool direct = false);
 
 //! "Version 4.0.1" <-> "4.0.1"
 QString versionFromCopyright(const QString& copyright);   // empty when there is none

@@ -65,10 +65,15 @@ double houseStaffHeightMm(const Score* score, bool partBook)
     return 4.0;
 }
 
-static bool starscoreSet(Score* score, Sid id, const PropertyValue& value)
+//! (direct: set without the undo stack and without Score::styleChanged, for applyVersionFooter's direct mode)
+static bool starscoreSet(Score* score, Sid id, const PropertyValue& value, bool direct = false)
 {
     if (score->style().styleV(id) != value) {
-        score->undoChangeStyleVal(id, value);
+        if (direct) {
+            score->style().set(id, value);
+        } else {
+            score->undoChangeStyleVal(id, value);
+        }
         return true;
     }
     return false;
@@ -109,7 +114,7 @@ private:
     bool m_laidOut = false;
 };
 
-bool applyVersionFooter(Score* score, const QString& version)
+bool applyVersionFooter(Score* score, const QString& version, bool direct)
 {
     if (!score || version.isEmpty()) {
         return false;
@@ -123,21 +128,21 @@ bool applyVersionFooter(Score* score, const QString& version)
         QString v = score->style().styleSt(id).toQString();
         if (re.match(v).hasMatch()) {
             v.replace(re, text);
-            changed |= starscoreSet(score, id, String::fromQString(v));
+            changed |= starscoreSet(score, id, String::fromQString(v), direct);
             found = true;
         }
     }
     if (!found) {
         // No version in the footer yet: put it in the right-hand footer box, as Starsign 2.3 does
         const QString odd = score->style().styleSt(Sid::oddFooterR).toQString();
-        changed |= starscoreSet(score, Sid::oddFooterR, String::fromQString(odd.isEmpty() ? text : text + "\n" + odd));
+        changed |= starscoreSet(score, Sid::oddFooterR, String::fromQString(odd.isEmpty() ? text : text + "\n" + odd), direct);
         if (score->style().styleB(Sid::footerOddEven)) {
             const QString even = score->style().styleSt(Sid::evenFooterR).toQString();
-            changed |= starscoreSet(score, Sid::evenFooterR, String::fromQString(even.isEmpty() ? text : text + "\n" + even));
+            changed |= starscoreSet(score, Sid::evenFooterR, String::fromQString(even.isEmpty() ? text : text + "\n" + even), direct);
         }
     }
-    changed |= starscoreSet(score, Sid::showFooter, true);
-    changed |= starscoreSet(score, Sid::footerFirstPage, true);
+    changed |= starscoreSet(score, Sid::showFooter, true, direct);
+    changed |= starscoreSet(score, Sid::footerFirstPage, true, direct);
     return changed;
 }
 

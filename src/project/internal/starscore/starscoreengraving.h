@@ -104,6 +104,11 @@ bool isRhythmMarking(const mu::engraving::Note* note);
 //! Every rhythm marking not pinned yet pinned to the space above the staff (or below it, for one that sits in the
 //! lower half of the staff). Undoable (inside a command) when apply; else only counts. Returns how many.
 int pinRhythmMarkings(mu::engraving::Score* score, bool apply);
+//! The rests beside rhythm markings are placed by the layout (centred 2 spaces beyond the staff on the markings' side,
+//! restlayout.cpp); a rest moved up or down by hand before then (Drum Battle's were raised 2 spaces) would be moved
+//! twice, so its vertical offset goes, in the full score and every part score. Undoable (inside a command) when apply;
+//! else only counts. Returns how many.
+int clearRhythmRestOffsets(mu::engraving::MasterScore* master, bool apply);
 //! The selected notes made rhythm markings: small, silent, slash heads (a marking's own head kept), stems up and pinned
 //! to the space above the staff, or stems down below it. Undoable (inside a command). Returns how many notes.
 int makeRhythmMarkings(mu::engraving::Score* score, bool below);

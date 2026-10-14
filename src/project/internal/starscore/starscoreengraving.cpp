@@ -16,6 +16,7 @@
 
 #include "engraving/dom/masterscore.h"
 #include "engraving/dom/excerpt.h"
+#include "engraving/dom/rest.h"
 #include "engraving/dom/measure.h"
 #include "engraving/dom/segment.h"
 #include "engraving/dom/chord.h"
@@ -1180,6 +1181,54 @@ int mu::project::starscore::pinRhythmMarkings(Score* score, bool apply)
                     const bool below = st && n->line() > st->middleLine();
                     n->undoChangeProperty(Pid::FIXED, true);
                     n->undoChangeProperty(Pid::FIXED_LINE, rhythmMarkingLine(n, below));
+                }
+            }
+        }
+    }
+    return count;
+}
+
+int mu::project::starscore::clearRhythmRestOffsets(MasterScore* master, bool apply)
+{
+    if (!master) {
+        return 0;
+    }
+    std::vector<Score*> scores { master };
+    for (Excerpt* ex : master->excerpts()) {
+        if (ex && ex->excerptScore()) {
+            scores.push_back(ex->excerptScore());
+        }
+    }
+    int count = 0;
+    for (Score* score : scores) {
+        for (Measure* m = score->firstMeasure(); m; m = m->nextMeasure()) {
+            std::set<track_idx_t> markingTracks;
+            for (Segment* s = m->first(SegmentType::ChordRest); s; s = s->next(SegmentType::ChordRest)) {
+                for (EngravingItem* e : s->elist()) {
+                    if (!e || !e->isChord()) {
+                        continue;
+                    }
+                    const Chord* c = toChord(e);
+                    bool all = !c->notes().empty();
+                    for (const Note* n : c->notes()) {
+                        all = all && n->fixed() && isRhythmMarking(n);
+                    }
+                    if (all) {
+                        markingTracks.insert(c->track());
+                    }
+                }
+            }
+            if (markingTracks.empty()) {
+                continue;
+            }
+            for (Segment* s = m->first(SegmentType::ChordRest); s; s = s->next(SegmentType::ChordRest)) {
+                for (EngravingItem* e : s->elist()) {
+                    if (e && e->isRest() && markingTracks.count(e->track()) && !RealIsNull(e->offset().y())) {
+                        ++count;
+                        if (apply) {
+                            e->undoChangeProperty(Pid::OFFSET, PointF(e->offset().x(), 0.0));
+                        }
+                    }
                 }
             }
         }

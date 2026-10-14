@@ -4087,6 +4087,23 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                 }
             }
         }
+        // Bass sheets named after a player from before StarScore ("Bass (Mike)", "Bass (Harley)"), once the song's Bass
+        // sheet is there: one bass sheet (Joel, 14 Oct 2026)
+        {
+            const QString prefix = rhythmFolder + "/" + plan.code + " - Bass";
+            const bool bassThere = std::any_of(current.begin(), current.end(), [&](const QString& rel) {
+                return rel.startsWith(prefix) && QFileInfo::exists(songDir + "/" + rel);
+            });
+            if (bassThere) {
+                const QDir dir(songDir + "/" + rhythmFolder);
+                for (const QString& fileName : dir.entryList({ plan.code + " - Bass (*).pdf" }, QDir::Files)) {
+                    const QString rel = rhythmFolder + "/" + fileName;
+                    if (!current.contains(rel)) {
+                        supersede(rel);
+                    }
+                }
+            }
+        }
         // 7-Horn bass horns: the sheets that sat in the arrangement folder before they got their own subfolder
         for (const QString& rel : current) {
             const QString marker = "/" + STARSCORE_BASS_HORNS_FOLDER + "/";
@@ -4724,11 +4741,9 @@ void StarScoreService::setScoreVersion(const QString& version)
             return;
         }
         engraving::Score* score = n->elements()->msScore();
-        score->lockUpdates(true);
-        n->undoStack()->prepareChanges(TranslatableString::untranslatable("Version"));
-        const bool changed = starscore::applyVersionFooter(score, version);
-        n->undoStack()->commitChanges();
-        score->lockUpdates(false);
+        // (set directly: the footer is the export's, and Score::styleChanged walked elements a part score no longer
+        // had since its last layout, which crashed Drum Battle's export)
+        const bool changed = starscore::applyVersionFooter(score, version, true);
         if (changed) {
             score->setLayoutAll();
             score->doLayout();

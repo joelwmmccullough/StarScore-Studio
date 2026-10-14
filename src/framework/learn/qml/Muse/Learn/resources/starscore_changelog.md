@@ -4,6 +4,12 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.45
+
+- **Rests beside rhythm markings place themselves.** In a bar where a voice holds rhythm markings, its rests sit beside them: 2 spaces above the staff for markings above it, 2 spaces below for markings below. That holds in the full score, every part score and every exported sheet, the Flexible ones included. Rests you had moved by hand there lose that move once, when the song opens (Drum Battle: 524 rests), so they aren't moved twice.
+- **Export crash fixed.** Setting the new version number in every part score's footer could crash after a long editing session (Drum Battle, 14 Oct). The footer is now set without the step that crashed.
+- **One bass sheet.** Bass sheets named after a player from before StarScore ("Bass (Mike)", "Bass (Harley)") go to Version History once the song's Bass sheet is exported.
+
 ## 1.18.44
 
 - **Rhythm markings above / below the staff works in part scores.** It always said "Select the notes to make rhythm markings first" in a part score, because it looked at the selection in the full score. It now uses the score on screen, and the full score and the other part scores get the same change (size, playback and stem direction included).

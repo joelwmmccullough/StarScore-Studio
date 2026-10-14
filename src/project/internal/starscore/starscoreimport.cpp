@@ -2021,6 +2021,14 @@ void StarScoreService::tidyOpenedScore()
         master->notation()->notationChanged().notify();
         LOGI() << "[starscore] pinned " << pinned << " rhythm marking(s)";
     }
+    // and the rests beside them placed by the layout, not moved by hand on top of that
+    if (starscore::clearRhythmRestOffsets(ms, false) > 0) {
+        master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Rests beside rhythm markings"));
+        const int cleared = starscore::clearRhythmRestOffsets(ms, true);
+        master->notation()->undoStack()->commitChanges();
+        master->notation()->notationChanged().notify();
+        LOGI() << "[starscore] " << cleared << " rest(s) beside rhythm markings no longer moved by hand";
+    }
 
     standardizeHornNames();
     renamePersonNamedPartScores();
