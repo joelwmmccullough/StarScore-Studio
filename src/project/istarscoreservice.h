@@ -109,6 +109,7 @@ enum class StarScoreStatus {
     Empty = 0,
     Sketch,
     InProgress,
+    WrittenUnformatted,   // "Written, unformatted" (Joel, 13 Oct 2026): the notes are in, the layout isn't done
     NeedsReview,
     Finished
 };

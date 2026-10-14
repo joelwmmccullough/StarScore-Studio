@@ -289,6 +289,7 @@ QString StarScoreService::statusKey(StarScoreStatus status)
     case StarScoreStatus::Empty: return "empty";
     case StarScoreStatus::Sketch: return "sketch";
     case StarScoreStatus::InProgress: return "in-progress";
+    case StarScoreStatus::WrittenUnformatted: return "written-unformatted";
     case StarScoreStatus::NeedsReview: return "needs-review";
     case StarScoreStatus::Finished: return "finished";
     }
@@ -301,6 +302,8 @@ StarScoreStatus StarScoreService::statusFromKey(const QString& key)
         return StarScoreStatus::Empty;
     } else if (key == "sketch") {
         return StarScoreStatus::Sketch;
+    } else if (key == "written-unformatted") {
+        return StarScoreStatus::WrittenUnformatted;
     } else if (key == "needs-review") {
         return StarScoreStatus::NeedsReview;
     } else if (key == "finished") {

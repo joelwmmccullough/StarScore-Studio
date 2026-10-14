@@ -22,14 +22,14 @@ Rectangle {
 
     readonly property color doneColor: "#3FB05A"
     readonly property color auditColor: "#8E7CF0"
-    readonly property var statusColors: ["#8A8A8A", "#E0463A", "#F29B30", "#3C8CE7", "#3FB05A"]
+    readonly property var statusColors: ["#8A8A8A", "#E0463A", "#F29B30", "#E3C02B", "#3C8CE7", "#3FB05A"]
 
     function cellColor(cell) {
         if (cell.state === "done") {
             return root.doneColor
         }
         if (cell.state === "todo") {
-            return cell.audit ? root.auditColor : root.statusColors[Math.max(0, Math.min(4, cell.status))]
+            return cell.audit ? root.auditColor : root.statusColors[Math.max(0, Math.min(5, cell.status))]
         }
         return "transparent"
     }
@@ -294,7 +294,7 @@ Rectangle {
                                         radius: 5
                                         color: taskRow.modelData.state === "missing" ? "transparent"
                                                : taskRow.modelData.audit ? root.auditColor
-                                               : root.statusColors[Math.max(0, Math.min(4, taskRow.modelData.status))]
+                                               : root.statusColors[Math.max(0, Math.min(5, taskRow.modelData.status))]
                                         border.width: 1
                                         border.color: taskRow.modelData.state === "missing" ? ui.theme.fontSecondaryColor : "transparent"
                                     }
@@ -456,7 +456,8 @@ Rectangle {
                                 { "c": root.auditColor, "t": qsTrc("starscore", "To audit (number = things to look at)") },
                                 { "c": root.statusColors[2], "t": qsTrc("starscore", "In progress") },
                                 { "c": root.statusColors[1], "t": qsTrc("starscore", "Sketch") },
-                                { "c": root.statusColors[3], "t": qsTrc("starscore", "Needs review") },
+                                { "c": root.statusColors[3], "t": qsTrc("starscore", "Written, unformatted") },
+                                { "c": root.statusColors[4], "t": qsTrc("starscore", "Needs review") },
                                 { "c": root.statusColors[0], "t": qsTrc("starscore", "Empty") },
                                 { "c": "transparent", "t": qsTrc("starscore", "Not written yet") },
                             ]

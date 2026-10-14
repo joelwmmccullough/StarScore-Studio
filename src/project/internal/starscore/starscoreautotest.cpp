@@ -1224,8 +1224,28 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         for (const engraving::Part* p : ms->parts()) {
             autotestLog(QString("  %1 (%2)").arg(p->partName().toQString(), p->instrumentId().toQString()));
         }
+    } else if (step.startsWith("setstatus:")) {
+        // setstatus:<part name>|<status number, -1 = no tag>: tags every part with that name, then logs the stored keys
+        const QString name = step.mid(10).section('|', 0, 0);
+        const int st = step.section('|', 1, 1).toInt();
+        for (const engraving::Part* p : ms->parts()) {
+            if (p->partName().toQString() == name) {
+                setPartStatus(p->id().toQString(), st);
+            }
+        }
+        const Data d = load();
+        for (const auto& [pid, key] : d.partStatus) {
+            for (const engraving::Part* p : ms->parts()) {
+                if (p->id().toQString() == pid) {
+                    autotestLog(QString("  tag %1: %2").arg(p->partName().toQString(), key));
+                }
+            }
+        }
+        for (const StarScoreTodoItem& t : todoList()) {
+            autotestLog(QString("  todo %1: %2").arg(t.title).arg(t.status));
+        }
     } else if (step == "status") {
-        // each arrangement's status (0 Empty … 4 Finished) and each section's
+        // each arrangement's status (0 Empty … 5 Finished) and each section's
         const Data d = load();
         for (const StarScoreSection& s : d.sections) {
             autotestLog(QString("  section %1: %2 (skips %3)").arg(s.name).arg(int(s.status)).arg(s.autoSkipSheets.join(",")));

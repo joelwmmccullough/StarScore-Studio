@@ -63,7 +63,8 @@ QString statusName(int status)
     case 0: return muse::qtrc("starscore", "Empty");
     case 1: return muse::qtrc("starscore", "Sketch");
     case 2: return muse::qtrc("starscore", "In progress");
-    case 3: return muse::qtrc("starscore", "Needs review");
+    case 3: return muse::qtrc("starscore", "Written, unformatted");
+    case 4: return muse::qtrc("starscore", "Needs review");
     default: return muse::qtrc("starscore", "Finished");
     }
 }

@@ -1866,8 +1866,15 @@ static void auditUpdateCache(const QString& path, const QJsonObject& entry)
 }
 
 // Bumped whenever a cached summary would be read differently; entries with another version are audited again
-// (3: the dashboard's arrangement list, 1.8.0; 4: the reference check removed, 1.10.0; 5: Finished = audited, 1.18.14)
-static const int AUDIT_CACHE_VERSION = 5;
+// (3: the dashboard's arrangement list, 1.8.0; 4: the reference check removed, 1.10.0; 5: Finished = audited, 1.18.14;
+// 6: "Written, unformatted" added as status 3, 1.18.38 — version 5 entries are read with their statuses moved up)
+static const int AUDIT_CACHE_VERSION = 6;
+
+//! A status number read from the cache: before version 6, 3 was Needs review and 4 Finished
+static int auditCachedStatus(const QJsonObject& entry, int status)
+{
+    return entry.value("v").toInt() < 6 && status >= 3 ? status + 1 : status;
+}
 
 static QJsonObject auditSummaryToJson(const StarScoreAuditFileSummary& s)
 {
@@ -1914,7 +1921,7 @@ static StarScoreAuditFileSummary auditSummaryFromJson(const QString& path, const
             fa.sectionKeys << k.toString();
         }
         fa.name = a.value("name").toString();
-        fa.status = a.value("status").toInt();
+        fa.status = auditCachedStatus(o, a.value("status").toInt());
         for (const QJsonValue& u : a.value("unfinished").toArray()) {
             fa.unfinished << u.toString();
         }
@@ -1926,14 +1933,15 @@ static StarScoreAuditFileSummary auditSummaryFromJson(const QString& path, const
     }
     const QJsonObject secStatus = o.value("secStatus").toObject();
     for (auto it = secStatus.begin(); it != secStatus.end(); ++it) {
-        s.sectionStatus[it.key()] = it.value().toInt();
+        s.sectionStatus[it.key()] = auditCachedStatus(o, it.value().toInt());
     }
     return s;
 }
 
 static bool auditCacheCurrent(const QJsonObject& entry, const QString& stamp)
 {
-    return entry.value("stamp").toString() == stamp && entry.value("v").toInt() == AUDIT_CACHE_VERSION;
+    return entry.value("stamp").toString() == stamp && (entry.value("v").toInt() == AUDIT_CACHE_VERSION
+                                                          || entry.value("v").toInt() == 5);
 }
 
 //! Which dashboard column an arrangement fills: "3H" (3-Horn Standard), "3F" (3-Horn Flexible), …
@@ -1960,7 +1968,8 @@ static QString auditStatusName(int status)
     case 0: return muse::qtrc("starscore", "Empty");
     case 1: return muse::qtrc("starscore", "Sketch");
     case 2: return muse::qtrc("starscore", "In progress");
-    case 3: return muse::qtrc("starscore", "Needs review");
+    case 3: return muse::qtrc("starscore", "Written, unformatted");
+    case 4: return muse::qtrc("starscore", "Needs review");
     default: return muse::qtrc("starscore", "Finished");
     }
 }

@@ -55,6 +55,7 @@ QString statusText(StarScoreStatus s)
     case StarScoreStatus::Empty: return muse::qtrc("starscore", "no status");
     case StarScoreStatus::Sketch: return muse::qtrc("starscore", "Sketch");
     case StarScoreStatus::InProgress: return muse::qtrc("starscore", "In progress");
+    case StarScoreStatus::WrittenUnformatted: return muse::qtrc("starscore", "Written, unformatted");
     case StarScoreStatus::NeedsReview: return muse::qtrc("starscore", "Needs review");
     case StarScoreStatus::Finished: return muse::qtrc("starscore", "Finished");
     }
@@ -307,8 +308,9 @@ TodoLook todoLook(int status)
     case 0: return { "#8A8A8A", "#4d4f57", "No status" };
     case 1: return { "#E0463A", "#a3271d", "Sketch" };
     case 2: return { "#F29B30", "#9a5a07", "In progress" };
-    case 3: return { "#3C8CE7", "#1d5ba3", "Needs review" };
-    case 4: return { "#3FB05A", "#1d6b33", "Finished" };
+    case 3: return { "#E3C02B", "#7a6400", "Written, unformatted" };
+    case 4: return { "#3C8CE7", "#1d5ba3", "Needs review" };
+    case 5: return { "#3FB05A", "#1d6b33", "Finished" };
     }
     return { "transparent", "#8b90a0", "Not in the score yet" };
 }
@@ -467,7 +469,7 @@ QString StarScoreService::todoPdfHtml(const QString& title, const QString& code,
 
     // legend
     b += "<div class=\"legend\">";
-    for (int st = 0; st <= 4; ++st) {
+    for (int st = 0; st <= int(StarScoreStatus::Finished); ++st) {
         b += QString("<span><span class=\"dot\" style=\"background:%1;\"></span> %2</span>").arg(todoLook(st).colour, todoLook(st).name);
     }
     b += "<span><span class=\"dot\" style=\"border:1.5px solid #b9bdc9;\"></span> Not in the score yet</span></div>";

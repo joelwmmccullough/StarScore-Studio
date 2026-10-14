@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.38
+
+- **New part status: "Written, unformatted"** (yellow), between In progress and Needs review: the notes are written but the layout isn't done. It is in every Part status and section Status menu, the part score tab menu, the to-do list and its PDF, and the dashboard. A section or arrangement on Auto shows it when that is its least finished part. In the Finder colours, a sheet folder whose least finished sheet is Written, unformatted is Orange, the same as In progress. Files saved with it open in older StarScore builds as In progress.
+
 ## 1.18.37
 
 - **The Keys bass staff always shows in the full score.** A rhythm section keyboard's lower (bass clef) staff is set to "Never hide" in the main score, so it is there to write in even when empty, and stays "Always hide" in the part scores, where it shows only on systems with music. The lead sheet's piano keeps "Always hide" everywhere. Set when a song opens, with Apply default style settings, and on export. Exported sheets and Scores come out as before.

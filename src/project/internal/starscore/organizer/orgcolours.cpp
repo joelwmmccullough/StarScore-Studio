@@ -12,13 +12,17 @@
 
 namespace mu::project::starscore::org {
 namespace {
-//! empty 0, sketch 1, in progress 2, needs review 3, finished 4; -1 = no status
+//! empty 0, sketch 1, in progress 2, written unformatted 3, needs review 4, finished 5; -1 = no status
+const int FINISHED = 5;
 int rank(const QString& key)
 {
     if (key == "finished") {
-        return 4;
+        return FINISHED;
     }
     if (key == "needs-review") {
+        return 4;
+    }
+    if (key == "written-unformatted") {
         return 3;
     }
     if (key == "in-progress") {
@@ -112,10 +116,10 @@ SongColours songColours(const Paths& paths, const QString& songRoot, const QJson
 
     // --- the song folder: up the ladder while each colour's sheets are there and far enough along
     static const std::vector<std::tuple<QString, QString, int> > LADDER {
-        { "red", "Red", 1 }, { "orange", "Orange", 4 }, { "yellow", "Yellow", 4 },
-        { "green", "Green", 4 }, { "blue", "Blue", 4 }, { "purple", "Purple", 4 },
+        { "red", "Red", 1 }, { "orange", "Orange", FINISHED }, { "yellow", "Yellow", FINISHED },
+        { "green", "Green", FINISHED }, { "blue", "Blue", FINISHED }, { "purple", "Purple", FINISHED },
     };
-    static const QStringList LEVEL { "empty", "Sketch", "In progress", "Needs review", "Finished" };
+    static const QStringList LEVEL { "empty", "Sketch", "In progress", "Written, unformatted", "Needs review", "Finished" };
     const QJsonObject tiers = record.value("tiers").toObject();
     out.song = "Gray";
     for (const auto& [key, colour, need] : LADDER) {
@@ -155,7 +159,7 @@ SongColours songColours(const Paths& paths, const QString& songRoot, const QJson
                 const QJsonObject t = step.toObject();
                 bool all = true;
                 for (const QString& rel : strings(t.value("paths"))) {
-                    all &= check.status(rel) == 4;
+                    all &= check.status(rel) == FINISHED;
                 }
                 if (!all) {
                     break;
@@ -172,7 +176,7 @@ SongColours songColours(const Paths& paths, const QString& songRoot, const QJson
         // Percussion sheets (Congas, Bongos…) never count toward a colour
         static const QRegularExpression percussion(" - (Percussion|Congas|Bongos|Timbales|Cajon|Shakers?)( \\(.*\\))?( \\d+)?\\.pdf$",
                                                    QRegularExpression::CaseInsensitiveOption);
-        int least = 4;
+        int least = FINISHED;
         int counted = 0;
         // a folder whose colour only its required sheets decide (1 Rhythm: drums, bass, guitar and the lead sheet)
         const bool onlyRequired = o.value("onlyRequired").toBool();
@@ -204,8 +208,8 @@ SongColours songColours(const Paths& paths, const QString& songRoot, const QJson
             gray = true;
         }
         const QString colour = gray || least < 1 ? QString("Gray")
-                               : least == 4 ? QString("Green") : least == 3 ? QString("Yellow")
-                               : least == 2 ? QString("Orange") : QString("Red");
+                               : least == FINISHED ? QString("Green") : least == 4 ? QString("Yellow")
+                               : least >= 2 ? QString("Orange") : QString("Red");   // Written, unformatted: Orange
         out.folders.emplace_back(folder, colour);
     }
     return out;

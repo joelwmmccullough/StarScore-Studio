@@ -19,7 +19,7 @@
  * A song with no record yet (not exported from StarScore 1.14 or later) gets no colour.
  *
  * Sheet folder (1 Lead Sheet, 1 Rhythm, each horn folder, Big Band …): Gray when a sheet it must have is missing;
- * otherwise by the least finished file in it: Green (all Finished), Yellow (Needs review), Orange (In progress),
+ * otherwise by the least finished file in it: Green (all Finished), Yellow (Needs review), Orange (In progress or Written, unformatted),
  * Red (Sketch), Gray (a file with no status, e.g. not exported from StarScore, or changed since).
  */
 #pragma once

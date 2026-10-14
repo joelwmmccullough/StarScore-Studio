@@ -20,7 +20,7 @@ Item {
     property int navigationOrderStart: 1
 
     // empty / sketch / in progress / needs review / finished, as on the StarScore bar and the Dashboard
-    readonly property var statusColors: ["#8A8A8A", "#E0463A", "#F29B30", "#3C8CE7", "#3FB05A"]
+    readonly property var statusColors: ["#8A8A8A", "#E0463A", "#F29B30", "#E3C02B", "#3C8CE7", "#3FB05A"]
 
     TodoPanelModel {
         id: todoModel
@@ -119,7 +119,7 @@ Item {
                             height: 10
                             radius: 5
                             color: row.modelData.missing ? "transparent"
-                                                         : root.statusColors[Math.max(0, Math.min(4, row.modelData.status))]
+                                                         : root.statusColors[Math.max(0, Math.min(5, row.modelData.status))]
                             border.color: row.modelData.missing ? ui.theme.fontSecondaryColor : "transparent"
                             border.width: 1
                         }

@@ -235,14 +235,14 @@ QVariant NotationSwitchListModel::data(const QModelIndex& index, int role) const
         return QVariant::fromValue(isCloud);
     }
     case RoleStatusColor: {
-        static const char* COLORS[] = { "#8A8A8A", "#E0463A", "#F29B30", "#3C8CE7", "#3FB05A" };
+        static const char* COLORS[] = { "#8A8A8A", "#E0463A", "#F29B30", "#E3C02B", "#3C8CE7", "#3FB05A" };
         const int status = starscoreStatus(notation);
-        return status < 0 || status > 4 ? QString() : QString(COLORS[status]);
+        return status < 0 || status > 5 ? QString() : QString(COLORS[status]);
     }
     case RoleStatusName: {
         const int status = starscoreStatus(notation);
-        static const char* NAMES[] = { "Empty", "Sketch", "In progress", "Needs review", "Finished" };
-        return status < 0 || status > 4 ? QString() : muse::qtrc("starscore", NAMES[status]);
+        static const char* NAMES[] = { "Empty", "Sketch", "In progress", "Written, unformatted", "Needs review", "Finished" };
+        return status < 0 || status > 5 ? QString() : muse::qtrc("starscore", NAMES[status]);
     }
     }
 
@@ -350,9 +350,9 @@ QVariantList NotationSwitchListModel::contextMenuItems(int index) const
     // StarScore: the part score's status (tags every part in it)
     if (!isMasterNotation(m_notations[index]) && starScore() && starScore()->isStarScoreFile()) {
         const int current = starscoreStatus(m_notations[index]);
-        static const char* NAMES[] = { "Empty", "Sketch", "In progress", "Needs review", "Finished" };
+        static const char* NAMES[] = { "Empty", "Sketch", "In progress", "Written, unformatted", "Needs review", "Finished" };
         QVariantList statusItems;
-        for (int i = 0; i < 5; ++i) {
+        for (int i = 0; i < 6; ++i) {
             statusItems << QVariantMap { { "id", "starscore-status:" + QString::number(i) }, { "title", muse::qtrc("starscore", NAMES[i]) },
                                          { "checkable", true }, { "checked", i == current }, { "enabled", true } };
         }

@@ -54,7 +54,8 @@ void TodoPanelModel::refresh()
     m_hasScore = globalContext()->currentProject() != nullptr;
 
     static const QStringList NAMES { muse::qtrc("starscore", "No status"), muse::qtrc("starscore", "Sketch"),
-                                     muse::qtrc("starscore", "In progress"), muse::qtrc("starscore", "Needs review"),
+                                     muse::qtrc("starscore", "In progress"), muse::qtrc("starscore", "Written, unformatted"),
+                                     muse::qtrc("starscore", "Needs review"),
                                      muse::qtrc("starscore", "Finished") };
     if (m_hasScore) {
         int rank = 0;

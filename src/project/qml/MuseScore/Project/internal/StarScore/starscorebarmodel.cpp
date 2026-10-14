@@ -242,6 +242,7 @@ QString StarScoreBarModel::statusColor(int status) const
     case StarScoreStatus::Empty: return "#8A8A8A";
     case StarScoreStatus::Sketch: return "#E0463A";
     case StarScoreStatus::InProgress: return "#F29B30";
+    case StarScoreStatus::WrittenUnformatted: return "#E3C02B";
     case StarScoreStatus::NeedsReview: return "#3C8CE7";
     case StarScoreStatus::Finished: return "#3FB05A";
     }
@@ -254,6 +255,7 @@ QString StarScoreBarModel::statusName(int status) const
     case StarScoreStatus::Empty: return muse::qtrc("starscore", "Empty");
     case StarScoreStatus::Sketch: return muse::qtrc("starscore", "Sketch");
     case StarScoreStatus::InProgress: return muse::qtrc("starscore", "In progress");
+    case StarScoreStatus::WrittenUnformatted: return muse::qtrc("starscore", "Written, unformatted");
     case StarScoreStatus::NeedsReview: return muse::qtrc("starscore", "Needs review");
     case StarScoreStatus::Finished: return muse::qtrc("starscore", "Finished");
     }
