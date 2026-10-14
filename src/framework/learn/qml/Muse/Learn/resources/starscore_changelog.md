@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.34
+
+- **New scores get a tempo marking in the time signature's beat.** Compound meters (6/8, 9/8, 12/8: a top number above 3 that divides by 3) count the dotted note: 6/8 and 12/8 get "dotted quarter =", 6/4 "dotted half =", 6/16 "dotted eighth =". Simple and odd meters count the bottom note: 4/4, 3/4 and 5/4 get "quarter =", 2/2 and 3/2 "half =", 3/8, 5/8 and 7/8 "eighth =". The number you enter is beats a minute in that note. This applies to New StarScore (its tempo field now says which note it counts in) and to MuseScore's New score wizard, where the tempo note follows the time signature you pick (you can still change it).
+
 ## 1.18.33
 
 - **Long instrument names no longer run into the title.** When the instrument name top left would touch the song title (Industrial Park Driveway's "Contrabass Clarinet in B♭"), it is broken over two lines, before "in" when there is one ("Contrabass Clarinet" / "in B♭"), otherwise before the last word, then the last two, until it clears. Mute lines stay under it. This happens on the exported sheets and in the part scores when the song opens.

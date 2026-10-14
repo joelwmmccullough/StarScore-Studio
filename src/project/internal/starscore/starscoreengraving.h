@@ -72,6 +72,11 @@ bool isBrassSheet(const QString& sheetName);
 //! the same (pixie and plunger together are the classic trombone "growl"). Tuba and sousaphone: straight, cup, practice.
 //! French horn: straight, stopping (brass) mute, practice.
 QStringList muteOptions(const QString& instrumentId);
+//! The note a time signature's tempo marking counts in (Joel, 13 Oct 2026). Compound meters (a top number above 3
+//! that divides by 3: 6/8, 9/8, 12/8, 6/4, 12/16) count the dotted note that holds three of the bottom note (6/8:
+//! dotted quarter; 6/4: dotted half; 6/16: dotted eighth). Simple and odd meters count the bottom note (4/4, 3/4,
+//! 5/4: quarter; 2/2, 3/2: half; 3/8, 5/8, 7/8: eighth; 7/16: 16th). `noteValue` is 1 (whole), 2, 4, 8 or 16.
+void tempoBeatFor(int numerator, int denominator, int& noteValue, bool& dotted);
 //! The lines under the instrument name for a part's mutes: "with Harmon Mute", "and Cup Mute" ("with A,", "B", "and C"
 //! for three)
 QString muteLines(const QStringList& mutes);

@@ -37,6 +37,19 @@ StyledDialogView {
     property int timeNum: 4
     property int timeDen: 4
     property int tempo: 120
+
+    function tempoLabel(num, den) {
+        var dotted = num > 3 && num % 3 === 0 && den >= 2
+        var value = dotted ? den / 2 : den
+        if (dotted && value === 1) {
+            dotted = false
+            value = 2
+        }
+        var names = { 1: qsTrc("starscore", "whole"), 2: qsTrc("starscore", "half"), 4: qsTrc("starscore", "quarter"),
+                      8: qsTrc("starscore", "eighth"), 16: qsTrc("starscore", "16th") }
+        var name = names[Math.min(16, Math.max(1, value))] || qsTrc("starscore", "16th")
+        return qsTrc("starscore", "Tempo (%1 =)").arg(dotted ? qsTrc("starscore", "dotted %1").arg(name) : name)
+    }
     property int measures: 32
     // the last choices, remembered in settings
     property string arrangementKey: newModel.lastArrangementKey
@@ -248,7 +261,8 @@ StyledDialogView {
             }
 
             ColumnLayout {
-                StyledTextLabel { text: qsTrc("starscore", "Tempo (♩ =)"); font: ui.theme.bodyBoldFont }
+                // the time signature's beat (6/8: dotted quarter; 2/2: half; 7/8: eighth), as the tempo marking counts
+                StyledTextLabel { text: root.tempoLabel(root.timeNum, root.timeDen); font: ui.theme.bodyBoldFont }
                 IncrementalPropertyControl {
                     Layout.preferredWidth: 80
                     currentValue: root.tempo

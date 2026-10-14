@@ -117,6 +117,7 @@ signals:
     void measureCountChanged(int measureCount);
 
 private:
+    void updateTempoBeat();
     struct KeySignature {
         QString titleMajor;
         QString titleMinor;

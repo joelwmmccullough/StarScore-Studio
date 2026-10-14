@@ -2272,7 +2272,17 @@ Ret StarScoreService::newStarScore(const StarScoreNewOptions& options)
     ScoreCreateOptions& score = projectOptions.scoreOptions;
     score.withTempo = options.tempoBpm > 0;
     score.tempo.valueBpm = options.tempoBpm;
-    score.tempo.duration = engraving::DurationType::V_QUARTER;
+    // in the beat of the time signature: 6/8 "dotted quarter = 120", 2/2 "half = 120" (Joel, 13 Oct 2026)
+    {
+        int noteValue = 4;
+        bool dotted = false;
+        starscore::tempoBeatFor(options.timeSigNumerator, options.timeSigDenominator, noteValue, dotted);
+        score.tempo.duration = noteValue == 1 ? engraving::DurationType::V_WHOLE
+                               : noteValue == 2 ? engraving::DurationType::V_HALF
+                               : noteValue == 8 ? engraving::DurationType::V_EIGHTH
+                               : noteValue == 16 ? engraving::DurationType::V_16TH : engraving::DurationType::V_QUARTER;
+        score.tempo.withDot = dotted;
+    }
     score.globalTimesig = engraving::Fraction(options.timeSigNumerator, options.timeSigDenominator);
     score.key = static_cast<engraving::Key>(std::clamp(options.keyFifths, -7, 7));
     score.totalMeasures = std::max(1, options.measures);

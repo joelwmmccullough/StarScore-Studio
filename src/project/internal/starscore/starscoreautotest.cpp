@@ -40,6 +40,7 @@
 #include "engraving/dom/textbase.h"
 #include "engraving/dom/page.h"
 #include "engraving/dom/systemlock.h"
+#include "engraving/dom/tempotext.h"
 #include "global/serialization/zipreader.h"
 #include "global/serialization/zipwriter.h"
 #include <QElapsedTimer>
@@ -1228,6 +1229,13 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         o.arrangementTemplateKey = a.value(0);
         o.doublerInstrumentId = a.value(1);
         o.lowHornInstrumentId = a.value(2);
+        if (a.value(3).contains('/')) {   // :<time signature> (6/8), then :<tempo>
+            o.timeSigNumerator = a.value(3).section('/', 0, 0).toInt();
+            o.timeSigDenominator = a.value(3).section('/', 1).toInt();
+        }
+        if (a.value(4).toInt() > 0) {
+            o.tempoBpm = a.value(4).toInt();
+        }
         // The app makes a new score in a window with no project open. Here the open song is let go first, but kept
         // alive until the new one is current: the status bar still points at its notation and disconnects from it
         // when the project changes, which crashed when the song had already been destroyed.
@@ -1242,6 +1250,17 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         }
         (void)old;
         autotestLog(QString("  new %1: %2").arg(a.value(0), r ? "ok" : QString::fromStdString(r.toString())));
+        if (engraving::MasterScore* nms = masterScore()) {
+            for (engraving::Segment* seg = nms->firstSegment(engraving::SegmentType::ChordRest); seg; seg = nullptr) {
+                for (engraving::EngravingItem* e : seg->annotations()) {
+                    if (e && e->isTempoText()) {
+                        autotestLog(QString("  tempo marking: %1 (%2 quarters a minute)").arg(toTempoText(e)->xmlText().toQString())
+                                    .arg(toTempoText(e)->tempo().val * 60.0));
+                        break;
+                    }
+                }
+            }
+        }
         // the dialog's doubler label takes the player's name from the band folder's roster (logged as found or not,
         // never the name)
         const QString band = qEnvironmentVariable("STARSCORE_AUTOTEST_BAND");

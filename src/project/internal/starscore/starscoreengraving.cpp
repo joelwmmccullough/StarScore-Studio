@@ -875,6 +875,17 @@ QStringList mu::project::starscore::muteOptions(const QString& id)
     return {};
 }
 
+void mu::project::starscore::tempoBeatFor(int numerator, int denominator, int& noteValue, bool& dotted)
+{
+    dotted = numerator > 3 && numerator % 3 == 0 && denominator >= 2;
+    noteValue = dotted ? denominator / 2 : denominator;
+    noteValue = std::clamp(noteValue, 1, 16);
+    if (dotted && noteValue == 1) {
+        dotted = false;   // (no dotted whole note to count in: 6/2 counts half notes)
+        noteValue = 2;
+    }
+}
+
 QString mu::project::starscore::muteLines(const QStringList& mutes)
 {
     QStringList lines;

@@ -21,6 +21,8 @@
  */
 #include "additionalinfomodel.h"
 
+#include "project/internal/starscore/starscoreengraving.h"
+
 #include "log.h"
 #include "translation.h"
 
@@ -214,6 +216,7 @@ void AdditionalInfoModel::setTimeSignatureType(int timeSignatureType)
 
     m_timeSignatureType = type;
     emit timeSignatureChanged();
+    updateTempoBeat();
 }
 
 void AdditionalInfoModel::setTimeSignatureNumerator(int numerator)
@@ -236,6 +239,24 @@ void AdditionalInfoModel::setTimeSignature(const notation::Fraction& timeSignatu
 
     m_timeSignature = timeSignature;
     emit timeSignatureChanged();
+    updateTempoBeat();
+}
+
+//! StarScore (Joel, 13 Oct 2026): the tempo marking counts in the time signature's beat: 6/8 dotted quarter, 2/2
+//! half, 7/8 eighth (see starscore::tempoBeatFor). Set again whenever the time signature changes; the number stays.
+void AdditionalInfoModel::updateTempoBeat()
+{
+    const QVariantMap ts = timeSignature();
+    int noteValue = 4;
+    bool dotted = false;
+    mu::project::starscore::tempoBeatFor(ts.value("numerator").toInt(), ts.value("denominator").toInt(), noteValue, dotted);
+    Tempo tempo = m_tempo;
+    tempo.noteIcon = noteValue == 1 ? MusicalSymbolCode::SEMIBREVE
+                     : noteValue == 2 ? MusicalSymbolCode::MINIM
+                     : noteValue == 8 ? MusicalSymbolCode::QUAVER
+                     : noteValue == 16 ? MusicalSymbolCode::SEMIQUAVER : MusicalSymbolCode::CROTCHET;
+    tempo.withDot = dotted;
+    setTempo(tempo.toMap());
 }
 
 QVariantList AdditionalInfoModel::musicSymbolCodes(int number) const
