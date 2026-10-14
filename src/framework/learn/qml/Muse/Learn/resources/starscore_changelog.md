@@ -4,6 +4,12 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.43
+
+- **Rhythm markings stay on their space.** The small, silent slash (or diamond, or x) notes that show a rhythm above or below the staff (Drum Battle, letter L) are now pinned to the first space above the staff, or the first space below it, whatever their pitch. That's how MuseScore's own slash notation stays on the middle line. Copying and pasting them onto another instrument, changing the instrument, transposing, the Flexible view and StarScore's own part copies no longer move them.
+- **Existing markings are pinned when a song opens.** Each one goes on the side it already shows on.
+- **New command: Format › Rhythm markings above the staff / below the staff** (also on a note's right-click menu, under Rhythm markings). It makes the selected notes rhythm markings in one step: small, silent, slash heads, stems up above the staff or down below it, and pinned.
+
 ## 1.18.42
 
 - **The multimeasure rest number counts bars in an additive time signature.** Six bars of rest in (4+5)/4 now show one multimeasure rest numbered 6 (1.18.36 showed 3, one per composite bar). The rest still starts at the start of the pattern and holds whole patterns only, and the "minimum number of empty measures" setting now counts bars too.

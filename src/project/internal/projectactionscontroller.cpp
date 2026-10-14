@@ -195,6 +195,23 @@ void ProjectActionsController::init()
     dispatcher()->reg(this, "starscore-part-mutes", [this]() {
         interactive()->open(Uri("musescore://starscore/mutes"));
     });
+    for (const bool below : { false, true }) {
+        dispatcher()->reg(this, below ? "starscore-rhythm-below" : "starscore-rhythm-above", [this, below]() {
+            INotationPtr notation = currentNotation();
+            if (!notation) {
+                return;
+            }
+            mu::engraving::Score* score = notation->elements()->msScore();
+            notation->undoStack()->prepareChanges(TranslatableString::untranslatable("Rhythm markings"));
+            const int n = starscore::makeRhythmMarkings(score, below);
+            notation->undoStack()->commitChanges();
+            notation->notationChanged().notify();
+            if (n == 0) {
+                interactive()->info(muse::trc("starscore", "Rhythm markings"),
+                                    muse::trc("starscore", "Select the notes to make rhythm markings first."));
+            }
+        });
+    }
     dispatcher()->reg(this, "starscore-make-keys", [this]() {
         interactive()->info(muse::trc("starscore", "Keys part"), starScoreService()->makeKeysPart().toStdString());
     });

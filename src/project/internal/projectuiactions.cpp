@@ -204,6 +204,20 @@ const UiActionList ProjectUiActions::m_actions = {
              TranslatableString("action", "Mutes for this part…"),
              TranslatableString("action", "Choose the mutes this brass part plays with; its sheets print them under the instrument name")
              ),
+    UiAction("starscore-rhythm-above",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Rhythm markings above the staff"),
+             TranslatableString("action", "Make the selected notes rhythm markings on the space above the staff: small, silent, "
+                                          "slash heads, kept there whatever their pitch")
+             ),
+    UiAction("starscore-rhythm-below",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Rhythm markings below the staff"),
+             TranslatableString("action", "Make the selected notes rhythm markings on the space below the staff: small, silent, "
+                                          "slash heads, kept there whatever their pitch")
+             ),
     UiAction("starscore-make-keys",
              mu::context::UiCtxProjectOpened,
              mu::context::CTX_ANY,

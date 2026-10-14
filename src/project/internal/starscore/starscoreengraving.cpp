@@ -36,6 +36,7 @@
 #include "engraving/dom/accidental.h"
 #include "engraving/dom/clef.h"
 #include "engraving/dom/notedot.h"
+#include "engraving/dom/stafftype.h"
 #include "engraving/dom/articulation.h"
 #include "engraving/types/symnames.h"
 #include "engraving/dom/select.h"
@@ -1137,6 +1138,86 @@ int mu::project::starscore::hideMuteMarkings(Score* score, std::vector<mu::engra
         *hidden = hide;
     }
     return int(hide.size());
+}
+
+bool mu::project::starscore::isRhythmMarking(const mu::engraving::Note* n)
+{
+    if (!n || n->noteType() != mu::engraving::NoteType::NORMAL || n->play() || !n->chord()) {
+        return false;
+    }
+    const bool small = n->isSmall() || n->chord()->isSmall();
+    return small && n->headGroup() != mu::engraving::NoteHeadGroup::HEAD_NORMAL;
+}
+
+namespace {
+//! The space above the staff (-1), or below it (the bottom line + 1)
+int rhythmMarkingLine(const mu::engraving::Note* n, bool below)
+{
+    const mu::engraving::StaffType* st = n->staffType();
+    return below && st ? st->bottomLine() + 1 : -1;
+}
+}
+
+int mu::project::starscore::pinRhythmMarkings(Score* score, bool apply)
+{
+    if (!score) {
+        return 0;
+    }
+    int count = 0;
+    for (Segment* s = score->firstSegment(SegmentType::ChordRest); s; s = s->next1(SegmentType::ChordRest)) {
+        for (EngravingItem* e : s->elist()) {
+            if (!e || !e->isChord()) {
+                continue;
+            }
+            for (Note* n : toChord(e)->notes()) {
+                if (n->fixed() || !isRhythmMarking(n)) {
+                    continue;
+                }
+                ++count;
+                if (apply) {
+                    // the side it shows on now: above the middle line, the space above; else the space below
+                    const mu::engraving::StaffType* st = n->staffType();
+                    const bool below = st && n->line() > st->middleLine();
+                    n->undoChangeProperty(Pid::FIXED, true);
+                    n->undoChangeProperty(Pid::FIXED_LINE, rhythmMarkingLine(n, below));
+                }
+            }
+        }
+    }
+    return count;
+}
+
+int mu::project::starscore::makeRhythmMarkings(Score* score, bool below)
+{
+    if (!score) {
+        return 0;
+    }
+    std::set<Chord*> chords;
+    for (EngravingItem* e : score->selection().elements()) {
+        if (e && e->isNote()) {
+            chords.insert(toNote(e)->chord());
+        } else if (e && e->isChord()) {
+            chords.insert(toChord(e));
+        }
+    }
+    int count = 0;
+    for (Chord* c : chords) {
+        if (!c || c->isGrace()) {
+            continue;
+        }
+        c->undoChangeProperty(Pid::SMALL, true);
+        c->undoChangeProperty(Pid::STEM_DIRECTION, PropertyValue::fromValue<DirectionV>(below ? DirectionV::DOWN : DirectionV::UP));
+        for (Note* n : c->notes()) {
+            if (n->headGroup() == NoteHeadGroup::HEAD_NORMAL) {
+                n->undoChangeProperty(Pid::HEAD_GROUP, NoteHeadGroup::HEAD_SLASH);
+            }
+            n->undoChangeProperty(Pid::PLAY, false);
+            n->undoChangeProperty(Pid::FIXED, true);
+            n->undoChangeProperty(Pid::FIXED_LINE, rhythmMarkingLine(n, below));
+            ++count;
+        }
+    }
+    return count;
 }
 
 bool mu::project::starscore::partHasNotes(const Part* part)

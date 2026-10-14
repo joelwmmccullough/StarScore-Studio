@@ -2012,6 +2012,16 @@ void StarScoreService::tidyOpenedScore()
         master->notation()->notationChanged().notify();
     }
 
+    // Rhythm markings pinned to their space above or below the staff, so a paste or a new instrument doesn't move them
+    // (Joel, 14 Oct 2026)
+    if (starscore::pinRhythmMarkings(ms, false) > 0) {
+        master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Pin rhythm markings"));
+        const int pinned = starscore::pinRhythmMarkings(ms, true);
+        master->notation()->undoStack()->commitChanges();
+        master->notation()->notationChanged().notify();
+        LOGI() << "[starscore] pinned " << pinned << " rhythm marking(s)";
+    }
+
     standardizeHornNames();
     renamePersonNamedPartScores();
     renameOffSchemePartScores();

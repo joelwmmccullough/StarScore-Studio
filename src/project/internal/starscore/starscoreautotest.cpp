@@ -473,6 +473,50 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             }
             autotestLog("  fermatas: " + out.join(", "));
         }
+    } else if (step.startsWith("makerhythm:")) {
+        // makerhythm:<staff>:<bar>:above|below: the notes of that staff's bar selected and made rhythm markings
+        const QStringList a = step.split(':');
+        engraving::Measure* m = ms->crMeasure(a.value(2).toInt() - 1);
+        ms->deselectAll();
+        if (m) {
+            ms->selection().setRange(m->first(engraving::SegmentType::ChordRest), m->last(), a.value(1).toInt(), a.value(1).toInt() + 1);
+            ms->selection().updateSelectedElements();
+        }
+        master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Rhythm markings"));
+        const int made = starscore::makeRhythmMarkings(ms, a.value(3) == "below");
+        master->notation()->undoStack()->commitChanges();
+        ms->deselectAll();
+        autotestLog(QString("  %1 note(s)").arg(made));
+    } else if (step.startsWith("rhythmmarks:")) {
+        // rhythmmarks:<bar>-<bar>: per staff, the rhythm markings in those bars (pinned or not) and the lines they show on
+        ms->doLayout();
+        const int b1 = step.mid(12).section('-', 0, 0).toInt(), b2 = step.mid(12).section('-', 1, 1).toInt();
+        std::map<size_t, std::map<int, int> > lines;
+        std::map<size_t, int> total, pinned;
+        for (engraving::Measure* m = ms->crMeasure(b1 - 1); m && m->no() <= b2 - 1; m = m->nextMeasure()) {
+            for (engraving::Segment* sg = m->first(engraving::SegmentType::ChordRest); sg; sg = sg->next(engraving::SegmentType::ChordRest)) {
+                for (engraving::EngravingItem* e : sg->elist()) {
+                    if (!e || !e->isChord()) {
+                        continue;
+                    }
+                    for (engraving::Note* n : engraving::toChord(e)->notes()) {
+                        if (starscore::isRhythmMarking(n)) {
+                            ++total[n->staffIdx()];
+                            pinned[n->staffIdx()] += n->fixed() ? 1 : 0;
+                            ++lines[n->staffIdx()][n->line()];
+                        }
+                    }
+                }
+            }
+        }
+        for (const auto& [si, count] : total) {
+            QStringList l;
+            for (const auto& [line, k] : lines[si]) {
+                l << QString("line %1 x%2").arg(line).arg(k);
+            }
+            autotestLog(QString("  staff %1 %2: %3 markings, %4 pinned; %5").arg(si).arg(ms->staff(si)->part()->partName().toQString())
+                        .arg(count).arg(pinned[si]).arg(l.join(", ")));
+        }
     } else if (step.startsWith("copyrange:")) {
         // copyrange:S:B1-B2:T:C: staff S (0-based) bars B1..B2 copied and pasted on staff T at bar C, as Copy and Paste
         // do (the score on screen)

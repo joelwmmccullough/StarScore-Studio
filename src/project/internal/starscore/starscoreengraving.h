@@ -15,6 +15,7 @@ class MasterScore;
 class Measure;
 class Part;
 class EngravingItem;
+class Note;
 }
 
 namespace mu::project::starscore {
@@ -95,6 +96,17 @@ bool isWoodwindInstrument(const QString& instrumentId);
 //! marking, and the brass mute symbols on notes. Undoable (inside a command). Returns how many were hidden; `hidden`
 //! gets them (to show them again after printing).
 int hideMuteMarkings(mu::engraving::Score* score, std::vector<mu::engraving::EngravingItem*>* hidden = nullptr);
+//! Rhythm markings (Joel, 14 Oct 2026): the small, silent notes with slash (or diamond, or x) heads that show a
+//! rhythm on the first space above the staff, or below it where the space above is taken (Drum Battle, letter L). As
+//! notes they have a pitch, so a paste onto another instrument, a transposition or an instrument change moved them.
+//! Pinned, they sit on their space whatever their pitch, as MuseScore's own slash notation does (FIXED, FIXED_LINE).
+bool isRhythmMarking(const mu::engraving::Note* note);
+//! Every rhythm marking not pinned yet pinned to the space above the staff (or below it, for one that sits in the
+//! lower half of the staff). Undoable (inside a command) when apply; else only counts. Returns how many.
+int pinRhythmMarkings(mu::engraving::Score* score, bool apply);
+//! The selected notes made rhythm markings: small, silent, slash heads (a marking's own head kept), stems up and pinned
+//! to the space above the staff, or stems down below it. Undoable (inside a command). Returns how many notes.
+int makeRhythmMarkings(mu::engraving::Score* score, bool below);
 //! Whether the part has any note (a rest-only part is empty)
 bool partHasNotes(const mu::engraving::Part* part);
 

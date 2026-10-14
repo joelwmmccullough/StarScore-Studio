@@ -292,6 +292,15 @@ MenuItemList NotationContextMenuModel::makeElementItems()
         items << makeMenuItem("edit-element");
     }
 
+    // StarScore rhythm markings, on notes (Joel, 14 Oct 2026)
+    if (element && element->isNote()) {
+        items << makeSeparator();
+        items << makeMenu(TranslatableString("notation", "Rhythm markings"), {
+            makeMenuItem("starscore-rhythm-above"),
+            makeMenuItem("starscore-rhythm-below"),
+        });
+    }
+
     // StarScore player annotations, in part scores (Joel, 9 Oct 2026)
     const INotationPtr current = globalContext()->currentNotation();
     if (current && current->elements() && current->elements()->msScore()
