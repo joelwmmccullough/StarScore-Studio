@@ -197,7 +197,8 @@ void ProjectActionsController::init()
     });
     for (const bool below : { false, true }) {
         dispatcher()->reg(this, below ? "starscore-rhythm-below" : "starscore-rhythm-above", [this, below]() {
-            INotationPtr notation = currentNotation();
+            // (the score on screen, a part score too: the selection is there, not in the full score)
+            INotationPtr notation = globalContext()->currentNotation();
             if (!notation) {
                 return;
             }

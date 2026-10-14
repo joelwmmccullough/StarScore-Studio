@@ -1200,11 +1200,22 @@ int mu::project::starscore::makeRhythmMarkings(Score* score, bool below)
             chords.insert(toChord(e));
         }
     }
-    int count = 0;
+    // (in a part score too: the full score and the other part scores take the same, as the part's own size, playback
+    // and stem direction otherwise stay in that part only)
+    std::set<Chord*> linked;
     for (Chord* c : chords) {
         if (!c || c->isGrace()) {
             continue;
         }
+        for (EngravingObject* o : c->linkList()) {
+            if (o && o->isChord()) {
+                linked.insert(toChord(o));
+            }
+        }
+    }
+    int count = 0;
+    for (Chord* c : linked) {
+        const bool counted = chords.count(c) > 0;
         c->undoChangeProperty(Pid::SMALL, true);
         c->undoChangeProperty(Pid::STEM_DIRECTION, PropertyValue::fromValue<DirectionV>(below ? DirectionV::DOWN : DirectionV::UP));
         for (Note* n : c->notes()) {
@@ -1214,7 +1225,7 @@ int mu::project::starscore::makeRhythmMarkings(Score* score, bool below)
             n->undoChangeProperty(Pid::PLAY, false);
             n->undoChangeProperty(Pid::FIXED, true);
             n->undoChangeProperty(Pid::FIXED_LINE, rhythmMarkingLine(n, below));
-            ++count;
+            count += counted ? 1 : 0;
         }
     }
     return count;

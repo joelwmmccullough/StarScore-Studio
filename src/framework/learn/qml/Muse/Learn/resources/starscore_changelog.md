@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.44
+
+- **Rhythm markings above / below the staff works in part scores.** It always said "Select the notes to make rhythm markings first" in a part score, because it looked at the selection in the full score. It now uses the score on screen, and the full score and the other part scores get the same change (size, playback and stem direction included).
+
 ## 1.18.43
 
 - **Rhythm markings stay on their space.** The small, silent slash (or diamond, or x) notes that show a rhythm above or below the staff (Drum Battle, letter L) are now pinned to the first space above the staff, or the first space below it, whatever their pitch. That's how MuseScore's own slash notation stays on the middle line. Copying and pasting them onto another instrument, changing the instrument, transposing, the Flexible view and StarScore's own part copies no longer move them.

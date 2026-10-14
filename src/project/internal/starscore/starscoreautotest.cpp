@@ -475,17 +475,26 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         }
     } else if (step.startsWith("makerhythm:")) {
         // makerhythm:<staff>:<bar>:above|below: the notes of that staff's bar selected and made rhythm markings
+        // (makerhythm:<staff in that score>:<bar>:above|below:<part score name>: in that part score)
         const QStringList a = step.split(':');
-        engraving::Measure* m = ms->crMeasure(a.value(2).toInt() - 1);
-        ms->deselectAll();
-        if (m) {
-            ms->selection().setRange(m->first(engraving::SegmentType::ChordRest), m->last(), a.value(1).toInt(), a.value(1).toInt() + 1);
-            ms->selection().updateSelectedElements();
+        engraving::Score* sc = ms;
+        INotationPtr where = master->notation();
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            if (!step.section(':', 4).isEmpty() && e->name() == step.section(':', 4) && e->notation()) {
+                where = e->notation();
+                sc = where->elements()->msScore();
+            }
         }
-        master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Rhythm markings"));
-        const int made = starscore::makeRhythmMarkings(ms, a.value(3) == "below");
-        master->notation()->undoStack()->commitChanges();
-        ms->deselectAll();
+        engraving::Measure* m = sc->crMeasure(a.value(2).toInt() - 1);
+        sc->deselectAll();
+        if (m) {
+            sc->selection().setRange(m->first(engraving::SegmentType::ChordRest), m->last(), a.value(1).toInt(), a.value(1).toInt() + 1);
+            sc->selection().updateSelectedElements();
+        }
+        where->undoStack()->prepareChanges(TranslatableString::untranslatable("Rhythm markings"));
+        const int made = starscore::makeRhythmMarkings(sc, a.value(3) == "below");
+        where->undoStack()->commitChanges();
+        sc->deselectAll();
         autotestLog(QString("  %1 note(s)").arg(made));
     } else if (step.startsWith("rhythmmarks:")) {
         // rhythmmarks:<bar>-<bar>: per staff, the rhythm markings in those bars (pinned or not) and the lines they show on
