@@ -25,6 +25,7 @@ class TodoPanelModel : public QObject, public muse::Contextable, public muse::as
     Q_PROPERTY(int doneCount READ doneCount NOTIFY changed)
     Q_PROPERTY(int totalCount READ totalCount NOTIFY changed)
     Q_PROPERTY(bool hasScore READ hasScore NOTIFY changed)
+    Q_PROPERTY(QVariantList statusColors READ statusColors CONSTANT)   // the status dot colours, by status number
 
     QML_ELEMENT
 
@@ -42,6 +43,7 @@ public:
     int doneCount() const { return m_done; }
     int totalCount() const { return int(m_items.size()); }
     bool hasScore() const { return m_hasScore; }
+    QVariantList statusColors() const;
 
 signals:
     void changed();

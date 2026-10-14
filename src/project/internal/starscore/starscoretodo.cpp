@@ -10,6 +10,7 @@
  * the lead sheet are as far along as the lead sheet.
  */
 #include "starscoreservice.h"
+#include "starscorestatus.h"
 
 #include <algorithm>
 #include <cmath>
@@ -49,17 +50,10 @@ StarScoreStatus todoPartStatus(const StarScoreService::Data& data, const QString
     return found ? s : StarScoreStatus::Empty;
 }
 
+//! The status's name in a step's details ("Trumpet: Sketch"); an untagged part has "no status"
 QString statusText(StarScoreStatus s)
 {
-    switch (s) {
-    case StarScoreStatus::Empty: return muse::qtrc("starscore", "no status");
-    case StarScoreStatus::Sketch: return muse::qtrc("starscore", "Sketch");
-    case StarScoreStatus::InProgress: return muse::qtrc("starscore", "In progress");
-    case StarScoreStatus::WrittenUnformatted: return muse::qtrc("starscore", "Written, unformatted");
-    case StarScoreStatus::NeedsReview: return muse::qtrc("starscore", "Needs review");
-    case StarScoreStatus::Finished: return muse::qtrc("starscore", "Finished");
-    }
-    return QString();
+    return s == StarScoreStatus::Empty ? muse::qtrc("starscore", "no status") : starscore::statusName(int(s));
 }
 }
 
@@ -304,15 +298,12 @@ struct TodoLook {
 };
 TodoLook todoLook(int status)
 {
-    switch (status) {
-    case 0: return { "#8A8A8A", "#4d4f57", "No status" };
-    case 1: return { "#E0463A", "#a3271d", "Sketch" };
-    case 2: return { "#F29B30", "#9a5a07", "In progress" };
-    case 3: return { "#E3C02B", "#7a6400", "Written, unformatted" };
-    case 4: return { "#3C8CE7", "#1d5ba3", "Needs review" };
-    case 5: return { "#3FB05A", "#1d6b33", "Finished" };
+    if (status < 0 || status >= starscore::STATUS_COUNT) {
+        return { "transparent", "#8b90a0", "Not in the score yet" };
     }
-    return { "transparent", "#8b90a0", "Not in the score yet" };
+    // (the fill is the status's dot colour; the ink is a darker shade of it for text on a light pill)
+    static const char* const INK[starscore::STATUS_COUNT] = { "#4d4f57", "#a3271d", "#9a5a07", "#7a6400", "#1d5ba3", "#1d6b33" };
+    return { starscore::statusColour(status), INK[status], status == 0 ? QString("No status") : starscore::statusName(status) };
 }
 QString todoPill(int status)
 {

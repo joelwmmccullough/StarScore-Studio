@@ -22,7 +22,7 @@ Rectangle {
 
     readonly property color doneColor: "#3FB05A"
     readonly property color auditColor: "#8E7CF0"
-    readonly property var statusColors: ["#8A8A8A", "#E0463A", "#F29B30", "#E3C02B", "#3C8CE7", "#3FB05A"]
+    readonly property var statusColors: dash.statusColors   // (starscorestatus.h: the one table of the status colours)
 
     function cellColor(cell) {
         if (cell.state === "done") {

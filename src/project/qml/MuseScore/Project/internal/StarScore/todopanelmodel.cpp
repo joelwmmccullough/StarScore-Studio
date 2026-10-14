@@ -5,6 +5,8 @@
  */
 #include "todopanelmodel.h"
 
+#include "project/internal/starscore/starscorestatus.h"
+
 #include "translation.h"
 
 using namespace mu::project;
@@ -45,6 +47,11 @@ void TodoPanelModel::scheduleRefresh()
     m_timer.start();
 }
 
+QVariantList TodoPanelModel::statusColors() const
+{
+    return starscore::statusColours();
+}
+
 void TodoPanelModel::refresh()
 {
     m_dirty = false;
@@ -53,10 +60,10 @@ void TodoPanelModel::refresh()
     m_done = 0;
     m_hasScore = globalContext()->currentProject() != nullptr;
 
-    static const QStringList NAMES { muse::qtrc("starscore", "No status"), muse::qtrc("starscore", "Sketch"),
-                                     muse::qtrc("starscore", "In progress"), muse::qtrc("starscore", "Written, unformatted"),
-                                     muse::qtrc("starscore", "Needs review"),
-                                     muse::qtrc("starscore", "Finished") };
+    // (an untagged step says "No status", not "Empty")
+    auto statusText = [](int status) {
+        return status == 0 ? muse::qtrc("starscore", "No status") : starscore::statusName(status);
+    };
     if (m_hasScore) {
         int rank = 0;
         for (const StarScoreTodoItem& t : starScore()->todoList()) {
@@ -70,7 +77,7 @@ void TodoPanelModel::refresh()
             }
             m_items << QVariantMap {
                 { "key", t.key }, { "title", t.title }, { "status", t.status }, { "rank", rank },
-                { "statusText", missing ? muse::qtrc("starscore", "Not in the score yet") : NAMES.value(t.status) },
+                { "statusText", missing ? muse::qtrc("starscore", "Not in the score yet") : statusText(t.status) },
                 { "details", t.details }, { "note", t.note }, { "done", done }, { "missing", missing },
             };
         }

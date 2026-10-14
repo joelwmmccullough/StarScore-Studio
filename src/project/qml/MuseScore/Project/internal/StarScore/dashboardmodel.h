@@ -26,6 +26,7 @@ class DashboardModel : public QObject, public muse::Contextable, public muse::as
     Q_PROPERTY(bool scanning READ scanning NOTIFY changed)
     Q_PROPERTY(QString status READ status NOTIFY changed)
     Q_PROPERTY(QVariantList columns READ columns CONSTANT)
+    Q_PROPERTY(QVariantList statusColors READ statusColors CONSTANT)   // the status dot colours, by status number
     Q_PROPERTY(QVariantList tiers READ tiers NOTIFY changed)
     Q_PROPERTY(QVariantList tasks READ tasks NOTIFY changed)
     Q_PROPERTY(QVariantList songs READ songs NOTIFY changed)
@@ -47,6 +48,7 @@ public:
     bool scanning() const;
     QString status() const;
     QVariantList columns() const;
+    QVariantList statusColors() const;
     QVariantList tiers() const;
     QVariantList tasks() const;
     QVariantList songs() const;

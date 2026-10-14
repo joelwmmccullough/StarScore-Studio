@@ -15,6 +15,7 @@
  * plus the listen-through (each horn section at each rehearsal mark) and the library scan.
  */
 #include "starscoreservice.h"
+#include "starscorestatus.h"
 
 #include <algorithm>
 #include <climits>
@@ -1964,14 +1965,8 @@ static QString auditArrangementColumn(const StarScoreArrangement& a)
 
 static QString auditStatusName(int status)
 {
-    switch (status) {
-    case 0: return muse::qtrc("starscore", "Empty");
-    case 1: return muse::qtrc("starscore", "Sketch");
-    case 2: return muse::qtrc("starscore", "In progress");
-    case 3: return muse::qtrc("starscore", "Written, unformatted");
-    case 4: return muse::qtrc("starscore", "Needs review");
-    default: return muse::qtrc("starscore", "Finished");
-    }
+    // (a number past the last status reads as Finished, as it always did here)
+    return status >= 0 && status < starscore::STATUS_COUNT ? starscore::statusName(status) : starscore::statusName(starscore::STATUS_COUNT - 1);
 }
 
 std::vector<StarScoreFileArrangement> StarScoreService::summarizeArrangements(const Data& data,

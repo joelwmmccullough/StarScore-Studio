@@ -17,6 +17,7 @@
 #include <QUrl>
 
 #include "translation.h"
+#include "project/internal/starscore/starscorestatus.h"
 #include "starscoresongs.h"
 
 using namespace mu::project;
@@ -59,14 +60,8 @@ QString columnTitle(const QString& key)
 
 QString statusName(int status)
 {
-    switch (status) {
-    case 0: return muse::qtrc("starscore", "Empty");
-    case 1: return muse::qtrc("starscore", "Sketch");
-    case 2: return muse::qtrc("starscore", "In progress");
-    case 3: return muse::qtrc("starscore", "Written, unformatted");
-    case 4: return muse::qtrc("starscore", "Needs review");
-    default: return muse::qtrc("starscore", "Finished");
-    }
+    // (a number past the last status reads as Finished, as it always did here)
+    return status >= 0 && status < starscore::STATUS_COUNT ? starscore::statusName(status) : starscore::statusName(starscore::STATUS_COUNT - 1);
 }
 }
 
@@ -123,6 +118,11 @@ QVariantList DashboardModel::columns() const
                              { "short", QString::fromUtf8(c.shortTitle) } };
     }
     return out;
+}
+
+QVariantList DashboardModel::statusColors() const
+{
+    return starscore::statusColours();
 }
 
 QVariantList DashboardModel::tiers() const
