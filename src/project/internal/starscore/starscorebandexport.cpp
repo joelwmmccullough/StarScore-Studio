@@ -1171,6 +1171,12 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
 }
 
 //! Whether the title frame doesn't show these names yet (told without laying anything out)
+//! The same text, whatever its line breaks (an instrument name broken to clear the title is still that name)
+static bool starscoreSameLines(const muse::String& a, const muse::String& b)
+{
+    return a.toQString().replace('\n', ' ').simplified() == b.toQString().replace('\n', ' ').simplified();
+}
+
 static bool starscoreNeedsRetitle(const mu::engraving::Score* score, const QString& left, const QString& right)
 {
     const mu::engraving::MeasureBase* mb = score ? score->first() : nullptr;
@@ -1194,7 +1200,8 @@ static bool starscoreNeedsRetitle(const mu::engraving::Score* score, const QStri
                 rightOk |= t->xmlText() == muse::String::fromQString(v.toHtmlEscaped());
             }
         } else {
-            leftOk |= t->xmlText() == l;
+            // (or broken over two lines to clear the title: fitInstrumentName)
+            leftOk |= starscoreSameLines(t->xmlText(), l);
         }
     }
     return !(leftOk && rightOk);
@@ -1245,7 +1252,7 @@ static bool starscoreRetitleTexts(mu::engraving::Score* score, const QString& le
     bool changed = false;
     if (!left.isEmpty()) {
         if (partText) {
-            if (partText->xmlText() != escape(left)) {
+            if (!starscoreSameLines(partText->xmlText(), escape(left))) {
                 partText->undoChangeProperty(mu::engraving::Pid::TEXT, escape(left));
                 changed = true;
             }
@@ -1312,6 +1319,8 @@ static void starscoreRetitleSheet(mu::engraving::Score* score, const QString& le
     score->setLayoutAll();
     score->doLayout();
     starscore::levelArrangementLabel(score);
+    starscore::fitInstrumentName(score);
+    starscore::fitArrangementLabel(score);
     starscore::clearComposerCredit(score);
 }
 
@@ -1389,6 +1398,18 @@ int StarScoreService::labelPartBooks()
         INotationPtr n = it->second->notation();
         engraving::Score* es = n->elements()->msScore();
         if (!starscoreNeedsRetitle(es, f.sheetLeft, f.sheetRight)) {
+            // titled already, but its instrument name runs into the title: broken over two lines (Joel, 13 Oct 2026:
+            // IPDW's "Contrabass Clarinet in B♭")
+            if (starscore::instrumentNameOverlapsTitle(es)) {
+                if (!open) {
+                    master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet titles"));
+                    open = true;
+                }
+                if (starscore::fitInstrumentName(es)) {
+                    touched.push_back(n);
+                    ++changed;
+                }
+            }
             continue;
         }
         if (!open) {
@@ -2497,6 +2518,8 @@ static Ret starscorePrintSheetAsIs(const INotationWriterPtr& writer, const INota
     }
     if (partSheet) {
         starscore::levelArrangementLabel(score);
+        // a long instrument name running into the title is broken over two lines ("Contrabass Clarinet" / "in B♭")
+        starscore::fitInstrumentName(score);
         // a long label running into the title is shortened ("Flexible 2H Arrangement"), then broken over two lines
         starscore::fitArrangementLabel(score);
     }

@@ -34,6 +34,15 @@ QStringList arrangementLabelVariants(const QString& label);
 //! title (and subtitle), or the forms run out (the last one stays). Lays out after each change. Undoable. Returns
 //! whether it changed the label.
 bool fitArrangementLabel(mu::engraving::Score* score);
+//! The instrument name's first line and its forms broken over two lines, in the order tried (Joel, 13 Oct 2026):
+//! "Contrabass Clarinet in B♭", "Contrabass Clarinet\nin B♭", then a break before the last word, the last two…
+QStringList instrumentNameVariants(const QString& firstLine);
+//! The instrument name (top left) running into the title: its first line broken (instrumentNameVariants) until it
+//! clears the title and subtitle, or the forms run out. The lines under it (the mutes) stay. Lays out after each
+//! change. Undoable. Returns whether it changed the name.
+bool fitInstrumentName(mu::engraving::Score* score);
+//! Whether the instrument name (top left) runs into the title or subtitle as last laid out
+bool instrumentNameOverlapsTitle(mu::engraving::Score* score);
 
 //! Writes "Version x.y.z" into the footer text (Starsign 2.3 has "Version 1.0.0" in the right-hand box),
 //! replacing the version already there, or adding it to the right-hand box. Must be called inside a command.

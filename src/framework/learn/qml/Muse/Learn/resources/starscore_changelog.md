@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.33
+
+- **Long instrument names no longer run into the title.** When the instrument name top left would touch the song title (Industrial Park Driveway's "Contrabass Clarinet in B♭"), it is broken over two lines, before "in" when there is one ("Contrabass Clarinet" / "in B♭"), otherwise before the last word, then the last two, until it clears. Mute lines stay under it. This happens on the exported sheets and in the part scores when the song opens.
+
 ## 1.18.32
 
 - **Starsign 2.8 house style**: hairpin text (cresc., dim.) in Futura 9 pt instead of Petaluma Script 10 pt. Nothing else changed. Apply default style settings to bring a song's part scores up to it. A different file you saved under the same name in the styles folder is kept beside it.

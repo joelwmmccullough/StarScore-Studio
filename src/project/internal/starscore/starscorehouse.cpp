@@ -561,6 +561,112 @@ bool fitArrangementLabel(Score* score)
     return changed;
 }
 
+QStringList instrumentNameVariants(const QString& firstLine)
+{
+    QStringList out { firstLine };
+    auto add = [&](const QString& v) {
+        if (!v.isEmpty() && !out.contains(v)) {
+            out << v;
+        }
+    };
+    const int in = firstLine.lastIndexOf(" in ");
+    if (in > 0) {
+        add(firstLine.left(in) + "\n" + firstLine.mid(in + 1));
+    }
+    const QStringList words = firstLine.split(' ', Qt::SkipEmptyParts);
+    for (int k = int(words.size()) - 1; k >= 1; --k) {
+        add(words.mid(0, k).join(' ') + "\n" + words.mid(k).join(' '));
+    }
+    return out;
+}
+
+//! The title frame's instrument name (top left) and its title and subtitle
+static Text* starscoreInstrumentNameText(Score* score, std::vector<const Text*>& titles)
+{
+    MeasureBase* frame = nullptr;
+    for (MeasureBase* mb = score ? score->first() : nullptr; mb && !mb->isMeasure(); mb = mb->next()) {
+        if (mb->isVBox()) {
+            frame = mb;
+            break;
+        }
+    }
+    if (!frame) {
+        return nullptr;
+    }
+    Text* name = nullptr;
+    for (EngravingItem* e : frame->el()) {
+        if (!e || !e->isText()) {
+            continue;
+        }
+        Text* t = toText(e);
+        if (t->textStyleType() == TextStyleType::INSTRUMENT_EXCERPT && t->position() != AlignH::RIGHT) {
+            if (!name) {
+                name = t;
+            }
+        } else if (t->textStyleType() == TextStyleType::TITLE || t->textStyleType() == TextStyleType::SUBTITLE) {
+            titles.push_back(t);
+        }
+    }
+    return name;
+}
+
+static bool starscoreNameOverlaps(const Score* score, const Text* name, const std::vector<const Text*>& titles)
+{
+    if (!name || !name->ldata() || name->plainText().isEmpty()) {
+        return false;
+    }
+    const double gap = 0.5 * score->style().spatium();
+    const RectF r = name->pageBoundingRect().adjusted(0.0, 0.0, gap, 0.0);
+    for (const Text* t : titles) {
+        if (t->ldata() && !t->plainText().isEmpty() && r.intersects(t->pageBoundingRect())) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool instrumentNameOverlapsTitle(Score* score)
+{
+    std::vector<const Text*> titles;
+    const Text* name = starscoreInstrumentNameText(score, titles);
+    return starscoreNameOverlaps(score, name, titles);
+}
+
+bool fitInstrumentName(Score* score)
+{
+    std::vector<const Text*> titles;
+    Text* name = starscoreInstrumentNameText(score, titles);
+    if (!name || titles.empty()) {
+        return false;
+    }
+    auto overlaps = [&]() {
+        return starscoreNameOverlaps(score, name, titles);
+    };
+    if (!overlaps()) {
+        return false;
+    }
+    // the instrument's own name is the first line, unless it was broken here before: then the first two
+    const QString current = name->plainText().toQString();
+    QStringList lines = current.split('\n');
+    const bool mutes = lines.size() > 1 && lines.at(1).startsWith("with ");
+    QString first = lines.takeFirst();
+    if (!mutes && !lines.isEmpty() && !lines.first().startsWith("with ")) {
+        first += " " + lines.takeFirst();   // ("Contrabass Clarinet" / "in B♭" from before)
+    }
+    const QStringList variants = instrumentNameVariants(first.simplified());
+    const QString rest = lines.isEmpty() ? QString() : "\n" + lines.join('\n');
+    bool changed = false;
+    int i = std::max(1, int(variants.indexOf(current.left(current.size() - rest.size()))) + 1);
+    for (; i < variants.size() && overlaps(); ++i) {
+        name->undoChangeProperty(Pid::TEXT, String::fromQString((variants[i] + rest).toHtmlEscaped()));
+        changed = true;
+        score->setLayoutAll();
+        score->doLayout();
+        levelArrangementLabel(score);
+    }
+    return changed;
+}
+
 QString versionFromCopyright(const QString& copyright)
 {
     static const QRegularExpression re("Version\\s+(\\d+)\\.(\\d+)\\.(\\d+)", QRegularExpression::CaseInsensitiveOption);
