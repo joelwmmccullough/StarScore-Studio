@@ -4,6 +4,29 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.46
+
+- **Flugelhorn parts.** Format › Flugelhorn part on/off (also in the StarScore bar's menu) marks the trumpet part on screen as played on flugelhorn. Its sheets then say "Flugelhorn" top left, and the file names still say Trumpet. When both trumpets in an arrangement are flugelhorns, the sheets say "Flugelhorn 1" and "Flugelhorn 2". When only one is, it says "Flugelhorn" and the other says "Trumpet in B♭". A Flexible chair can be marked too: its trumpet sheet then says "Flugelhorn". Copying a flugelhorn part to a trumpet part in another arrangement copies the setting.
+- **Chord charts rebuilt for reading at sight.**
+  - Four bars to a line, every line starting on a 4-bar phrase. A section's bars line up in columns, all the same width whatever their time signature (six bars of 3/4 used to share a line). One bar left over joins the last line; two or three make a short line.
+  - A section whose chords don't fit four bars to a line at a readable size gets two bars to a line instead. Each section has one chord size, so sizes no longer jump from bar to bar.
+  - Every rehearsal mark is its own section. A long section the same as the one before says "Same as D"; a short one is written out again. "D–F 3 times" over a "2×" repeat is gone.
+  - Bars without chords are one multi-bar rest even when the time signature changes inside them (Drum Battle's drum intro used to show as empty bars).
+  - A 2nd ending sits under the 1st, with room for its bracket.
+  - Labels, counts, time signatures, the form line and the notes over each section are in the chord font, bold and larger. Only the title keeps the display font.
+  - The chart is laid out once its fonts have loaded, so the chords are measured in their own font.
+- **Combined sheets cleaned up.**
+  - Arrangements that play the same notes share one line. Before, small differences that don't print, such as a note muted in playback, a dynamic's playback volume or a beam's angle, split them into two voices playing in unison (Drum Battle's trumpet, letter B). Different dynamics alone no longer split them either; the line keeps one arrangement's.
+  - Lines split only in the bars where they differ, not for the whole phrase. A single bar where they come together between two split passages stays split, so lines don't join and split bar by bar.
+  - Lines in the same rhythm share stems: one chord, labelled over it top line first ("1H / 2H / 3H"). A unison is one note.
+  - Arrangements that rest get no line and no label, so "4H–7H tacet" and empty voices of rests are gone. The label says who plays.
+  - At most two lines to a staff. Three or four different lines get a staff each, shown only where needed.
+  - Notes tied from one passage into the next keep their ties.
+  - Beat slashes that overlap another line's notes are hidden; the notes stay. Rhythmic slashes (with stems) are never hidden.
+  - "(open)" and "open" count as the same text. A dynamic is kept on each staff.
+  - The top left lists every mute any arrangement uses. A chair played on flugelhorn in only some arrangements says "Trumpet".
+- **One bass guitar part.** When a song with a 4-string and a 5-string bass part opens, the two become one "Bass Guitar" part with the 4-string part's notes. If the 4-string part is empty, the 5-string part's notes are kept. The song as it was is copied first to Version History/<date> Before one bass part. Save the song to keep the change. Treble-clef, 6-string and other second bass parts are left alone.
+
 ## 1.18.45
 
 - **Rests beside rhythm markings place themselves.** In a bar where a voice holds rhythm markings, its rests sit beside them: 2 spaces above the staff for markings above it, 2 spaces below for markings below. That holds in the full score, every part score and every exported sheet, the Flexible ones included. Rests you had moved by hand there lose that move once, when the song opens (Drum Battle: 524 rests), so they aren't moved twice.

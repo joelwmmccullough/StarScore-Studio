@@ -895,6 +895,10 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
                     f.relativePath = folder + "/" + code + " - " + starscoreSafeFileName(name) + ".pdf";
                     f.header = arr + name;
                     f.sheetLeft = QString::fromUtf8(seat.sheet);
+                    // a chair played on flugelhorn: its trumpet sheet says so; the file keeps the Trumpet name
+                    if (QString(seat.instrumentId) == "bb-trumpet" && data.flugelhornParts.count(pid)) {
+                        f.sheetLeft = "Flugelhorn";
+                    }
                     f.sheetRight = right;
                     // a sheet made into a part of its own to edit by hand (the section's menu) prints as that part
                     auto own = sec.sheetParts.find(name);
@@ -963,6 +967,10 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
                 plan.files.back().sheetLeft = sax ? QString(name).replace("Eb ", QString::fromUtf8("E\u266D "))
                                                     .replace("Bb ", QString::fromUtf8("B\u266D "))
                                                   : starscoreSheetHornName(name);
+                // a trumpet part played on flugelhorn says so top left; the file keeps the Trumpet name (Joel, 14 Oct 2026)
+                if (name == "Trumpet" && data.flugelhornParts.count(pid)) {
+                    plan.files.back().sheetLeft = "Flugelhorn";
+                }
                 plan.files.back().sheetRight = QString("1-Horn Arrangement");
                 // the Trombone sheet in tenor clef too (Joel, 5 Oct 2026), as the Flexible trombone sheets
                 if (name == "Trombone") {
@@ -1053,6 +1061,20 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
                 }
             }
 
+            // Trumpet parts played on flugelhorn (Joel, 14 Oct 2026) say "Flugelhorn" top left; the file keeps the
+            // Trumpet name. The number on the sheet counts the sheets that print the same instrument: Trumpet 1 on
+            // flugelhorn with Trumpet 2 on trumpet prints "Flugelhorn" and "Trumpet in B♭"; both on flugelhorn,
+            // "Flugelhorn 1" and "Flugelhorn 2".
+            std::map<QString, QString> printedAs;
+            std::map<QString, int> printedCounts;
+            bool anyFlugelhorn = false;
+            for (const auto& [pid, horn] : horns) {
+                const bool flugel = horn == "Trumpet" && data.flugelhornParts.count(pid);
+                anyFlugelhorn |= flugel;
+                printedAs[pid] = flugel ? QString("Flugelhorn") : horn;
+                printedCounts[printedAs[pid]]++;
+            }
+            std::map<QString, int> printedSeen;
             std::map<QString, int> seen;
             for (const auto& [pid, horn] : horns) {
                 QString name = horn;
@@ -1061,6 +1083,14 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
                 }
                 addFile(bassHorns.count(pid) ? folder + "/" + STARSCORE_BASS_HORNS_FOLDER : folder, name, { pid }, false);
                 plan.files.back().sheetLeft = starscoreSheetHornName(name);
+                if (anyFlugelhorn && horn == "Trumpet") {
+                    const QString printed = printedAs[pid];
+                    QString label = printed;
+                    if (printedCounts[printed] > 1) {
+                        label += QString(" %1").arg(++printedSeen[printed]);
+                    }
+                    plan.files.back().sheetLeft = printed == "Flugelhorn" ? label : starscoreSheetHornName(label);
+                }
                 plan.files.back().sheetRight = QString("%1-Horn Arrangement").arg(players);
                 // 4- to 7-Horn trombones in tenor clef too (Joel, 6 Oct 2026), as the 1-Horn and Flexible ones; not the
                 // bass trombone, which reads bass clef
@@ -3970,12 +4000,45 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
             n->undoStack()->prepareChanges(TranslatableString::untranslatable("Combined part layout"));
             const QStringList layoutLog = starscore::copySectionLayouts(layoutSources, n->elements()->msScore());
             n->undoStack()->commitChanges();
+            // beat slashes over another line's notes: the notes stay, the slashes go (Joel, 14 Oct 2026)
+            {
+                engraving::Score* es = n->elements()->msScore();
+                n->undoStack()->prepareChanges(TranslatableString::untranslatable("Slashes over notes"));
+                es->setLayoutAll();
+                es->doLayout();
+                const int hiddenSlashes = starscore::hideSlashesOverNotes(es);
+                n->undoStack()->commitChanges();
+                LOGI() << "[starscore] combined " << chair.name.toStdString() << ": " << hiddenSlashes << " slash chord(s) over notes hidden";
+            }
             LOGI() << "[starscore] combined " << chair.name.toStdString() << " layout: " << layoutLog.join("; ").toStdString();
             std::vector<int> horns;
             for (const starscore::CombinedSource& s : chair.sources) {
                 horns.push_back(s.horns);
             }
-            const QString left = f ? f->sheetLeft : chair.name;
+            // the instrument, and every mute any arrangement's line uses (before 1.18.46 the largest arrangement's only)
+            QString left = f ? f->sheetLeft.section('\n', 0, 0) : chair.name;
+            {
+                const Data cd = loadFrom(ms);
+                QStringList mutes;
+                for (const starscore::CombinedSource& s : chair.sources) {
+                    auto m = cd.partMutes.find(s.partId);
+                    for (const QString& mute : m == cd.partMutes.end() ? QStringList() : m->second) {
+                        if (!mutes.contains(mute)) {
+                            mutes << mute;
+                        }
+                    }
+                }
+                // a chair played on flugelhorn in some arrangements only: the trumpet's name
+                if (left.startsWith("Flugelhorn") && !std::all_of(chair.sources.begin(), chair.sources.end(),
+                                                                  [&](const starscore::CombinedSource& s) {
+                    return cd.flugelhornParts.count(s.partId) > 0;
+                })) {
+                    left = starscoreSheetHornName(chair.name);
+                }
+                if (!mutes.isEmpty() && starscore::isBrassSheet(left)) {
+                    left += "\n" + starscore::muteLines(mutes);
+                }
+            }
             const QString right = muse::qtrc("starscore", "Combined: %1").arg(starscore::arrangementLabel(horns));
             QByteArray pdf;
             n->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
@@ -3987,7 +4050,8 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                 continue;
             }
             LOGI() << "[starscore] combined " << chair.name.toStdString() << ": " << res.passages << " passages, "
-                   << res.splitPassages << " with more than one line" << (res.secondStaff ? ", second staff" : "");
+                   << res.splitPassages << " with more than one line, " << res.staves << " staff/staves, "
+                   << res.tiesMade << " tie(s) made over passages, " << res.sharedStemPassages << " line(s) sharing stems";
             const QString target = songDir + "/" + rel;
             if (QFileInfo::exists(target) && starscoreSamePdf(pdf, target)) {
                 ++combinedSame;

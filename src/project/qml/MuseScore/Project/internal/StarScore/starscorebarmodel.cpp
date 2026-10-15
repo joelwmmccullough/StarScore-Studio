@@ -521,6 +521,7 @@ QVariantList StarScoreBarModel::moreMenu() const
         QVariantMap { { "id", "make-keys" }, { "title", muse::qtrc("starscore", "Combine keyboard parts into a Keys part") },
                       { "enabled", true } },
         QVariantMap { { "id", "part-mutes" }, { "title", muse::qtrc("starscore", "Mutes for this part…") }, { "enabled", true } },
+        QVariantMap { { "id", "part-flugelhorn" }, { "title", muse::qtrc("starscore", "Flugelhorn part on/off") }, { "enabled", true } },
         QVariantMap {},
         QVariantMap { { "id", "layout-to" }, { "title", muse::qtrc("starscore", "Copy part formatting…") },
                       { "enabled", true } },
@@ -927,6 +928,8 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
         dispatcher()->dispatch("starscore-make-keys");
     } else if (action == "part-mutes") {
         dispatcher()->dispatch("starscore-part-mutes");
+    } else if (action == "part-flugelhorn") {
+        dispatcher()->dispatch("starscore-part-flugelhorn");
     } else if (action == "check-ranges") {
         dispatcher()->dispatch("starscore-check-ranges");
     } else if (action == "export-band") {

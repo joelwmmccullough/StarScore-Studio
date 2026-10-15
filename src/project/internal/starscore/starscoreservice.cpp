@@ -443,6 +443,11 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
             data.partMutes[it.key()] = mutes;
         }
     }
+    for (const QJsonValue& v : root.value("flugelhornParts").toArray()) {
+        if (!v.toString().isEmpty()) {
+            data.flugelhornParts.insert(v.toString());
+        }
+    }
     const QJsonObject scoreStatus = root.value("scoreStatus").toObject();
     for (auto it = scoreStatus.begin(); it != scoreStatus.end(); ++it) {
         data.scoreStatus[it.key()] = it.value().toString();
@@ -608,6 +613,13 @@ QString StarScoreService::toJson(const Data& data)
     }
     if (!partMutes.isEmpty()) {
         root["partMutes"] = partMutes;
+    }
+    if (!data.flugelhornParts.empty()) {
+        QJsonArray flugel;
+        for (const QString& pid : data.flugelhornParts) {
+            flugel.append(pid);
+        }
+        root["flugelhornParts"] = flugel;
     }
     QJsonObject scoreStatus;
     for (const auto& [aid, key] : data.scoreStatus) {
@@ -2516,6 +2528,40 @@ void StarScoreService::setPartMutes(const QString& partId, const QStringList& mu
     }
     store(data);
     labelPartBooks();   // the part score's title shows them
+}
+
+QString StarScoreService::togglePartFlugelhorn()
+{
+    const StarScoreMuteTarget t = muteTarget();
+    notation::INotationPtr n = globalContext()->currentNotation();
+    engraving::Score* score = n && n->elements() ? n->elements()->msScore() : nullptr;
+    engraving::MasterScore* ms = score ? score->masterScore() : nullptr;
+    const engraving::Part* part = ms && !t.partId.isEmpty() ? ms->partById(ID(t.partId)) : nullptr;
+    const QString id = part ? part->instrumentId().toQString() : QString();
+    const bool trumpet = (id.contains("trumpet") || id.contains("cornet")) && !id.contains("piccolo");
+    if (!part || (!trumpet && !t.flexible)) {
+        return part ? muse::qtrc("starscore", "%1 isn't a trumpet part. Only trumpet parts and the Flexible chairs can be "
+                                              "marked as flugelhorn parts.").arg(t.partName)
+               : muse::qtrc("starscore", "Open the part score of a trumpet part (or select one of its notes in the full "
+                                         "score), then try again.");
+    }
+    Data data = load();
+    const bool on = !data.flugelhornParts.count(t.partId);
+    if (on) {
+        data.flugelhornParts.insert(t.partId);
+    } else {
+        data.flugelhornParts.erase(t.partId);
+    }
+    store(data);
+    labelPartBooks();   // the part score's title shows it
+    if (t.flexible) {
+        return on ? muse::qtrc("starscore", "%1 is now a flugelhorn part: its trumpet sheet says \"Flugelhorn\" top left. "
+                                            "The file name still says Trumpet in Bb.").arg(t.partName)
+               : muse::qtrc("starscore", "%1's trumpet sheet says \"Trumpet in B\u266D\" again.").arg(t.partName);
+    }
+    return on ? muse::qtrc("starscore", "%1 is now a flugelhorn part: its sheets say \"Flugelhorn\" top left. The file "
+                                        "names still say Trumpet.").arg(t.partName)
+           : muse::qtrc("starscore", "%1 is a trumpet part again: its sheets say \"Trumpet in B\u266D\" top left.").arg(t.partName);
 }
 
 std::vector<mu::engraving::Part*> StarScoreService::masterPartsOf(const engraving::Score* score, const engraving::MasterScore* ms)

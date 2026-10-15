@@ -390,6 +390,7 @@ MenuItem* AppMenuModel::makeFormatMenu()
         makeMenuItem("starscore-standardize"),
         makeMenuItem("starscore-add-solo"),
         makeMenuItem("starscore-part-mutes"),
+        makeMenuItem("starscore-part-flugelhorn"),
         makeMenuItem("starscore-rhythm-above"),
         makeMenuItem("starscore-rhythm-below"),
         makeMenuItem("starscore-make-keys"),

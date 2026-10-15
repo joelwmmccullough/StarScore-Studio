@@ -45,6 +45,9 @@ struct CombinedResult {
     bool ok = false;
     QString targetPartId;   // the part (in the copy) that now holds the combined line
     bool secondStaff = false;
+    int staves = 1;         // the combined staff and the staves under it (two lines to a staff)
+    int tiesMade = 0;       // notes tied over from one passage into the next
+    int sharedStemPassages = 0;   // lines put into another line's chords (same rhythm)
     int passages = 0;       // stretches with one grouping of the arrangements
     int splitPassages = 0;  // of those, with more than one line
     QString problem;
@@ -71,4 +74,9 @@ QStringList copySectionLayouts(const std::vector<CombinedLayoutSource>& sources,
 
 //! "3H–5H", "6H, 7H", "2H, 4H–6H"
 QString arrangementLabel(std::vector<int> horns);
+
+//! Beat slashes (slash noteheads without stems, as "Fill with slashes" writes them; not rhythmic slashes, which have
+//! stems) that overlap another line's notes on the page are hidden; the notes stay (Joel, 14 Oct 2026). The score
+//! must be laid out; call inside a command. Returns how many slash chords were hidden.
+int hideSlashesOverNotes(mu::engraving::Score* score);
 }

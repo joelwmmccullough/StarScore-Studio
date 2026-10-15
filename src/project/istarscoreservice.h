@@ -577,6 +577,9 @@ public:
     //! Harmon Mute", "and Cup Mute"). Copied with the part to the same instrument in another arrangement.
     virtual QStringList partMutes(const QString& partId) const = 0;
     virtual void setPartMutes(const QString& partId, const QStringList& mutes) = 0;
+    //! Flugelhorn part on/off (Joel, 14 Oct 2026) for the trumpet part open (or a Flexible chair): its sheets say
+    //! "Flugelhorn" top left; the file names still say Trumpet. Returns what to tell Joel.
+    virtual QString togglePartFlugelhorn() = 0;
     virtual void setPartStatus(const QString& partId, int status) = 0;   // -1 = no tag
     //! Offers to make the stand-in versions the section's main parts don't have yet (see versionMains).
     virtual void makeBassHornVersions(const QString& sectionId) = 0;

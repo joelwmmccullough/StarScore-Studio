@@ -144,6 +144,7 @@ using mu::project::starscore::org::RenderJob;
 @property (nonatomic, strong) NSWindow* window;
 @property (nonatomic, strong) NSTimer* watchdog;
 @property (nonatomic, strong) StarScoreOrgPrinter* keepAlive;
+- (void)readPageHeight:(int)gen tries:(int)tries;
 @end
 
 @implementation StarScoreOrgPrinter
@@ -233,18 +234,34 @@ using mu::project::starscore::org::RenderJob;
         // StarScore chord charts: one page as tall as the page's script says (data-height, in points). The page is
         // 480 CSS px wide and the paper 360 pt, so WebKit's print path scales it by 0.75 pt per px — the same scale
         // Chromium printed the prototype at, which is what data-height was measured for.
-        [self.view evaluateJavaScript:@"document.body.dataset.height" completionHandler:^(id result, NSError* err) {
-            if (gen != self.generation) {
-                return;
-            }
-            double h = 0;
-            if ([result respondsToSelector:@selector(doubleValue)]) {
-                h = [result doubleValue];
-            }
-            const RenderJob& j = self->_jobs[self.index];
-            [self printJob:gen paperHeight:std::max(j.pageHeight, h > 0 ? h + 2 : 0.0)];
-        }];
+        [self readPageHeight:gen tries:40];
     });
+}
+
+// The page's height once its script says it's laid out (data-ready, set when its fonts have loaded: since 1.18.46
+// the chords are measured in their own fonts); a page without data-ready after 4 s is printed at the height it has
+- (void)readPageHeight:(int)gen tries:(int)tries
+{
+    [self.view evaluateJavaScript:@"(document.body.dataset.ready || '') + '|' + (document.body.dataset.height || '')"
+                completionHandler:^(id result, NSError* err) {
+        if (gen != self.generation) {
+            return;
+        }
+        NSString* text = [result isKindOfClass:[NSString class]] ? (NSString*)result : @"|";
+        NSArray<NSString*>* parts = [text componentsSeparatedByString:@"|"];
+        const BOOL ready = parts.count > 0 && [parts[0] isEqualToString:@"1"];
+        if (!ready && tries > 0) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                if (gen == self.generation) {
+                    [self readPageHeight:gen tries:tries - 1];
+                }
+            });
+            return;
+        }
+        const double h = parts.count > 1 ? [parts[1] doubleValue] : 0;
+        const RenderJob& j = self->_jobs[self.index];
+        [self printJob:gen paperHeight:std::max(j.pageHeight, h > 0 ? h + 2 : 0.0)];
+    }];
 }
 
 - (void)printJob:(int)gen paperHeight:(double)paperHeight

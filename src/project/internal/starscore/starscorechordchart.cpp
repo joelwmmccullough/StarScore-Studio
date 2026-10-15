@@ -698,6 +698,7 @@ struct Group {
     QStringList texts;
     std::optional<QString> same;    // an earlier group with the same chords: its first label
     std::vector<Item> items;
+    std::vector<QStringList> textsPer;   // each label's section's own texts
 };
 
 struct Analysis {
@@ -996,6 +997,7 @@ Analysis analyse(const ChordChartData& song)
         if (!a.groups.empty() && a.groups.back().keys == s.keys && !s.label.isEmpty() && a.groups.back().labels.last() != s.label) {
             Group& g = a.groups.back();
             g.labels << s.label;
+            g.textsPer.push_back(s.texts);
             g.times += 1;
             for (const QString& t : s.texts) {
                 if (!g.texts.contains(t)) {
@@ -1004,7 +1006,7 @@ Analysis analyse(const ChordChartData& song)
             }
             continue;
         }
-        a.groups.push_back(Group { { s.label }, s.keys, 1, s.texts, std::nullopt, {} });
+        a.groups.push_back(Group { { s.label }, s.keys, 1, s.texts, std::nullopt, {}, { s.texts } });
     }
     std::map<QString, QString> seen;
     for (Group& g : a.groups) {
@@ -1064,32 +1066,35 @@ const char* PDF_CSS = R"CSS(
 @font-face { font-family: Modernoir; src: url('%(modernoir)s'); }
 @font-face { font-family: SSJost; src: url('%(jost)s'); }
 @font-face { font-family: BravuraText; src: url('%(bravura)s'); }
-:root { --R: 30pt; --ink: #141414; --muted: #6b6b6b; --rule: #1d1d1d; --inset: 11pt; }
+:root { --R: 28pt; --ink: #141414; --muted: #6b6b6b; --rule: #1d1d1d; --inset: 11pt; }
 html, body { margin: 0; padding: 0; background: #fff; }
 #page { width: 360pt; min-height: 780pt; box-sizing: border-box; padding: 22pt 4pt 28pt 6pt; color: var(--ink);
         font-family: SSJost, sans-serif; }
 header { text-align: center; margin: 0 0 16pt; }
 h1 { font-family: Modernoir, sans-serif; font-weight: normal; font-size: 34pt; letter-spacing: 0.05em; margin: 0; line-height: 1.05; }
-.sub { font-family: Modernoir, sans-serif; font-size: 16pt; color: #333; margin-top: 5pt; letter-spacing: 0.03em; }
+.sub { font-family: SSJost, sans-serif; font-weight: 500; font-size: 16pt; color: #222; margin-top: 6pt; }
 .sub .note { font-family: BravuraText; font-size: 16pt; position: relative; top: 0.28em; }
-.form { font-family: Modernoir, sans-serif; font-size: 14pt; color: #333; margin: 8pt 14pt 0; line-height: 1.45; letter-spacing: 0.03em; }
-.form .sep { color: #aaa; }
+.form { font-family: SSJost, sans-serif; font-weight: 500; font-size: 13pt; color: #222; margin: 9pt 10pt 0; line-height: 1.5; }
+.form .sep { color: #aaa; margin-left: 0.3em; }
+.form span { white-space: nowrap; }
 section { margin-top: 14pt; }
 .head { display: flex; align-items: center; gap: 8pt; margin: 0 0 4pt 4pt; }
-.notes { font-family: Modernoir, sans-serif; font-size: 14pt; color: #444; letter-spacing: 0.02em; line-height: 1.15; }
-.row { display: grid; align-items: stretch; margin-top: 15pt; }
+.notes { font-family: SSJost, sans-serif; font-weight: 500; font-size: 14pt; color: #1a1a1a; line-height: 1.2; }
+.row { display: grid; align-items: stretch; margin-top: 10pt; }
+.row.ending { margin-top: 20pt; }
 section > .row:first-child, .head + .row { margin-top: 8pt; }
 .gut { position: relative; }
-.lab { font-family: Modernoir, sans-serif; font-size: 18pt; line-height: 1; padding: 3pt 4pt 2pt;
-       border: 1.3pt solid var(--ink); min-width: 11pt; text-align: center; background: #fff; white-space: nowrap; }
+.lab { font-family: SSJost, sans-serif; font-weight: 700; font-size: 17pt; line-height: 1; padding: 3pt 4pt 2pt;
+       border: 1.6pt solid var(--ink); min-width: 13pt; text-align: center; background: #fff; white-space: nowrap; }
 .gut .lab { position: absolute; left: 2pt; top: 50%%; transform: translateY(-50%%); }
 .mts { position: absolute; right: 3pt; top: 50%%; transform: translateY(-50%%); display: flex; flex-direction: column;
        font-size: 15pt; line-height: 0.86; font-weight: 700; text-align: center; }
 .gut .lab + .mts { right: 1pt; }
 .cnt { font-size: 13pt; font-weight: 700; display: flex; align-items: center; padding-left: 4pt; }
 .pad { display: flex; align-items: center; }
+.sp { min-width: 0; }
 .bar { position: relative; height: calc(var(--R) * 1.5); border-left: 1pt solid var(--rule); min-width: 0; }
-.bar.tall { height: calc(var(--R) * 1.95); }
+.bar.tall, .row.tall .bar { height: calc(var(--R) * 1.95); }
 .bar.closing { border-right: 1pt solid var(--rule); }
 .row.last .bar.closing:not(.re) { border-right: 3.2pt double var(--rule); }
 /* repeat barlines: thick line, thin line, two dots */
@@ -1101,7 +1106,7 @@ section > .row:first-child, .head + .row { margin-top: 8pt; }
 .dot.l { left: 4pt; } .dot.r { right: 4pt; }
 .dot.d1 { top: calc(50%% - 6pt); } .dot.d2 { top: calc(50%% + 2.8pt); }
 /* endings: a bracket in the space above the bars (drawn by the script) */
-.bar.en .enn { position: absolute; left: 4pt; top: -17pt; font-size: 11pt; font-weight: 700; }
+.bar.en .enn { position: absolute; left: 4pt; top: -7pt; font-size: 11pt; font-weight: 700; line-height: 1; }
 /* chords */
 .slot { position: absolute; left: calc(var(--inset) + var(--at) * (100%% - var(--inset) - 6pt)); top: calc(var(--R) * 0.17); }
 .bar.hasts .slot.s0 { left: calc(var(--inset) + 10pt); }
@@ -1117,7 +1122,7 @@ section > .row:first-child, .head + .row { margin-top: 8pt; }
 .bs { position: absolute; left: 0.95em; top: 1.95em; font-size: 0.46em; }
 .bs .sl { margin-right: 0.04em; }
 .bs .acc { font-size: 0.9em; position: relative; top: -0.3em; margin-left: 0.03em; }
-.c.nc { font-size: calc(var(--R) * 0.62); font-weight: 500; top: 0.35em; }
+.c.nc { font-size: calc(var(--R) * var(--fs, 1) * 0.62); font-weight: 500; top: 0.35em; }
 .sim { position: absolute; left: 50%%; top: 50%%; transform: translate(-50%%, -50%%); font-family: BravuraText; font-size: 30pt; color: #333; }
 .ts { position: absolute; left: 4pt; top: 50%%; transform: translateY(-50%%); display: flex; flex-direction: column;
       font-size: 15pt; line-height: 0.86; font-weight: 700; text-align: center; }
@@ -1131,7 +1136,10 @@ section > .row:first-child, .head + .row { margin-top: 8pt; }
 
 const char* PDF_JS = R"JS(
 <script>
-(function () {
+// Laid out once the page's fonts have loaded (the chords are measured in them): data-ready then says so to the
+// printer, which waits for it (1.18.46; before, the script ran before the fonts had loaded, so the measurements
+// could be another font's)
+function starscoreLayout() {
   const PX = 96 / 72;
   function chordsOf(bar) { return Array.from(bar.querySelectorAll('.c')); }
   function crowded(bar) {
@@ -1155,6 +1163,59 @@ const char* PDF_JS = R"JS(
     const inset = parseFloat(getComputedStyle(bar.querySelector('.slot')).left) || 15;
     return w + (cs.length - 1) * 9 * PX + inset + (bar.classList.contains('re') ? 14 : 6) * PX;
   }
+  // A line whose chords don't fit four bars to a line at a readable size (Joel, 14 Oct 2026: smaller text is
+  // unusable on a phone) becomes two lines of two bars, so the lines still follow the phrases. Measured at full size:
+  // the line's bars (a bar without chords keeps half its room) against the line's width.
+  const READABLE = 0.85;
+  function rowScale(row) {
+    let total = 0, needs = 0, chords = 0;
+    row.querySelectorAll('.bar').forEach(b => {
+      const w = b.getBoundingClientRect().width, n = need(b);
+      total += w;
+      needs += n > 0 ? n : 0.5 * w;
+      chords += n > 0 ? 1 : 0;
+    });
+    return chords > 0 && needs > 0 ? total / needs : 1;
+  }
+  // (the whole section when one of its lines needs it, so its lines stay alike)
+  document.querySelectorAll('section').forEach(sec => {
+    if (!Array.from(sec.querySelectorAll('.row')).some(row => rowScale(row) < READABLE)) return;
+    Array.from(sec.querySelectorAll('.row')).forEach(row => {
+      const kids = Array.from(row.children);
+      const gut = kids[0], right = kids[kids.length - 1];
+      const cells = kids.slice(1, -1).filter(c => !c.classList.contains('pad'));
+      if (cells.length <= 2 || cells.some(c => c.classList.contains('rest'))) return;
+      const chunks = [];
+      for (let i = 0; i < cells.length; i += 2) chunks.push(cells.slice(i, i + 2));
+      if (chunks.length > 1 && chunks[chunks.length - 1].length === 1) chunks[chunks.length - 2].push(chunks.pop()[0]);
+      const keep = chunks.filter(ch => ch.some(c => !c.classList.contains('sp')));
+      const rowClass = row.className;
+      let after = row;
+      keep.forEach((ch, k) => {
+        const r = k === 0 ? row : document.createElement('div');
+        if (k > 0) {
+          r.className = rowClass;
+          const g = document.createElement('div'); g.className = 'gut'; r.appendChild(g);
+          after.after(r);
+        } else {
+          while (r.children.length > 1) r.removeChild(r.lastChild);
+        }
+        ch.forEach(c => r.appendChild(c));
+        const last = k === keep.length - 1;
+        if (!last) {
+          r.classList.remove('last');
+          ch[ch.length - 1].classList.add('closing');
+          const cnt = document.createElement('div'); cnt.className = 'cnt'; r.appendChild(cnt);
+        } else {
+          r.appendChild(right);
+        }
+        r.style.gridTemplateColumns = '46pt ' + ch.map(() => '1fr').join(' ') + (ch.length < 2 ? ' 1fr' : '') + ' 22pt';
+        if (ch.length < 2) r.insertBefore(document.createElement('div'), r.lastChild);
+        after = r;
+      });
+    });
+  });
+
   document.querySelectorAll('.row').forEach(row => {
     const cells = Array.from(row.children).slice(1, -1);
     const bars = cells.filter(c => c.classList.contains('bar'));
@@ -1162,7 +1223,7 @@ const char* PDF_JS = R"JS(
     // a crowded bar takes width from bars in the row that have room
     const widths = cells.map(c => c.getBoundingClientRect().width);
     const total = widths.reduce((a, b) => a + b, 0);
-    const minw = cells.map((c, i) => c.classList.contains('bar') ? Math.max(need(c), 0.42 * widths[i] / (parseFloat(c.dataset.w) || 1) * (parseFloat(c.dataset.w) || 1)) : 0);
+    const minw = cells.map((c, i) => c.classList.contains('bar') ? Math.max(need(c), 0.6 * widths[i] / (parseFloat(c.dataset.w) || 1) * (parseFloat(c.dataset.w) || 1)) : 0);
     const want = cells.map((c, i) => c.classList.contains('bar') ? Math.max(widths[i], minw[i]) : widths[i]);
     let over = want.reduce((a, b) => a + b, 0) - total;
     const give = cells.map((c, i) => Math.max(0, want[i] - minw[i]) * (want[i] <= widths[i] ? 1 : 0));
@@ -1174,6 +1235,21 @@ const char* PDF_JS = R"JS(
     const cols = [parts[0]].concat(out.map(w => (w * scale).toFixed(2) + 'px')).concat([parts[parts.length - 1]]);
     row.style.gridTemplateColumns = cols.join(' ');
   });
+  // One chord size for each section (Joel, 14 Oct 2026: chord charts must be sight-readable; before 1.18.46 each
+  // crowded bar shrank on its own, so sizes jumped from bar to bar): the size at which nearly all its bars' chords
+  // fit side by side, after the crowded bars took room from their neighbours. The few bars still too full are
+  // fitted below.
+  const page = document.getElementById('page');
+  const sectionScales = new Map();
+  document.querySelectorAll('section').forEach(sec => {
+    const rs = [];
+    sec.querySelectorAll('.bar').forEach(b => { const n = need(b); if (n > 0) rs.push(b.getBoundingClientRect().width / n); });
+    rs.sort((a, b) => a - b);
+    let s = rs.length ? rs[Math.floor(rs.length * 0.2)] : 1;
+    s = Math.max(0.66, Math.min(1, s));
+    sec.style.setProperty('--fs', s.toFixed(3));
+    sectionScales.set(sec, s);
+  });
   document.querySelectorAll('.bar').forEach(b => {
     // still too tight: chords spaced evenly, then narrower (as iReal does), then smaller
     if (crowded(b)) {
@@ -1181,24 +1257,32 @@ const char* PDF_JS = R"JS(
       slots.forEach((s, i) => s.style.setProperty('--at', (i / slots.length).toFixed(3)));
     }
     let sx = 1;
-    while (crowded(b) && sx > 0.7) { sx -= 0.05; b.style.setProperty('--sx', sx); }
-    let fs = 1;
-    while (crowded(b) && fs > 0.6) { fs -= 0.05; b.style.setProperty('--fs', fs); }
+    while (crowded(b) && sx > 0.75) { sx -= 0.05; b.style.setProperty('--sx', sx); }
+    let fs = sectionScales.get(b.closest('section')) || 1;
+    while (crowded(b) && fs > 0.5) { fs -= 0.04; b.style.setProperty('--fs', fs); }
   });
   // ending brackets: a line in the space above the bars, a hook at the start and end
   document.querySelectorAll('.bar.en').forEach(b => {
     const l = document.createElement('i');
     l.className = 'enl';
-    l.style.cssText = 'position:absolute;left:0;right:0;top:-6pt;border-top:1.2pt solid #1d1d1d;' +
+    l.style.cssText = 'position:absolute;left:0;right:0;top:-10pt;border-top:1.2pt solid #1d1d1d;' +
       (b.classList.contains('enstart') ? 'border-left:1.2pt solid #1d1d1d;height:9pt;' : '') +
       (b.classList.contains('enend') || b.classList.contains('re') ? 'border-right:1.2pt solid #1d1d1d;height:9pt;' : '');
     b.appendChild(l);
   });
-  const page = document.getElementById('page');
   document.body.dataset.cols = 4;
   document.body.dataset.scale = 1;
   document.body.dataset.height = Math.ceil(page.getBoundingClientRect().height * 0.75);
-})();
+  document.body.dataset.ready = '1';
+}
+if (document.fonts && document.fonts.load) {
+  // (asked for by name: a font the page hasn't drawn with yet isn't loading, and fonts.ready wouldn't wait for it)
+  Promise.all([document.fonts.load('700 28pt SSJost', 'A'), document.fonts.load('28pt SSJost', 'A'),
+               document.fonts.load('16pt BravuraText', '\uE260'), document.fonts.load('20pt Modernoir', 'A')])
+    .catch(function () {}).then(function () { return document.fonts.ready; }).then(starscoreLayout);
+} else {
+  starscoreLayout();
+}
 </script>
 )JS";
 
@@ -1293,7 +1377,9 @@ std::vector<Item> compressReadable(const Keys& keys)
         choice[i] = Choice { 0, 0, 0, 0, 0 };
         if (empty[i]) {
             int r = 0;
-            while (i + r < n && empty[i + r] && keys[i + r].ts == keys[i].ts && keys[i + r].len == keys[i].len) {
+            // (any bars without chords, whatever their time signatures: before 1.18.46 a run of bars changing between
+            // 4/4 and 5/4 was drawn as empty bars, Drum Battle's drum intro)
+            while (i + r < n && empty[i + r]) {
                 ++r;
             }
             if (r >= 2 && 1.2 + best[i + r] < best[i]) {
@@ -1374,99 +1460,116 @@ struct Cell {
     int ending = 0;               // 1st/2nd ending starts here
     bool endingCont = false, endingLast = false;
     bool closing = false;
+    bool spacer = false;          // an empty place before a 2nd ending, under the 1st
 };
 
-//! width of a bar, in standard bars: a 2/4 bar in a 4/4 song is 0.5 (never narrower than half, nor wider than 2)
-double barWeight(const BarKey& key, const Fraction& unit)
+//! The lines a run of `n` bars is written on (Joel, 14 Oct 2026: chord charts must be sight-readable; the usual
+//! practice, Real Book and iReal Pro: four bars to a line, every line starting on a 4-bar phrase, so the bars line
+//! up in columns). Bars left over make a shorter last line (6 bars: 4 + 2), except a single bar, which joins the
+//! line before it (9 bars: 4 + 5).
+std::vector<int> lineLengths(int n, int cols)
 {
-    Fraction w = parseFrac(key.len) / unit;
-    if (w < Fraction(1, 2)) {
-        w = Fraction(1, 2);
+    std::vector<int> out;
+    for (int left = n; left > 0; left -= cols) {
+        out.push_back(std::min(cols, left));
     }
-    if (w > Fraction(2, 1)) {
-        w = Fraction(2, 1);
+    if (out.size() > 1 && out.back() == 1) {
+        out.pop_back();
+        out.back() += 1;
     }
-    return double(w.numerator()) / double(w.denominator());
+    return out;
 }
 
-//! Rows holding up to `cols` standard bars
-std::vector<std::vector<Cell> > buildRows(const std::vector<Item>& items, int cols, const Fraction& unit)
+//! The chart's rows: every bar the same width, four to a line (see lineLengths); a repeat, a passage with 1st and
+//! 2nd endings and a multi-bar rest start a line of their own; a 2nd ending sits under the 1st. Before 1.18.46 a
+//! bar's width followed its length and a row took as many as fitted (six bars of 3/4, two of busy 4/4), so lines
+//! didn't follow the phrases.
+std::vector<std::vector<Cell> > buildRows(const std::vector<Item>& items, int cols)
 {
-    std::vector<std::vector<Cell> > rows(1);
-    auto used = [&]() {
-        double s = 0;
-        for (const Cell& c : rows.back()) {
-            s += c.w;
-        }
-        return s;
-    };
-    auto newrow = [&]() {
-        if (!rows.back().empty()) {
-            rows.emplace_back();
+    std::vector<std::vector<Cell> > rows;
+    std::vector<Cell> run;   // bars not in a repeat, written as lines of four
+    auto lay = [&](const std::vector<Cell>& cells) {
+        size_t at = 0;
+        for (int len : lineLengths(int(cells.size()), cols)) {
+            rows.emplace_back(cells.begin() + long(at), cells.begin() + long(at) + len);
+            at += size_t(len);
         }
     };
-    auto put = [&](const Cell& cell) {
-        if (!rows.back().empty() && used() + cell.w > cols + 0.01) {
-            rows.emplace_back();
-        }
-        rows.back().push_back(cell);
+    auto flush = [&]() {
+        lay(run);
+        run.clear();
+    };
+    auto barCell = [](const BarKey& k) {
+        Cell c;
+        c.key = k;
+        return c;
     };
     for (const Item& it : items) {
         if (it.kind == Item::BarItem) {
-            Cell c;
-            c.key = it.keys.front();
-            c.w = barWeight(c.key, unit);
-            put(c);
+            run.push_back(barCell(it.keys.front()));
         } else if (it.kind == Item::Rest) {
-            newrow();
+            flush();
             Cell c;
             c.rest = true;
             c.n = it.n;
             c.key = it.keys.front();
             c.w = double(cols);
-            put(c);
-            newrow();
+            rows.push_back({ c });
         } else if (it.kind == Item::Rep) {
-            newrow();
-            const Keys& ks = it.keys;
-            for (size_t j = 0; j < ks.size(); ++j) {
-                Cell c;
-                c.key = ks[j];
-                c.w = barWeight(c.key, unit);
-                c.rs = j == 0;
-                c.re = j == ks.size() - 1;
-                c.times = j == ks.size() - 1 ? it.n : 0;
-                put(c);
-            }
-            newrow();
-        } else {
-            newrow();
+            flush();
+            std::vector<Cell> cells;
             for (size_t j = 0; j < it.keys.size(); ++j) {
-                Cell c;
-                c.key = it.keys[j];
-                c.w = barWeight(c.key, unit);
+                Cell c = barCell(it.keys[j]);
                 c.rs = j == 0;
-                put(c);
+                c.re = j == it.keys.size() - 1;
+                c.times = c.re ? it.n : 0;
+                cells.push_back(c);
             }
-            for (size_t n = 0; n < it.ends.size(); ++n) {
-                const Keys& e = it.ends[n];
-                for (size_t j = 0; j < e.size(); ++j) {
-                    Cell c;
-                    c.key = e[j];
-                    c.w = barWeight(c.key, unit);
-                    c.ending = j == 0 ? int(n) + 1 : 0;
+            lay(cells);
+        } else {
+            flush();
+            // the body and the 1st ending in lines of four (8 or 16 bars: whole lines)
+            std::vector<Cell> cells;
+            for (size_t j = 0; j < it.keys.size(); ++j) {
+                Cell c = barCell(it.keys[j]);
+                c.rs = j == 0;
+                cells.push_back(c);
+            }
+            int endingColumn = 0;
+            for (size_t e = 0; e < it.ends.size(); ++e) {
+                if (e == 1) {
+                    // the 2nd ending on the next line, under the 1st
+                    for (size_t at = 0; at < cells.size(); at += size_t(cols)) {
+                        rows.emplace_back(cells.begin() + long(at), cells.begin() + long(std::min(cells.size(), at + size_t(cols))));
+                    }
+                    cells.clear();
+                    for (int k = 0; k < endingColumn; ++k) {
+                        Cell sp;
+                        sp.spacer = true;
+                        cells.push_back(sp);
+                    }
+                }
+                if (e == 0) {
+                    endingColumn = int(cells.size() % size_t(cols));
+                    if (endingColumn + int(it.ends[e].size()) > cols) {
+                        endingColumn = 0;
+                    }
+                }
+                for (size_t j = 0; j < it.ends[e].size(); ++j) {
+                    Cell c = barCell(it.ends[e][j]);
+                    c.ending = j == 0 ? int(e) + 1 : 0;
                     c.endingCont = j > 0;
-                    c.endingLast = j == e.size() - 1;
-                    c.re = n == 0 && j == e.size() - 1;
-                    put(c);
+                    c.endingLast = j == it.ends[e].size() - 1;
+                    c.re = e == 0 && c.endingLast;
+                    cells.push_back(c);
                 }
             }
-            newrow();
+            for (size_t at = 0; at < cells.size(); at += size_t(cols)) {
+                rows.emplace_back(cells.begin() + long(at), cells.begin() + long(std::min(cells.size(), at + size_t(cols))));
+            }
         }
     }
-    if (rows.back().empty()) {
-        rows.pop_back();
-    }
+    flush();
     return rows;
 }
 
@@ -1546,128 +1649,111 @@ QString tempoHtml(const QString& tempo)
 QString chordChartHtml(const ChordChartData& song, const QString& title, const ChordChartFonts& fonts, const QString& version)
 {
     const Analysis a = analyse(song);
-    // the song's usual bar length: the width of a standard bar (the most common one; the first of equals)
-    Fraction unit(1, 1);
-    {
-        std::map<QString, int> counts;
-        QStringList order;
-        for (const ChordChartMeasure& m : song.measures) {
-            if (!counts.count(m.len)) {
-                order << m.len;
-            }
-            ++counts[m.len];
-        }
-        int best = -1;
-        for (const QString& len : order) {
-            if (counts[len] > best) {
-                best = counts[len];
-                unit = parseFrac(len);
-            }
-        }
-    }
+    const int cols = 4;
     const QString TIMES = QString::fromUtf8("\xc3\x97");       // ×
-    const QString DASH = QString::fromUtf8("\xe2\x80\x93");    // –
     const QString DOT = QString::fromUtf8(" \xc2\xb7 ");       // " · "
     QStringList form;
     QString out;
     QString prevTs;   // null = none yet
     for (const Group& g : a.groups) {
-        QStringList labs;
-        for (const QString& l : g.labels) {
-            labs << shortLabel(l);
-        }
-        const QString lab = labs.size() == 1 ? labs.first() : labs.first() + DASH + labs.last();
         const std::vector<Item> items = compressReadable(g.keys);
-        std::vector<int> counts;
-        for (const BarKey& k : g.keys) {
-            if (!k.ch.empty()) {
-                counts.push_back(int(k.ch.size()));
-            }
+        std::vector<std::vector<Cell> > rows = buildRows(items, cols);
+        for (std::vector<Cell>& row : rows) {
+            row.back().closing = true;
         }
-        double mean = 0;
-        int maxCount = 0;
-        for (int c : counts) {
-            mean += c;
-            maxCount = std::max(maxCount, c);
-        }
-        mean = counts.empty() ? 0 : mean / counts.size();
-        const bool dense = !counts.empty() && (mean >= 1.75 || (maxCount >= 3 && mean >= 1.5));
-        const int cols = dense ? 2 : 4;
-        std::vector<std::vector<Cell> > rows = buildRows(items, cols, unit);
         QString reps;
-        if (items.size() == 1 && items.front().kind == Item::Rep && labs.size() == 1) {
-            reps = TIMES + QString::number(items.front().n);
+        if (items.size() == 1 && items.front().kind == Item::Rep) {
+            reps = QString::number(items.front().n) + TIMES;
         }
-        if (!lab.isEmpty()) {
-            form << lab + reps;
-        }
-        QStringList notes;
-        if (labs.size() > 1) {
-            notes << QString("%1 times").arg(labs.size());
-        }
-        if (g.labels.size() == 1) {
-            if (const std::optional<QString> note = labelNote(g.labels.first())) {
+        // Each rehearsal mark is a section of its own (Joel, 14 Oct 2026; before 1.18.46 sections in a row with the
+        // same chords were one, "D–F" with "3 times" over a "2×" repeat). A section the same as the one before it is
+        // written out again when it's short, else "Same as D".
+        for (qsizetype li = 0; li < g.labels.size(); ++li) {
+            const QString lab = shortLabel(g.labels[li]);
+            if (!lab.isEmpty()) {
+                form << lab + (reps.isEmpty() ? QString() : QString(" ") + reps);
+            }
+            QStringList notes;
+            const bool sameAs = li > 0 && rows.size() > 2;
+            if (sameAs) {
+                notes << QString("Same as %1").arg(shortLabel(g.labels.first()));
+            }
+            if (const std::optional<QString> note = labelNote(g.labels[li])) {
                 notes << *note;
             }
-        }
-        for (const QString& t : g.texts) {
-            if (pyLen(t) < 80) {
-                notes << t;
-            }
-        }
-        QString sec = "<section>";
-        const bool wide = pyLen(lab) > 2;
-        if (wide || !notes.isEmpty()) {
-            sec += QString("<div class=\"head\">%1%2</div>")
-                   .arg(wide ? QString("<span class=\"lab\">%1</span>").arg(esc(lab)) : QString(),
-                        notes.isEmpty() ? QString() : QString("<span class=\"notes\">%1</span>").arg(esc(notes.join(DOT))));
-        }
-        const BarKey* prev = nullptr;
-        for (size_t r = 0; r < rows.size(); ++r) {
-            std::vector<Cell>& row = rows[r];
-            row.back().closing = true;
-            const bool last = r == rows.size() - 1;
-            // time signature: at the start of a row it sits in the margin, before the barline
-            const QString firstTs = row.front().key.ts;
-            QString marginTs;
-            if (prevTs.isNull() || firstTs != prevTs) {
-                marginTs = tsHtml(firstTs, "mts");
-            }
-            QStringList cells;
-            for (size_t j = 0; j < row.size(); ++j) {
-                const Cell& cell = row[j];
-                const QString ts = cell.key.ts;
-                const bool inside = j > 0 && ts != prevTs;
-                cells << barHtml(cell, prev, inside);
-                prev = cell.rest ? nullptr : &cell.key;
-                prevTs = ts;
-            }
-            double used = 0;
-            int times = 0;
-            QStringList colsCss;
-            for (const Cell& c : row) {
-                used += c.w;
-                if (!times && c.times) {
-                    times = c.times;
+            for (const QString& t : size_t(li) < g.textsPer.size() ? g.textsPer[size_t(li)] : g.texts) {
+                if (pyLen(t) < 80 && !notes.contains(t)) {
+                    notes << t;
                 }
-                colsCss << f3(c.w) + "fr";
             }
-            if (used < cols - 0.01) {
-                colsCss << f3(cols - used) + "fr";
-                // a short row: the repeat count right after its repeat sign
-                cells << QString("<div class=\"pad\">%1</div>")
-                    .arg(times ? QString("<span class=\"cnt\">%1%2</span>").arg(QString::number(times), TIMES) : QString());
-                times = 0;
+            QString sec = "<section>";
+            const bool wide = pyLen(lab) > 2 || sameAs;
+            if (wide || !notes.isEmpty()) {
+                sec += QString("<div class=\"head\">%1%2</div>")
+                       .arg(wide && !lab.isEmpty() ? QString("<span class=\"lab\">%1</span>").arg(esc(lab)) : QString(),
+                            notes.isEmpty() ? QString() : QString("<span class=\"notes\">%1</span>").arg(esc(notes.join(DOT))));
             }
-            const QString gutter = QString("<div class=\"gut\">%1%2</div>")
-                                   .arg(r == 0 && !wide && !lab.isEmpty() ? QString("<span class=\"lab\">%1</span>").arg(esc(lab)) : QString(),
-                                        marginTs);
-            const QString right = QString("<div class=\"cnt\">%1</div>").arg(times ? QString::number(times) + TIMES : QString());
-            sec += QString("<div class=\"row%1\" style=\"grid-template-columns: 44pt %2 20pt\">%3%4%5</div>")
-                   .arg(last ? " last" : "", colsCss.join(' '), gutter, cells.join(QString()), right);
+            if (sameAs) {
+                out += sec + "</section>";
+                continue;
+            }
+            const BarKey* prev = nullptr;
+            for (size_t r = 0; r < rows.size(); ++r) {
+                const std::vector<Cell>& row = rows[r];
+                const bool last = r == rows.size() - 1;
+                // time signature: at the start of a row it sits in the margin, before the barline
+                const bool startsWithBar = !row.front().spacer;
+                QString marginTs;
+                if (startsWithBar && (prevTs.isNull() || row.front().key.ts != prevTs)) {
+                    marginTs = tsHtml(row.front().key.ts, "mts");
+                }
+                QStringList cells;
+                QStringList colsCss;
+                double used = 0;
+                int times = 0;
+                for (size_t j = 0; j < row.size(); ++j) {
+                    const Cell& cell = row[j];
+                    colsCss << f3(cell.w) + "fr";
+                    used += cell.w;
+                    if (cell.spacer) {
+                        cells << "<div class=\"sp\"></div>";
+                        continue;
+                    }
+                    const QString ts = cell.key.ts;
+                    const bool inside = !(j == 0 && startsWithBar) && ts != prevTs;
+                    cells << barHtml(cell, prev, inside);
+                    prev = cell.rest ? nullptr : &cell.key;
+                    prevTs = ts;
+                    if (!times && cell.times) {
+                        times = cell.times;
+                    }
+                }
+                if (used < cols - 0.01) {
+                    colsCss << f3(cols - used) + "fr";
+                    // a short row: the repeat count right after its repeat sign
+                    cells << QString("<div class=\"pad\">%1</div>")
+                        .arg(times ? QString("<span class=\"cnt\">%1%2</span>").arg(QString::number(times), TIMES) : QString());
+                    times = 0;
+                }
+                const QString gutter = QString("<div class=\"gut\">%1%2</div>")
+                                       .arg(r == 0 && !wide && !lab.isEmpty() ? QString("<span class=\"lab\">%1</span>").arg(esc(lab)) : QString(),
+                                            marginTs);
+                const QString right = QString("<div class=\"cnt\">%1</div>").arg(times ? QString::number(times) + TIMES : QString());
+                // a slash chord's bass note makes its bar taller: the whole row is, so the barlines line up
+                const bool tallRow = std::any_of(row.begin(), row.end(), [](const Cell& c) {
+                    return !c.spacer && std::any_of(c.key.ch.begin(), c.key.ch.end(), [](const std::pair<Fraction, QString>& ch) {
+                        return ch.second != "NC" && !ch.second.section('|', 2, 2).isEmpty();
+                    });
+                });
+                // (a row with an ending bracket has room above it for the bracket)
+                const bool endingRow = std::any_of(row.begin(), row.end(), [](const Cell& c) { return c.ending || c.endingCont; });
+                sec += QString("<div class=\"row%1%2%3\" style=\"grid-template-columns: 46pt %4 22pt\">%5%6%7</div>")
+                       .arg(last ? " last" : "", tallRow ? " tall" : "", endingRow ? " ending" : "", colsCss.join(' '), gutter,
+                            cells.join(QString()), right);
+            }
+            sec += "</section>";
+            out += sec;
         }
-        sec += "</section>";
-        out += sec;
     }
     QString css = pyFormat(QString::fromUtf8(PDF_CSS), { { "modernoir", fonts.modernoir }, { "jost", fonts.jost },
                                                            { "bravura", fonts.bravura } });
@@ -1676,14 +1762,15 @@ QString chordChartHtml(const ChordChartData& song, const QString& title, const C
         css += QString::fromUtf8(PDF_FOOTER_CSS);
         footer = QString("<div class=\"ver\">%1</div>").arg(esc(QString("Version %1 %2 made by StarScore Studio").arg(version, DOT.trimmed())));
     }
+    // (each separator kept with the name before it, so a line never starts with one)
     QStringList formSpans;
-    for (const QString& f : form) {
-        formSpans << QString("<span>%1</span>").arg(esc(f));
+    for (qsizetype k = 0; k < form.size(); ++k) {
+        formSpans << QString("<span>%1%2</span>").arg(esc(form[k]), k + 1 < form.size() ? QString("<span class='sep'>%1</span>").arg(DOT.trimmed()) : QString());
     }
     return QString("<!doctype html><html><head><meta charset='utf-8'><style>%1</style></head><body><div id='page'>"
                    "<header><h1>%2</h1>%3<div class='form'>%4</div></header>%5%6</div>%7</body></html>")
            .arg(css, esc(title), a.tempo.isEmpty() ? QString() : QString("<div class=\"sub\">%1</div>").arg(tempoHtml(a.tempo)),
-                formSpans.join(QString("<span class='sep'>%1</span>").arg(DOT)), out, footer, QString::fromUtf8(PDF_JS));
+                formSpans.join(QString(" ")), out, footer, QString::fromUtf8(PDF_JS));
 }
 
 // ============================================================================================ 4. iReal Pro (chart.py)

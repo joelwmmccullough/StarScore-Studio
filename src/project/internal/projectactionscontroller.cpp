@@ -195,6 +195,12 @@ void ProjectActionsController::init()
     dispatcher()->reg(this, "starscore-part-mutes", [this]() {
         interactive()->open(Uri("musescore://starscore/mutes"));
     });
+    dispatcher()->reg(this, "starscore-part-flugelhorn", [this]() {
+        const QString message = starScoreService()->togglePartFlugelhorn();
+        if (!message.isEmpty()) {
+            interactive()->info(muse::trc("starscore", "Flugelhorn part"), message.toStdString());
+        }
+    });
     for (const bool below : { false, true }) {
         dispatcher()->reg(this, below ? "starscore-rhythm-below" : "starscore-rhythm-above", [this, below]() {
             // (the score on screen, a part score too: the selection is there, not in the full score)

@@ -19,7 +19,9 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSet>
+#include <QDate>
 #include <QDir>
+#include <QFileInfo>
 #include <QElapsedTimer>
 
 #include "settings.h"
@@ -28,6 +30,7 @@
 #include "engraving/dom/excerpt.h"
 #include "engraving/dom/part.h"
 #include "engraving/dom/instrument.h"
+#include "engraving/dom/stringdata.h"
 #include "engraving/dom/staff.h"
 #include "engraving/dom/measure.h"
 #include "engraving/dom/segment.h"
@@ -1921,6 +1924,128 @@ int StarScoreService::standardizeHornNames()
     return int(renames.size());
 }
 
+namespace {
+//! A bass guitar's string count from its names ("Bass Guitar (5-String)", "5 String Bass", "Bass Guitar 5s",
+//! "B. Guit. 4s"), else from its strings; 0 when it isn't a bass guitar or is a treble-clef or 6-string one
+int starscoreBassStrings(const mu::engraving::Part* p)
+{
+    const QString id = p->instrumentId().toQString();
+    if (!(id.contains("bass-guitar") || id.contains("electric-bass") || id.contains("fretless") || id.contains("string-bass"))
+        || id.contains("acoustic") || id == "contrabass") {
+        return 0;
+    }
+    const mu::engraving::Instrument* in = p->instrument();
+    const QString names = p->partName().toQString() + " | " + p->longName().toQString() + " | " + p->shortName().toQString();
+    if (names.contains("treble", Qt::CaseInsensitive) || names.contains("walking", Qt::CaseInsensitive)) {
+        return 0;
+    }
+    static const QRegularExpression strings("\\b([4-6])(?:[- ]?string|[- ]?str\\.?|s)\\b", QRegularExpression::CaseInsensitiveOption);
+    const QRegularExpressionMatch m = strings.match(names);
+    if (m.hasMatch()) {
+        return m.captured(1).toInt();
+    }
+    const int count = in && in->stringData() ? int(in->stringData()->strings()) : 4;
+    return count == 5 ? 5 : count == 6 ? 6 : 4;
+}
+}
+
+QString StarScoreService::mergeBassParts(bool apply)
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    engraving::MasterScore* ms = masterScore();
+    if (!master || !ms) {
+        return QString();
+    }
+    std::vector<engraving::Part*> four, five;
+    for (engraving::Part* p : ms->parts()) {
+        const int n = starscoreBassStrings(p);
+        if (n == 4) {
+            four.push_back(p);
+        } else if (n == 5) {
+            five.push_back(p);
+        }
+    }
+    if (four.size() != 1 || five.size() != 1) {
+        return QString();   // no pair (or more than two bass guitars: left alone)
+    }
+    // the 4-string part's notes (Joel's choice); the 5-string part's when the 4-string part has none
+    engraving::Part* keep = four.front();
+    engraving::Part* drop = five.front();
+    if (!starscore::partHasNotes(keep) && starscore::partHasNotes(drop)) {
+        std::swap(keep, drop);
+    }
+    const QString keepId = idText(keep), dropId = idText(drop);
+    const QString line = muse::qtrc("starscore", "Bass: \"%1\" and \"%2\" made one Bass Guitar part with the notes of \"%3\"")
+                         .arg(four.front()->longName().toQString(), five.front()->longName().toQString(),
+                              keep->longName().toQString());
+    if (!apply) {
+        return line;
+    }
+    // the song's data: the dropped part's place in sections goes to the kept part
+    Data d = load();
+    for (StarScoreSection& s : d.sections) {
+        const qsizetype at = s.partIds.indexOf(dropId);
+        if (at >= 0) {
+            if (s.partIds.contains(keepId)) {
+                s.partIds.removeAt(at);
+            } else {
+                s.partIds[at] = keepId;
+            }
+        }
+        s.shownPartIds.removeAll(dropId);
+        s.alternates.erase(dropId);
+    }
+    d.partStatus.erase(dropId);
+    d.partMutes.erase(dropId);
+    d.flugelhornParts.erase(dropId);
+    store(d);
+
+    // its part scores go with it; the kept part is "Bass Guitar"
+    const QString oldName = keep->partName().toQString();
+    {
+        ExcerptNotationList kept;
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            engraving::Excerpt* ex = importExcerptOf(e);
+            const std::vector<engraving::Part*> ps = ex ? masterPartsOf(ex) : std::vector<engraving::Part*> {};
+            if (ps.size() == 1 && ps.front() == drop) {
+                continue;
+            }
+            kept.push_back(e);
+        }
+        if (kept.size() != master->excerpts().size()) {
+            master->setExcerpts(kept);
+        }
+    }
+    removePartsKeepingSystemObjects(master, { dropId });
+    master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("One bass guitar part"));
+    engraving::EditPart::setInstrumentName(ms, keep, engraving::Fraction(0, 1), String(u"Bass Guitar"));
+    engraving::EditPart::setInstrumentAbbreviature(ms, keep, engraving::Fraction(0, 1), String(u"B. Guit."));
+    keep->setPartName(String(u"Bass Guitar"));
+    master->notation()->undoStack()->commitChanges();
+    for (const IExcerptNotationPtr& e : master->excerpts()) {
+        engraving::Excerpt* ex = importExcerptOf(e);
+        const std::vector<engraving::Part*> ps = ex ? masterPartsOf(ex) : std::vector<engraving::Part*> {};
+        if (ps.size() != 1 || ps.front() != keep) {
+            continue;
+        }
+        // its part score: named after the old part, or with the string count taken out ("Bass (4-String)" -> "Bass")
+        static const QRegularExpression strings("\\s*\\(?\\b[45][- ]?(?:string|str)\\b\\)?\\s*", QRegularExpression::CaseInsensitiveOption);
+        QString name = e->name() == oldName ? QString("Bass Guitar") : e->name();
+        name = name.replace(strings, " ").simplified();
+        if (!name.isEmpty() && name != e->name()) {
+            e->setName(name);
+        }
+    }
+    if (INotationProjectPtr project = globalContext()->currentProject()) {
+        project->markAsUnsaved();
+    }
+    master->parts()->partsChanged().notify();
+    master->notation()->notationChanged().notify();
+    scheduleChanged();
+    LOGI() << "[starscore] " << line.toStdString();
+    return line;
+}
+
 //! On opening a file: stand-in versions from older files shown with their section, their barlines like the Bass
 //! Trombone's, horn parts named by the scheme, and the horn part scores showing their exported title
 void StarScoreService::tidyOpenedScore()
@@ -2028,6 +2153,33 @@ void StarScoreService::tidyOpenedScore()
         master->notation()->undoStack()->commitChanges();
         master->notation()->notationChanged().notify();
         LOGI() << "[starscore] " << cleared << " rest(s) beside rhythm markings no longer moved by hand";
+    }
+
+    // One bass guitar part (Joel, 14 Oct 2026): a song with a 4-string and a 5-string bass part keeps the 4-string
+    // part's notes as "Bass Guitar"; the file as it was is first copied to Version History
+    if (!mergeBassParts(false).isEmpty()) {
+        const QString path = mainProjectPath().toQString();
+        QString archived;
+        if (!path.isEmpty() && QFileInfo::exists(path)) {
+            const QFileInfo fi(path);
+            const QString dir = fi.absolutePath() + "/Version History/" + QDate::currentDate().toString("yyyy-MM-dd")
+                                + " Before one bass part";
+            QDir().mkpath(dir);
+            archived = dir + "/" + fi.fileName();
+            if (!QFileInfo::exists(archived) && !QFile::copy(path, archived)) {
+                archived.clear();
+            }
+        }
+        // (only with the file safely copied: the change can't be undone reliably)
+        if (!archived.isEmpty() || path.isEmpty()) {
+            const QString done = mergeBassParts(true);
+            if (!qEnvironmentVariableIsSet("STARSCORE_AUTOTEST")) {
+                interactive()->info(muse::trc("starscore", "One bass guitar part"),
+                                    (done + "\n\n" + muse::qtrc("starscore", "The song as it was is in Version History (%1). Save "
+                                                                            "the song to keep the change.")
+                                     .arg(QFileInfo(QFileInfo(archived).absolutePath()).fileName())).toStdString());
+            }
+        }
     }
 
     standardizeHornNames();

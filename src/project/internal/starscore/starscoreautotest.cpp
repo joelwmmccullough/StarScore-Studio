@@ -88,6 +88,7 @@
 #include "engraving/dom/excerpt.h"
 #include "engraving/dom/part.h"
 #include "engraving/dom/instrument.h"
+#include "engraving/dom/stringdata.h"
 #include "engraving/dom/staff.h"
 #include "engraving/dom/text.h"
 #include "engraving/dom/stafftext.h"
@@ -696,6 +697,60 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             if (f.sheetLeft.contains("\n")) {
                 autotestLog(QString("  %1: %2").arg(f.relativePath, QString(f.sheetLeft).replace("\n", " / ")));
             }
+        }
+    } else if (step.startsWith("flugel:")) {
+        // flugel:<part name>[|<part name>…]: mark those parts as played on flugelhorn, then every planned sheet's file
+        // and its title top left (with #<filter> after the names, only paths containing it)
+        const QStringList names = step.mid(7).section('#', 0, 0).split('|', Qt::SkipEmptyParts);
+        const QString filter = step.mid(7).section('#', 1);
+        if (!qEnvironmentVariable("STARSCORE_AUTOTEST_BAND").isEmpty()) {
+            setBandFolder(qEnvironmentVariable("STARSCORE_AUTOTEST_BAND"));
+        }
+        Data d = load();
+        for (const engraving::Part* p : ms->parts()) {
+            if (names.contains(p->partName().toQString())) {
+                d.flugelhornParts.insert(idText(p));
+            }
+        }
+        store(d);
+        labelPartBooks();
+        const RetVal<StarScoreBandExportPlan> plan = planBandExport();
+        if (!plan.ret) {
+            autotestLog("  no plan: " + QString::fromStdString(plan.ret.toString()));
+        }
+        for (const StarScoreBandFile& f : plan.val.files) {
+            if (!f.isScore && (filter.isEmpty() || f.relativePath.contains(filter))) {
+                autotestLog(QString("  %1: %2").arg(f.relativePath, QString(f.sheetLeft).replace("\n", " / ")));
+            }
+        }
+    } else if (step == "basses") {
+        // the bass guitar parts (name, long name, strings, notes), their part scores and sections
+        for (const engraving::Part* p : ms->parts()) {
+            const QString id = p->instrumentId().toQString();
+            if (!id.contains("bass") || id.contains("clarinet") || id.contains("trombone") || id.contains("sax") || id.contains("soon")) {
+                continue;
+            }
+            QStringList books, secs;
+            for (const IExcerptNotationPtr& e : master->excerpts()) {
+                engraving::Score* es = e->notation() ? e->notation()->elements()->msScore() : nullptr;
+                if (es && std::any_of(es->parts().begin(), es->parts().end(), [&](const engraving::Part* bp) {
+                    return std::any_of(bp->staves().begin(), bp->staves().end(), [&](const engraving::Staff* st) {
+                        const engraving::Staff* l = st->findLinkedInScore(ms);
+                        return l && l->part() == p;
+                    });
+                })) {
+                    books << e->name();
+                }
+            }
+            for (const StarScoreSection& sec : load().sections) {
+                if (sec.partIds.contains(idText(p))) {
+                    secs << sec.name;
+                }
+            }
+            autotestLog(QString("  %1 [%2] long \"%3\" strings %4 notes %5 | books: %6 | sections: %7")
+                        .arg(p->partName().toQString(), id, p->longName().toQString())
+                        .arg(p->instrument()->stringData() ? int(p->instrument()->stringData()->strings()) : 0)
+                        .arg(starscore::partHasNotes(p) ? "yes" : "no", books.join(", "), secs.join(", ")));
         }
     } else if (step.startsWith("addtextat:")) {
         // addtextat:<part name>|<bar>|<text>: a staff text on the part's first beat of that bar (in the main score)

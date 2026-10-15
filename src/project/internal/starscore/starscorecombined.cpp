@@ -17,7 +17,9 @@
 #include <set>
 #include <tuple>
 
+#include <QFile>
 #include <QRegularExpression>
+#include <QTextStream>
 
 #include "engraving/dom/factory.h"
 #include "engraving/dom/fermata.h"
@@ -31,6 +33,9 @@
 #include "engraving/dom/staff.h"
 #include "engraving/dom/stafftext.h"
 #include "engraving/dom/chord.h"
+#include "engraving/dom/note.h"
+#include "engraving/dom/stem.h"
+#include "engraving/dom/tie.h"
 #include "engraving/dom/systemlock.h"
 #include "engraving/editing/editsystemlocks.h"
 #include "engraving/rw/xmlreader.h"
@@ -61,11 +66,33 @@ QString normalized(QString xml)
     static const QRegularExpression staffId("<Staff id=\"\\d+\">");
     static const QRegularExpression staffAttr(" staff=\"\\d+\"");
     static const QRegularExpression offset("<offset [^>]*/>");
-    static const QRegularExpression simple("<(placement|autoplace|minDistance)>[^<]*</\\1>");
+    // (play: whether a note or chord symbol sounds in playback, not what's printed; 14 Oct 2026: Drum Battle's
+    // trumpet lines differed only in that and were printed as two voices in unison)
+    static const QRegularExpression simple("<(placement|autoplace|minDistance|play|eid|velocity)>[^<]*</\\1>");
+    // an articulation's glyph above or below follows the stem; the clipboard's list of the voices it holds
+    static const QRegularExpression aboveBelow("<subtype>(artic\\w+?)(Above|Below)</subtype>");
+    static const QRegularExpression voiceOffset("<voiceOffset>.*?</voiceOffset>", QRegularExpression::DotMatchesEverythingOption);
+    xml.replace(aboveBelow, "<subtype>\\1</subtype>");
+    xml.replace(voiceOffset, QString());
     xml.replace(staffId, "<Staff>");
     xml.replace(staffAttr, QString());
     xml.replace(offset, QString());
     xml.replace(simple, QString());
+    // (and the indentation of what was taken out)
+    static const QRegularExpression between(">\\s+<");
+    xml.replace(between, "><");
+    return xml;
+}
+
+//! What decides whether two lines are the same: dynamics and hairpins left out (Joel, 14 Oct 2026: the same notes
+//! with f in one arrangement and mf in another were printed as two voices in unison; the line keeps the dynamics of
+//! the arrangement it's taken from)
+QString withoutDynamics(QString xml)
+{
+    static const QRegularExpression dynamic("<Dynamic>.*?</Dynamic>", QRegularExpression::DotMatchesEverythingOption);
+    static const QRegularExpression hairpin("<Spanner type=\"HairPin\">.*?</Spanner>", QRegularExpression::DotMatchesEverythingOption);
+    xml.replace(dynamic, QString());
+    xml.replace(hairpin, QString());
     return xml;
 }
 
@@ -108,6 +135,37 @@ int topVoice(const QString& xml)
         top = std::max(top, it.next().captured(1).toInt());
     }
     return top;
+}
+
+//! A bar's rhythm: each chord and rest with its length, tuplets, ties and grace notes (pitches left out)
+QString rhythmOf(const QString& sig)
+{
+    static const QRegularExpression tok("<(Chord|Rest)>|<durationType>[^<]*</durationType>|<dots>\\d</dots>|<Tuplet\\b|<endTuplet/>"
+                                        "|<Spanner type=\"Tie\">|<(acciaccatura|appoggiatura|grace\\w*)/>|<ticks>[^<]*</ticks>");
+    QString out;
+    QRegularExpressionMatchIterator it = tok.globalMatch(sig);
+    while (it.hasNext()) {
+        out += it.next().captured(0);
+    }
+    return out;
+}
+
+//! Each chord's pitches in a bar, in order
+std::vector<std::vector<int> > chordPitches(const QString& sig)
+{
+    static const QRegularExpression chord("<Chord>(.*?)</Chord>", QRegularExpression::DotMatchesEverythingOption);
+    static const QRegularExpression pitch("<pitch>(\\d+)</pitch>");
+    std::vector<std::vector<int> > out;
+    QRegularExpressionMatchIterator it = chord.globalMatch(sig);
+    while (it.hasNext()) {
+        std::vector<int> ps;
+        QRegularExpressionMatchIterator pit = pitch.globalMatch(it.next().captured(1));
+        while (pit.hasNext()) {
+            ps.push_back(pit.next().captured(1).toInt());
+        }
+        out.push_back(ps);
+    }
+    return out;
 }
 
 double meanPitch(const QStringList& sigs)
@@ -256,7 +314,7 @@ CombinedResult buildCombinedPart(const mu::notation::IMasterNotationPtr& copy, c
             QString sig = normalized(clip(parts[k], bars[i]->tick(), bars[i]->endTick()));
             rests[i][k] = restsOnly(sig);
             sigs[i][k] = sig;
-            const QString key = rests[i][k] ? QString("REST") : sig;
+            const QString key = rests[i][k] ? QString("REST") : withoutDynamics(sig);
             int g = int(seen.indexOf(key));
             if (g < 0) {
                 g = int(seen.size());
@@ -266,81 +324,125 @@ CombinedResult buildCombinedPart(const mu::notation::IMasterNotationPtr& copy, c
             silent[i] = silent[i] && rests[i][k];
         }
     }
-
-    // 2. Phrases: the bars between two bars where everyone rests, and between rehearsal marks. The grouping holds
-    // for a whole phrase (as Dorico condenses), so lines don't split and join bar by bar: two arrangements share a
-    // line only if they play the same thing in every bar of the phrase. Phrases in a row with the same grouping are
-    // one passage (labelled once); bars where everyone rests belong to the passage they're in.
-    auto rehearsalAt = [&](size_t i) {
-        for (Segment* seg = bars[i]->first(SegmentType::ChordRest); seg; seg = seg->next(SegmentType::ChordRest)) {
-            for (const EngravingItem* e : seg->annotations()) {
-                if (e->isRehearsalMark()) {
-                    return true;
+    // (STARSCORE_COMBINED_DEBUG=<file>: each bar's grouping, and where the different lines first differ)
+    if (const QString dbg = qEnvironmentVariable("STARSCORE_COMBINED_DEBUG"); !dbg.isEmpty()) {
+        QFile f(dbg);
+        if (f.open(QIODevice::Append | QIODevice::Text)) {
+            QTextStream ts(&f);
+            ts << "== " << chair.name << "\n";
+            for (size_t b = 0; b < nb; ++b) {
+                QStringList g;
+                for (size_t k = 0; k < n; ++k) {
+                    g << QString("%1H:%2").arg(chair.sources[k].horns).arg(rests[b][k] ? QString("-") : QString::number(group[b][k]));
+                }
+                ts << "bar " << b + 1 << " (" << bars[b]->no() + 1 << ") " << g.join(' ') << "\n";
+                if (!silent[b] && qEnvironmentVariableIsSet("STARSCORE_COMBINED_DEBUG_NOTES")) {
+                    // each line's notes: duration and pitches
+                    static const QRegularExpression tok("<(Chord|Rest)>|<durationType>([^<]+)</durationType>|<pitch>(\\d+)</pitch>");
+                    for (size_t k = 0; k < n; ++k) {
+                        QStringList out;
+                        QRegularExpressionMatchIterator it = tok.globalMatch(sigs[b][k]);
+                        while (it.hasNext()) {
+                            const QRegularExpressionMatch mm = it.next();
+                            if (mm.captured(1) == "Rest") {
+                                out << "r";
+                            } else if (mm.captured(1) == "Chord") {
+                                out << "|";
+                            } else if (!mm.captured(2).isEmpty()) {
+                                out.last() += mm.captured(2).left(3);
+                            } else {
+                                out.last() += "." + mm.captured(3);
+                            }
+                        }
+                        ts << "     " << chair.sources[k].horns << "H " << out.join(' ') << "\n";
+                    }
+                }
+                for (size_t k = 1; k < n; ++k) {
+                    if (rests[b][k] || rests[b][0] || group[b][k] == group[b][0]) {
+                        continue;
+                    }
+                    // the first differing spot between arrangement 0's line and this one's
+                    const QString& a = sigs[b][0];
+                    const QString& c = sigs[b][k];
+                    int p = 0;
+                    while (p < a.size() && p < c.size() && a[p] == c[p]) {
+                        ++p;
+                    }
+                    const int from = std::max(0, p - 80);
+                    ts << "   vs " << chair.sources[k].horns << "H @" << p << "\n     A: "
+                       << QString(a.mid(from, 200)).replace('\n', ' ') << "\n     B: " << QString(c.mid(from, 200)).replace('\n', ' ') << "\n";
                 }
             }
         }
-        return false;
-    };
+    }
+
+    // 2. Passages: bars in a row with the same grouping (bars where everyone rests belong to the passage they're
+    // in). Until 1.18.46 the grouping held for a whole phrase (from one bar where everyone rests to the next, as
+    // Dorico condenses), so one bar that differed split the whole phrase into voices, and arrangements playing the
+    // same thing were printed in unison in two voices for bars on end (Joel, 14 Oct 2026: "bizarre unisons"). Now
+    // the lines split only where they differ. So that they don't split and join bar by bar, a single bar where lines
+    // come together between two passages split the same way stays split.
     struct Run {
         size_t first = 0, last = 0;
         std::vector<int> grouping;
         int groups = 1;
         size_t firstPlayed = 0;   // the first bar where someone plays (where the labels go)
+        int played = 0;           // bars where someone plays
     };
     std::vector<Run> runs;
-    size_t i = 0;
-    while (i < nb) {
+    for (size_t i = 0; i < nb; ++i) {
         if (silent[i]) {
             if (runs.empty()) {
-                runs.push_back({ i, i, std::vector<int>(n, 0), 1, i });
+                runs.push_back({ i, i, std::vector<int>(n, 0), 1, i, 0 });
             } else {
                 runs.back().last = i;
             }
-            ++i;
             continue;
         }
-        // the phrase from bar i
-        size_t j = i;
-        while (j + 1 < nb && !silent[j + 1] && !rehearsalAt(j + 1)) {
-            ++j;
-        }
-        // arrangements together only if together in every bar of it
-        std::vector<int> grouping(n, -1);
-        int groups = 0;
-        for (size_t k = 0; k < n; ++k) {
-            if (grouping[k] >= 0) {
-                continue;
-            }
-            grouping[k] = groups;
-            for (size_t k2 = k + 1; k2 < n; ++k2) {
-                bool same = grouping[k2] < 0;
-                for (size_t b = i; b <= j && same; ++b) {
-                    same = group[b][k] == group[b][k2];
-                }
-                if (same) {
-                    grouping[k2] = groups;
-                }
-            }
-            ++groups;
-        }
-        const bool allSilentSoFar = !runs.empty() && std::all_of(silent.begin() + runs.back().first,
-                                                                  silent.begin() + runs.back().last + 1, [](bool b) { return b; });
-        if (!runs.empty() && runs.back().grouping == grouping && !allSilentSoFar) {
-            runs.back().last = j;
-        } else if (allSilentSoFar) {
-            runs.back().last = j;
-            runs.back().grouping = grouping;
-            runs.back().groups = groups;
-            runs.back().firstPlayed = i;
+        const std::vector<int>& grouping = group[i];   // (group ids in order of first appearance: comparable)
+        const int groups = *std::max_element(grouping.begin(), grouping.end()) + 1;
+        if (!runs.empty() && runs.back().played == 0) {
+            Run& r0 = runs.back();
+            r0.last = i;
+            r0.grouping = grouping;
+            r0.groups = groups;
+            r0.firstPlayed = i;
+            r0.played = 1;
+        } else if (!runs.empty() && runs.back().grouping == grouping) {
+            runs.back().last = i;
+            ++runs.back().played;
         } else {
-            runs.push_back({ i, j, grouping, groups, i });
+            runs.push_back({ i, i, grouping, groups, i, 1 });
         }
-        i = j + 1;
+    }
+    // whether `coarse` keeps together every arrangements `fine` keeps together
+    auto coarser = [&](const std::vector<int>& coarse, const std::vector<int>& fine) {
+        for (size_t k = 0; k < n; ++k) {
+            for (size_t k2 = k + 1; k2 < n; ++k2) {
+                if (fine[k] == fine[k2] && coarse[k] != coarse[k2]) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    };
+    for (bool merged = true; merged;) {
+        merged = false;
+        for (size_t r = 1; r + 1 < runs.size(); ++r) {
+            if (runs[r].played == 1 && runs[r - 1].grouping == runs[r + 1].grouping && runs[r].groups < runs[r - 1].groups
+                && coarser(runs[r].grouping, runs[r - 1].grouping)) {
+                runs[r - 1].last = runs[r + 1].last;
+                runs[r - 1].played += runs[r].played + runs[r + 1].played;
+                runs.erase(runs.begin() + long(r), runs.begin() + long(r) + 2);
+                merged = true;
+                break;
+            }
+        }
     }
 
     // 3. per passage: each group's voice (higher line first; a group that only rests last), and the clips
     struct Paste {
-        int staff = 0;   // 0 the combined staff, 1 the second staff
+        int staff = 0;   // 0 the combined staff, 1… the staves under it
         Fraction tick;
         QString xml;
     };
@@ -352,7 +454,32 @@ CombinedResult buildCombinedPart(const mu::notation::IMasterNotationPtr& copy, c
     };
     std::vector<Paste> pastes;
     std::vector<Label> labels;
+    // where each passage's lines went: (staff, first voice, the arrangement whose line it is), to tie notes over
+    // from one passage into the next (a tie out of a clip isn't pasted)
+    struct Placed {
+        int staff = 0;
+        int base = 0;
+        size_t rep = 0;
+    };
+    std::vector<std::vector<Placed> > placedByRun;
+    // lines whose notes go into the top line's chords: (first bar, last bar, the arrangement whose line it is)
+    struct Shared {
+        size_t first = 0, last = 0;
+        size_t rep = 0;
+        int staff = 0;   // where its head line is
+        int base = 0;
+    };
+    std::vector<Shared> sharedLines;
     int previousGroups = 1;
+    QStringList previousShown;
+    // Two lines to a staff at most (Gould: more than two parts on a staff can't be read at sight); a third line
+    // goes on a staff of its own under it, shown only where it's needed. Before 1.18.46 a staff took four voices
+    // (Joel, 14 Oct 2026: four lines on one staff in Industrial Park Driveway). (STARSCORE_COMBINED_VOICES: other
+    // than two, for testing)
+    static const int perStaff = std::clamp(qEnvironmentVariableIntValue("STARSCORE_COMBINED_VOICES") > 0
+                                           ? qEnvironmentVariableIntValue("STARSCORE_COMBINED_VOICES") : 2, 1, int(VOICES));
+    static constexpr int MAX_STAVES = 4;
+    int stavesNeeded = 1;
     for (const Run& run : runs) {
         ++r.passages;
         struct G {
@@ -364,6 +491,7 @@ CombinedResult buildCombinedPart(const mu::notation::IMasterNotationPtr& copy, c
             int voices = 1;
             int staff = 0;
             int base = 0;
+            bool shared = false;
         };
         std::vector<G> gs(run.groups);
         for (int g = 0; g < run.groups; ++g) {
@@ -396,37 +524,95 @@ CombinedResult buildCombinedPart(const mu::notation::IMasterNotationPtr& copy, c
             }
             return a.pitch > b.pitch;
         });
-        int used[2] = { 0, 0 };
-        // (STARSCORE_COMBINED_VOICES: fewer voices per staff, for testing the second staff)
-        static const int perStaff = std::clamp(qEnvironmentVariableIntValue("STARSCORE_COMBINED_VOICES") > 0
-                                               ? qEnvironmentVariableIntValue("STARSCORE_COMBINED_VOICES") : int(VOICES), 1, int(VOICES));
-        std::vector<int> tacet;   // arrangements resting through the passage that got no line of their own
+        // Lines in the same rhythm that don't cross share stems: one chord, each line's note in it, the labels over
+        // it top line first, "1H / 2H / 3H" (Gould: parts in the same rhythm share a stem; a unison is one note).
+        // Before 1.18.46 each got a voice or a staff of its own, so a horn stab in four arrangements took four staves
+        // (Joel, 14 Oct 2026: Industrial Park Driveway). Lines are taken from the top down: one joins the line above
+        // it when it has the same rhythm wherever it plays (and that line plays there too) and its notes are never
+        // above the notes of the line just above it.
+        std::vector<G*> playing;
         for (G& g : gs) {
-            // a group that only rests goes on the second staff never: it's told it rests in words
-            if (g.restsThroughout && used[0] + g.voices > perStaff) {
-                g.staff = -1;
-                tacet.insert(tacet.end(), g.horns.begin(), g.horns.end());
-                continue;
-            }
-            g.staff = used[0] + g.voices <= perStaff ? 0 : 1;
-            g.base = used[g.staff];
-            used[g.staff] += g.voices;
-            if (used[1] > perStaff) {
-                r.problem = QString("bar %1: more than eight lines at once").arg(bars[run.first]->no() + 1);
-                return r;
+            if (!g.restsThroughout) {
+                playing.push_back(&g);
             }
         }
-        r.secondStaff = r.secondStaff || used[1] > 0;
+        std::map<const G*, const G*> headOf;   // a line sharing stems -> the line whose chords take its notes
+        for (size_t k = 1; k < playing.size(); ++k) {
+            const G* above = playing[k - 1];
+            const G* head = headOf.count(above) ? headOf[above] : above;
+            const G* g = playing[k];
+            bool fits = head->voices == 1 && g->voices == 1;
+            for (size_t i = run.first; i <= run.last && fits; ++i) {
+                if (silent[i] || rests[i][g->rep]) {
+                    continue;
+                }
+                const QString& mine = sigs[i][g->rep];
+                fits = !rests[i][head->rep] && rhythmOf(mine) == rhythmOf(sigs[i][head->rep]);
+                if (fits && !rests[i][above->rep]) {
+                    const std::vector<std::vector<int> > hi = chordPitches(sigs[i][above->rep]);
+                    const std::vector<std::vector<int> > lo = chordPitches(mine);
+                    fits = hi.size() == lo.size();
+                    for (size_t c = 0; c < lo.size() && fits; ++c) {
+                        fits = !hi[c].empty() && !lo[c].empty()
+                               && *std::min_element(hi[c].begin(), hi[c].end()) >= *std::max_element(lo[c].begin(), lo[c].end());
+                    }
+                }
+            }
+            if (fits) {
+                headOf[g] = head;
+            }
+        }
+        int used[MAX_STAVES] = { 0, 0, 0, 0 };
+        // Two lines share a staff (one stems up, labelled above; one stems down, labelled below). Three or four lines
+        // get a staff each, labelled above, so no label sits between two staves where it could be either's; more
+        // than four go two to a staff again.
+        const int lines = int(playing.size() - headOf.size());
+        const int runPerStaff = qEnvironmentVariableIntValue("STARSCORE_COMBINED_VOICES") > 0 ? perStaff
+                                : (lines >= 3 && lines <= MAX_STAVES ? 1 : perStaff);
+        for (G& g : gs) {
+            // A group that only rests gets no line: the lines played are labelled with who plays them, so the others
+            // know they rest (Gould: a part labelled "1." is played by the first player alone). Before 1.18.46 it got
+            // a voice of rests and a label, or "4H–7H tacet" where there was no room (Joel, 14 Oct 2026: labels
+            // stacked three deep in Industrial Park Driveway).
+            if (g.restsThroughout) {
+                g.staff = -1;
+                continue;
+            }
+            if (headOf.count(&g)) {
+                continue;   // placed with its head, below
+            }
+            // the first staff with room (a line in more voices than that has a staff to itself)
+            int st = 0;
+            while (st < MAX_STAVES && used[st] > 0 && used[st] + g.voices > std::max(runPerStaff, g.voices)) {
+                ++st;
+            }
+            if (st >= MAX_STAVES || used[st] + g.voices > int(VOICES)) {
+                r.problem = QString("bar %1: too many different lines at once").arg(bars[run.first]->no() + 1);
+                return r;
+            }
+            g.staff = st;
+            g.base = used[st];
+            used[st] += g.voices;
+            stavesNeeded = std::max(stavesNeeded, st + 1);
+        }
+        for (auto& [g, head] : headOf) {
+            G* m = const_cast<G*>(g);
+            m->staff = head->staff;
+            m->base = head->base;
+            m->shared = true;   // its notes go into its head's chords
+        }
         if (run.groups > 1) {
             ++r.splitPassages;
         }
 
-        if (!tacet.empty()) {
-            labels.push_back({ 0, run.firstPlayed, used[0] > 1 ? 1 : 0,
-                               muse::qtrc("starscore", "%1 tacet").arg(arrangementLabel(tacet)) });
-        }
+        placedByRun.emplace_back();
         for (const G& g : gs) {
             if (g.staff < 0) {
+                continue;
+            }
+            placedByRun.back().push_back({ g.staff, g.base, g.rep });
+            if (g.shared) {
+                sharedLines.push_back({ run.first, run.last, g.rep, g.staff, g.base });
                 continue;
             }
             const bool main = g.staff == 0 && g.base == 0;
@@ -446,18 +632,40 @@ CombinedResult buildCombinedPart(const mu::notation::IMasterNotationPtr& copy, c
                 pastes.push_back({ g.staff, bars[i]->tick(), shifted(xml, g.base) });
                 i = j + 1;
             }
-            if (run.groups > 1) {
-                labels.push_back({ g.staff, run.firstPlayed, g.base, arrangementLabel(g.horns) });
+        }
+        // the labels: who plays each line, where that changes (not again when only who rests changed)
+        QStringList shown;
+        for (const G& g : gs) {
+            if (g.staff >= 0) {
+                shown << QString("%1/%2/%3").arg(g.staff).arg(g.base).arg(arrangementLabel(g.horns));
+            }
+        }
+        if (run.groups > 1 && shown != previousShown) {
+            for (const G& g : gs) {
+                if (g.staff < 0 || g.shared) {
+                    continue;
+                }
+                QStringList stack { arrangementLabel(g.horns) };   // its own, then the lines sharing its stems, top down
+                for (const G& m : gs) {
+                    auto h = headOf.find(&m);
+                    if (h != headOf.end() && h->second == &g) {
+                        stack << arrangementLabel(m.horns);
+                    }
+                }
+                labels.push_back({ g.staff, run.firstPlayed, g.base, stack.join(" / ") });
             }
         }
         if (run.groups == 1 && previousGroups > 1) {
             labels.push_back({ 0, run.firstPlayed, 0, muse::qtrc("starscore", "All") });
         }
         previousGroups = run.groups;
+        previousShown = run.groups > 1 ? shown : QStringList();
     }
 
-    // 4. into the copy: the largest arrangement's part emptied, a second staff if needed, the lines and the labels
-    if (r.secondStaff) {
+    // 4. into the copy: the largest arrangement's part emptied, the staves needed under it, the lines and the labels
+    r.staves = stavesNeeded;
+    r.secondStaff = stavesNeeded > 1;
+    for (int k = 1; k < stavesNeeded; ++k) {
         Staff* st = Factory::createStaff(target);
         st->setDefaultClefType(target->staves().front()->defaultClefType());
         copy->parts()->appendStaff(st, target->id());
@@ -483,6 +691,117 @@ CombinedResult buildCombinedPart(const mu::notation::IMasterNotationPtr& copy, c
         }
         ms->deselectAll();
     }
+    // Lines sharing stems: each note of theirs into the top line's chord at the same beat (a unison is one note), tied
+    // as in their own arrangement
+    for (const Shared& sh : sharedLines) {
+        const staff_idx_t srcStaff = parts[sh.rep]->staves().front()->idx();
+        std::map<const Note*, Note*> placed;   // the arrangement's note -> the note in the chord
+        for (size_t b = sh.first; b <= sh.last; ++b) {
+            for (Segment* seg = bars[b]->first(SegmentType::ChordRest); seg; seg = seg->next(SegmentType::ChordRest)) {
+                const EngravingItem* se = seg->element(srcStaff * VOICES);
+                EngravingItem* de = seg->element((dst0 + sh.staff) * VOICES + sh.base);
+                if (!se || !se->isChord() || !de || !de->isChord()) {
+                    continue;
+                }
+                Chord* dc = toChord(de);
+                for (const Note* sn : toChord(se)->notes()) {
+                    Note* there = dc->findNote(sn->pitch());
+                    if (!there) {
+                        there = Factory::createNote(dc);
+                        there->setParent(dc);
+                        there->setTrack(dc->track());
+                        there->setNval(sn->noteVal());
+                        ms->undoAddElement(there);
+                    }
+                    placed[sn] = there;
+                }
+                // its grace notes are left out: the rhythm compared doesn't let them differ
+            }
+        }
+        for (const auto& [sn, there] : placed) {
+            const Tie* st = sn->tieFor();
+            auto to = st ? placed.find(st->endNote()) : placed.end();
+            if (to == placed.end() || there->tieFor() || to->second->tieBack()) {
+                continue;
+            }
+            Tie* tie = Factory::createTie(ms->dummy());
+            tie->setStartNote(there);
+            tie->setEndNote(to->second);
+            tie->setTick(there->tick());
+            tie->setTick2(to->second->tick());
+            tie->setTrack(there->track());
+            there->setTieFor(tie);
+            to->second->setTieBack(tie);
+            ms->undoAddElement(tie);
+        }
+        ++r.sharedStemPassages;
+    }
+
+    // Ties from one passage into the next: a clip's tie into a bar after it isn't pasted. Where the line's
+    // arrangement ties a note over, the note is tied to the same pitch at the start of the next passage on its staff
+    // (in its own voice when it has the note there, else in another).
+    int tiesMade = 0;
+    for (size_t ri = 0; ri + 1 < runs.size() && ri < placedByRun.size(); ++ri) {
+        const Fraction boundary = bars[runs[ri].last]->endTick();
+        Measure* lastBar = bars[runs[ri].last];
+        for (const Placed& pl : placedByRun[ri]) {
+            const staff_idx_t srcStaff = parts[pl.rep]->staves().front()->idx();
+            const staff_idx_t dstStaff = dst0 + pl.staff;
+            for (Segment* seg = lastBar->first(SegmentType::ChordRest); seg; seg = seg->next(SegmentType::ChordRest)) {
+                for (voice_idx_t v = 0; v < VOICES; ++v) {
+                    const EngravingItem* se = seg->element(srcStaff * VOICES + v);
+                    if (!se || !se->isChord()) {
+                        continue;
+                    }
+                    for (const Note* sn : toChord(se)->notes()) {
+                        const Tie* st = sn->tieFor();
+                        if (!st || !st->endNote() || st->endNote()->tick() != boundary) {
+                            continue;
+                        }
+                        // the note it starts from: the same pitch in the line's voice, in the chord at the same beat
+                        const voice_idx_t dv = voice_idx_t(pl.base) + v;
+                        if (dv >= VOICES) {
+                            continue;
+                        }
+                        const EngravingItem* de = seg->element(dstStaff * VOICES + dv);
+                        Note* from = de && de->isChord() ? toChord(de)->findNote(sn->pitch()) : nullptr;
+                        if (!from || from->tieFor()) {
+                            continue;
+                        }
+                        Segment* next = ms->tick2segment(boundary, true, SegmentType::ChordRest);
+                        Note* to = nullptr;
+                        for (int pass = 0; pass < 2 && next && !to; ++pass) {
+                            for (voice_idx_t w = 0; w < VOICES && !to; ++w) {
+                                if ((pass == 0) != (w == dv)) {
+                                    continue;
+                                }
+                                const EngravingItem* ne = next->element(dstStaff * VOICES + w);
+                                Note* cand = ne && ne->isChord() ? toChord(ne)->findNote(sn->pitch()) : nullptr;
+                                if (cand && !cand->tieBack()) {
+                                    to = cand;
+                                }
+                            }
+                        }
+                        if (!to) {
+                            continue;
+                        }
+                        Tie* tie = Factory::createTie(ms->dummy());
+                        tie->setStartNote(from);
+                        tie->setEndNote(to);
+                        tie->setTick(from->tick());
+                        tie->setTick2(to->tick());
+                        tie->setTrack(from->track());
+                        from->setTieFor(tie);
+                        to->setTieBack(tie);
+                        ms->undoAddElement(tie);
+                        ++tiesMade;
+                    }
+                }
+            }
+        }
+    }
+    r.tiesMade = tiesMade;
+
     // A chord symbol or dynamic that several lines brought in, once at its beat; a text with the same words, once
     // within two bars (the arrangements put it in slightly different places). What's left sits where MuseScore puts
     // it: the positions were set by hand for another layout.
@@ -496,10 +815,13 @@ CombinedResult buildCombinedPart(const mu::notation::IMasterNotationPtr& copy, c
                 if (e->staffIdx() < dst0 || e->staffIdx() >= dst0 + target->nstaves() || !e->isTextBase()) {
                     continue;
                 }
-                const QString words = toTextBase(e)->plainText().toQString();
+                // ("(open)" and "open" are the same words)
+                const QString words = toTextBase(e)->plainText().toQString().remove('(').remove(')').simplified().toLower();
                 bool dup = false;
                 if (e->isHarmony() || e->isDynamic()) {
-                    dup = !seen.insert(std::make_pair(int(e->type()) * 100000 + int(seg->rtick().ticks()), words)).second;
+                    // (once on each staff: a line on the staff under the combined one keeps its own)
+                    dup = !seen.insert(std::make_pair(int(e->staffIdx()) * 10000000 + int(e->type()) * 100000 + int(seg->rtick().ticks()),
+                                                      words)).second;
                 } else {
                     const QString key = QString::number(int(e->type())) + "|" + words;
                     auto it = textBar.find(key);
@@ -566,6 +888,69 @@ CombinedResult buildCombinedPart(const mu::notation::IMasterNotationPtr& copy, c
     r.ok = true;
     r.targetPartId = target->id().toQString();
     return r;
+}
+
+int hideSlashesOverNotes(Score* score)
+{
+    if (!score) {
+        return 0;
+    }
+    auto beatSlash = [](const Chord* c) {
+        if (c->notes().empty() || c->isGrace()) {
+            return false;
+        }
+        for (const Note* n : c->notes()) {
+            if (n->headGroup() != NoteHeadGroup::HEAD_SLASH || isRhythmMarking(n)) {
+                return false;
+            }
+        }
+        return c->noStem() || !c->stem() || !c->stem()->visible();
+    };
+    int hidden = 0;
+    for (Measure* m = score->firstMeasure(); m; m = m->nextMeasure()) {
+        for (staff_idx_t si = 0; si < score->nstaves(); ++si) {
+            std::vector<Chord*> slashes;
+            std::vector<Chord*> notes;
+            for (Segment* seg = m->first(SegmentType::ChordRest); seg; seg = seg->next(SegmentType::ChordRest)) {
+                for (voice_idx_t v = 0; v < VOICES; ++v) {
+                    EngravingItem* e = seg->element(si * VOICES + v);
+                    if (!e || !e->isChord() || !e->visible()) {
+                        continue;
+                    }
+                    Chord* c = toChord(e);
+                    (beatSlash(c) ? slashes : notes).push_back(c);
+                }
+            }
+            if (slashes.empty() || notes.empty()) {
+                continue;
+            }
+            const double shrink = score->style().spatium() * 0.05;   // touching isn't overlapping
+            for (Chord* s : slashes) {
+                bool hit = false;
+                for (const Note* sn : s->notes()) {
+                    const RectF r = sn->pageBoundingRect().adjusted(shrink, shrink, -shrink, -shrink);
+                    for (const Chord* o : notes) {
+                        if (o->track() == s->track()) {
+                            continue;
+                        }
+                        hit = hit || o->shape().translated(o->pagePos()).intersects(r);
+                        for (const Note* on : o->notes()) {
+                            hit = hit || on->pageBoundingRect().intersects(r);
+                        }
+                    }
+                }
+                if (!hit) {
+                    continue;
+                }
+                for (Note* sn : s->notes()) {
+                    sn->undoChangeProperty(Pid::VISIBLE, false);
+                }
+                s->undoChangeProperty(Pid::VISIBLE, false);
+                ++hidden;
+            }
+        }
+    }
+    return hidden;
 }
 
 QStringList copySectionLayouts(const std::vector<CombinedLayoutSource>& sources, Score* target)

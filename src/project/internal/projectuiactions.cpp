@@ -204,6 +204,13 @@ const UiActionList ProjectUiActions::m_actions = {
              TranslatableString("action", "Mutes for this part…"),
              TranslatableString("action", "Choose the mutes this brass part plays with; its sheets print them under the instrument name")
              ),
+    UiAction("starscore-part-flugelhorn",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Flugelhorn part on/off"),
+             TranslatableString("action", "Mark the trumpet part open as played on flugelhorn: its sheets say \"Flugelhorn\" "
+                                          "top left; the file names still say Trumpet")
+             ),
     UiAction("starscore-rhythm-above",
              mu::context::UiCtxProjectOpened,
              mu::context::CTX_ANY,

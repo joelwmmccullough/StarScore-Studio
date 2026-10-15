@@ -121,6 +121,7 @@ public:
     std::map<QString, StarScoreStatus> partStatuses() const override;
     QStringList partMutes(const QString& partId) const override;
     void setPartMutes(const QString& partId, const QStringList& mutes) override;
+    QString togglePartFlugelhorn() override;
     void setPartStatus(const QString& partId, int status) override;
     int partScoreStatus(const mu::engraving::Score* score) const override;
     void setPartScoreStatus(const mu::engraving::Score* score, int status) override;
@@ -310,6 +311,7 @@ public:
         QString version;   // "4.0.1"; printed in the footer
         std::map<QString, QString> partStatus;   // part id -> status key
         std::map<QString, QStringList> partMutes;   // part id -> its mutes as the sheet names them ("Harmon Mute")
+        std::set<QString> flugelhornParts;   // trumpet parts (and Flexible chairs) played on flugelhorn
         // Big Band, Orchestra and Marching Band: their full score has a status of its own (arrangement id ->
         // status key); the arrangement is finished only when its full score is marked Finished too
         std::map<QString, QString> scoreStatus;
@@ -533,6 +535,10 @@ private:
     int standardizeHornNames();
     //! Tidying on opening a file: older stand-in versions shown, horn names, part score titles
     void tidyOpenedScore();
+    //! A song's 4-string and 5-string bass guitar parts made one "Bass Guitar" part with the 4-string part's notes
+    //! (Joel, 14 Oct 2026: "one single bass guitar part"). apply false: only says what it would do. Returns a line
+    //! saying what was (or would be) done, empty when the song doesn't have the pair.
+    QString mergeBassParts(bool apply);
     void clearComposerInCurrentScore();
     void lockFinishedScore(engraving::Score* score);
     void lockFinishedParts(const QStringList& partIds);
