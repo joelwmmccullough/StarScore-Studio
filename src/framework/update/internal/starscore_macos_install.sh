@@ -24,33 +24,70 @@ LOG="$LOG_DIR/update.log"
 
 MOUNT_POINT=""
 
+# While this script runs, StarScore refuses to start: it shows the "installing" window instead and the script opens it
+# when the install is done (Joel, 15 Oct 2026). The lock holds this script's pid and start time; StarScore checks both
+# (and that the pid is still this script), so a lock left behind by a script that was killed is ignored and never
+# keeps StarScore from opening. Keep the path and format in step with src/app/starscoreupdatelock.h.
+LOCK_DIR="$HOME/Library/Application Support/StarScore Studio"
+LOCK="$LOCK_DIR/update-in-progress"
+WINDOW_FILE="$LOCK_DIR/update-window"
+
 log() {
     printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOG"
 }
 
-# While the new app is copied in, a window says StarScore is installing, so nobody opens the old app (or a
-# half-copied one) in the meantime. It closes by itself when the install is done or fails.
+# While the new app is copied in, a window says StarScore is installing. It closes by itself when the install is done
+# or fails. (Opening StarScore meanwhile shows the same window again: see the lock above.)
 WINDOW_PID=""
 show_installing_window() {
     osascript >/dev/null 2>&1 <<'OSA' &
 activate
-display dialog "StarScore Studio is installing an update." & return & return & "Please don't open StarScore yet. It will open by itself when the install is done (usually within a minute)." with title "Installing StarScore Studio" buttons {"OK"} default button "OK" with icon note giving up after 900
+display dialog "Installation in progress." & return & return & "StarScore Studio will open by itself once the installation is finished (usually within a minute)." with title "Installing StarScore Studio" buttons {"OK"} default button "OK" with icon note giving up after 900
 OSA
     WINDOW_PID=$!
+    printf '%s\n' "$WINDOW_PID" > "$WINDOW_FILE" 2>/dev/null || true
 }
 close_installing_window() {
     if [ -n "$WINDOW_PID" ]; then
         kill "$WINDOW_PID" 2>/dev/null
         WINDOW_PID=""
     fi
+    rm -f -- "$WINDOW_FILE" 2>/dev/null
 }
 
-# The script is a temp file; remove it once done, whatever happened.
+write_lock() {
+    mkdir -p "$LOCK_DIR" 2>/dev/null
+    if printf '%s %s\n' "$$" "$(date +%s)" > "$LOCK.tmp" 2>/dev/null && mv -f "$LOCK.tmp" "$LOCK" 2>/dev/null; then
+        log "lock written: $LOCK"
+    else
+        rm -f -- "$LOCK.tmp" 2>/dev/null
+        log "could not write the lock $LOCK (StarScore can still be opened during the install)"
+    fi
+}
+remove_lock() {
+    rm -f -- "$LOCK" "$LOCK.tmp" 2>/dev/null
+}
+
+# The script is a temp file; remove it once done, whatever happened. The lock goes too, so StarScore can always be
+# opened again once this script has ended, however it ended.
+STAGING=""
+OLD_APP=""
 cleanup_self() {
+    # stopped between moving the old app aside and moving the new one in: put the old one back, so there is always
+    # an app to open
+    if [ -n "$OLD_APP" ] && [ -d "$OLD_APP" ] && [ -n "$APP" ] && [ ! -e "$APP" ]; then
+        mv "$OLD_APP" "$APP" >> "$LOG" 2>&1 && log "put the old app back" || log "could not put $OLD_APP back at $APP"
+    fi
+    if [ -n "$STAGING" ] && [ -d "$STAGING" ]; then
+        rm -rf "$STAGING"
+    fi
     close_installing_window
+    remove_lock
     rm -f -- "$0" 2>/dev/null
 }
 trap cleanup_self EXIT
+# (a signal ends the script through exit, so the EXIT trap above runs)
+trap 'log "stopped by a signal"; exit 1' HUP INT TERM
 
 detach_dmg() {
     if [ -n "$MOUNT_POINT" ] && [ -d "$MOUNT_POINT" ]; then
@@ -65,6 +102,8 @@ detach_dmg() {
 # Last resort: behave like the old updater and let the user drag the app out of the dmg themselves.
 fallback_open_dmg() {
     detach_dmg
+    close_installing_window
+    remove_lock
     log "falling back to opening the dmg in Finder: $DMG"
     if [ -f "$DMG" ]; then
         open "$DMG" >> "$LOG" 2>&1 || log "open failed for $DMG"
@@ -73,6 +112,7 @@ fallback_open_dmg() {
 }
 
 log "---- update started: dmg=\"$DMG\" app=\"$APP\" pid=\"$PID\""
+write_lock
 
 if [ -z "$DMG" ] || [ ! -f "$DMG" ]; then
     log "dmg not found; nothing to install"
@@ -162,6 +202,9 @@ if ! ditto "$NEW_APP" "$STAGING" >> "$LOG" 2>&1; then
     fallback_open_dmg
 fi
 
+# (the quarantine flag off before it goes into place, so it never sits in /Applications unopenable)
+xattr -dr com.apple.quarantine "$STAGING" >> "$LOG" 2>&1 || true
+
 if ! mv "$APP" "$OLD_APP" >> "$LOG" 2>&1; then
     log "could not move the old app aside ($APP -> $OLD_APP)"
     rm -rf "$STAGING"
@@ -186,6 +229,8 @@ xattr -dr com.apple.quarantine "$APP" >> "$LOG" 2>&1 || true
 
 log "installed $APP from $DMG"
 close_installing_window
+# (before opening it: the new StarScore must not find the lock and wait for this script)
+remove_lock
 
 if ! open "$APP" >> "$LOG" 2>&1; then
     log "open failed for $APP"

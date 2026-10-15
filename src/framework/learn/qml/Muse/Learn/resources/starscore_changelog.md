@@ -4,6 +4,11 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.48
+
+- **Opening StarScore during an update.** While an update is being installed, opening StarScore shows the "Installing StarScore Studio" window ("Installation in progress. StarScore Studio will open by itself once the installation is finished.") instead of starting the old app. The window closes and StarScore opens when the install is done. This works from the next update on: the update to 1.18.48 is still installed by 1.18.47's installer.
+- **Safer installs.** StarScore only waits for an install that is really running: a lock file left by an install that was stopped, is more than 20 minutes old, or belongs to another program is ignored and deleted, so it can never keep StarScore from opening. If an install is stopped partway, the old app is put back and the half-copied one removed. The downloaded app's quarantine flag is cleared before it goes into Applications.
+
 ## 1.18.47
 
 - **Double-Time and Half-Time sheets get their own folders.** They go in "Sheet Music (Double-Time)" and "Sheet Music (Half-Time)" next to "Sheet Music", with the same arrangement folders inside. Sheets already in "Sheet Music/…/Double-Time" or "Half-Time" folders are moved there the next time the song is exported. Where a sheet is in both places, the newer one is kept and the older one goes to Version History.

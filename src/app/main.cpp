@@ -28,6 +28,7 @@
 #include <QSslSocket>
 
 #include "appfactory.h"
+#include "starscoreupdatelock.h"
 #include "internal/commandlineparser.h"
 #include "global/iapplication.h"
 
@@ -145,6 +146,14 @@ static void app_init_qrc()
 
 int main(int argc, char** argv)
 {
+#ifdef Q_OS_MACOS
+    // StarScore: while an update is being installed, show the "Installation in progress" window and quit; the install
+    // script opens StarScore when it's done (see starscoreupdatelock.h)
+    if (starscore::updatelock::installInProgress()) {
+        return 0;
+    }
+#endif
+
 #ifndef MUSE_MODULE_DIAGNOSTICS_CRASHPAD_CLIENT
     installCrashCallback();
 #endif
