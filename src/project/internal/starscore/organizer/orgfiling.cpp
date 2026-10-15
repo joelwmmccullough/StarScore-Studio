@@ -203,26 +203,23 @@ SheetMusicMove moveSongIntoSheetMusic(const QString& band, const QString& songRo
     if (songRoot.isEmpty() || !dir.exists()) {
         return out;
     }
-    for (const QFileInfo& fi : dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
-        const QString name = fi.fileName();
-        if (fi.isSymLink() || hidden(name) || staysAtSongTop(name)) {
-            continue;
-        }
-        const QString to = song + "/" + SHEET_MUSIC + "/" + name;
+    // A folder's files into another folder that may already hold some: the folder moves whole when the other isn't
+    // there; else file by file, the newer of two files with one name kept and the other archived. The emptied folders
+    // go (a folder with anything left in it, a .DS_Store included, stays). True when anything moved.
+    auto mergeInto = [&](const QString& from, const QString& to) {
         if (!QFileInfo::exists(to)) {
-            if (moveItem(fi.filePath(), to)) {
-                out.moved << name;
-            } else {
-                out.failed << songRoot + "/" + name;
+            QDir().mkpath(QFileInfo(to).absolutePath());
+            if (moveItem(from, to)) {
+                return true;
             }
-            continue;
+            out.failed << relativeTo(band, from);
+            return false;
         }
-        // already there too: file by file, the newer of two files with one name kept
         QStringList leaves;
-        walkLeaves(fi.filePath(), QString(), leaves);
+        walkLeaves(from, QString(), leaves);
         bool any = false;
         for (const QString& rel : leaves) {
-            const QString src = fi.filePath() + "/" + rel;
+            const QString src = from + "/" + rel;
             const QString dst = to + "/" + rel;
             auto archive = [&](const QString& path) {
                 const QString tgt = freeName(song + "/Version History/" + todayIso + " Superseded/" + relativeTo(song, dst));
@@ -243,15 +240,15 @@ SheetMusicMove moveSongIntoSheetMusic(const QString& band, const QString& songRo
                     continue;
                 }
             }
+            QDir().mkpath(QFileInfo(dst).absolutePath());
             if (moveItem(src, dst)) {
                 any = true;
             } else {
                 out.failed << relativeTo(band, src);
             }
         }
-        // the emptied folders go (a folder with anything left in it, a .DS_Store included, stays)
         QStringList dirs;
-        QDirIterator it(fi.filePath(), QDir::Dirs | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+        QDirIterator it(from, QDir::Dirs | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
         while (it.hasNext()) {
             dirs << it.next();
         }
@@ -259,9 +256,36 @@ SheetMusicMove moveSongIntoSheetMusic(const QString& band, const QString& songRo
         for (const QString& d : dirs) {
             QDir().rmdir(d);
         }
-        QDir().rmdir(fi.filePath());
-        if (any) {
+        QDir().rmdir(from);
+        return any;
+    };
+    for (const QFileInfo& fi : dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
+        const QString name = fi.fileName();
+        if (fi.isSymLink() || hidden(name) || staysAtSongTop(name)) {
+            continue;
+        }
+        if (mergeInto(fi.filePath(), song + "/" + SHEET_MUSIC + "/" + name)) {
             out.moved << name;
+        }
+    }
+    // The Half-Time and Double-Time sheets in their own folders beside Sheet Music (Joel, 15 Oct 2026): until 1.18.47
+    // they were in a subfolder of each sheet folder ("Sheet Music/4H Tpt Alt Ten/Double-Time/…"), or of Sheet Music
+    // itself for a sheet at the top of the song folder
+    const QString sheets = song + "/" + SHEET_MUSIC;
+    for (const QString& variant : { QString("Half-Time"), QString("Double-Time") }) {
+        const QString target = song + "/" + sheetMusicFor(variant);
+        bool any = false;
+        if (QFileInfo(sheets + "/" + variant).isDir()) {
+            any |= mergeInto(sheets + "/" + variant, target);
+        }
+        for (const QFileInfo& fi : QDir(sheets).entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
+            const QString inner = fi.filePath() + "/" + variant;
+            if (!fi.isSymLink() && QFileInfo(inner).isDir()) {
+                any |= mergeInto(inner, target + "/" + fi.fileName());
+            }
+        }
+        if (any) {
+            out.moved << sheetMusicFor(variant);
         }
     }
 

@@ -37,6 +37,7 @@
 #include <QSettings>
 #include <QUuid>
 
+#include "engraving/dom/layoutbreak.h"
 #include "engraving/dom/masterscore.h"
 #include "engraving/dom/excerpt.h"
 #include "engraving/dom/part.h"
@@ -647,18 +648,16 @@ INotationProjectPtr StarScoreService::exportSourceProject() const
     return m_mainProject ? m_mainProject : globalContext()->currentProject();
 }
 
-//! A Half-Time or Double-Time sheet's place: in a subfolder of its part folder ("4H/Double-Time/CODE - Trumpet.pdf",
-//! "4H/Double-Time/Section Scores/…"); a file at the top of the song folder goes into the subfolder there
+//! A Half-Time or Double-Time sheet's place: "Sheet Music (Double-Time)/4H/CODE - Trumpet.pdf",
+//! "Sheet Music (Double-Time)/4H/Section Scores/…"
 static QString starscoreVariantPath(const QString& rel, const QString& variant)
 {
     if (variant.isEmpty()) {
         return rel;
     }
-    // (inside Sheet Music: "Sheet Music/4H/Double-Time/…")
-    const QString inner = starscore::org::withoutSheetMusic(rel);
-    const QString outer = rel.left(rel.size() - inner.size());
-    const int slash = inner.indexOf('/');
-    return outer + (slash < 0 ? variant + "/" + inner : inner.left(slash) + "/" + variant + inner.mid(slash));
+    // its own folder beside Sheet Music (Joel, 15 Oct 2026): "Sheet Music (Double-Time)/4H/…"; until 1.18.47 a
+    // subfolder of each sheet folder ("Sheet Music/4H/Double-Time/…", moved by moveSongIntoSheetMusic)
+    return starscore::org::sheetMusicFor(variant) + "/" + starscore::org::withoutSheetMusic(rel);
 }
 
 RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
@@ -3092,6 +3091,10 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     const QString songDir = plan.bandFolder + "/" + plan.songFolder;
     // sheets exported under an older path or name go to their place now first (every sheet of the song, ticked or
     // not; none is made again for that)
+    if (!m_exportDryRun && !variant.isEmpty()) {
+        // the Half-Time and Double-Time sheets from before 1.18.47 into their own folders first
+        starscore::org::moveSongIntoSheetMusic(full.bandFolder, full.songFolder, full.code, QDate::currentDate().toString(Qt::ISODate));
+    }
     if (!m_exportDryRun && variant.isEmpty()) {
         moveSheetsToCurrentPaths(full);
     }
@@ -5426,6 +5429,152 @@ RetVal<std::vector<StarScoreSongbookSheet> > StarScoreService::songbookChartShee
 //  song is never changed.
 // ---------------------------------------------------------------------------
 
+namespace {
+//! Where a part score's lines start: the bar number (Measure::no()) of each system's first bar
+std::set<int> starscoreLineStarts(mu::engraving::Score* score)
+{
+    using namespace mu::engraving;
+    std::set<int> out;
+    score->setLayoutAll();
+    score->doLayout();
+    for (const System* sys : score->systems()) {
+        for (const MeasureBase* mb : sys->measures()) {
+            if (mb->isMeasure()) {
+                out.insert(toMeasure(mb)->no());
+                break;
+            }
+        }
+    }
+    return out;
+}
+
+//! The standard sheet's lines again in a converted part score (Joel, 15 Oct 2026: "if the standard-time sheets have
+//! breaks every four bars in section A, the double-time and half-time sheets too"). The converted sheets keep the
+//! song's bar numbers (both halves of a doubled bar carry its number), so each line starts at the bar number a line of
+//! the standard sheet starts at: the same music to a line. A Half-Time bar holding that number (it holds two) starts
+//! the line instead; the second half of a doubled bar never does. Where a line's music doesn't fit (it usually doesn't
+//! on Double-Time sheets, which have twice as many bars), it is split into 2 (or 4, 8) lines of equal bar numbers, so
+//! lines still start where the standard sheet's do: a 4-bar line becomes two 2-bar lines. Bar numbers are left to
+//! MuseScore's rule, which numbers the first bar of each line. Must be called inside a command on the score. Returns
+//! how many lines were made; split counts the standard sheet's lines that were split.
+int starscoreApplyLineStarts(mu::engraving::Score* score, const std::set<int>& starts, int& split)
+{
+    using namespace mu::engraving;
+    if (!score->systemLocks()->allLocks().empty()) {
+        EditSystemLocks::undoRemoveAllLocks(score);
+    }
+    // the bar numbers layout will give (MeasureLayout::adjustMeasureNo), without laying out first
+    std::vector<Measure*> bars;
+    std::vector<int> no;
+    int counter = 0;
+    for (Measure* m = score->firstMeasure(); m; m = m->nextMeasure()) {
+        counter += m->noOffset();
+        bars.push_back(m);
+        no.push_back(counter);
+        if (!m->irregular()) {
+            ++counter;
+        }
+        const LayoutBreak* sectionBreak = m->sectionBreakElement();
+        if (sectionBreak && sectionBreak->startWithMeasureOne()) {
+            counter = 0;
+        }
+    }
+    // each bar's line: the standard sheet's lines, bar by bar
+    std::vector<size_t> lineStart;   // index of each line's first bar
+    for (size_t i = 0; i < bars.size(); ++i) {
+        const int holdsTo = std::max(no[i], i + 1 < bars.size() ? no[i + 1] - 1 : no[i]);
+        const auto s = starts.lower_bound(no[i]);
+        if (i == 0 || (s != starts.end() && *s <= holdsTo && no[i] != no[i - 1])) {
+            lineStart.push_back(i);
+        }
+    }
+    auto setBreaks = [&](const std::vector<size_t>& firsts) {
+        std::set<size_t> before;
+        for (size_t f : firsts) {
+            if (f > 0) {
+                before.insert(f - 1);
+            }
+        }
+        for (size_t i = 0; i < bars.size(); ++i) {
+            Measure* m = bars[i];
+            const bool want = before.count(i) > 0;
+            if (m->lineBreak() != want) {
+                m->undoSetBreak(want, LayoutBreakType::LINE);
+            }
+            if (m->pageBreak()) {
+                m->undoSetBreak(false, LayoutBreakType::PAGE);
+            }
+            if (m->noBreak()) {
+                m->undoSetBreak(false, LayoutBreakType::NOBREAK);
+            }
+            // numbered by MuseScore's rule: the first bar of each line (a bar numbered by hand on the standard sheet
+            // may not start a line here)
+            if (m->measureNumberMode() != MeasureNumberMode::AUTO) {
+                m->setMeasureNumberMode(MeasureNumberMode::AUTO);
+            }
+        }
+    };
+    setBreaks(lineStart);
+    score->setLayoutAll();
+    score->doLayout();
+
+    // a line MuseScore had to break: into 2, 4 or 8 lines (as many as it needed, rounded up), cut at equal bar numbers;
+    // a cut moves to a bar that starts a multimeasure rest or a doubled bar
+    std::vector<size_t> firsts;
+    bool changed = false;
+    for (size_t k = 0; k < lineStart.size(); ++k) {
+        const size_t a = lineStart[k];
+        const size_t b = k + 1 < lineStart.size() ? lineStart[k + 1] : bars.size();   // one past the last bar
+        firsts.push_back(a);
+        std::set<const System*> systems;
+        for (size_t i = a; i < b; ++i) {
+            const Measure* shown = bars[i]->coveringMMRestOrThis();
+            if (shown->system()) {
+                systems.insert(shown->system());
+            }
+        }
+        if (systems.size() < 2) {
+            continue;
+        }
+        size_t parts = 2;
+        while (parts < systems.size() && parts < 8) {
+            parts *= 2;
+        }
+        const int from = no[a];
+        const int to = no[b - 1] + 1;
+        size_t last = a;
+        for (size_t p = 1; p < parts; ++p) {
+            const double at = from + double(to - from) * double(p) / double(parts);
+            size_t cut = 0;
+            double best = std::numeric_limits<double>::max();
+            for (size_t i = last + 1; i < b; ++i) {
+                const Measure* shown = bars[i]->coveringMMRestOrThis();
+                if (no[i] == no[i - 1] || shown->tick() != bars[i]->tick()) {
+                    continue;   // the second half of a doubled bar, or inside a multimeasure rest
+                }
+                const double d = std::abs(no[i] - at);
+                if (d <= best) {   // (the later bar on a tie: a 3-bar line becomes 2 + 1 bars, not 1 + 2)
+                    best = d;
+                    cut = i;
+                }
+            }
+            if (cut > last) {
+                firsts.push_back(cut);
+                last = cut;
+                changed = true;
+            }
+        }
+        ++split;
+    }
+    if (changed) {
+        setBreaks(firsts);
+        score->setLayoutAll();
+        score->doLayout();
+    }
+    return int(firsts.size());
+}
+}
+
 RetVal<QString> StarScoreService::exportTimeVariants(const QStringList& onlyPaths, bool halfTime, bool doubleTime)
 {
     INotationProjectPtr project = exportSourceProject();
@@ -5457,6 +5606,14 @@ RetVal<QString> StarScoreService::exportTimeVariants(const QStringList& onlyPath
             QDir(dir).removeRecursively();
             continue;
         }
+        // each part score's bars to a system, section by section, before the conversion lays it out again
+        std::map<QString, std::set<int> > patterns;
+        for (const IExcerptNotationPtr& e : copy->masterNotation()->excerpts()) {
+            INotationPtr en = e ? e->notation() : nullptr;
+            if (en && en->elements() && en->elements()->msScore()) {
+                patterns[e->name()] = starscoreLineStarts(en->elements()->msScore());
+            }
+        }
         const RetVal<QString> converted = convertTimeOf(copy, toDouble, true, true);
         LOGI() << "[starscore] " << variant << ": " << converted.val;
         if (!converted.ret) {
@@ -5464,6 +5621,24 @@ RetVal<QString> StarScoreService::exportTimeVariants(const QStringList& onlyPath
             QDir(dir).removeRecursively();
             continue;
         }
+        // the standard sheets' bars to a system again, and bar numbers at the start of each system
+        int lockedSystems = 0;
+        int halvedSections = 0;
+        // (one command for every part score: ending a command lays out the song and all its part scores again, which
+        // took longer than this whole step when each part score had its own)
+        copy->masterNotation()->notation()->undoStack()->prepareChanges(
+            TranslatableString::untranslatable("Lines like the standard sheets"));
+        for (const IExcerptNotationPtr& e : copy->masterNotation()->excerpts()) {
+            INotationPtr en = e ? e->notation() : nullptr;
+            auto p = patterns.find(e ? e->name() : QString());
+            if (!en || !en->elements() || !en->elements()->msScore() || p == patterns.end()) {
+                continue;
+            }
+            lockedSystems += starscoreApplyLineStarts(en->elements()->msScore(), p->second, halvedSections);
+        }
+        copy->masterNotation()->notation()->undoStack()->commitChanges();
+        LOGI() << "[starscore] " << variant << ": " << lockedSystems << " line(s) started where the standard sheets' do, "
+               << halvedSections << " of them split to fit";
         // nothing in this copy is ever undone: what the conversion's steps hold is let go (see convertTimeOf)
         copy->masterNotation()->masterScore()->undoStack()->clearHistory();
         m_exportSource = copy;

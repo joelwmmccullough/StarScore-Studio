@@ -4,6 +4,14 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.47
+
+- **Double-Time and Half-Time sheets get their own folders.** They go in "Sheet Music (Double-Time)" and "Sheet Music (Half-Time)" next to "Sheet Music", with the same arrangement folders inside. Sheets already in "Sheet Music/…/Double-Time" or "Half-Time" folders are moved there the next time the song is exported. Where a sheet is in both places, the newer one is kept and the older one goes to Version History.
+- **Double-Time and Half-Time sheets follow the standard sheets' lines.** These sheets keep the song's bar numbers, and each line starts at the bar number a line of the standard sheet starts at, so each line holds the same music as on the standard sheet. If the standard sheet has a line every four bars in section A, so does the Double-Time or Half-Time sheet, counted by bar number. Where that much music doesn't fit on one line (usual on Double-Time sheets, which have twice as many bars), the line is split into two (or four) lines at equal bar numbers, so lines still start at the standard sheet's bar numbers. On a Half-Time sheet, a line that would start on the second half of a bar starts at that bar. Exporting these sheets takes a little longer, since each part is laid out once or twice more.
+- **Bar numbers only at the start of each line** on Double-Time and Half-Time sheets. Before, the second bar of a line was often numbered too.
+- **Multi-bar rests on Double-Time sheets.** Bars of rest are joined into one multi-bar rest, as on the other sheets. Before, every bar of rest was written out.
+- **Chord charts: sharps and flats no longer touch the number after them.** The ♯ in F♯7 sat on the 7. Sharps are now smaller and raised.
+
 ## 1.18.46
 
 - **Flugelhorn parts.** Format › Flugelhorn part on/off (also in the StarScore bar's menu) marks the trumpet part on screen as played on flugelhorn. Its sheets then say "Flugelhorn" top left, and the file names still say Trumpet. When both trumpets in an arrangement are flugelhorns, the sheets say "Flugelhorn 1" and "Flugelhorn 2". When only one is, it says "Flugelhorn" and the other says "Trumpet in B♭". A Flexible chair can be marked too: its trumpet sheet then says "Flugelhorn". Copying a flugelhorn part to a trumpet part in another arrangement copies the setting.

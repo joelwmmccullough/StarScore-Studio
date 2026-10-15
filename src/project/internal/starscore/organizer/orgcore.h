@@ -83,6 +83,11 @@ QString md5OfFile(const QString& path);
 //     Extras, String Duo, Combined Parts…) is inside "<song>/Sheet Music/"; the song folder itself keeps Chord Charts,
 //     Demos, Reference PDFs, Horn Part Guides, Update Notes, Version History and the song's own PDFs.
 extern const QString SHEET_MUSIC;   // "Sheet Music"
+//! The Half-Time and Double-Time sheets' folder in the song folder, beside Sheet Music (Joel, 15 Oct 2026):
+//! "Sheet Music (Double-Time)/4H Tpt Alt Ten/CODE - Trumpet.pdf". variant: "Half-Time" or "Double-Time"
+QString sheetMusicFor(const QString& variant);
+//! Whether a song's top folder is one of those
+bool isTimeVariantFolder(const QString& folder);
 //! A folder that stays at the top of the song folder (not a sheet folder); `folder` is one name, not a path
 bool staysAtSongTop(const QString& folder);
 //! Where a song's folder is, relative to the song folder: "1 Rhythm" -> "Sheet Music/1 Rhythm", "Demos" -> "Demos"

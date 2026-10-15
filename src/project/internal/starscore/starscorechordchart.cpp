@@ -1115,6 +1115,9 @@ section > .row:first-child, .head + .row { margin-top: 8pt; }
 .rw { position: relative; display: inline-block; }
 .r { font-weight: 500; }
 .ac { position: absolute; left: 100%%; top: -0.06em; font-size: 0.78em; line-height: 1; padding-left: 0.07em; }
+/* (higher, so it clears the extension under it: Joel, 15 Oct 2026, the sharp of F#7add11 ran into the 7) */
+.ac.sharp { top: -0.36em; font-size: 0.72em; }
+.ac.flat { top: -0.12em; }
 .acc { font-family: BravuraText; -webkit-text-stroke: 0.045em currentColor; }
 .q { font-size: 0.5em; margin-left: 0.05em; letter-spacing: 0.01em; }
 .c.hasacc .q { display: inline-block; min-width: 0.95em; }
@@ -1340,7 +1343,7 @@ QString chordHtml(const QString& key)
     QString cls = "c" + QString(acc.isEmpty() ? "" : " hasacc") + QString(bass.isEmpty() ? "" : " hasbass");
     QString s = QString("<span class=\"%1\"><span class=\"rw\"><span class=\"r\">%2</span>").arg(cls, esc(root.left(1)));
     if (!acc.isEmpty()) {
-        s += QString("<span class=\"ac\">%1</span>").arg(accHtml(acc));
+        s += QString("<span class=\"ac%1\">%2</span>").arg(acc.startsWith('#') ? " sharp" : acc.startsWith('b') ? " flat" : "", accHtml(acc));
     }
     s += QString("</span><span class=\"q\">%1</span>").arg(q.isEmpty() ? QString() : qualityHtml(q));
     if (!bass.isEmpty()) {

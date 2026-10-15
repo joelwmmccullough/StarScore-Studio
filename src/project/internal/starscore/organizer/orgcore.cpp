@@ -200,11 +200,22 @@ QString md5OfFile(const QString& path)
 
 const QString SHEET_MUSIC = QStringLiteral("Sheet Music");
 
+QString sheetMusicFor(const QString& variant)
+{
+    return variant.isEmpty() ? SHEET_MUSIC : QString("%1 (%2)").arg(SHEET_MUSIC, variant);
+}
+
+bool isTimeVariantFolder(const QString& folder)
+{
+    return folder == sheetMusicFor("Double-Time") || folder == sheetMusicFor("Half-Time");
+}
+
 bool staysAtSongTop(const QString& folder)
 {
     static const QStringList TOP { "Sheet Music", "Chord Charts", "Demos", "Reference PDFs", "Horn Part Guides",
                                    "Version History", "Old Versions" };
-    return TOP.contains(folder) || folder.startsWith("Update Notes") || folder.startsWith('.') || isBundle(folder);
+    return TOP.contains(folder) || isTimeVariantFolder(folder) || folder.startsWith("Update Notes") || folder.startsWith('.')
+           || isBundle(folder);
 }
 
 QString songFolderPath(const QString& folder)

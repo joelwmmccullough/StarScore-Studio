@@ -64,6 +64,7 @@ struct OldBar {
     BarLineType endType = BarLineType::NORMAL;
     bool startsMark = false;
     int no = 0;   // its bar number (Measure::no(), 0-based)
+    bool irregular = false;   // left out of the bar count (a pickup bar)
 };
 
 struct NewBar {
@@ -219,6 +220,7 @@ RetVal<QString> StarScoreService::convertTimeOf(const INotationProjectPtr& proje
         b.repeatCount = m->repeatCount();
         b.endType = m->endBarLineType();
         b.no = m->no();
+        b.irregular = m->irregular();
         for (Segment* seg = m->first(SegmentType::ChordRest); seg; seg = seg->next(SegmentType::ChordRest)) {
             for (EngravingItem* a : seg->annotations()) {
                 // the copy on the top staff (MuseScore shows system objects on more staves itself)
@@ -783,7 +785,11 @@ RetVal<QString> StarScoreService::convertTimeOf(const INotationProjectPtr& proje
 
     // 10. keepBarNumbers (the Half-Time and Double-Time sheets, Joel 7 Oct 2026): each new bar numbered like the bar of
     // the song it starts in, so the sheets' bar numbers match the standard sheets. Both halves of a doubled bar carry
-    // its number (the first is left out of the count), and a bar made of two counts as both (the next bar skips one).
+    // its number, and a bar made of two counts as both (the next bar skips one). Both are done with bar number offsets
+    // (the second half of a doubled bar counts one back), not by leaving bars out of the count: MuseScore never puts a
+    // bar left out of the count into a multimeasure rest, nor the bar after it, so the Double-Time sheets had no
+    // multimeasure rests at all (Joel 15 Oct 2026). Only a bar that was left out of the count in the song (a pickup)
+    // still is.
     if (keepBarNumbers) {
         ms->setLayoutAll();
         ms->doLayout();
@@ -791,24 +797,26 @@ RetVal<QString> StarScoreService::convertTimeOf(const INotationProjectPtr& proje
                            // out of the count doesn't move the counter on)
         Measure* m = ms->firstMeasure();
         for (size_t i = 0; i < bars.size() && m; ++i, m = m->nextMeasure()) {
-            auto wanted = [&](size_t k) {
-                int no = 0;
-                for (const OldBar& b : old) {
-                    if (b.tick <= bars[k].oldTick) {
-                        no = b.no;
+            auto oldBarOf = [&](size_t k) -> const OldBar& {
+                size_t at = 0;
+                for (size_t o = 0; o < old.size(); ++o) {
+                    if (old[o].tick <= bars[k].oldTick) {
+                        at = o;
                     }
                 }
-                return no;
+                return old[at];
             };
-            const int want = wanted(i);
-            const bool shared = i + 1 < bars.size() && wanted(i + 1) == want;   // the next new bar has the same number
-            if (m->irregular() != shared) {
-                m->undoChangeProperty(Pid::IRREGULAR, shared);
+            const OldBar& from = oldBarOf(i);
+            const int want = from.no;
+            const bool shared = i + 1 < bars.size() && oldBarOf(i + 1).no == want;   // the next new bar has the same number
+            const bool leftOut = shared && from.irregular;
+            if (m->irregular() != leftOut) {
+                m->undoChangeProperty(Pid::IRREGULAR, leftOut);
             }
             if (m->noOffset() != want - counter) {
                 m->undoChangeProperty(Pid::NO_OFFSET, want - counter);
             }
-            counter = shared ? want : want + 1;
+            counter = leftOut ? want : want + 1;
         }
         starscore::syncBarNumbering(ms, starscore::BarNumberingSync::Undoable);
     }
