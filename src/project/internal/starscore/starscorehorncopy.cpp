@@ -289,7 +289,7 @@ int StarScoreService::copyHornParts(const std::vector<std::pair<QString, QString
             }
             // played on flugelhorn: so is the trumpet part it's copied to (Joel, 14 Oct 2026)
             const QString toId = to->instrumentId().toQString();
-            if (data.flugelhornParts.count(srcId) && (toId.contains("trumpet") || toId.contains("cornet"))) {
+            if (data.flugelhornParts.count(srcId) && (toId.contains("trumpet") || toId.contains("cornet")) && !toId.contains("piccolo")) {
                 data.flugelhornParts.insert(dstId);
             }
             ++copied;

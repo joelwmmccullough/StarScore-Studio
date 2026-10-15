@@ -1939,7 +1939,7 @@ int starscoreBassStrings(const mu::engraving::Part* p)
     if (names.contains("treble", Qt::CaseInsensitive) || names.contains("walking", Qt::CaseInsensitive)) {
         return 0;
     }
-    static const QRegularExpression strings("\\b([4-6])(?:[- ]?string|[- ]?str\\.?|s)\\b", QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression strings("\\b([4-6])(?:[- ]?strings?|[- ]?str\\.?|s)\\b", QRegularExpression::CaseInsensitiveOption);
     const QRegularExpressionMatch m = strings.match(names);
     if (m.hasMatch()) {
         return m.captured(1).toInt();
@@ -1992,7 +1992,9 @@ QString StarScoreService::mergeBassParts(bool apply)
                 s.partIds[at] = keepId;
             }
         }
-        s.shownPartIds.removeAll(dropId);
+        if (s.shownPartIds.removeAll(dropId) > 0 && !s.shownPartIds.contains(keepId)) {
+            s.shownPartIds << keepId;
+        }
         s.alternates.erase(dropId);
     }
     d.partStatus.erase(dropId);
@@ -2029,7 +2031,7 @@ QString StarScoreService::mergeBassParts(bool apply)
             continue;
         }
         // its part score: named after the old part, or with the string count taken out ("Bass (4-String)" -> "Bass")
-        static const QRegularExpression strings("\\s*\\(?\\b[45][- ]?(?:string|str)\\b\\)?\\s*", QRegularExpression::CaseInsensitiveOption);
+        static const QRegularExpression strings("\\s*\\(?\\b[45][- ]?(?:strings?|str)\\b\\)?\\s*", QRegularExpression::CaseInsensitiveOption);
         QString name = e->name() == oldName ? QString("Bass Guitar") : e->name();
         name = name.replace(strings, " ").simplified();
         if (!name.isEmpty() && name != e->name()) {
@@ -2170,8 +2172,8 @@ void StarScoreService::tidyOpenedScore()
                 archived.clear();
             }
         }
-        // (only with the file safely copied: the change can't be undone reliably)
-        if (!archived.isEmpty() || path.isEmpty()) {
+        // (only with the file safely copied: the change can't be undone reliably; a song never saved waits)
+        if (!archived.isEmpty()) {
             const QString done = mergeBassParts(true);
             if (!qEnvironmentVariableIsSet("STARSCORE_AUTOTEST")) {
                 interactive()->info(muse::trc("starscore", "One bass guitar part"),

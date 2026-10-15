@@ -141,7 +141,9 @@ int topVoice(const QString& xml)
 QString rhythmOf(const QString& sig)
 {
     static const QRegularExpression tok("<(Chord|Rest)>|<durationType>[^<]*</durationType>|<dots>\\d</dots>|<Tuplet\\b|<endTuplet/>"
-                                        "|<Spanner type=\"Tie\">|<(acciaccatura|appoggiatura|grace\\w*)/>|<ticks>[^<]*</ticks>");
+                                        "|<Spanner type=\"Tie\">|<(acciaccatura|appoggiatura|grace\\w*)/>|<ticks>[^<]*</ticks>"
+                                        // (beat slashes and rhythm markings don't share stems with notes)
+                                        "|<head>[^<]*</head>|<noStem>[^<]*</noStem>|<small>[^<]*</small>");
     QString out;
     QRegularExpressionMatchIterator it = tok.globalMatch(sig);
     while (it.hasNext()) {
@@ -307,11 +309,15 @@ CombinedResult buildCombinedPart(const mu::notation::IMasterNotationPtr& copy, c
     std::vector<std::vector<int> > group(nb, std::vector<int>(n, 0));     // bar, arrangement -> group
     std::vector<std::vector<bool> > rests(nb, std::vector<bool>(n, true));   // bar, arrangement -> only rests
     std::vector<std::vector<QString> > sigs(nb, std::vector<QString>(n));
+    // the voices each bar uses (from the clip as written: normalized() takes out the list of voices)
+    std::vector<std::vector<int> > voicesUsed(nb, std::vector<int>(n, 1));
     std::vector<bool> silent(nb, true);   // everyone rests
     for (size_t i = 0; i < nb; ++i) {
         QStringList seen;
         for (size_t k = 0; k < n; ++k) {
-            QString sig = normalized(clip(parts[k], bars[i]->tick(), bars[i]->endTick()));
+            const QString raw = clip(parts[k], bars[i]->tick(), bars[i]->endTick());
+            voicesUsed[i][k] = topVoice(raw) + 1;
+            QString sig = normalized(raw);
             rests[i][k] = restsOnly(sig);
             sigs[i][k] = sig;
             const QString key = rests[i][k] ? QString("REST") : withoutDynamics(sig);
@@ -514,7 +520,7 @@ CombinedResult buildCombinedPart(const mu::notation::IMasterNotationPtr& copy, c
                 }
                 repSigs << sigs[i][gs[g].rep];
                 gs[g].restsThroughout = gs[g].restsThroughout && rests[i][gs[g].rep];
-                gs[g].voices = std::max(gs[g].voices, topVoice(sigs[i][gs[g].rep]) + 1);
+                gs[g].voices = std::max(gs[g].voices, voicesUsed[i][gs[g].rep]);
             }
             gs[g].pitch = meanPitch(repSigs);
         }
@@ -548,8 +554,9 @@ CombinedResult buildCombinedPart(const mu::notation::IMasterNotationPtr& copy, c
                 }
                 const QString& mine = sigs[i][g->rep];
                 fits = !rests[i][head->rep] && rhythmOf(mine) == rhythmOf(sigs[i][head->rep]);
-                if (fits && !rests[i][above->rep]) {
-                    const std::vector<std::vector<int> > hi = chordPitches(sigs[i][above->rep]);
+                if (fits) {
+                    // (the line above, or the head where the line above rests)
+                    const std::vector<std::vector<int> > hi = chordPitches(sigs[i][rests[i][above->rep] ? head->rep : above->rep]);
                     const std::vector<std::vector<int> > lo = chordPitches(mine);
                     fits = hi.size() == lo.size();
                     for (size_t c = 0; c < lo.size() && fits; ++c) {
@@ -696,6 +703,7 @@ CombinedResult buildCombinedPart(const mu::notation::IMasterNotationPtr& copy, c
     for (const Shared& sh : sharedLines) {
         const staff_idx_t srcStaff = parts[sh.rep]->staves().front()->idx();
         std::map<const Note*, Note*> placed;   // the arrangement's note -> the note in the chord
+        std::set<const Note*> made;            // notes this line added (not a unison with the head line's)
         for (size_t b = sh.first; b <= sh.last; ++b) {
             for (Segment* seg = bars[b]->first(SegmentType::ChordRest); seg; seg = seg->next(SegmentType::ChordRest)) {
                 const EngravingItem* se = seg->element(srcStaff * VOICES);
@@ -712,6 +720,7 @@ CombinedResult buildCombinedPart(const mu::notation::IMasterNotationPtr& copy, c
                         there->setTrack(dc->track());
                         there->setNval(sn->noteVal());
                         ms->undoAddElement(there);
+                        made.insert(there);
                     }
                     placed[sn] = there;
                 }
@@ -721,7 +730,8 @@ CombinedResult buildCombinedPart(const mu::notation::IMasterNotationPtr& copy, c
         for (const auto& [sn, there] : placed) {
             const Tie* st = sn->tieFor();
             auto to = st ? placed.find(st->endNote()) : placed.end();
-            if (to == placed.end() || there->tieFor() || to->second->tieBack()) {
+            // (only between notes this line added: a unison note is the head line's, tied or not as that line is)
+            if (to == placed.end() || there->tieFor() || to->second->tieBack() || !made.count(there) || !made.count(to->second)) {
                 continue;
             }
             Tie* tie = Factory::createTie(ms->dummy());

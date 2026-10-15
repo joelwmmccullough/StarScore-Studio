@@ -1184,7 +1184,8 @@ function starscoreLayout() {
       const kids = Array.from(row.children);
       const gut = kids[0], right = kids[kids.length - 1];
       const cells = kids.slice(1, -1).filter(c => !c.classList.contains('pad'));
-      if (cells.length <= 2 || cells.some(c => c.classList.contains('rest'))) return;
+      // (a line of three or fewer stays: its repeat count sits in its padding)
+      if (cells.length <= 3 || cells.some(c => c.classList.contains('rest'))) return;
       const chunks = [];
       for (let i = 0; i < cells.length; i += 2) chunks.push(cells.slice(i, i + 2));
       if (chunks.length > 1 && chunks[chunks.length - 1].length === 1) chunks[chunks.length - 2].push(chunks.pop()[0]);
@@ -1226,7 +1227,8 @@ function starscoreLayout() {
     const minw = cells.map((c, i) => c.classList.contains('bar') ? Math.max(need(c), 0.6 * widths[i] / (parseFloat(c.dataset.w) || 1) * (parseFloat(c.dataset.w) || 1)) : 0);
     const want = cells.map((c, i) => c.classList.contains('bar') ? Math.max(widths[i], minw[i]) : widths[i]);
     let over = want.reduce((a, b) => a + b, 0) - total;
-    const give = cells.map((c, i) => Math.max(0, want[i] - minw[i]) * (want[i] <= widths[i] ? 1 : 0));
+    // (a spacer before a 2nd ending keeps its width, so the ending stays under the 1st)
+    const give = cells.map((c, i) => c.classList.contains('sp') ? 0 : Math.max(0, want[i] - minw[i]) * (want[i] <= widths[i] ? 1 : 0));
     const room = give.reduce((a, b) => a + b, 0);
     const out = want.map((w, i) => room > 0 && over > 0 ? w - give[i] * Math.min(1, over / room) : w);
     let sum = out.reduce((a, b) => a + b, 0);
