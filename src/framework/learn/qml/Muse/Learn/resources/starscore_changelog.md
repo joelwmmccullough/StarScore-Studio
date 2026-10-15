@@ -16,8 +16,8 @@ Version numbers: the first number changes when files stop being compatible, the 
   - Labels, counts, time signatures, the form line and the notes over each section are in the chord font, bold and larger. Only the title keeps the display font.
   - The chart is laid out once its fonts have loaded, so the chords are measured in their own font.
 - **Combined sheets cleaned up.**
-  - Arrangements that play the same notes share one line. Before, small differences that don't print, such as a note muted in playback, a dynamic's playback volume or a beam's angle, split them into two voices playing in unison (Drum Battle's trumpet, letter B). Different dynamics alone no longer split them either; the line keeps one arrangement's.
-  - Lines split only in the bars where they differ, not for the whole phrase. A single bar where they come together between two split passages stays split, so lines don't join and split bar by bar.
+  - Arrangements that play the same notes share one line. Before, small differences that don't print, such as a note muted in playback, a dynamic's playback volume, a beam's angle or where a slur into the bar started, split them into two voices playing in unison (Drum Battle's trumpet, letter B). Different dynamics alone no longer split them either; the line keeps one arrangement's.
+  - Lines split only in the bars where they differ, not for the whole phrase. A single bar where two lines come together between two passages split the same way stays split, so lines don't join and split bar by bar. Where three or more lines come together, the bar is one line.
   - Lines in the same rhythm share stems: one chord, labelled over it top line first ("1H / 2H / 3H"). A unison is one note.
   - Arrangements that rest get no line and no label, so "4H–7H tacet" and empty voices of rests are gone. The label says who plays.
   - At most two lines to a staff. Three or four different lines get a staff each, shown only where needed.

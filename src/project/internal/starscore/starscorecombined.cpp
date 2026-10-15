@@ -81,6 +81,11 @@ QString normalized(QString xml)
     // (and the indentation of what was taken out)
     static const QRegularExpression between(">\\s+<");
     xml.replace(between, "><");
+    // where a slur or glissando ending here started (in an earlier bar, compared there; G.I. Jorge's alto sax bar 24 was
+    // the same notes in five arrangements, split only by where the slur into it began)
+    static const QRegularExpression spannerEnd("<Spanner type=\"[^\"]+\"><prev><location>.*?</location></prev></Spanner>",
+                                               QRegularExpression::DotMatchesEverythingOption);
+    xml.replace(spannerEnd, QString());
     return xml;
 }
 
@@ -387,7 +392,7 @@ CombinedResult buildCombinedPart(const mu::notation::IMasterNotationPtr& copy, c
     // Dorico condenses), so one bar that differed split the whole phrase into voices, and arrangements playing the
     // same thing were printed in unison in two voices for bars on end (Joel, 14 Oct 2026: "bizarre unisons"). Now
     // the lines split only where they differ. So that they don't split and join bar by bar, a single bar where lines
-    // come together between two passages split the same way stays split.
+    // come together between two passages split two ways stays split.
     struct Run {
         size_t first = 0, last = 0;
         std::vector<int> grouping;
@@ -435,8 +440,10 @@ CombinedResult buildCombinedPart(const mu::notation::IMasterNotationPtr& copy, c
     for (bool merged = true; merged;) {
         merged = false;
         for (size_t r = 1; r + 1 < runs.size(); ++r) {
+            // (only between two-way splits: a bar where three or more lines come together is shown as one line, not
+            // as the same notes on three staves; G.I. Jorge, alto sax, B3)
             if (runs[r].played == 1 && runs[r - 1].grouping == runs[r + 1].grouping && runs[r].groups < runs[r - 1].groups
-                && coarser(runs[r].grouping, runs[r - 1].grouping)) {
+                && runs[r - 1].groups <= 2 && coarser(runs[r].grouping, runs[r - 1].grouping)) {
                 runs[r - 1].last = runs[r + 1].last;
                 runs[r - 1].played += runs[r].played + runs[r + 1].played;
                 runs.erase(runs.begin() + long(r), runs.begin() + long(r) + 2);
