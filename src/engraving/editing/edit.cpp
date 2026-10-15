@@ -6937,6 +6937,18 @@ void Score::undoAddElement(EngravingItem* element, bool addToLinkedStaves, bool 
                     e->setParent(nm);
                     doUndoAddElement(e);
                 }
+                // StarScore (Joel, 15 Oct 2026): the section break is in every score, so a locked system it falls
+                // inside goes in every score, as MuseScore does only in the score it was added in (the other part
+                // scores kept a locked system broken in two, one bar stretched across a line)
+                Measure* sm = s->tick2measure(m->tick());
+                if (sm) {
+                    const MeasureBase* shown = s->style().styleB(Sid::createMultiMeasureRests)
+                                               ? toMeasureBase(sm->coveringMMRestOrThis()) : toMeasureBase(sm);
+                    const SystemLock* lock = s->systemLocks()->lockContaining(shown);
+                    if (lock && shown != lock->endMB()) {
+                        EditSystemLocks::undoRemoveSystemLock(s, lock);
+                    }
+                }
             }
             return;
         }

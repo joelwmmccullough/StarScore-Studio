@@ -21,6 +21,7 @@
  */
 
 #include "harmony.h"
+#include "starscoremodes.h"
 
 #include "containers.h"
 #include "translation.h"
@@ -171,6 +172,13 @@ ParsedChord* HarmonyInfo::getParsedChord()
 bool HarmonyInfo::hasModifiers() const
 {
     return m_parsedChord ? m_parsedChord->modifiers().size() > 0 : false;
+}
+
+//! StarScore: whether this chord symbol is a root and a mode name ("B locrian"; see starscoremodes.h)
+bool Harmony::isStarScoreMode(const HarmonyInfo* info) const
+{
+    return info && m_harmonyType == HarmonyType::STANDARD && tpcIsValid(info->rootTpc())
+           && starscore::modeName(info->textName()).valid();
 }
 
 String Harmony::displayText() const
@@ -414,6 +422,9 @@ void Harmony::afterRead()
     // or constructed in the Chord Symbol Properties dialog.
 
     for (HarmonyInfo* info : m_chords) {
+        if (isStarScoreMode(info)) {
+            continue;   // StarScore: a mode name has no chord description
+        }
         if (tpcIsValid(info->rootTpc())) {
             if (info->id() > 0) {
                 // positive id will happen only for scores that were created with explicit chord lists
@@ -576,6 +587,13 @@ const ChordDescription* Harmony::parseSingleHarmony(const String& ss, HarmonyInf
         }
     } else {
         s = s.mid(idx);             // don't simplify; keep leading space before extension if present
+    }
+
+    // StarScore: a mode name after the root ("Blocrian", "F#mixolydianb6") is written out by the layout, not parsed as
+    // a chord (it would read as a minor chord, "m" + "ixolydian"); the root stays a root, so it transposes
+    if (m_harmonyType == HarmonyType::STANDARD && starscore::modeName(s).valid()) {
+        info->setTextName(s.trimmed());
+        return nullptr;
     }
 
     const ChordList* cl = score()->chordList();
@@ -871,6 +889,9 @@ void Harmony::setHarmony(const String& s)
         HarmonyInfo* info = m_chords.at(i);
         const ChordDescription* cd = i < descriptions.size() ? descriptions.at(i) : nullptr;
 
+        if (!cd && isStarScoreMode(info)) {
+            continue;   // StarScore: a mode name keeps its root and has no chord description (see parseSingleHarmony)
+        }
         if (!cd && info->getParsedChord()->parseable()) {
             // our first time encountering this chord
             // generate a descriptor and use it

@@ -268,6 +268,7 @@ public:
     bool hasModifiers() const;
 
     String displayText() const;
+    bool isStarScoreMode(const HarmonyInfo* info) const;
     String harmonyName() const;
 
     double baseLine() const override;

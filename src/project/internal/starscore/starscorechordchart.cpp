@@ -29,6 +29,7 @@
 #include <QStandardPaths>
 #include <QTimer>
 
+#include "engraving/dom/starscoremodes.h"
 #include "engraving/dom/masterscore.h"
 #include "engraving/dom/measure.h"
 #include "engraving/dom/segment.h"
@@ -1122,6 +1123,9 @@ section > .row:first-child, .head + .row { margin-top: 8pt; }
 .q { font-size: 0.5em; margin-left: 0.05em; letter-spacing: 0.01em; }
 .c.hasacc .q { display: inline-block; min-width: 0.95em; }
 .q .acc { font-size: 1.1em; position: relative; top: -0.05em; }
+/* a mode name after the root ("B locrian"): smaller than the root, on its baseline, a space after the root */
+.q.md { font-size: 0.42em; margin-left: 0.22em; letter-spacing: 0; }
+.c.hasacc .q.md { margin-left: 0.6em; min-width: 0; }
 .bs { position: absolute; left: 0.95em; top: 1.95em; font-size: 0.46em; }
 .bs .sl { margin-right: 0.04em; }
 .bs .acc { font-size: 0.9em; position: relative; top: -0.3em; margin-left: 0.03em; }
@@ -1345,7 +1349,18 @@ QString chordHtml(const QString& key)
     if (!acc.isEmpty()) {
         s += QString("<span class=\"ac%1\">%2</span>").arg(acc.startsWith('#') ? " sharp" : acc.startsWith('b') ? " flat" : "", accHtml(acc));
     }
-    s += QString("</span><span class=\"q\">%1</span>").arg(q.isEmpty() ? QString() : qualityHtml(q));
+    // a mode name ("locrian", "mixolydianb6"; Joel, 15 Oct 2026) is written out: "B locrian", "F♯ mixolydian ♭6"
+    const mu::engraving::starscore::ModeName mode = mu::engraving::starscore::modeName(String::fromQString(q));
+    if (mode.valid()) {
+        QString words = esc(mode.words.toQString());
+        for (const auto& [acc, degree] : mode.alterations) {
+            const QString a = acc.toQString();
+            words += " " + (a == "natural" ? QString::fromUtf8("\xe2\x99\xae") : accHtml(a)) + esc(degree.toQString());
+        }
+        s += QString("</span><span class=\"q md\">%1</span>").arg(words);
+    } else {
+        s += QString("</span><span class=\"q\">%1</span>").arg(q.isEmpty() ? QString() : qualityHtml(q));
+    }
     if (!bass.isEmpty()) {
         s += QString("<span class=\"bs\"><span class=\"sl\">%1</span>%2%3</span>").arg(QString::fromUtf8("\xe2\x88\x95"),
                                                                                       esc(bass.left(1)), accHtml(bass.mid(1)));
@@ -1820,7 +1835,44 @@ QString irealChord(const QString& key, std::set<QString>& notes)
     QString root = parts.value(0), bass = parts.value(2);
     const QString q = parts.value(1);
     QString iq;
-    if (irealQualities().count(q)) {
+    const mu::engraving::starscore::ModeName mode = mu::engraving::starscore::modeName(String::fromQString(q));
+    if (mode.valid()) {
+        // iReal Pro has no mode names: the mode's seventh chord
+        static const std::map<QString, QString> MODE_CHORD {
+            { "ionian", "^7" }, { "dorian", "-7" }, { "phrygian", "-7" }, { "lydian", "^7#11" }, { "mixolydian", "7" },
+            { "aeolian", "-7" }, { "natural minor", "-7" }, { "locrian", "h7" }, { "harmonic minor", "-^7" },
+            { "melodic minor", "-^7" }, { "jazz minor", "-^7" }, { "phrygian dominant", "7b9b13" }, { "phrygian major", "7b9b13" },
+            { "lydian dominant", "7#11" }, { "lydian augmented", "^7#5" }, { "ionian augmented", "^7#5" }, { "altered", "7alt" },
+            { "altered dominant", "7alt" }, { "superlocrian", "7alt" }, { "ultralocrian", "o7" }, { "aeolian dominant", "7b13" },
+            { "Ukrainian dorian", "-7" }, { "harmonic major", "^7" }, { "melodic major", "7b13" }, { "diminished", "o7" },
+            { "whole-half", "o7" }, { "half-whole", "7b9" }, { "augmented", "+" }, { "whole-tone", "7#5" },
+        };
+        const QString words = mode.words.toQString();
+        iq = MODE_CHORD.count(words) ? MODE_CHORD.at(words) : QString();
+        // the usual altered forms
+        QString alts;
+        for (const auto& [acc, degree] : mode.alterations) {
+            alts += acc.toQString() + degree.toQString();
+        }
+        if (words == "locrian" && alts == "#2") {
+            iq = "h7";
+        } else if (words == "mixolydian" && (alts == "b6" || alts == "b13")) {
+            iq = "7b13";
+        } else if (words == "mixolydian" && alts == "b9b13") {
+            iq = "7b9b13";
+        } else if (words == "lydian" && alts == "b7") {
+            iq = "7#11";
+        } else if (words == "superlocrian" && alts == "bb7") {
+            iq = "o7";
+        } else if (words == "dorian" && alts == "#4") {
+            iq = "-7";
+        } else if (words == "ionian" && alts == "#5") {
+            iq = "^7#5";
+        } else if (words == "lydian" && alts == "#2") {
+            iq = "^7#11";
+        }
+        notes.insert(QString("%1 %2 written as %3%4").arg(root, words + (alts.isEmpty() ? QString() : " " + alts), root, iq));
+    } else if (irealQualities().count(q)) {
         iq = q;
     } else if (irealMap().count(q)) {
         iq = irealMap().at(q);

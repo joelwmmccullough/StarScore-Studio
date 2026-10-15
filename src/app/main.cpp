@@ -28,7 +28,9 @@
 #include <QSslSocket>
 
 #include "appfactory.h"
-#include "starscoreupdatelock.h"
+#ifdef Q_OS_MACOS
+#include "starscoreupdatelock.h"   // (POSIX only: Windows has no unistd.h)
+#endif
 #include "internal/commandlineparser.h"
 #include "global/iapplication.h"
 

@@ -21,6 +21,10 @@
  *   new:KEY[:DOUBLER[:LOW]]   makes a new StarScore from an arrangement template, replacing the open song, and logs
  *                 its parts and sections (new:7-horn-standard:bb-clarinet:contrabass-clarinet)
  *   styles        applies the part styles to everything
+ *   tabs          lists the part scores open as tabs, and the closed ones
+ *   chordsymbols:<staff>:<chord>|<chord>   types chord symbols on bars 1, 2, … of a staff; logs what each score shows
+ *   sectionbreaks the bars with a section break, score by score; addsectionbreak:<part score>:<bar> and
+ *                 removesectionbreak:<part score>:<bar> add or take away one first
  *   version:X     sets the version number (version:1.2.3) in the song and every part score's footer
  *   export        Export to Sheets and Demos into STARSCORE_AUTOTEST_BAND (a copy, never the real folder)
  *   chords        the chord charts' three outputs: chords.json (the lead sheet's form and chords, extract.py's
@@ -36,10 +40,12 @@
  */
 #include "starscoreservice.h"
 #include "starscoreautoarchive.h"
+#include "engraving/dom/layoutbreak.h"
 #include "engraving/dom/system.h"
 #include "engraving/dom/textbase.h"
 #include "engraving/dom/page.h"
 #include "engraving/dom/systemlock.h"
+#include "engraving/editing/editsystemlocks.h"
 #include "engraving/dom/tempotext.h"
 #include "engraving/dom/mmrest.h"
 #include "global/serialization/zipreader.h"
@@ -81,6 +87,7 @@
 #include "engraving/dom/drumset.h"
 #include "engraving/dom/rehearsalmark.h"
 #include "engraving/dom/harmony.h"
+#include "engraving/dom/linkedobjects.h"
 #include "engraving/dom/dynamic.h"
 #include "engraving/dom/factory.h"
 #include "engraving/rw/xmlreader.h"
@@ -1651,6 +1658,200 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             for (const StarScoreSection& s : load().sections) {
                 autotestLog(QString("  section %1 (%2): %3").arg(s.id, s.templateKey, s.partIds.join(", ")));
             }
+        }
+        if (IMasterNotationPtr nm = globalContext()->currentMasterNotation()) {
+            QStringList open, closed;
+            for (const IExcerptNotationPtr& e : nm->excerpts()) {
+                (e && e->notation() && e->notation()->isOpen() ? open : closed) << (e ? e->name() : QString());
+            }
+            autotestLog(QString("  open tabs: %1").arg(open.join(", ")));
+            autotestLog(QString("  closed part scores: %1").arg(closed.join(", ")));
+        }
+    } else if (step.startsWith("addlock:")) {
+        // addlock:<part score>:<first bar>-<last bar>: locks those bars into one system there, as Format › Lock does
+        const QString who = step.mid(step.indexOf(':') + 1, step.lastIndexOf(':') - step.indexOf(':') - 1);
+        const QString range = step.mid(step.lastIndexOf(':') + 1);
+        const int from = range.section('-', 0, 0).toInt();
+        const int to = range.section('-', 1, 1).toInt();
+        IMasterNotationPtr nm = globalContext()->currentMasterNotation();
+        INotationPtr n = nm && who == "(full score)" ? nm->notation() : nullptr;
+        for (const IExcerptNotationPtr& e : nm ? nm->excerpts() : ExcerptNotationList()) {
+            if (e && e->name() == who) {
+                n = e->notation();
+            }
+        }
+        engraving::Score* sc = n ? n->elements()->msScore() : nullptr;
+        engraving::Measure* a = sc ? sc->firstMeasure() : nullptr;
+        for (int i = 1; a && i < from; ++i) {
+            a = a->nextMeasure();
+        }
+        engraving::Measure* b = a;
+        for (int i = from; b && i < to; ++i) {
+            b = b->nextMeasure();
+        }
+        if (a && b) {
+            n->undoStack()->prepareChanges(TranslatableString::untranslatable("Lock"));
+            engraving::EditSystemLocks::undoAddSystemLock(sc, new engraving::SystemLock(a->coveringMMRestOrThis(), b->coveringMMRestOrThis()));
+            n->undoStack()->commitChanges();
+            n->notationChanged().notify();
+        }
+        QStringList locks;
+        if (sc) {
+            for (const engraving::SystemLock* l : sc->systemLocks()->allLocks()) {
+                locks << QString("%1-%2").arg(l->startMB()->tick().ticks()).arg(l->endMB()->tick().ticks());
+            }
+        }
+        autotestLog(QString("  locked bars %1-%2 in %3: %4; locks (ticks) %5").arg(from).arg(to).arg(who, a && b ? "done" : "no such bars",
+                                                                                                    locks.join(" ")));
+    } else if (step == "sectionbreaks" || step.startsWith("addsectionbreak:") || step.startsWith("removesectionbreak:")) {
+        // sectionbreaks: the bars with a section break in the full score and in each part score (bar number, and "!"
+        // where the bar's flag and its break element disagree); addsectionbreak:<part score>:<bar>
+        // (removesectionbreak:…) adds (takes away) one there as Format › Add/Remove section break does, then lists them
+        IMasterNotationPtr nm = globalContext()->currentMasterNotation();
+        if (!nm) {
+            autotestLog("  no score");
+        } else {
+            std::vector<std::pair<QString, INotationPtr> > all { { "(full score)", nm->notation() } };
+            for (const IExcerptNotationPtr& e : nm->excerpts()) {
+                if (e && e->notation()) {
+                    all.emplace_back(e->name(), e->notation());
+                }
+            }
+            if (!step.startsWith("sectionbreaks")) {
+                // (part score names have colons: "2H: Trumpet")
+                const QString who = step.mid(step.indexOf(':') + 1, step.lastIndexOf(':') - step.indexOf(':') - 1);
+                const int bar = step.mid(step.lastIndexOf(':') + 1).toInt();
+                const bool add = step.startsWith("add");
+                for (const auto& [name, n] : all) {
+                    if (name != who) {
+                        continue;
+                    }
+                    engraving::Score* sc = n->elements()->msScore();
+                    engraving::Measure* m = sc->firstMeasure();
+                    for (int i = 1; m && i < bar; ++i) {
+                        m = m->nextMeasure();
+                    }
+                    if (m) {
+                        n->undoStack()->prepareChanges(TranslatableString::untranslatable("Section break"));
+                        m->undoSetBreak(add, engraving::LayoutBreakType::SECTION);
+                        n->undoStack()->commitChanges();
+                        n->notationChanged().notify();
+                    }
+                    autotestLog(QString("  %1 section break at bar %2 of %3: %4").arg(add ? "added" : "took away").arg(bar).arg(who,
+                                                                                                                    m ? "done" : "no such bar"));
+                }
+            }
+            std::map<QString, QStringList> byBars;
+            for (const auto& [name, n] : all) {
+                QStringList bars;
+                int no = 1;
+                for (engraving::Measure* m = n->elements()->msScore()->firstMeasure(); m; m = m->nextMeasure(), ++no) {
+                    const bool element = m->sectionBreakElement() != nullptr;
+                    if (m->sectionBreak() || element) {
+                        bars << QString::number(no) + (m->sectionBreak() != element ? "!" : "");
+                    }
+                }
+                byBars[bars.join(" ")] << name;
+            }
+            for (const auto& [bars, names] : byBars) {
+                autotestLog(QString("  section breaks at bars [%1]: %2").arg(bars, names.join(", ")));
+            }
+        }
+    } else if (step.startsWith("chordsymbols:")) {
+        // chordsymbols:<staff>:<chord>|<chord>|…: types each chord symbol on bar 1, 2, … of that staff (counted from 1)
+        // as the chord symbol tool does (linked into the part scores), then logs, in the full score and in each part
+        // score showing that staff, the text the chord holds and the text it shows
+        // (…@<staff>: then copies those bars of the staff and pastes them onto that staff, as copy and paste do)
+        const int staff = step.section(':', 1, 1).toInt() - 1;
+        const QString rest = step.section(':', 2);
+        const QStringList chords = rest.section('@', 0, 0).split('|');
+        const int pasteTo = rest.contains('@') ? rest.section('@', 1).toInt() - 1 : -1;
+        engraving::Measure* m = ms->firstMeasure();
+        std::vector<engraving::Harmony*> made;
+        master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Chord symbols"));
+        for (const QString& text : chords) {
+            if (!m || staff < 0 || staff >= int(ms->nstaves())) {
+                break;
+            }
+            engraving::Segment* seg = m->first(engraving::SegmentType::ChordRest);
+            for (engraving::EngravingItem* a : seg->annotations()) {
+                if (a->isHarmony() && a->staffIdx() == size_t(staff)) {
+                    ms->undoRemoveElement(a);
+                    break;
+                }
+            }
+            engraving::Harmony* h = engraving::Factory::createHarmony(seg);
+            h->setTrack(staff * engraving::VOICES);
+            h->setParent(seg);
+            h->setHarmony(String::fromQString(text));
+            h->setPlainText(h->harmonyName());
+            ms->undoAddElement(h);
+            made.push_back(h);
+            m = m->nextMeasure();
+        }
+        master->notation()->undoStack()->commitChanges();
+        ms->setLayoutAll();
+        ms->doLayout();
+        if (pasteTo >= 0 && pasteTo < int(ms->nstaves()) && m) {
+            master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Paste chord symbols"));
+            ms->deselectAll();
+            ms->selection().setRangeTicks(engraving::Fraction(0, 1), m->tick(), staff, staff + 1);
+            ms->selection().updateSelectedElements();
+            const ByteArray mime = ms->selection().mimeData();
+            ms->deselectAll();
+            engraving::XmlReader reader(mime);
+            const bool ok = !mime.empty() && ms->pasteStaff(reader, ms->firstMeasure()->first(engraving::SegmentType::ChordRest), pasteTo);
+            master->notation()->undoStack()->commitChanges();
+            autotestLog(QString("  pasted onto staff %1: %2").arg(pasteTo + 1).arg(ok ? "ok" : "FAILED"));
+            made.clear();
+            for (engraving::Segment* seg = ms->firstSegment(engraving::SegmentType::ChordRest); seg && seg->tick() < m->tick();
+                 seg = seg->next1(engraving::SegmentType::ChordRest)) {
+                for (engraving::EngravingItem* a : seg->annotations()) {
+                    if (a->isHarmony() && a->staffIdx() == size_t(pasteTo)) {
+                        made.push_back(engraving::toHarmony(a));
+                    }
+                }
+            }
+            ms->setLayoutAll();
+            ms->doLayout();
+        }
+        std::vector<engraving::Score*> scores { ms };
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            if (e->notation()) {
+                scores.push_back(e->notation()->elements()->msScore());
+            }
+        }
+        for (engraving::Score* sc : scores) {
+            sc->setLayoutAll();
+            sc->doLayout();
+            QStringList seen;
+            for (engraving::Harmony* h : made) {
+                const engraving::Harmony* here = sc->isMaster() ? h : nullptr;
+                if (!here && h->links()) {
+                    for (engraving::EngravingObject* o : *h->links()) {
+                        if (o->score() == sc) {
+                            here = engraving::toHarmony(o);
+                        }
+                    }
+                }
+                if (here) {
+                    seen << QString("%1 -> \"%2\"").arg(here->harmonyName().toQString(), here->displayText().toQString());
+                }
+            }
+            if (!seen.isEmpty()) {
+                autotestLog(QString("  [%1] %2").arg(sc->isMaster() ? QString("full score") : sc->excerpt()->name().toQString(),
+                                                     seen.join("  ")));
+            }
+        }
+    } else if (step == "tabs") {
+        // the part scores open as tabs, and the ones closed
+        if (IMasterNotationPtr nm = globalContext()->currentMasterNotation()) {
+            QStringList open, closed;
+            for (const IExcerptNotationPtr& e : nm->excerpts()) {
+                (e && e->notation() && e->notation()->isOpen() ? open : closed) << (e ? e->name() : QString());
+            }
+            autotestLog(QString("  open tabs: %1").arg(open.join(", ")));
+            autotestLog(QString("  closed part scores: %1").arg(closed.join(", ")));
         }
     } else if (step == "styles") {
         autotestLog(QString("  restyled %1").arg(applyStyles()));

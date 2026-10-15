@@ -120,8 +120,42 @@ public:
 
 void EditSystemLocks::undoAddSystemLock(Score* score, const SystemLock* lock)
 {
-    removeLayoutBreaksOnAddSystemLock(score, lock);
-    score->undo(new AddSystemLock(lock));
+    // StarScore (Joel, 15 Oct 2026): a section break is in the score and every part score, so locking a system in one
+    // of them never takes it away (MuseScore did, in every score): the lock is split after each section break inside it
+    const bool mmrests = score->style().styleB(Sid::createMultiMeasureRests);
+    auto next = [mmrests](MeasureBase* mb) { return mmrests ? mb->nextMM() : mb->next(); };
+    auto lockable = [](const MeasureBase* mb) { return mb && (mb->isMeasure() || mb->isHBox()); };
+    std::vector<std::pair<MeasureBase*, MeasureBase*> > pieces;
+    MeasureBase* pieceStart = lock->startMB();
+    MeasureBase* lastLockable = nullptr;
+    for (MeasureBase* mb = lock->startMB(); mb && mb->isBeforeOrEqual(lock->endMB()); mb = next(mb)) {
+        if (lockable(mb)) {
+            lastLockable = mb;
+            if (!pieceStart) {
+                pieceStart = mb;
+            }
+        }
+        if (mb != lock->endMB() && mb->sectionBreak()) {
+            if (pieceStart && lastLockable && (pieceStart == lastLockable || pieceStart->isBefore(lastLockable))) {
+                pieces.emplace_back(pieceStart, lastLockable);
+            }
+            pieceStart = nullptr;
+        }
+    }
+    if (pieces.empty() && pieceStart == lock->startMB()) {
+        removeLayoutBreaksOnAddSystemLock(score, lock);
+        score->undo(new AddSystemLock(lock));
+        return;
+    }
+    if (pieceStart && (pieceStart == lock->endMB() || pieceStart->isBefore(lock->endMB()))) {
+        pieces.emplace_back(pieceStart, lock->endMB());
+    }
+    delete lock;
+    for (const auto& [a, b] : pieces) {
+        SystemLock* piece = new SystemLock(a, b);
+        removeLayoutBreaksOnAddSystemLock(score, piece);
+        score->undo(new AddSystemLock(piece));
+    }
 }
 
 void EditSystemLocks::undoRemoveSystemLock(Score* score, const SystemLock* lock)

@@ -27,6 +27,7 @@
 
 #include "dom/fret.h"
 #include "dom/harmony.h"
+#include "dom/starscoremodes.h"
 #include "draw/fontmetrics.h"
 #include "dom/factory.h"
 
@@ -545,10 +546,37 @@ void HarmonyLayout::doRenderSingleHarmony(Harmony* item, Harmony::LayoutData* ld
 
     NoteSpellingType spelling = style.styleV(Sid::chordSymbolSpelling).value<NoteSpellingType>();
 
-    const ChordDescription* cd = info->getDescription();
+    // StarScore: a root and a mode name ("Blocrian" -> "B locrian", "F#mixolydianb6" -> "F♯ mixolydian ♭6"): the root as
+    // any root (so it transposes), then the name, its words spaced and its alterations with the chord file's accidentals
+    const starscore::ModeName mode = item->isStarScoreMode(info) ? starscore::modeName(info->textName()) : starscore::ModeName();
+    const ChordDescription* cd = mode.valid() ? nullptr : info->getDescription();
     const bool stackModifiers = style.styleB(Sid::verticallyStackModifiers) && !item->doNotStackModifiers();
 
-    if (item->harmonyType() == HarmonyType::STANDARD && tpcIsValid(rootTpc)) {
+    if (mode.valid() && tpcIsValid(rootTpc)) {
+        render(item, ldata, chordList->renderListRoot, harmonyCtx, ctx, rootTpc, spelling, rootCase);
+        static constexpr double MODE_SCALE = 0.8;   // a little smaller than the root, on its baseline
+        std::vector<RenderActionPtr> words { std::make_shared<RenderActionScale>(MODE_SCALE),
+                                             std::make_shared<RenderActionSet>(String(u" ") + mode.words) };
+        for (const auto& [acc, degree] : mode.alterations) {
+            words.push_back(std::make_shared<RenderActionSet>(String(u" ")));
+            bool tokenFound = false;
+            for (const ChordToken& tok : chordList->chordTokenList) {
+                if (muse::contains(tok.names, acc) && !tok.renderList.empty()) {
+                    words.insert(words.end(), tok.renderList.begin(), tok.renderList.end());
+                    tokenFound = true;
+                    break;
+                }
+            }
+            if (!tokenFound) {
+                words.push_back(std::make_shared<RenderActionSet>(acc == u"b" ? String(u"\u266D") : acc == u"bb" ? String(u"\U0001D12B")
+                                                                  : acc == u"#" ? String(u"\u266F") : acc == u"##" ? String(u"\U0001D12A")
+                                                                  : String(u"\u266E")));
+            }
+            words.push_back(std::make_shared<RenderActionSet>(degree));
+        }
+        words.push_back(std::make_shared<RenderActionScale>(1.0 / MODE_SCALE));
+        render(item, ldata, words, harmonyCtx, ctx, 0);
+    } else if (item->harmonyType() == HarmonyType::STANDARD && tpcIsValid(rootTpc)) {
         // render root
         render(item, ldata, chordList->renderListRoot, harmonyCtx, ctx, rootTpc, spelling, rootCase);
         // render extension

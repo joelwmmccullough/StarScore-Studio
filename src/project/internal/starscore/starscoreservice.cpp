@@ -2017,6 +2017,8 @@ RetVal<QString> StarScoreService::createSection(const QString& templateKey, cons
     standardizeHornNames();   // "4H: Trumpet", "3H Flexible: Horn 1"
 
     applyStyles(section.partIds);
+    // the new section shows: open its part scores, as showing a section does
+    syncSectionTabs({ section.id });
     // The mixer's tracks for new instruments appear a moment after they're added: apply the defaults again then.
     // A horn section's chord symbols never play (Joel, 13 Oct 2026): their tracks start muted, also before the parts
     // have any chord symbols.
@@ -2395,6 +2397,13 @@ Ret StarScoreService::newStarScore(const StarScoreNewOptions& options)
     store(data);
     syncArrangementScores();
     applyStyles();
+    // every section starts shown: open its part scores, as showing a section does (Joel, 15 Oct 2026: they stayed
+    // closed until every section was hidden and shown again)
+    QStringList all;
+    for (const StarScoreSection& s : data.sections) {
+        all << s.id;
+    }
+    syncSectionTabs(all);
     return make_ok();
 }
 
@@ -3398,10 +3407,10 @@ void StarScoreService::saveStyleSettings(const StyleSettings& settings)
 //! Done once per bundled version. A default the user chose themselves (not an older bundled one) is kept.
 void StarScoreService::installBuiltinDefaultStyle()
 {
-    static const int BUILTIN_STYLE_VERSION = 12;   // 1 = Starsign 2.0, 2 = 2.1, 3 = 2.2, 4 = 2.3, 5 = 2.4, 6 = 2.5, 7 = 2.6, 8 = 2.6 with H-bar 0.7sp, 9 = Futura staff text and text lines, 10 = alternate chord symbols 11pt, 11 = 2.7 (glissando text off), 12 = 2.8 (hairpin text Futura 9pt)
+    static const int BUILTIN_STYLE_VERSION = 13;   // 1 = Starsign 2.0, 2 = 2.1, 3 = 2.2, 4 = 2.3, 5 = 2.4, 6 = 2.5, 7 = 2.6, 8 = 2.6 with H-bar 0.7sp, 9 = Futura staff text and text lines, 10 = alternate chord symbols 11pt, 11 = 2.7 (glissando text off), 12 = 2.8 (hairpin text Futura 9pt), 13 = 2.9 (expression text 9pt, Joel 15 Oct 2026)
 
     const QString dir = globalConfiguration()->userAppDataPath().appendingComponent("StarScoreStyles").toQString();
-    const QString target = dir + "/Starsign 2.8.mss";
+    const QString target = dir + "/Starsign 2.9.mss";
 
     StyleSettings settings = loadStyleSettings();
     const bool newVersion = settings.builtinStyleVersion < BUILTIN_STYLE_VERSION;
@@ -3412,15 +3421,15 @@ void StarScoreService::installBuiltinDefaultStyle()
     QDir().mkpath(dir);
     // a different file already under this name (a style saved there by hand) is kept beside it, never removed
     if (QFileInfo::exists(target)) {
-        QFile mine(":/resources/starscore/Starsign_2.8.mss"), there(target);
+        QFile mine(":/resources/starscore/Starsign_2.9.mss"), there(target);
         const bool same = mine.open(QIODevice::ReadOnly) && there.open(QIODevice::ReadOnly) && mine.readAll() == there.readAll();
         there.close();
         if (!same) {
-            QFile::rename(target, dir + "/Starsign 2.8 (kept " + QDate::currentDate().toString(Qt::ISODate) + ").mss");
+            QFile::rename(target, dir + "/Starsign 2.9 (kept " + QDate::currentDate().toString(Qt::ISODate) + ").mss");
         }
     }
     QFile::remove(target);
-    if (!QFile::copy(":/resources/starscore/Starsign_2.8.mss", target)) {
+    if (!QFile::copy(":/resources/starscore/Starsign_2.9.mss", target)) {
         LOGE() << "Could not install the built-in StarScore style";
         return;
     }

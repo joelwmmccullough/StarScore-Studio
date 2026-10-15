@@ -994,7 +994,7 @@
     <dynamicsFrameBgColor r="255" g="255" b="255" a="0"/>
     <dynamicsPosition>center</dynamicsPosition>
     <expressionFontFace>Futura</expressionFontFace>
-    <expressionFontSize>8</expressionFontSize>
+    <expressionFontSize>9</expressionFontSize>
     <expressionLineSpacing>1</expressionLineSpacing>
     <expressionFontSpatiumDependent>1</expressionFontSpatiumDependent>
     <expressionFontStyle>2</expressionFontStyle>
