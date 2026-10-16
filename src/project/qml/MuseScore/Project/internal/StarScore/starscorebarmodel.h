@@ -97,6 +97,7 @@ signals:
     void solosChanged();
 
 private:
+    QString askTwoTrumpetSources();
     //! Re-reads the service and fires changed(), plus the list signals whose list is different
     void refresh();
     QVariantList buildArrangements() const;

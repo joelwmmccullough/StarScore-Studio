@@ -8,9 +8,13 @@
  * paired instrument by instrument in score order (5H Trumpet 1 -> 6H Trumpet 1, 5H Trumpet 2 -> 6H Trumpet 2,
  * 5H Tenor Sax -> 6H Tenor Sax 1); a part with no partner stays empty. Each copy gets the music, its part score's
  * style, layout (system and page breaks), text positions and measure widths, and is marked Sketch.
+ *
+ * The 4-Horn 2-Trumpet (Joel, 16 Oct 2026) is copied without asking: its Trumpet 1 and 2 from the 5-Horn's, its Tenor
+ * Sax and doubler from the 3-Horn Standard's.
  */
 #include "starscoreservice.h"
 #include "starscoreengraving.h"
+#include "starscorehornkeys.h"
 
 #include <tuple>
 
@@ -51,6 +55,71 @@ int hornCount(const QString& templateKey)
     const QRegularExpressionMatch m = key.match(templateKey);
     return m.hasMatch() ? m.captured(1).toInt() : 0;
 }
+
+//! A Standard horn section's chairs by role, stand-in versions left out: "trumpet1", "trumpet2" (the trumpets in score
+//! order), "tenor" (the first Tenor Sax: a tenor doubler comes after it) and "doubler" (the one part left; in a 3-Horn
+//! or a 4-Horn 2-Trumpet, the doubler's)
+std::map<QString, QString> hornRoles(const mu::engraving::MasterScore* ms, const StarScoreSection& section)
+{
+    std::map<QString, QString> roles;
+    QStringList rest;
+    int trumpets = 0;
+    for (const mu::engraving::Part* p : ms->parts()) {
+        const QString pid = p->id().toQString();
+        if (!section.partIds.contains(pid) || section.alternates.count(pid)) {
+            continue;
+        }
+        const QString inst = p->instrumentId().toQString();
+        if ((inst.contains("trumpet") || inst.contains("flugelhorn") || inst.contains("cornet")) && !inst.contains("piccolo")
+            && trumpets < 2) {
+            roles[QString("trumpet%1").arg(++trumpets)] = pid;
+        } else if (inst == "tenor-saxophone" && !roles.count("tenor")) {
+            roles["tenor"] = pid;
+        } else {
+            rest << pid;
+        }
+    }
+    if (rest.size() == 1) {
+        roles["doubler"] = rest.front();
+    }
+    return roles;
+}
+}
+
+//! The 4-Horn 2-Trumpet's parts and where they're copied from: (5-Horn Trumpet 1, its Trumpet 1), (5-Horn Trumpet 2,
+//! its Trumpet 2), (3-Horn Tenor Sax, its Tenor Sax), (3-Horn doubler, its doubler); only the sources with music
+std::vector<std::pair<QString, QString> > StarScoreService::twoTrumpetSources(const StarScoreSection& made) const
+{
+    std::vector<std::pair<QString, QString> > pairs;
+    engraving::MasterScore* ms = masterScore();
+    if (!ms) {
+        return pairs;
+    }
+    const std::map<QString, QString> to = hornRoles(ms, made);
+    for (const StarScoreSection& s : load().sections) {
+        QStringList roles;
+        if (s.templateKey == "5-horn") {
+            roles = { "trumpet1", "trumpet2" };
+        } else if (s.templateKey == "3-horn") {
+            roles = { "tenor", "doubler" };
+        }
+        if (roles.isEmpty()) {
+            continue;
+        }
+        const std::map<QString, QString> from = hornRoles(ms, s);
+        for (const QString& role : roles) {
+            auto f = from.find(role);
+            auto t = to.find(role);
+            if (f == from.end() || t == to.end()) {
+                continue;
+            }
+            const engraving::Part* p = ms->partById(ID(f->second));
+            if (p && starscore::partHasNotes(p)) {
+                pairs.emplace_back(f->second, t->second);
+            }
+        }
+    }
+    return pairs;
 }
 
 std::vector<std::pair<QString, QString> > StarScoreService::matchingHornParts(const QString& fromSectionId,
@@ -124,6 +193,14 @@ void StarScoreService::offerMatchingHornParts(const QStringList& sectionIdsBefor
         }
         const std::vector<StarScoreSection> all = sections();
         for (const StarScoreSection& made : all) {
+            // the 4-Horn 2-Trumpet: copied from the 5-Horn and the 3-Horn Standard without asking (Joel, 16 Oct 2026)
+            if (!sectionIdsBefore.contains(made.id) && made.templateKey == starscore::TWO_TRUMPET_4H) {
+                const std::vector<std::pair<QString, QString> > pairs = twoTrumpetSources(made);
+                if (!pairs.empty()) {
+                    copyHornParts(pairs);
+                }
+                continue;
+            }
             const int n = hornCount(made.templateKey);
             if (sectionIdsBefore.contains(made.id) || n == 0) {
                 continue;

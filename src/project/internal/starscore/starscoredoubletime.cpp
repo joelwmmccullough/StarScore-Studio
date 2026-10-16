@@ -21,6 +21,7 @@
 #include "starscoreengraving.h"
 
 #include <cmath>
+#include <set>
 
 #include <QRegularExpression>
 
@@ -149,6 +150,37 @@ size_t measuresFrom(Measure* m)
 RetVal<QString> StarScoreService::convertFromDoubleTime()
 {
     return convertTimeOf(globalContext()->currentProject(), false, false);
+}
+
+//! How many pieces of ties, slurs and lines the systems of the song and its part scores hold that belong to nothing in
+//! the score any more: a line that was removed, or a tie in a bar that was removed
+static int staleSpannerSegments(MasterScore* ms)
+{
+    int stale = 0;
+    for (Score* s : ms->scoreList()) {
+        std::set<const MeasureBase*> bars;
+        for (const MeasureBase* mb = s->first(); mb; mb = mb->next()) {
+            bars.insert(mb);
+        }
+        std::set<const Spanner*> live;
+        for (const auto& [tick, sp] : s->spanner()) {
+            live.insert(sp);
+        }
+        for (System* sys : s->systems()) {
+            for (const SpannerSegment* ss : sys->spannerSegments()) {
+                const Spanner* sp = ss->spanner();
+                if (!sp || live.count(sp)) {
+                    continue;
+                }
+                const EngravingItem* start = sp->startElement();
+                const MeasureBase* at = start ? start->findMeasureBase() : nullptr;
+                if (!s->unmanagedSpanners().count(const_cast<Spanner*>(sp)) || !at || !bars.count(at)) {
+                    ++stale;
+                }
+            }
+        }
+    }
+    return stale;
 }
 
 //! toDouble false: "Convert from double time" (every note half as long, two bars of x/4 become one, x/8 -> x/16, the
@@ -431,6 +463,19 @@ RetVal<QString> StarScoreService::convertTimeOf(const INotationProjectPtr& proje
     ms->setLayoutAll();
     ms->doLayout();
     if (throwawayCopy) {
+        // Every part score laid out with the new bars first (1.18.51; Joel, 16 Oct 2026: G.I. Jorge's Double-Time
+        // export crashed StarScore again). Only the song itself had been laid out here: each part score's lines still
+        // held the pieces of the old bars' ties, slurs and lines (a rit. line among them), and once the old bars were
+        // let go, the part score's next layout wrote into memory that had been freed.
+        const int staleBefore = staleSpannerSegments(ms);
+        for (Score* s : ms->scoreList()) {
+            if (s != ms) {
+                s->setLayoutAll();
+                s->doLayout();
+            }
+        }
+        LOGI() << "[starscore] double time: part scores laid out before the old bars are let go (" << staleBefore
+               << " piece(s) of old lines in their systems before, " << staleSpannerSegments(ms) << " after)";
         // the edits so far closed as a step of their own and forgotten, with the old bars they hold; the rest of the
         // conversion is a new step. The score isn't laid out again for the closing (its updates are held): the layouts
         // the conversion makes stay the same ones, so the sheets come out the same.

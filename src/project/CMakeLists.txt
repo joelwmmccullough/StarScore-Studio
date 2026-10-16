@@ -105,6 +105,7 @@ target_sources(project PRIVATE
     internal/starscore/starscoreautotest.cpp
     internal/starscore/starscoreservice.h
     internal/starscore/starscorestatus.h
+    internal/starscore/starscorehornkeys.h
     internal/starscore/starscoreengraving.cpp
     internal/starscore/starscorehouse.cpp
     internal/starscore/starscorehouse.h

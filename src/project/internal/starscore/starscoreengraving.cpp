@@ -935,6 +935,39 @@ int mu::project::starscore::copyTextPositions(const Score* source, Score* target
         }
     }
 
+    // notes and rests hidden in the source part score only (1.18.51: the 5-Horn Trumpet 1 had the slash under a whole
+    // note hidden in its part score; the 4-Horn 2-Trumpet's copy showed it). Matched by place in the song, voice, and
+    // kind (a rest to a rest; a chord's notes to a chord of as many notes)
+    const track_idx_t tracks = std::min(source->ntracks(), target->ntracks());
+    for (const Segment* seg = source->firstSegment(SegmentType::ChordRest); seg; seg = seg->next1(SegmentType::ChordRest)) {
+        Segment* tseg = nullptr;
+        for (track_idx_t t = 0; t < tracks; ++t) {
+            const EngravingItem* e = seg->element(t);
+            if (!e) {
+                continue;
+            }
+            if (!tseg) {
+                tseg = target->tick2segment(seg->tick(), true, SegmentType::ChordRest);
+                if (!tseg || tseg->tick() != seg->tick()) {
+                    break;
+                }
+            }
+            EngravingItem* te = tseg->element(t);
+            if (!te || te->type() != e->type()) {
+                continue;
+            }
+            if (e->isRest()) {
+                copyProps(e, te, { Pid::VISIBLE });
+            } else if (e->isChord() && toChord(e)->notes().size() == toChord(te)->notes().size()) {
+                const std::vector<Note*>& from = toChord(e)->notes();
+                const std::vector<Note*>& to = toChord(te)->notes();
+                for (size_t i = 0; i < from.size(); ++i) {
+                    copyProps(from[i], to[i], { Pid::VISIBLE });
+                }
+            }
+        }
+    }
+
     // frames (the title frame first): their height and gaps, and where each of their texts sits, matched by kind
     // (title, subtitle, composer, instrument name…), never the words
     std::vector<const Box*> sourceBoxes;

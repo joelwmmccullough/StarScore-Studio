@@ -6,6 +6,7 @@
  */
 #include "starscoreservice.h"
 #include "starscoreengraving.h"
+#include "starscorehornkeys.h"
 
 #include <algorithm>
 #include <map>
@@ -665,8 +666,9 @@ QString StarScoreService::songDoublerInstrumentId(int forHorns) const
         return QString();
     }
     const Data d = load();
-    for (int horns = 3; horns <= 7; ++horns) {
-        const QString key = QString("%1-horn").arg(horns);
+    for (const QString& key : { QString("3-horn"), QString("4-horn"), starscore::TWO_TRUMPET_4H, QString("5-horn"),
+                                QString("6-horn"), QString("7-horn") }) {
+        const int horns = starscore::hornSectionSize(key);
         const std::optional<StarScoreSectionTemplate> t = sectionTemplate(key);
         for (const StarScoreSection& s : d.sections) {
             if (s.templateKey != key || !t) {
@@ -1825,7 +1827,6 @@ int StarScoreService::standardizeHornNames()
         return 0;
     }
     const Data d = load();
-    static const QRegularExpression keyRe("^(\\d)-horn(-any)?$");
     auto bare = [](const QString& name) {
         const int at = name.lastIndexOf(": ");
         return (at >= 0 ? name.mid(at + 2) : name).trimmed();
@@ -1833,12 +1834,12 @@ int StarScoreService::standardizeHornNames()
 
     std::vector<std::pair<engraving::Part*, QString> > renames;
     for (const StarScoreSection& s : d.sections) {
-        const QRegularExpressionMatch m = keyRe.match(s.templateKey);
-        if (!m.hasMatch()) {
+        // "3H", "3H Flexible", "4H 2-Trumpet"
+        const QString prefix = starscore::hornPartPrefix(s.templateKey);
+        if (prefix.isEmpty()) {
             continue;
         }
-        const bool flexible = !m.captured(2).isEmpty();
-        const QString prefix = m.captured(1) + "H" + (flexible ? QString(" Flexible") : QString());
+        const bool flexible = s.templateKey.endsWith("-horn-any");
 
         std::vector<engraving::Part*> parts;   // in score order
         for (engraving::Part* p : ms->parts()) {

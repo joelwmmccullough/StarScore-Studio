@@ -33,8 +33,10 @@ struct Column {
 //! Dashboard columns, in the order they're shown
 const std::vector<Column> COLUMNS {
     { "3H", "3-Horn", "3H" }, { "2H", "2-Horn", "2H" }, { "2F", "2-Horn Flexible", "2F" }, { "3F", "3-Horn Flexible", "3F" },
-    { "1H", "1-Horn", "1H" }, { "4H", "4-Horn", "4H" }, { "5H", "5-Horn", "5H" }, { "6H", "6-Horn", "6H" }, { "7H", "7-Horn", "7H" },
+    { "1H", "1-Horn", "1H" }, { "4H", "4-Horn", "4H" }, { "4T", "4-Horn 2-Trumpet", "4T" }, { "5H", "5-Horn", "5H" },
+    { "6H", "6-Horn", "6H" }, { "7H", "7-Horn", "7H" },
 };
+// (the 4-Horn 2-Trumpet, 16 Oct 2026, has a column but isn't in the priority order: Joel makes it when he wants one)
 
 //! Joel's priority order (29 Sep 2026, 1-Horn added the same day): which arrangements of which songs come first
 struct Tier {

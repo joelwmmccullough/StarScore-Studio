@@ -1951,9 +1951,12 @@ static bool auditCacheCurrent(const QJsonObject& entry, const QString& stamp)
                                                           || entry.value("v").toInt() == 5);
 }
 
-//! Which dashboard column an arrangement fills: "3H" (3-Horn Standard), "3F" (3-Horn Flexible), …
+//! Which dashboard column an arrangement fills: "3H" (3-Horn Standard), "3F" (3-Horn Flexible), "4T" (4-Horn 2-Trumpet), …
 static QString auditArrangementColumn(const StarScoreArrangement& a)
 {
+    if (a.templateKey == "4-horn-2tpt") {
+        return "4T";   // the 4-Horn 2-Trumpet
+    }
     static const QRegularExpression keyRe("^(\\d)-horn-(standard|any)$");
     const QRegularExpressionMatch km = keyRe.match(a.templateKey);
     if (km.hasMatch()) {

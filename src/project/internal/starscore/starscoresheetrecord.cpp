@@ -355,7 +355,7 @@ QString StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, con
     static const std::vector<std::pair<QString, QString> > NAMES {
         { "1-horn-standard", "1-Horn Standard" }, { "2-horn-any", "2-Horn Flexible" }, { "2-horn-standard", "2-Horn Standard" },
         { "3-horn-any", "3-Horn Flexible" }, { "3-horn-standard", "3-Horn Standard" }, { "4-horn-standard", "4-Horn Standard" },
-        { "5-horn-standard", "5-Horn Standard" }, { "6-horn-standard", "6-Horn Standard" }, { "7-horn-standard", "7-Horn Standard" },
+        { "4-horn-2tpt", "4-Horn 2-Trumpet" }, { "5-horn-standard", "5-Horn Standard" }, { "6-horn-standard", "6-Horn Standard" }, { "7-horn-standard", "7-Horn Standard" },
         { "big-band", "Big Band" }, { "marching-band", "Marching Band" },
     };
     auto nameOf = [&](const QString& tpl) {
@@ -429,8 +429,9 @@ QString StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, con
             needRole(t, "bass", "bass");
         }
     };
-    for (const QString& tpl : { QString("4-horn-standard"), QString("5-horn-standard"), QString("6-horn-standard"),
-                                QString("7-horn-standard") }) {
+    // (the 4-Horn 2-Trumpet too since 1.18.51: Joel, 16 Oct 2026)
+    for (const QString& tpl : { QString("4-horn-standard"), QString("4-horn-2tpt"), QString("5-horn-standard"),
+                                QString("6-horn-standard"), QString("7-horn-standard") }) {
         needChart(blue, tpl, true);
     }
     // Big Band and Marching Band: their folder holds the whole band, rhythm included

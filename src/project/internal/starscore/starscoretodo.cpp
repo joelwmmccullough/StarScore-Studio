@@ -226,6 +226,10 @@ std::vector<StarScoreTodoItem> StarScoreService::todoList(const Data& data) cons
     // 11–13. 5-, 6- and 7-Horn Sections (the 7-Horn main low horn — the bass trombone, or whatever the 7th chair is —
     // also as Bass Trombone / Bari Sax / Bass Sax / Bassoon versions)
     out.push_back(sectionItem("5-horn", muse::qtrc("starscore", "5-Horn Section"), "5-horn"));
+    // the 4-Horn 2-Trumpet (Joel, 16 Oct 2026): only in a song that has one; it isn't a step every song needs
+    if (std::any_of(data.sections.begin(), data.sections.end(), [](const StarScoreSection& s) { return s.templateKey == "4-horn-2tpt"; })) {
+        out.push_back(sectionItem("4-horn-2tpt", muse::qtrc("starscore", "4-Horn 2-Trumpet Section"), "4-horn-2tpt"));
+    }
     out.push_back(sectionItem("6-horn", muse::qtrc("starscore", "6-Horn Section"), "6-horn"));
     {
         StarScoreTodoItem i = sectionItem("7-horn", muse::qtrc("starscore", "7-Horn Section"), "7-horn");

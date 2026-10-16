@@ -7,6 +7,7 @@
 
 #include <QSettings>
 
+#include "project/internal/starscore/starscorehornkeys.h"
 #include "translation.h"
 #include "log.h"
 
@@ -24,13 +25,10 @@ static const QStringList NEW_ARRANGEMENTS {
     "7-horn-standard",
 };
 
-//! Horn count of a Standard arrangement key ("5-horn-standard" -> 5); 0 for anything else
+//! Horn count of a Standard arrangement key ("5-horn-standard" -> 5, "4-horn-2tpt" -> 4); 0 for anything else
 static int standardHorns(const QString& arrangementKey)
 {
-    if (!arrangementKey.endsWith("-horn-standard")) {
-        return 0;
-    }
-    return arrangementKey.left(arrangementKey.indexOf('-')).toInt();
+    return starscore::standardArrangementSize(arrangementKey);
 }
 
 NewStarScoreModel::NewStarScoreModel(QObject* parent)
@@ -213,7 +211,7 @@ bool NewStarScoreModel::asksOnAdd(const QString& arrangementKey) const
         return false;   // 2-Horn, Flexible, Big Band, Orchestra, Marching Band: nothing to choose
     }
     // the horn section ("3-horn" of "3-horn-standard") is made only when the score hasn't got one
-    const QString hornKey = QString("%1-horn").arg(standardHorns(arrangementKey));
+    const QString hornKey = starscore::hornSectionOfArrangement(arrangementKey);
     for (const StarScoreSection& s : starScore()->sections()) {
         if (s.templateKey == hornKey) {
             return false;

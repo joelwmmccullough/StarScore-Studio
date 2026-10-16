@@ -39,6 +39,7 @@
  * Everything is logged to log.txt.
  */
 #include "starscoreservice.h"
+#include "starscorehornkeys.h"
 #include "starscoreautoarchive.h"
 #include "engraving/dom/layoutbreak.h"
 #include "engraving/dom/system.h"
@@ -366,8 +367,8 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         // newsection:<template key>: a section made as the StarScore panel makes it (the doubler as the song's), then
         // its parts, each new staff's swing at its first bar, and whether its chord-symbol track starts muted
         const QString key = step.mid(11);
-        const int horns = key.left(1).toInt();
-        const QString doubler = horns >= 3 && horns <= 7 && key == QString("%1-horn").arg(horns) ? songDoublerInstrumentId(horns) : QString();
+        const int horns = starscore::hornSectionSize(key);
+        const QString doubler = horns >= 3 ? songDoublerInstrumentId(horns) : QString();
         autotestLog("  doubler: " + (doubler.isEmpty() ? QString("(template's own)") : doubler));
         const RetVal<QString> made = createSectionFromTemplate(key, doubler);
         for (int i = 0; i < 30; ++i) {
@@ -1603,6 +1604,16 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         const QStringList a = step.mid(QString("arrangement:").size()).split(':');
         const RetVal<QString> made = createArrangementFromTemplate(a.value(0), a.value(1), a.value(2));
         autotestLog(QString("  %1: %2").arg(a.value(0), made.ret ? made.val : QString::fromStdString(made.ret.toString())));
+        // the 4-Horn 2-Trumpet's parts copied from the 5-Horn and the 3-Horn Standard, as after the menu (no question)
+        for (const StarScoreSection& sec : load().sections) {
+            if (made.ret && sec.templateKey == starscore::TWO_TRUMPET_4H) {
+                const auto pairs = twoTrumpetSources(sec);
+                for (const auto& [from, to] : pairs) {
+                    autotestLog(QString("  copy %1 -> %2").arg(partScoreName(from), partScoreName(to)));
+                }
+                autotestLog(QString("  copied %1").arg(copyHornParts(pairs)));
+            }
+        }
     } else if (step.startsWith("new:")) {
         // new:<arrangement key>[:<doubler id>[:<low horn id>]]: a new StarScore as File › New makes it (title "Autotest"),
         // which replaces the open song; its parts and sections are logged

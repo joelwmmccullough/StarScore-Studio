@@ -8,6 +8,7 @@
 #include "engraving/dom/starscoreprogress.h"
 #include "starscoreautoarchive.h"
 #include "settings.h"
+#include "starscorehornkeys.h"
 #include "starscorehouse.h"
 #include "starscorepdf.h"
 #include "starscoreengraving.h"
@@ -809,8 +810,7 @@ StarScoreService::Data StarScoreService::loadFrom(const engraving::MasterScore* 
         const bool rhythm = s.templateKey == "rhythm" || s.templateKey == "bigband-rhythm";
         // A 1- to 7-Horn section counts every chair, hidden or not: each one is exported (1.18.14: Amplitudes' 2-Horn
         // Section read Finished from its Tenor Sax alone, its Trumpet left hidden by the audit)
-        static const QRegularExpression hornSection("^[1-7]-horn$");
-        QStringList counted = (s.shownPartIds.isEmpty() || hornSection.match(s.templateKey).hasMatch()) ? s.partIds
+        QStringList counted = (s.shownPartIds.isEmpty() || starscore::hornSectionSize(s.templateKey) > 0) ? s.partIds
                               : s.shownPartIds;
         for (const auto& [alt, main] : s.alternates) {   // stand-in versions count even when left out of the shown list
             if (!counted.contains(alt)) {
@@ -1179,8 +1179,7 @@ void StarScoreService::applyOnSections(const QStringList& onIds, const QString& 
             // A 1- to 7-Horn section always comes back with every chair; only its stand-in versions are remembered
             // (1.18.14: an instrument the audit showed for an issue, still showing after the file was reopened,
             // was remembered as the 2-Horn Section's only instrument, and Amplitudes' 2-Horn lost its Trumpet)
-            static const QRegularExpression hornSection("^[1-7]-horn$");
-            if (hornSection.match(s.templateKey).hasMatch()) {
+            if (starscore::hornSectionSize(s.templateKey) > 0) {
                 for (const QString& id : s.partIds) {
                     if (!s.alternates.count(id)) {
                         shown.insert(id);
@@ -1566,6 +1565,9 @@ std::vector<StarScoreSectionTemplate> StarScoreService::sectionTemplates() const
               inst("tenor-saxophone", "Tenor Saxophone"), inst("trombone", "Trombone") } },
         { "5-horn", "5-Horn Section", { inst("bb-trumpet", "Trumpet 1"), inst("bb-trumpet", "Trumpet 2"),
               inst("alto-saxophone", "Alto Saxophone"), inst("tenor-saxophone", "Tenor Saxophone"), inst("trombone", "Trombone") } },
+        // the two-trumpet 4-Horn (Joel, 16 Oct 2026): the 5-Horn without its trombone; the doubler takes the alto chair
+        { starscore::TWO_TRUMPET_4H, "4-Horn 2-Trumpet Section", { inst("bb-trumpet", "Trumpet 1"), inst("bb-trumpet", "Trumpet 2"),
+              inst("alto-saxophone", "Alto Saxophone"), inst("tenor-saxophone", "Tenor Saxophone") } },
         { "6-horn", "6-Horn Section", { inst("bb-trumpet", "Trumpet 1"), inst("bb-trumpet", "Trumpet 2"),
               inst("soprano-saxophone", "Soprano Saxophone"), inst("alto-saxophone", "Alto Saxophone"),
               inst("tenor-saxophone", "Tenor Saxophone"), inst("trombone", "Trombone") } },
@@ -1647,6 +1649,7 @@ std::vector<StarScoreArrangementTemplate> StarScoreService::arrangementTemplates
         { "3-horn-standard", "3-Horn Standard", { "lead-sheet", "3-horn", "rhythm" } },
         { "3-horn-any", "3-Horn Flexible", { "lead-sheet", "3-horn-any", "rhythm" } },
         { "4-horn-standard", "4-Horn Standard", { "lead-sheet", "4-horn", "rhythm" } },
+        { starscore::TWO_TRUMPET_4H, "4-Horn 2-Trumpet", { "lead-sheet", starscore::TWO_TRUMPET_4H, "rhythm" } },
         { "5-horn-standard", "5-Horn Standard", { "lead-sheet", "5-horn", "rhythm" } },
         { "6-horn-standard", "6-Horn Standard", { "lead-sheet", "6-horn", "rhythm" } },
         { "7-horn-standard", "7-Horn Standard", { "lead-sheet", "7-horn", "rhythm" } },
@@ -2048,8 +2051,7 @@ RetVal<QString> StarScoreService::createSection(const QString& templateKey, cons
     // A piccolo's Flute part made with the section, empty, so both can be pasted into straight away (Joel, 6 Oct 2026);
     // marking the Piccolo Finished while the Flute is still empty fills it from the Piccolo as before
     QStringList madeIds = section.partIds;
-    static const QRegularExpression hornSection("^[3-7]-horn$");
-    if (hornSection.match(section.templateKey).hasMatch()) {
+    if (starscore::hornSectionSize(section.templateKey) >= 3) {
         if (engraving::MasterScore* ms = masterScore()) {
             for (const QString& pid : section.partIds) {
                 const engraving::Part* p = ms->partById(ID(pid));
@@ -2170,12 +2172,7 @@ std::vector<StarScoreInstrument> StarScoreService::templateInstrumentsFor(const 
     const QString low = doublerInstrumentId == "bb-bass-clarinet" && lowHornInstrumentId == "bb-bass-clarinet"
                         ? QString("bass-trombone") : lowHornInstrumentId;
     // Which chair the doubler takes: the alto in 3/4/5-Horn, the soprano in 6/7-Horn (the alto is a player of its own there)
-    QString doublerChair;
-    if (t.key == "3-horn" || t.key == "4-horn" || t.key == "5-horn") {
-        doublerChair = "alto-saxophone";
-    } else if (t.key == "6-horn" || t.key == "7-horn") {
-        doublerChair = "soprano-saxophone";
-    }
+    const QString doublerChair = starscore::doublerChairOf(t.key);
     auto replaceChair = [&](const QString& chairId, const QString& withId, const std::vector<StarScoreHornChoice>& choices) {
         if (withId.isEmpty() || withId == chairId) {
             return;
@@ -2951,8 +2948,7 @@ RetVal<QString> StarScoreService::createArrangementFromTemplate(const QString& t
         }
         if (existingId.isEmpty()) {
             // the doubler and 7th horn choices are for the horn section ("3-horn"); the others take their template
-            static const QRegularExpression hornKey("^\\d+-horn$");
-            const bool horns = hornKey.match(sectionKey).hasMatch();
+            const bool horns = starscore::hornSectionSize(sectionKey) > 0;
             RetVal<QString> created = createSectionFromTemplate(sectionKey, horns ? doublerInstrumentId : QString(),
                                                                 horns ? lowHornInstrumentId : QString());
             if (!created.ret) {

@@ -4,6 +4,12 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.51
+
+- **G.I. Jorge's Double-Time export no longer crashes.** Making the Double-Time (and Half-Time) sheets replaces the song's bars in a copy. The old bars were thrown away while the part scores still pointed at pieces of their ties, slurs and lines (G.I. Jorge's rit. line among them), so laying out a part score afterwards wrote into memory that was no longer in use. On a Mac that crashed StarScore a little later, partway through the Double-Time sheets. The part scores are now laid out with the new bars before the old ones are thrown away.
+- **New arrangement: 4-Horn 2-Trumpet** (Trumpet 1, Trumpet 2, the doubler, Tenor Sax). It's in the StarScore bar's Add arrangement menu. The doubler takes the alto chair, as in the 3-, 4- and 5-Horn, and is chosen the same way: Alto Sax is recommended, or whatever the doubler already plays in the song's other horn sections. When it's made, its Trumpet 1 and Trumpet 2 are copied from the 5-Horn and its Tenor Sax and doubler from the 3-Horn Standard, notes and part score formatting (the copies are marked Sketch, as other copied parts are). If the song has no 3-Horn Standard or 5-Horn yet, or their horns aren't marked Finished, StarScore says "It is recommended that you create 3H Standard and 5H first." with Continue, Cancel, and Create 5H / Create 3H for the ones that don't exist yet. Its sheets go in a folder named from its instruments ("4H 2Tpt Alt Ten"), its parts are named "4H 2-Trumpet: Trumpet 1" and so on, and it has its own dashboard column ("4T"). It's needed for a song's folder to be blue, along with the 4-, 5-, 6- and 7-Horn.
+- **Copied parts keep their hidden notes and rests.** Copying parts into a new arrangement, and Copy layout, now also copy which notes and rests are hidden in the source's part score. Before, a slash hidden under a whole note in the 5-Horn's Trumpet 1 sheet showed on the copy.
+
 ## 1.18.50
 
 - **G.I. Jorge's export no longer crashes.** A laissez vibrer ("let ring") tie on a staff that the export shows while setting up a Score, in a bar that was part of a multi-bar rest, crashed StarScore at the 7-Horn Section Score.

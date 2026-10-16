@@ -54,6 +54,8 @@ void CopyLayoutModel::load(const QString& mode)
                 const bool flexible = !m.captured(2).isEmpty();
                 // 1H, 2H, 2HF, 3H, 3HF, 4H, 5H, 6H, 7H
                 g = n == 1 ? 1 : n == 2 ? (flexible ? 3 : 2) : n == 3 ? (flexible ? 5 : 4) : 2 + n;
+            } else if (s.templateKey == "4-horn-2tpt") {
+                g = 6;   // with the 4H
             } else if (s.templateKey == "rhythm") {
                 g = 10;
             } else if (s.templateKey.startsWith("bigband-")) {

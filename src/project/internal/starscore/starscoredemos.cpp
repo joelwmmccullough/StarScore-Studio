@@ -9,6 +9,7 @@
  * chord-symbol track muted except on keys and guitar. The mixer's mute/solo state is put back afterwards.
  */
 #include "starscoreservice.h"
+#include "starscorehornkeys.h"
 
 #include <QDir>
 #include <QFile>
@@ -92,9 +93,9 @@ RetVal<QString> StarScoreService::exportAudioDemos()
     std::vector<Demo> demos;
     QStringList skipped;
     const Data d = loadFrom(ms);
-    static const QRegularExpression hornKey("^(\\d)-horn$");
     for (const StarScoreArrangement& a : d.arrangements) {
         int horns = 0;
+        bool twoTrumpet = false;   // the 4-Horn 2-Trumpet
         bool flexible = false;
         QString family;
         std::vector<const StarScoreSection*> sections;
@@ -103,9 +104,9 @@ RetVal<QString> StarScoreService::exportAudioDemos()
                 continue;
             }
             sections.push_back(&s);
-            const QRegularExpressionMatch m = hornKey.match(s.templateKey);
-            if (m.hasMatch()) {
-                horns = m.captured(1).toInt();
+            if (starscore::hornSectionSize(s.templateKey) > 0) {
+                horns = starscore::hornSectionSize(s.templateKey);
+                twoTrumpet = s.templateKey == starscore::TWO_TRUMPET_4H;
             } else if (s.templateKey.endsWith("-horn-any")) {
                 flexible = true;
             } else if (s.templateKey.startsWith("bigband-")) {
@@ -120,7 +121,7 @@ RetVal<QString> StarScoreService::exportAudioDemos()
         if (flexible) {
             continue;   // (no demos of the Flexible arrangements)
         } else if (horns >= 2) {
-            demo.name = QString("%1-Horn Arrangement").arg(horns);
+            demo.name = twoTrumpet ? QString("4-Horn 2-Trumpet Arrangement") : QString("%1-Horn Arrangement").arg(horns);
         } else if (!family.isEmpty()) {
             demo.name = family + " Arrangement";
         } else {

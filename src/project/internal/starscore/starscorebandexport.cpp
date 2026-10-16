@@ -14,6 +14,7 @@
  * the folders list by date).
  */
 #include "starscoreservice.h"
+#include "starscorehornkeys.h"
 
 #include <algorithm>
 #include <cmath>
@@ -1875,13 +1876,11 @@ static StarScoreScoreLayout starscoreScoreLayout(const mu::engraving::MasterScor
         return out;
     }
 
-    // Standard 2- to 7-Horn
-    static const QRegularExpression stdRe("^([2-7])-horn$");
-    const QRegularExpressionMatch sm = stdRe.match(key);
-    if (!sm.hasMatch()) {
+    // Standard 2- to 7-Horn (and the 4-Horn 2-Trumpet)
+    const int horns = starscore::hornSectionSize(key);
+    if (horns < 2 || horns > 7) {
         return out;
     }
-    const int horns = sm.captured(1).toInt();
     // the 7th chair ("bass inst."): the section's last low horn that isn't a stand-in version
     QString bassPid;
     if (horns == 7) {

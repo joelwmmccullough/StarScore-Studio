@@ -12,6 +12,7 @@
 #include <QFileInfo>
 #include <QUrl>
 
+#include "project/internal/starscore/starscorehornkeys.h"
 #include "project/internal/starscore/starscorestatus.h"
 #include "types/uri.h"
 #include "log.h"
@@ -627,6 +628,70 @@ QStringList StarScoreBarModel::sectionIds() const
     return ids;
 }
 
+//! Before a 4-Horn 2-Trumpet is made (Joel, 16 Oct 2026): its parts are copied from the 3-Horn Standard's Tenor and
+//! doubler and the 5-Horn's two Trumpets, so when either horn section is missing or not Finished, it's recommended to
+//! make them first. Returns "" to go on, "cancel", or the arrangement to make instead ("3-horn-standard",
+//! "5-horn-standard").
+QString StarScoreBarModel::askTwoTrumpetSources()
+{
+    const std::vector<StarScoreSection> sections = starScore()->sections();
+    const std::vector<StarScoreArrangement> arrangements = starScore()->arrangements();
+    auto sectionOf = [&](const QString& key) -> const StarScoreSection* {
+        for (const StarScoreSection& s : sections) {
+            if (s.templateKey == key) {
+                return &s;
+            }
+        }
+        return nullptr;
+    };
+    auto hasArrangement = [&](const QString& key) {
+        return std::any_of(arrangements.begin(), arrangements.end(), [&](const StarScoreArrangement& a) { return a.templateKey == key; });
+    };
+    const StarScoreSection* three = sectionOf("3-horn");
+    const StarScoreSection* five = sectionOf("5-horn");
+    const bool has3 = three && hasArrangement("3-horn-standard");
+    const bool has5 = five && hasArrangement("5-horn-standard");
+    QStringList why;
+    if (!has3) {
+        why << muse::qtrc("starscore", "There's no 3H Standard yet.");
+    } else if (three->status != StarScoreStatus::Finished) {
+        why << muse::qtrc("starscore", "The 3H Standard's horns aren't marked Finished.");
+    }
+    if (!has5) {
+        why << muse::qtrc("starscore", "There's no 5H yet.");
+    } else if (five->status != StarScoreStatus::Finished) {
+        why << muse::qtrc("starscore", "The 5H's horns aren't marked Finished.");
+    }
+    if (why.isEmpty()) {
+        return QString();
+    }
+    constexpr int Continue = static_cast<int>(IInteractive::Button::CustomButton) + 1;
+    constexpr int Cancel = static_cast<int>(IInteractive::Button::CustomButton) + 2;
+    constexpr int Make5 = static_cast<int>(IInteractive::Button::CustomButton) + 3;
+    constexpr int Make3 = static_cast<int>(IInteractive::Button::CustomButton) + 4;
+    IInteractive::ButtonDatas buttons {
+        IInteractive::ButtonData(Continue, muse::trc("starscore", "Continue")),
+        IInteractive::ButtonData(Cancel, muse::trc("starscore", "Cancel")),
+    };
+    if (!has5) {
+        buttons.push_back(IInteractive::ButtonData(Make5, muse::trc("starscore", "Create 5H")));
+    }
+    if (!has3) {
+        buttons.push_back(IInteractive::ButtonData(Make3, muse::trc("starscore", "Create 3H")));
+    }
+    const IInteractive::Result answer = interactive()->questionSync(
+        muse::trc("starscore", "It is recommended that you create 3H Standard and 5H first."),
+        (muse::qtrc("starscore", "The 4-Horn 2-Trumpet's Trumpets are copied from the 5H, and its Tenor and doubler from "
+                                 "the 3H Standard.") + "\n\n" + why.join("\n")).toStdString(),
+        buttons, Cancel);
+    switch (answer.button()) {
+    case Continue: return QString();
+    case Make5: return QString("5-horn-standard");
+    case Make3: return QString("3-horn-standard");
+    default: return QString("cancel");
+    }
+}
+
 void StarScoreBarModel::handleMenuItem(const QString& itemId)
 {
     const int colon = itemId.indexOf(':');
@@ -673,9 +738,20 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
     } else if (action == "arr-new-tpl") {
         // A Standard arrangement of 3 or more horns whose horn section is new asks what the doubler plays (and the
         // 7th horn of a 7-Horn), as File › New does; everything else is made at once
+        // the 4-Horn 2-Trumpet is copied from the 3-Horn Standard and the 5-Horn: those first (Joel, 16 Oct 2026)
+        if (arg == starscore::TWO_TRUMPET_4H) {
+            const QString first = askTwoTrumpetSources();
+            if (first == "cancel") {
+                return;
+            }
+            if (!first.isEmpty()) {
+                handleMenuItem("arr-new-tpl:" + first);
+                return;
+            }
+        }
         bool asks = false;
-        if (arg.endsWith("-horn-standard") && arg.left(arg.indexOf('-')).toInt() >= 3) {
-            const QString hornKey = QString("%1-horn").arg(arg.left(arg.indexOf('-')).toInt());
+        if (starscore::standardArrangementSize(arg) >= 3) {
+            const QString hornKey = starscore::hornSectionOfArrangement(arg);
             const std::vector<StarScoreSection> sections = starScore()->sections();
             asks = std::none_of(sections.begin(), sections.end(), [&](const StarScoreSection& s) { return s.templateKey == hornKey; });
         }
@@ -791,8 +867,8 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
             }
         }
         // a 3- to 7-Horn Section: the doubler plays what it plays in the song's other horn sections (Joel, 5 Oct 2026)
-        static const QRegularExpression hornKey("^[3-7]-horn$");
-        const QString doubler = hornKey.match(arg).hasMatch() ? starScore()->songDoublerInstrumentId(arg.left(1).toInt()) : QString();
+        const int horns = starscore::hornSectionSize(arg);
+        const QString doubler = horns >= 3 ? starScore()->songDoublerInstrumentId(horns) : QString();
         const QStringList before = sectionIds();
         RetVal<QString> ret = starScore()->createSectionFromTemplate(arg, doubler);
         if (!ret.ret) {
