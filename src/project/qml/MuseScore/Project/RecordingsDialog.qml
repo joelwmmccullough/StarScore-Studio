@@ -187,6 +187,8 @@ StyledDialogView {
                     Layout.fillWidth: true
                     currentText: rrow.modelData.link
                     hint: qsTrc("starscore", "YouTube link")
+                    // a pasted link to a video fills in album / who and the date from the video at once
+                    onTextEdited: function(t) { rec.releaseLinkTyped(rrow.modelData.id, t) }
                     onTextEditingFinished: function(t) { rec.setReleaseField(rrow.modelData.id, "link", t) }
                 }
                 TextInputField {

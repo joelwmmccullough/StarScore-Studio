@@ -2052,6 +2052,12 @@ void SlurTieLayout::layoutLaissezVibChord(Chord* chord, LayoutContext& ctx)
     // Laissez vib ties should all end at the same rightmost point while honouring each tie's minimum length
     // Ties drawn by MuseScore can start at differing points
     // SMuFL symbols will also start at the same point because they are of fixed length
+    // StarScore (Joel, 16 Oct 2026): a chord whose bar has no system (a bar inside a multimeasure rest, on a staff that
+    // is hidden, in the continuous view: the export lays out a Section Score so while showing its staves) has nothing to
+    // draw its laissez vibrer on; the system's staves were read through a null system (G.I. Jorge's export crashed)
+    if (!chord->measure() || !chord->measure()->system()) {
+        return;
+    }
     double chordLvEndPoint = -DBL_MAX;
     std::map<LaissezVibSegment*, SlurTiePos> lvSegmentsWithPositions;
     const bool smuflLayout = ctx.conf().styleB(Sid::laissezVibUseSmuflSym);

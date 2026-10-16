@@ -41,7 +41,20 @@ struct YouTubeVideo {
     QString description;
     int lengthSeconds = 0;
     QDate published;
+    QString channel;   // the channel's name ("Snarky Puppy", "The Meters - Topic")
 };
+
+//! What a YouTube music video says about the recording it holds: the "Provided to YouTube by …" description of an
+//! auto-generated (Topic) video names the artists, the album and the release date; any other video only has its
+//! channel, title and upload date
+struct YouTubeRecording {
+    QString artist;     // "The Meters", or the channel's name without " - Topic"
+    QString album;      // "" when the video doesn't say
+    QDate released;     // the release date, else the upload date
+    QString title;      // the video's title
+    bool releaseInfo = false;   // from a "Provided to YouTube by" description
+};
+YouTubeRecording youTubeRecording(const YouTubeVideo& video);
 
 //! "1:06:25 Amplitudes" in a video description
 struct Timestamp {

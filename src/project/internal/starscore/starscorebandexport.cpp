@@ -5607,11 +5607,15 @@ RetVal<QString> StarScoreService::exportTimeVariants(const QStringList& onlyPath
             continue;
         }
         // each part score's bars to a system, section by section, before the conversion lays it out again
+        // and whether it has multimeasure rests (Joel, 16 Oct 2026: as the standard sheet does, nearly always on)
         std::map<QString, std::set<int> > patterns;
+        std::map<QString, bool> mmRestsOf;
+        const bool songMMRests = copy->masterNotation()->masterScore()->style().styleB(engraving::Sid::createMultiMeasureRests);
         for (const IExcerptNotationPtr& e : copy->masterNotation()->excerpts()) {
             INotationPtr en = e ? e->notation() : nullptr;
             if (en && en->elements() && en->elements()->msScore()) {
                 patterns[e->name()] = starscoreLineStarts(en->elements()->msScore());
+                mmRestsOf[e->name()] = en->elements()->msScore()->style().styleB(engraving::Sid::createMultiMeasureRests);
             }
         }
         const RetVal<QString> converted = convertTimeOf(copy, toDouble, true, true);
@@ -5628,13 +5632,29 @@ RetVal<QString> StarScoreService::exportTimeVariants(const QStringList& onlyPath
         // took longer than this whole step when each part score had its own)
         copy->masterNotation()->notation()->undoStack()->prepareChanges(
             TranslatableString::untranslatable("Lines like the standard sheets"));
+        engraving::MasterScore* cms = copy->masterNotation()->masterScore();
+        if (cms->style().styleB(engraving::Sid::createMultiMeasureRests) != songMMRests) {
+            cms->undoChangeStyleVal(engraving::Sid::createMultiMeasureRests, songMMRests);
+        }
+        int mmRestsSet = 0;
         for (const IExcerptNotationPtr& e : copy->masterNotation()->excerpts()) {
             INotationPtr en = e ? e->notation() : nullptr;
             auto p = patterns.find(e ? e->name() : QString());
             if (!en || !en->elements() || !en->elements()->msScore() || p == patterns.end()) {
                 continue;
             }
-            lockedSystems += starscoreApplyLineStarts(en->elements()->msScore(), p->second, halvedSections);
+            engraving::Score* es = en->elements()->msScore();
+            // the standard sheet's multimeasure rests (before the bars are laid out in lines)
+            const auto mm = mmRestsOf.find(e->name());
+            if (mm != mmRestsOf.end() && es->style().styleB(engraving::Sid::createMultiMeasureRests) != mm->second) {
+                es->undoChangeStyleVal(engraving::Sid::createMultiMeasureRests, mm->second);
+                ++mmRestsSet;
+            }
+            lockedSystems += starscoreApplyLineStarts(es, p->second, halvedSections);
+        }
+        if (mmRestsSet) {
+            LOGI() << "[starscore] " << variant << ": multimeasure rests set back as on the standard sheets in " << mmRestsSet
+                   << " part score(s)";
         }
         copy->masterNotation()->notation()->undoStack()->commitChanges();
         LOGI() << "[starscore] " << variant << ": " << lockedSystems << " line(s) started where the standard sheets' do, "

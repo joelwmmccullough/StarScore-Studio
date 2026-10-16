@@ -8,6 +8,9 @@
 #pragma once
 
 #include <functional>
+#include <map>
+#include <memory>
+#include <set>
 
 #include <QJsonArray>
 #include <QJsonObject>
@@ -17,6 +20,7 @@
 
 #include "modularity/ioc.h"
 #include "project/istarscoreservice.h"
+#include "project/internal/starscore/organizer/orgonline.h"
 
 namespace mu::project {
 class RecordingsModel : public QObject, public muse::Contextable
@@ -36,6 +40,7 @@ class RecordingsModel : public QObject, public muse::Contextable
 
 public:
     explicit RecordingsModel(QObject* parent = nullptr);
+    ~RecordingsModel() override;
 
     QString songTitle() const { return m_code; }
     QString status() const { return m_status; }
@@ -55,6 +60,9 @@ public:
     //! key: kind (album, wip, session, original), label, date, link, note
     Q_INVOKABLE void setReleaseField(const QString& id, const QString& key, const QString& value);
     Q_INVOKABLE void removeRelease(const QString& id);
+    //! the YouTube link field as typed or pasted: a link to a video sets the link at once and fills in the album / who
+    //! and date fields from the video (Joel, 16 Oct 2026), unless they were typed by hand
+    Q_INVOKABLE void releaseLinkTyped(const QString& id, const QString& text);
     Q_INVOKABLE void addRelease();
     Q_INVOKABLE bool save();
 
@@ -64,6 +72,14 @@ signals:
 private:
     QString recordingsFile() const;
     void touch(QJsonArray& list, const QString& id, const std::function<void(QJsonObject&)>& edit);
+    void lookUpRelease(const QString& id, const QString& videoId);
+    void fillRelease(const QString& id);
+
+    std::set<QString> m_autoLabel;   // releases whose album / who may still be filled from the video
+    std::set<QString> m_autoDate;    // releases whose date may still be filled from the video
+    std::map<QString, std::pair<QString, starscore::org::YouTubeRecording> > m_looked;   // release id -> (video id, what it says)
+    std::set<QString> m_lookingUp;   // "<release id> <video id>" being read now
+    std::shared_ptr<bool> m_alive = std::make_shared<bool>(true);
 
     QString m_code;
     QString m_status;

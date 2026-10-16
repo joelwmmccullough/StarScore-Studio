@@ -285,7 +285,61 @@ bool parseYouTubeWatchPage(const QString& html, YouTubeVideo& out)
         date = micro.value("uploadDate").toString();
     }
     out.published = QDate::fromString(date.left(10), Qt::ISODate);
+    out.channel = details.value("author").toString();
+    if (out.channel.isEmpty()) {
+        out.channel = micro.value("ownerChannelName").toString();
+    }
     return !out.id.isEmpty();
+}
+
+YouTubeRecording youTubeRecording(const YouTubeVideo& video)
+{
+    YouTubeRecording out;
+    out.title = video.title.trimmed();
+    out.released = video.published;
+    QString channel = video.channel.trimmed();
+    static const QRegularExpression topic("\\s*-\\s*Topic$", QRegularExpression::CaseInsensitiveOption);
+    channel.replace(topic, "");
+    static const QRegularExpression vevo("VEVO$");
+    channel.replace(vevo, "");
+    out.artist = channel.trimmed();
+
+    // Provided to YouTube by <label>
+    //
+    // <song> · <artist> · <artist>
+    //
+    // <album>
+    //
+    // ℗ …
+    //
+    // Released on: 1969-01-01
+    QStringList lines;
+    for (const QString& l : video.description.split('\n')) {
+        if (!l.trimmed().isEmpty()) {
+            lines << l.trimmed();
+        }
+    }
+    if (!lines.isEmpty() && lines.front().startsWith("Provided to YouTube by", Qt::CaseInsensitive)) {
+        out.releaseInfo = true;
+        if (lines.size() > 1) {
+            const QStringList who = lines.at(1).split(QString::fromUtf8(" \xc2\xb7 "));
+            if (who.size() > 1) {
+                out.artist = who.at(1).trimmed();   // (the first credited artist: "Chameleon · Herbie Hancock · Bennie Maupin")
+            }
+        }
+        if (lines.size() > 2 && !lines.at(2).startsWith(QString::fromUtf8("\xe2\x84\x97")) && !lines.at(2).startsWith("Released on")) {
+            out.album = lines.at(2);
+        }
+        static const QRegularExpression released("Released on:\\s*(\\d{4}-\\d{2}-\\d{2})");
+        const auto m = released.match(video.description);
+        if (m.hasMatch()) {
+            const QDate d = QDate::fromString(m.captured(1), Qt::ISODate);
+            if (d.isValid()) {
+                out.released = d;
+            }
+        }
+    }
+    return out;
 }
 
 std::vector<Timestamp> parseTimestamps(const QString& description)

@@ -15,6 +15,7 @@
 #include "project/internal/starscore/organizer/orgcore.h"
 #include "project/internal/starscore/organizer/orghtml.h"
 #include "project/internal/starscore/organizer/orgonline.h"
+#include "project/internal/starscore/organizer/orgplatform.h"
 #include "project/internal/starscore/organizer/orgrecordings.h"
 #include "project/internal/starscore/organizer/orgstores.h"
 #include "translation.h"
@@ -243,17 +244,144 @@ QString RecordingsModel::addPerformance(const QString& showIdIn, const QString& 
     return QString();
 }
 
+RecordingsModel::~RecordingsModel()
+{
+    *m_alive = false;   // (a YouTube page still loading finds the model gone)
+}
+
 void RecordingsModel::setReleaseField(const QString& id, const QString& key, const QString& value)
 {
     QJsonArray rels = m_all.value("releases").toArray();
+    QString video;
     touch(rels, id, [&](QJsonObject& o) {
         if (key == "link") {
-            o["video"] = org::youTubeId(value);
+            video = org::youTubeId(value);
+            o["video"] = video;
         } else {
             o[key] = value;
         }
     });
     m_all["releases"] = rels;
+    // typed by hand: kept from now on
+    if (key == "label") {
+        m_autoLabel.erase(id);
+    } else if (key == "date") {
+        m_autoDate.erase(id);
+    }
+    emit changed();
+    if (key == "link" && !video.isEmpty()) {
+        lookUpRelease(id, video);
+    } else if (key == "kind") {
+        fillRelease(id);   // an album is named after the album, the original after its artist
+    }
+}
+
+void RecordingsModel::releaseLinkTyped(const QString& id, const QString& text)
+{
+    const QString video = org::youTubeId(text);
+    if (video.isEmpty()) {
+        return;
+    }
+    for (const QJsonValue& v : m_all.value("releases").toArray()) {
+        if (v.toObject().value("id").toString() == id && v.toObject().value("video").toString() == video) {
+            return;   // already this video
+        }
+    }
+    setReleaseField(id, "link", text);
+}
+
+void RecordingsModel::lookUpRelease(const QString& id, const QString& videoId)
+{
+    const auto known = m_looked.find(id);
+    if (known != m_looked.end() && known->second.first == videoId) {
+        fillRelease(id);
+        return;
+    }
+    const QString key = id + " " + videoId;
+    if (m_lookingUp.count(key)) {
+        return;   // (the link pasted, then the field left: read once)
+    }
+    m_lookingUp.insert(key);
+    m_status = muse::qtrc("starscore", "Reading the YouTube video…");
+    emit changed();
+    const QString url = "https://www.youtube.com/watch?v=" + videoId;
+    std::weak_ptr<bool> alive = m_alive;
+    auto finish = [this, alive, id, videoId, key](const QString& html) {
+        if (alive.expired() || !*alive.lock()) {
+            return;
+        }
+        m_lookingUp.erase(key);
+        org::YouTubeVideo video;
+        if (!org::parseYouTubeWatchPage(html, video)) {
+            m_status = muse::qtrc("starscore", "Couldn't read that YouTube video: fill in the album / who and the date by hand.");
+            emit changed();
+            return;
+        }
+        m_looked[id] = { videoId, org::youTubeRecording(video) };
+        m_status.clear();
+        fillRelease(id);
+    };
+    // the plain page first; YouTube sometimes only gives the details to a browser
+    org::fetchPage(url, false, [url, finish, alive](const QString& html, int) {
+        if (alive.expired() || !*alive.lock()) {
+            return;
+        }
+        org::YouTubeVideo probe;
+        if (org::parseYouTubeWatchPage(html, probe)) {
+            finish(html);
+        } else {
+            org::fetchPage(url, true, [finish](const QString& html2, int) { finish(html2); });
+        }
+    });
+}
+
+void RecordingsModel::fillRelease(const QString& id)
+{
+    const auto known = m_looked.find(id);
+    if (known == m_looked.end()) {
+        return;
+    }
+    const org::YouTubeRecording& r = known->second.second;
+    QJsonArray rels = m_all.value("releases").toArray();
+    bool filled = false;
+    for (int i = 0; i < rels.size(); ++i) {
+        QJsonObject o = rels[i].toObject();
+        if (o.value("id").toString() != id || o.value("video").toString() != known->second.first) {
+            continue;
+        }
+        // album / who: an album by its name; the original (a cover's) by its artist, and the album when the video
+        // names one; a session or a mix by the video's title
+        const QString kind = o.value("kind").toString();
+        QString label;
+        if (kind == "original") {
+            label = !r.album.isEmpty() && r.album.compare(r.artist, Qt::CaseInsensitive) != 0
+                    ? r.artist + QString::fromUtf8(" \xe2\x80\x94 ") + r.album : r.artist;
+        } else if (kind == "album") {
+            label = !r.album.isEmpty() ? r.album : r.title;
+        } else {
+            label = r.title;
+        }
+        if (!label.isEmpty() && (m_autoLabel.count(id) || o.value("label").toString().trimmed().isEmpty())
+            && o.value("label").toString() != label) {
+            o["label"] = label;
+            m_autoLabel.insert(id);   // (still the video's, so a change of kind names it again)
+            filled = true;
+        }
+        if (r.released.isValid() && (m_autoDate.count(id) || o.value("date").toString().trimmed().isEmpty())
+            && o.value("date").toString() != r.released.toString(Qt::ISODate)) {
+            o["date"] = r.released.toString(Qt::ISODate);
+            m_autoDate.insert(id);
+            filled = true;
+        }
+        if (filled) {
+            o["modified"] = QDateTime::currentDateTime().toString(Qt::ISODate);
+            rels[i] = o;
+            m_dirty = true;
+        }
+    }
+    if (filled) {
+        m_all["releases"] = rels;
+    }
     emit changed();
 }
 
@@ -270,7 +398,11 @@ void RecordingsModel::addRelease()
         return;
     }
     QJsonArray rels = m_all.value("releases").toArray();
-    rels.append(QJsonObject { { "id", org::newRecordingId(m_all, "r") }, { "song", m_code }, { "kind", "session" }, { "label", "Live session" },
+    const QString newId = org::newRecordingId(m_all, "r");
+    // its album / who and date are placeholders until the YouTube link fills them in
+    m_autoLabel.insert(newId);
+    m_autoDate.insert(newId);
+    rels.append(QJsonObject { { "id", newId }, { "song", m_code }, { "kind", "session" }, { "label", "Live session" },
                               { "date", QDate::currentDate().toString(Qt::ISODate) }, { "video", "" },
                               { "modified", QDateTime::currentDateTime().toString(Qt::ISODate) } });
     m_all["releases"] = rels;
