@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.56
+
+- **Shorter mute lines when they run into the title.** The mute lines under the instrument name are shortened too: "with Harmon Mute" → "w/ Harmon Mute" → "w/ Harmon", "and Plunger" → "& Plunger". Whichever line reaches furthest right (the name or a mute line) is shortened first.
+
 ## 1.18.55
 
 - **Shorter instrument names when they run into the title.** The instrument name top left is shortened one step at a time until it clears the title: "Soprano Saxophone" → "Soprano Sax" → "Sop Sax" → "Sop", "Trumpet 1 in B♭" → "B♭ Trumpet 1" → "Trumpet 1" → "Tpt 1", and the same for the other horns and strings. A name with no shorter form is still broken over two lines. Mute lines under it stay as they are.

@@ -526,12 +526,46 @@ String arrangementLabelXml(const QString& main, const QString& note, double size
     return String::fromQString(xml);
 }
 
+//! The first line of an instrument name's mute lines: "with Harmon Mute", or shortened, "w/ Harmon"
+static bool starscoreIsMuteLine(const QString& line)
+{
+    return line.startsWith("with ") || line.startsWith("w/ ");
+}
+
+//! The mute lines at a shortening step (Joel, 17 Oct 2026): 0 as written ("with Harmon Mute" / "and Plunger"), 1 with
+//! "w/" and "&" ("w/ Harmon Mute" / "& Plunger"), 2 without the word "Mute" ("w/ Harmon" / "& Plunger"). A line already
+//! shortened stays as it is.
+static QString starscoreMuteForm(const QString& lines, int step)
+{
+    if (step <= 0 || lines.isEmpty()) {
+        return lines;
+    }
+    QStringList out;
+    for (QString line : lines.split('\n')) {
+        if (line.startsWith("with ")) {
+            line = "w/ " + line.mid(5);
+        } else if (line.startsWith("and ")) {
+            line = "& " + line.mid(4);
+        }
+        if (step >= 2) {
+            static const QRegularExpression muteWord(" Mute(,?)$");
+            static const QRegularExpression hat(" \\(Hat\\)(,?)$");
+            line.replace(muteWord, "\\1");
+            line.replace(hat, "\\1");
+        }
+        out << line;
+    }
+    return out.join('\n');
+}
+
+static constexpr int STARSCORE_MUTE_STEPS = 2;
+
 String instrumentNameXml(const QString& plain, double size)
 {
     QStringList lines = plain.split('\n');
     int mutesAt = -1;
     for (int i = 1; i < lines.size(); ++i) {
-        if (lines.at(i).startsWith("with ")) {
+        if (starscoreIsMuteLine(lines.at(i))) {
             mutesAt = i;
             break;
         }
@@ -557,7 +591,9 @@ bool instrumentNameShows(const Text* name, const QString& plain)
     const QString shown = flat(name->plainText().toQString());
     bool same = false;
     for (const QString& v : instrumentNameVariants(nl < 0 ? plain : plain.left(nl))) {
-        same |= shown == flat(v + rest);
+        for (int step = 0; step <= STARSCORE_MUTE_STEPS; ++step) {
+            same |= shown == flat(v + starscoreMuteForm(rest, step));
+        }
     }
     if (!same) {
         return false;
@@ -834,19 +870,54 @@ bool fitInstrumentName(Score* score, const QString& plain)
     if (!overlaps()) {
         return changed;
     }
-    // the instrument's own name is the first line, unless it was broken here before: then the first two
+    // the instrument's own name is the first line, unless it was broken here before: then the first two; the mute
+    // lines under it
     const QString current = name->plainText().toQString();
     QStringList lines = current.split('\n');
-    const bool mutes = lines.size() > 1 && lines.at(1).startsWith("with ");
     QString first = lines.takeFirst();
-    if (!mutes && !lines.isEmpty() && !lines.first().startsWith("with ")) {
+    if (!lines.isEmpty() && !starscoreIsMuteLine(lines.first())) {
         first += " " + lines.takeFirst();   // ("Contrabass Clarinet" / "in B♭" from before)
     }
+    const QString mutes = lines.join('\n');
     const QStringList variants = instrumentNameVariants(first.simplified());
-    const QString rest = lines.isEmpty() ? QString() : "\n" + lines.join('\n');
-    int i = std::max(1, int(variants.indexOf(current.left(current.size() - rest.size()))) + 1);
-    for (; i < variants.size() && overlaps(); ++i) {
-        name->undoChangeProperty(Pid::TEXT, instrumentNameXml(variants[i] + rest, name->size()));
+    const QString shownName = current.left(current.size() - (mutes.isEmpty() ? 0 : mutes.size() + 1));
+    int ni = std::max(0, int(variants.indexOf(shownName)));
+    int muteStep = 0;
+    while (starscoreMuteForm(mutes, muteStep + 1) == starscoreMuteForm(mutes, muteStep) && muteStep < STARSCORE_MUTE_STEPS) {
+        ++muteStep;   // (already as short as that)
+    }
+    // the line that reaches furthest right is shortened first: the name, or the mute lines (Joel, 17 Oct 2026)
+    auto widest = [&](int fromRow, int toRow) {
+        double w = 0.0;
+        const auto* ld = name->ldata();
+        for (int r = fromRow; ld && r < toRow && r < int(ld->blocks.size()); ++r) {
+            w = std::max(w, ld->blocks[r].boundingRect().width());
+        }
+        return w;
+    };
+    while (overlaps()) {
+        int nextMute = muteStep + 1;
+        while (nextMute <= STARSCORE_MUTE_STEPS && starscoreMuteForm(mutes, nextMute) == starscoreMuteForm(mutes, muteStep)) {
+            ++nextMute;
+        }
+        const bool canName = ni + 1 < int(variants.size());
+        const bool canMute = !mutes.isEmpty() && nextMute <= STARSCORE_MUTE_STEPS;
+        if (!canName && !canMute) {
+            break;
+        }
+        const int nameRows = int(variants[ni].count('\n')) + 1;
+        // (the widest line as short as it goes: the other one shortened wouldn't clear the title)
+        const bool shortenMutes = !mutes.isEmpty() && widest(nameRows, 1000) > widest(0, nameRows);
+        if (shortenMutes ? !canMute : !canName) {
+            break;
+        }
+        if (shortenMutes) {
+            muteStep = nextMute;
+        } else {
+            ++ni;
+        }
+        const QString m = starscoreMuteForm(mutes, muteStep);
+        name->undoChangeProperty(Pid::TEXT, instrumentNameXml(variants[ni] + (m.isEmpty() ? QString() : "\n" + m), name->size()));
         changed = true;
         score->setLayoutAll();
         score->doLayout();
