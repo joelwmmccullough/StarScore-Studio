@@ -89,6 +89,23 @@ std::vector<PlacedText> placedTexts(const Score* score)
     return out;
 }
 
+//! Each page's texts as a run [first, end) of indices into `texts`: placedTexts lists them page by page, and the
+//! checks below only ever compare two texts on the same page, so each page is scanned on its own (the same pairs
+//! in the same order as one scan over everything, at a fraction of the comparisons on a big Score)
+std::vector<std::pair<size_t, size_t> > pageRuns(const std::vector<PlacedText>& texts)
+{
+    std::vector<std::pair<size_t, size_t> > runs;
+    for (size_t i = 0; i < texts.size();) {
+        size_t j = i + 1;
+        while (j < texts.size() && texts[j].page == texts[i].page) {
+            ++j;
+        }
+        runs.emplace_back(i, j);
+        i = j;
+    }
+    return runs;
+}
+
 QString wordsOf(const EngravingItem* e)
 {
     QString w = toTextBase(e)->plainText().toQString().simplified();
@@ -136,20 +153,22 @@ std::vector<LayoutIssue> layoutIssues(const Score* score)
             issues.push_back({ t.pageNo, t.bar, QString("off page"), QString("%1 \"%2\"").arg(t.item->typeName(), wordsOf(t.item)) });
         }
     }
-    for (size_t i = 0; i < texts.size(); ++i) {
-        for (size_t j = i + 1; j < texts.size(); ++j) {
-            const PlacedText& a = texts[i];
-            const PlacedText& b = texts[j];
-            if (a.page != b.page || a.item == b.item || sameText(a, b)) {
-                continue;
+    for (const auto& [first, end] : pageRuns(texts)) {
+        for (size_t i = first; i < end; ++i) {
+            for (size_t j = i + 1; j < end; ++j) {
+                const PlacedText& a = texts[i];
+                const PlacedText& b = texts[j];
+                if (a.page != b.page || a.item == b.item || sameText(a, b)) {
+                    continue;
+                }
+                const RectF in = a.rect.intersected(b.rect);
+                if (in.isEmpty() || in.width() < 0.3 * sp || in.height() < 0.3 * std::min(a.rect.height(), b.rect.height())) {
+                    continue;
+                }
+                issues.push_back({ a.pageNo, a.bar, QString("overlap"),
+                                   QString("%1 \"%2\" / %3 \"%4\"").arg(a.item->typeName(), wordsOf(a.item), b.item->typeName(),
+                                                                        wordsOf(b.item)) });
             }
-            const RectF in = a.rect.intersected(b.rect);
-            if (in.isEmpty() || in.width() < 0.3 * sp || in.height() < 0.3 * std::min(a.rect.height(), b.rect.height())) {
-                continue;
-            }
-            issues.push_back({ a.pageNo, a.bar, QString("overlap"),
-                               QString("%1 \"%2\" / %3 \"%4\"").arg(a.item->typeName(), wordsOf(a.item), b.item->typeName(),
-                                                                    wordsOf(b.item)) });
         }
     }
     return issues;
@@ -379,33 +398,40 @@ int separateOverlappingTexts(Score* score)
         pairs.clear();
         const std::vector<PlacedText> texts = placedTexts(score);
         const double sp = score->style().spatium();
-        for (size_t i = 0; i < texts.size(); ++i) {
-            for (size_t j = 0; j < texts.size(); ++j) {
-                const PlacedText& a = texts[i];
-                const PlacedText& b = texts[j];
-                if (i == j || a.page != b.page || !movable(a.item)) {
+        for (const auto& [first, end] : pageRuns(texts)) {
+            for (size_t i = first; i < end; ++i) {
+                if (!movable(texts[i].item)) {
                     continue;
                 }
-                // Only a text over a chord symbol or a bar number, or a Combined Parts label over anything, is moved
-                // (the label moving). Two texts placed by hand over each other are left as they are: stacking them
-                // made them harder to read (Deep Speech's Keys sheet: "Solo #1", "Repeat to cue" and the F mark).
-                const bool overThing = b.item->isHarmony() || b.item->isMeasureNumber();
-                const bool labelA = isCombinedLabel(a.item);
-                const bool labelB = isCombinedLabel(b.item);
-                // Two texts MuseScore placed itself (autoplace on) that still overlap (it doesn't keep texts on one
-                // beat apart: Fish Oil's "Repeat to cue" and "Note: rhythm here is 8+6, not 7+7!"): the later one
-                // moves; a rehearsal mark stays where it is
-                const bool bothAuto = a.item->autoplace() && b.item->autoplace() && !a.item->isRehearsalMark()
-                                      && (b.item->isRehearsalMark() || j > i);
-                if (!(overThing || (labelA && !labelB) || (labelA && labelB && j > i) || bothAuto)) {
-                    continue;
-                }
-                if (sameText(a, b)) {
-                    continue;
-                }
-                const RectF in = a.rect.intersected(b.rect);
-                if (!in.isEmpty() && in.width() >= 0.3 * sp && in.height() >= 0.3 * std::min(a.rect.height(), b.rect.height())) {
-                    pairs.emplace_back(a, b);
+                for (size_t j = first; j < end; ++j) {
+                    const PlacedText& a = texts[i];
+                    const PlacedText& b = texts[j];
+                    if (i == j || a.page != b.page) {
+                        continue;
+                    }
+                    // Only a text over a chord symbol or a bar number, or a Combined Parts label over anything, is
+                    // moved (the label moving). Two texts placed by hand over each other are left as they are:
+                    // stacking them made them harder to read (Deep Speech's Keys sheet: "Solo #1", "Repeat to cue"
+                    // and the F mark).
+                    const bool overThing = b.item->isHarmony() || b.item->isMeasureNumber();
+                    const bool labelA = isCombinedLabel(a.item);
+                    const bool labelB = isCombinedLabel(b.item);
+                    // Two texts MuseScore placed itself (autoplace on) that still overlap (it doesn't keep texts on
+                    // one beat apart: Fish Oil's "Repeat to cue" and "Note: rhythm here is 8+6, not 7+7!"): the
+                    // later one moves; a rehearsal mark stays where it is
+                    const bool bothAuto = a.item->autoplace() && b.item->autoplace() && !a.item->isRehearsalMark()
+                                          && (b.item->isRehearsalMark() || j > i);
+                    if (!(overThing || (labelA && !labelB) || (labelA && labelB && j > i) || bothAuto)) {
+                        continue;
+                    }
+                    if (sameText(a, b)) {
+                        continue;
+                    }
+                    const RectF in = a.rect.intersected(b.rect);
+                    if (!in.isEmpty() && in.width() >= 0.3 * sp
+                        && in.height() >= 0.3 * std::min(a.rect.height(), b.rect.height())) {
+                        pairs.emplace_back(a, b);
+                    }
                 }
             }
         }
@@ -417,20 +443,22 @@ int separateOverlappingTexts(Score* score)
     {
         const std::vector<PlacedText> texts = placedTexts(score);
         std::set<EngravingItem*> hidden;
-        for (size_t i = 0; i < texts.size(); ++i) {
-            for (size_t j = i + 1; j < texts.size(); ++j) {
-                const PlacedText& a = texts[i];
-                const PlacedText& b = texts[j];
-                if (a.page != b.page || a.item->type() != b.item->type() || hidden.count(a.item) || hidden.count(b.item)
-                    || !movable(b.item) || toTextBase(a.item)->plainText() != toTextBase(b.item)->plainText()) {
-                    continue;
-                }
-                const RectF in = a.rect.intersected(b.rect);
-                const double area = in.isEmpty() ? 0.0 : in.width() * in.height();
-                if (area > 0.5 * a.rect.width() * a.rect.height() && area > 0.5 * b.rect.width() * b.rect.height()
-                    && a.rect != b.rect) {
-                    changeHere(b.item, Pid::VISIBLE, PropertyValue(false));
-                    hidden.insert(b.item);
+        for (const auto& [first, end] : pageRuns(texts)) {
+            for (size_t i = first; i < end; ++i) {
+                for (size_t j = i + 1; j < end; ++j) {
+                    const PlacedText& a = texts[i];
+                    const PlacedText& b = texts[j];
+                    if (a.page != b.page || a.item->type() != b.item->type() || hidden.count(a.item) || hidden.count(b.item)
+                        || !movable(b.item) || toTextBase(a.item)->plainText() != toTextBase(b.item)->plainText()) {
+                        continue;
+                    }
+                    const RectF in = a.rect.intersected(b.rect);
+                    const double area = in.isEmpty() ? 0.0 : in.width() * in.height();
+                    if (area > 0.5 * a.rect.width() * a.rect.height() && area > 0.5 * b.rect.width() * b.rect.height()
+                        && a.rect != b.rect) {
+                        changeHere(b.item, Pid::VISIBLE, PropertyValue(false));
+                        hidden.insert(b.item);
+                    }
                 }
             }
         }
