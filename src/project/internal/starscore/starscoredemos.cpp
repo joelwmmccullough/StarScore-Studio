@@ -231,10 +231,21 @@ RetVal<QString> StarScoreService::exportAudioDemos()
 
         LOGI() << "[starscore] demo " << demo.name << ": rendered, " << (ret ? "ok" : ret.toString());
         if (ret && QFileInfo(tmp).size() > 0) {
-            QFile::remove(target);
-            if (QFile::rename(tmp, target)) {
-                written << fileName;
-                continue;
+            // the old demo steps aside, the new one takes its name, and only then is the old one removed: a rename
+            // Drive refuses leaves the old demo in place (it was removed first before 1.18.53, which could leave the
+            // song with no demo at all)
+            const QString old = demosDir + "/." + fileName + ".old";
+            QFile::remove(old);
+            const bool hadOld = QFileInfo::exists(target);
+            if (!hadOld || QFile::rename(target, old)) {
+                if (QFile::rename(tmp, target)) {
+                    QFile::remove(old);
+                    written << fileName;
+                    continue;
+                }
+                if (hadOld && !QFile::rename(old, target)) {
+                    LOGW() << "[starscore] demo " << demo.name << ": the old demo is at " << old;
+                }
             }
         }
         LOGW() << "[starscore] demo not written: " << demo.name << " " << ret.toString();
