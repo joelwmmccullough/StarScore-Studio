@@ -312,6 +312,29 @@ Rectangle {
                         barModel.handleMenuItem(itemId)
                     }
                 }
+
+                // every section shown or hidden in one click (Joel, 16 Oct 2026)
+                StarScoreChip {
+                    text: qsTrc("starscore", "Show all")
+                    dashed: true
+                    showDot: false
+                    toolTip: qsTrc("starscore", "Show every section")
+
+                    onLeftClicked: function(mouse) {
+                        barModel.handleMenuItem("all-on")
+                    }
+                }
+
+                StarScoreChip {
+                    text: qsTrc("starscore", "Hide all")
+                    dashed: true
+                    showDot: false
+                    toolTip: qsTrc("starscore", "Hide every section")
+
+                    onLeftClicked: function(mouse) {
+                        barModel.handleMenuItem("all-off")
+                    }
+                }
             }
         }
 

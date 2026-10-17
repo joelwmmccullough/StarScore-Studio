@@ -894,6 +894,15 @@ CombinedResult buildCombinedPart(const mu::notation::IMasterNotationPtr& copy, c
         t->setTrack((dst0 + l.staff) * VOICES + l.voice);
         t->setParent(seg);
         t->setXmlText(String(u"<b>%1</b>").arg(String::fromQString(l.text)));
+        // smaller than other staff text and starting at the note, not centred on it (Joel, 16 Oct 2026: a label centred
+        // on a line's first note ran left of the staff, and labels a bar apart, each wider than the bar, stacked up in
+        // a staircase)
+        t->setSize(std::max(6.0, t->size() * 0.8));
+        t->setPropertyFlags(Pid::FONT_SIZE, PropertyFlags::UNSTYLED);
+        t->setAlign(Align(AlignH::LEFT, AlignV::BASELINE));
+        t->setPropertyFlags(Pid::ALIGN, PropertyFlags::UNSTYLED);
+        t->setPosition(AlignH::LEFT);
+        t->setPropertyFlags(Pid::POSITION, PropertyFlags::UNSTYLED);
         if (l.voice % 2 == 1) {
             t->setPlacement(PlacementV::BELOW);
             t->setPropertyFlags(Pid::PLACEMENT, PropertyFlags::UNSTYLED);

@@ -313,7 +313,9 @@ void ScoreHorizontalViewLayout::collectLinearSystem(LayoutContext& ctx)
                 SystemLayout::layoutSystem(system, ctx, curSystemWidth, true);
                 if (m->repeatStart()) {
                     Segment* s = m->findSegmentR(SegmentType::StartRepeatBarLine, Fraction(0, 1));
-                    if (!s->enabled()) {
+                    // (StarScore, 16 Oct 2026: a first bar marked as a repeat start with no start-repeat barline
+                    // segment, as in Ciao Ferrari's export copies, crashed the continuous-view layout here)
+                    if (s && !s->enabled()) {
                         s->setEnabled(true);
                     }
                 }

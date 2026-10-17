@@ -4,6 +4,22 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.53
+
+- **Show all / Hide all.** Two buttons after "+ New section" on the StarScore bar show or hide every section at once.
+- **Combined Parts look tidier.**
+  - Their texts sit where the style puts them. The sheet reused the largest arrangement's part score, with text positions set by hand for that layout, which put Amplitudes' "Chords provided to help y'all remember accidentals" off the left of the page.
+  - The arrangement labels ("2H / 4H–7H / 3H", "All") are smaller and start at the note instead of being centred on it.
+  - Labels on one line of music sit at one height instead of following each bar's notes up and down like a staircase.
+- **Every sheet is checked before it's printed** (parts, Section Scores, Combined Parts, Double-Time and Half-Time):
+  - A text wider than the page is broken over two or more lines.
+  - A text or rehearsal mark running off the left or right edge starts (or ends) at the note instead of being centred on it, or is moved in to the margin. A chord symbol at the end of a line is moved in too.
+  - A text, tempo marking or rehearsal mark printed over a chord symbol or a bar number is moved clear of it ("Play as written or improvise, your choice" in Amplitudes' Section Scores and Combined Parts). So is a Combined Parts label over another text.
+  - The same text twice almost on top of each other is printed once.
+  - Texts you placed by hand that overlap each other are left as they are and listed in the log.
+  - The part sheets are printed from your part scores, so these changes are made there too and stay if you save the song.
+- **Ciao Ferrari's export no longer crashes.** A first bar that starts a repeat crashed the export while it made the 2H Flexible Section Score.
+
 ## 1.18.52
 
 - **Change an instrument.** In a horn section's menu on the StarScore bar, **Change an instrument ▸ (part) ▸ (instrument)** puts that part on another horn: Trumpet, Piccolo, Flute, Clarinet, Soprano, Alto, Tenor or Bari Sax, Bass Clarinet, Trombone, Bass Trombone or Tuba. The music stays at the same sounding pitch and is written for the new instrument. The part and its part score are renamed ("4H 2-Trumpet: Alto Sax", "Alto Saxophone" on the sheet), its sheets go in the folder named for the new instruments, and mutes or a flugelhorn mark that don't fit the new instrument are dropped. Undo takes it back. Use it when a section was made with the wrong doubler instead of deleting and remaking it.

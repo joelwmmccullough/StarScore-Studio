@@ -15,6 +15,7 @@
  */
 #include "starscoreservice.h"
 #include "starscorehornkeys.h"
+#include "starscorelayoutcheck.h"
 
 #include <algorithm>
 #include <cmath>
@@ -2607,6 +2608,18 @@ static Ret starscorePrintSheetAsIs(const INotationWriterPtr& writer, const INota
         starscore::fitArrangementLabel(score);
     }
     starscore::clearComposerCredit(score);
+    // texts over chord symbols or each other moved clear, texts running off the page moved in; what still looks wrong
+    // in the log (Joel, 16 Oct 2026)
+    // (on the page first: a text moved in can land on a chord symbol)
+    const int onPage = starscore::keepTextsOnPage(score);
+    const int separated = starscore::separateOverlappingTexts(score);
+    const int movedIn = onPage + separated;
+    const std::vector<starscore::LayoutIssue> issues = starscore::layoutIssues(score);
+    if (movedIn > 0 || !issues.empty()) {
+        LOGI() << "[starscore] layout check \"" << QString(left).replace('\n', ' ').toStdString() << " | "
+               << QString(right).replace('\n', ' ').toStdString() << "\": " << movedIn << " text(s) moved (" << separated << " clear of others); "
+               << starscore::describeIssues(issues).join(" ; ").toStdString();
+    }
     const bool minMajNote = starscoreSetMinMajNote(score);
     const Ret ret = starscorePdfBytes(writer, notation, pdf);
     if (minMajNote) {
@@ -4016,7 +4029,12 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                                           ms->partById(ID(s.partId)) });
             }
             n->undoStack()->prepareChanges(TranslatableString::untranslatable("Combined part layout"));
+            // the texts where the style puts them: the book is the largest arrangement's part score, whose texts were
+            // placed by hand for its own layout (Joel, 16 Oct 2026: Amplitudes' "Chords provided to help y'all remember
+            // accidentals" ran off the left of the page)
+            const int textsReset = starscore::resetTextPositions(n->elements()->msScore());
             const QStringList layoutLog = starscore::copySectionLayouts(layoutSources, n->elements()->msScore());
+            LOGI() << "[starscore] combined " << chair.name.toStdString() << ": " << textsReset << " text position(s) reset";
             n->undoStack()->commitChanges();
             // beat slashes over another line's notes: the notes stay, the slashes go (Joel, 14 Oct 2026)
             {
@@ -4025,6 +4043,8 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                 es->setLayoutAll();
                 es->doLayout();
                 const int hiddenSlashes = starscore::hideSlashesOverNotes(es);
+                const int aligned = starscore::alignCombinedLabels(es);
+                LOGI() << "[starscore] combined " << chair.name.toStdString() << ": " << aligned << " label(s) levelled";
                 n->undoStack()->commitChanges();
                 LOGI() << "[starscore] combined " << chair.name.toStdString() << ": " << hiddenSlashes << " slash chord(s) over notes hidden";
             }
