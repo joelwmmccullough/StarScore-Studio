@@ -17,6 +17,7 @@
 #include <QRegularExpression>
 #include <algorithm>
 #include "project/internal/starscore/starscoreengraving.h"
+#include "project/internal/starscore/starscorehornkeys.h"
 
 using namespace mu::project;
 using namespace mu::notation;
@@ -45,17 +46,17 @@ void CopyLayoutModel::load(const QString& mode)
     engraving::MasterScore* ms = master->masterScore();
     std::map<QString, int> groupOfPart;
     if (starScore()) {
-        static const QRegularExpression horn("^([1-7])-horn(-any)?$");
+        static const QRegularExpression flexibleHorn("^([1-7])-horn-any$");
         for (const StarScoreSection& s : starScore()->sections()) {
             int g = 11;   // another section (lead sheet, strings, solos…)
-            const QRegularExpressionMatch m = horn.match(s.templateKey);
-            if (m.hasMatch()) {
-                const int n = m.captured(1).toInt();
-                const bool flexible = !m.captured(2).isEmpty();
+            // the Standard horn sections (the two-trumpet 4-Horn with the 4H) and the Flexible ones
+            const int standard = starscore::hornSectionSize(s.templateKey);
+            const QRegularExpressionMatch m = flexibleHorn.match(s.templateKey);
+            if ((standard >= 1 && standard <= 7) || m.hasMatch()) {
+                const int n = standard > 0 ? standard : m.captured(1).toInt();
+                const bool flexible = standard == 0;
                 // 1H, 2H, 2HF, 3H, 3HF, 4H, 5H, 6H, 7H
                 g = n == 1 ? 1 : n == 2 ? (flexible ? 3 : 2) : n == 3 ? (flexible ? 5 : 4) : 2 + n;
-            } else if (s.templateKey == "4-horn-2tpt") {
-                g = 6;   // with the 4H
             } else if (s.templateKey == "rhythm") {
                 g = 10;
             } else if (s.templateKey.startsWith("bigband-")) {
