@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.57
+
+- **The 4-Horn 2-Trumpet's horns are bracketed.** Its four horns are in one bracket in the main score and in the 4-Horn 2-Trumpet arrangement's score, like the other Standard sections. Songs that already have the section get the bracket when they're opened (save the song to keep it); a new 4-Horn 2-Trumpet gets it when it's made.
+
 ## 1.18.56
 
 - **Shorter mute lines when they run into the title.** The mute lines under the instrument name are shortened too: "with Harmon Mute" → "w/ Harmon Mute" → "w/ Harmon", "and Plunger" → "& Plunger". Whichever line reaches furthest right (the name or a mute line) is shortened first.

@@ -185,6 +185,37 @@ bool StarScoreService::sectionHasMusic(const StarScoreSection& section) const
     return false;
 }
 
+int StarScoreService::bracketTwoTrumpetSections()
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    engraving::MasterScore* ms = master ? master->masterScore() : nullptr;
+    if (!ms) {
+        return 0;
+    }
+    int added = 0;
+    for (const StarScoreSection& s : loadFrom(ms).sections) {
+        if (s.templateKey != starscore::TWO_TRUMPET_4H) {
+            continue;
+        }
+        std::vector<engraving::Part*> parts;
+        for (const QString& pid : s.partIds) {
+            engraving::Part* p = s.alternates.count(pid) ? nullptr : ms->partById(ID(pid));
+            if (p) {
+                parts.push_back(p);
+            }
+        }
+        if (starscore::bracketPartsTogether(ms, parts, false) == 0) {
+            continue;
+        }
+        master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Bracket the 4-Horn 2-Trumpet"));
+        added += starscore::bracketPartsTogether(ms, parts, true);
+        master->notation()->undoStack()->commitChanges();
+        master->notation()->notationChanged().notify();
+        LOGI() << "[starscore] " << s.name.toStdString() << ": its horns bracketed in " << added << " score(s)";
+    }
+    return added;
+}
+
 void StarScoreService::offerMatchingHornParts(const QStringList& sectionIdsBefore)
 {
     // after the dialog that made the section has closed
@@ -201,6 +232,7 @@ void StarScoreService::offerMatchingHornParts(const QStringList& sectionIdsBefor
                 if (!pairs.empty()) {
                     copyHornParts(pairs);
                 }
+                bracketTwoTrumpetSections();
                 continue;
             }
             const int n = hornCount(made.templateKey);

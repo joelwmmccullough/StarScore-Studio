@@ -47,6 +47,7 @@
 #include "engraving/dom/slur.h"
 #include "engraving/editing/editmeasures.h"
 #include "engraving/editing/undo.h"
+#include "engraving/dom/bracketItem.h"
 #include "engraving/editing/editspanner.h"
 #include "engraving/compat/dummyelement.h"
 #include "engraving/dom/systemlock.h"
@@ -1540,4 +1541,65 @@ void mu::project::starscore::undoSetPartName(Part* part, const QString& name)
         return;
     }
     part->score()->undo(new StarScoreChangePartName(part, String::fromQString(name)));
+}
+
+int mu::project::starscore::bracketPartsTogether(MasterScore* master, const std::vector<Part*>& parts, bool apply)
+{
+    if (!master || parts.size() < 2) {
+        return 0;
+    }
+    int added = 0;
+    std::vector<Score*> scores { master };
+    for (const Excerpt* ex : master->excerpts()) {
+        if (ex && ex->excerptScore()) {
+            scores.push_back(ex->excerptScore());
+        }
+    }
+    for (Score* score : scores) {
+        std::vector<staff_idx_t> idx;
+        bool all = true;
+        for (const Part* p : parts) {
+            for (const Staff* st : p->staves()) {
+                const Staff* here = score == master ? st : st->findLinkedInScore(score);
+                if (!here) {
+                    all = false;
+                    break;
+                }
+                idx.push_back(here->idx());
+            }
+            if (!all) {
+                break;
+            }
+        }
+        if (!all || idx.size() < 2) {
+            continue;
+        }
+        std::sort(idx.begin(), idx.end());
+        bool together = true;
+        for (size_t i = 1; i < idx.size(); ++i) {
+            together &= idx[i] == idx[i - 1] + 1;
+        }
+        if (!together) {
+            continue;
+        }
+        // none of them in a bracket already (a brace of a two-staff part is fine)
+        bool bracketed = false;
+        for (staff_idx_t s = 0; s < score->nstaves() && !bracketed; ++s) {
+            const Staff* st = score->staff(s);
+            for (const BracketItem* b : st->brackets()) {
+                if (b && b->bracketType() == BracketType::NORMAL && b->bracketSpan() > 0
+                    && s <= idx.back() && s + b->bracketSpan() - 1 >= idx.front()) {
+                    bracketed = true;
+                }
+            }
+        }
+        if (bracketed) {
+            continue;
+        }
+        if (apply) {
+            score->undoAddBracket(score->staff(idx.front()), 0, BracketType::NORMAL, idx.size());
+        }
+        ++added;
+    }
+    return added;
 }

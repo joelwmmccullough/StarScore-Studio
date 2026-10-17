@@ -178,4 +178,9 @@ QString applyAdditiveTimeSig(mu::engraving::MasterScore* score, mu::engraving::M
 //! The part's name changed through the undo stack, so Undo puts the old name back with the rest of the command
 //! (Part::setPartName on its own isn't undoable). Inside a command; outside one it just changes the name.
 void undoSetPartName(mu::engraving::Part* part, const QString& name);
+
+//! The staves of these parts (of the main score) bracketed together, in the main score and in every part score or
+//! arrangement score that has all of them, where they sit together and none of them is in a bracket yet. With apply
+//! false only counts. Undoable; call inside a command. Returns in how many scores a bracket was (or would be) added.
+int bracketPartsTogether(mu::engraving::MasterScore* master, const std::vector<mu::engraving::Part*>& parts, bool apply);
 }

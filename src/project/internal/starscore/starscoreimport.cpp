@@ -2214,6 +2214,7 @@ void StarScoreService::tidyOpenedScore()
     standardizeHornNames();
     renamePersonNamedPartScores();
     renameOffSchemePartScores();
+    bracketTwoTrumpetSections();
     labelPartBooks();
     // the Keys player's bass staff: always in the full score, only where it has music in the part scores
     if (starscore::applyKeysStaffRules(ms, leadSheetPartsOf(ms)) > 0) {

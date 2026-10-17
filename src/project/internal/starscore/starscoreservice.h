@@ -534,6 +534,9 @@ private:
     void showOldAlternates();
     //! The horn part scores show their exported title (instrument name, arrangement label); see starscorebandexport.cpp
     int labelPartBooks();
+    //! The 4-Horn 2-Trumpet section's four horns in one bracket, in the main score and its arrangement's score (Joel,
+    //! 17 Oct 2026: its parts are made by StarScore, so they had none). Returns in how many scores one was added.
+    int bracketTwoTrumpetSections();
     std::vector<StarScoreTodoItem> todoList(const Data& data) const;   // starscoretodo.cpp
     //! The to-do list as a printable page (HTML for the organizer's PDF printer)
     QString todoPdfHtml(const QString& title, const QString& code, const QString& version) const;
