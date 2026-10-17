@@ -4690,7 +4690,17 @@ Ret StarScoreService::injectSolos(const io::path_t& starscorePath)
                 || QString::fromStdString(name).startsWith(STARSCORE_REFS_DIR + "/")) {
                 continue;
             }
-            writer.addFile(name, reader.fileData(name));
+            const ByteArray data = reader.fileData(name);
+            // ZipReader::fileData returns nothing, without setting the error, when an entry can't be unpacked: the
+            // song file just saved is then left exactly as MuseScore wrote it rather than rewritten with an empty
+            // score inside
+            if (data.empty() && info.size > 0) {
+                LOGE() << "[starscore] could not read " << name << " back from " << starscorePath << "; the file is left as saved";
+                writer.close();
+                QFile::remove(tmp);
+                return make_ret(Ret::Code::UnknownError);
+            }
+            writer.addFile(name, data);
         }
         for (const StarScoreSolo& solo : list) {
             QFile f(soloWorkPath(solo.id).toQString());
