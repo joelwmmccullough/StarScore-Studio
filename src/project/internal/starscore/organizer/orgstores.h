@@ -41,6 +41,7 @@ struct Player {
     bool current = true;
     bool horn = false;        // gets a Horn Part Guide
     std::map<int, Chair> chairs;   // Any Horns: horn count (2, 3) -> chair
+    QJsonObject extra;        // anything else in the player's entry in roster.json (written back as it was)
 
     QJsonObject toJson() const;
     static Player fromJson(const QJsonObject& o);
@@ -59,6 +60,8 @@ public:
     bool save(const Paths& paths) const;
 
     std::vector<Player> players;
+    //! anything else in roster.json, added by hand: written back as it was
+    QJsonObject extra;
     //! Old sheets named after a player ("Seagrass-Name.pdf"): first name -> instrument, for filing them
     std::map<QString, QString> fileNameHints;
 

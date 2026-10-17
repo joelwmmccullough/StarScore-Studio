@@ -23,6 +23,7 @@
  */
 #include "starscoreservice.h"
 #include "starscoreengraving.h"
+#include "starscorehornkeys.h"
 
 #include <algorithm>
 #include <map>
@@ -468,14 +469,19 @@ QStringList StarScoreService::standardizeSong(bool apply)
         for (const FlexConversion& c : conversions) {
             keysAfter.insert(QString("%1-horn-any").arg(c.horns));
         }
-        static const QRegularExpression hornKeyRe("^([1-7])-horn(-any)?$");
         const std::set<QString> keysNow = keysAfter;
         for (const QString& key : keysNow) {
-            const QRegularExpressionMatch m = hornKeyRe.match(key);
-            if (!m.hasMatch()) {
+            // a Standard section's Standard arrangement (the two-trumpet 4-Horn's own too), a Flexible section's own
+            const int standard = starscore::hornSectionSize(key);
+            const int flexible = starscore::flexibleSectionSize(key);
+            QString arrKey;
+            if (standard >= 1 && standard <= 7) {
+                arrKey = starscore::standardArrangementOfSection(key);
+            } else if (flexible >= 1 && flexible <= 7) {
+                arrKey = key;
+            } else {
                 continue;
             }
-            const QString arrKey = m.captured(2).isEmpty() ? QString("%1-horn-standard").arg(m.captured(1)) : key;
             if (arrangementTemplatesHeld.count(arrKey)) {
                 continue;
             }
@@ -770,7 +776,7 @@ QStringList StarScoreService::standardizeSong(bool apply)
         master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("String section names"));
         for (const auto& [p, name] : renames) {
             engraving::EditPart::setInstrumentName(ms, p, engraving::Fraction(0, 1), String::fromQString(name));
-            p->setPartName(String::fromQString(name));
+            starscore::undoSetPartName(p, name);
         }
         master->notation()->undoStack()->commitChanges();
         for (const auto& [p, name] : renames) {

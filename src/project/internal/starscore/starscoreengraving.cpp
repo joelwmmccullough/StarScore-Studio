@@ -46,6 +46,7 @@
 #include "engraving/dom/range.h"
 #include "engraving/dom/slur.h"
 #include "engraving/editing/editmeasures.h"
+#include "engraving/editing/undo.h"
 #include "engraving/editing/editspanner.h"
 #include "engraving/compat/dummyelement.h"
 #include "engraving/dom/systemlock.h"
@@ -1507,4 +1508,36 @@ int mu::project::starscore::lockSheetLayout(Score* score)
         ++added;
     }
     return added;
+}
+
+namespace {
+//! A part's name, undoably (ChangePart would also swap in a copy of the instrument)
+class StarScoreChangePartName : public UndoCommand
+{
+    Part* m_part = nullptr;
+    String m_name;
+
+    void flip(EditData*) override
+    {
+        const String old = m_part->partName();
+        m_part->setPartName(m_name);
+        m_name = old;
+        m_part->score()->setInstrumentsChanged(true);
+    }
+
+public:
+    StarScoreChangePartName(Part* part, const String& name)
+        : m_part(part), m_name(name) {}
+
+    UNDO_NAME("StarScoreChangePartName")
+    UNDO_CHANGED_OBJECTS({ m_part })
+};
+}
+
+void mu::project::starscore::undoSetPartName(Part* part, const QString& name)
+{
+    if (!part || !part->score() || part->partName().toQString() == name) {
+        return;
+    }
+    part->score()->undo(new StarScoreChangePartName(part, String::fromQString(name)));
 }

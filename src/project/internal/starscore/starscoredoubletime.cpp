@@ -403,7 +403,8 @@ RetVal<QString> StarScoreService::convertTimeOf(const INotationProjectPtr& proje
     };
     std::vector<SpannerKept> lines;
     for (const auto& [tick, sp] : ms->spanner()) {
-        if (sp->isTie() || sp->isSlur() /* chord to chord: kept by the paste unless they cross an edge */ && !crossesEdge(sp->tick(), sp->tick2())) {
+        // ties, and slurs (chord to chord: kept by the paste) unless they cross an edge
+        if (sp->isTie() || (sp->isSlur() && !crossesEdge(sp->tick(), sp->tick2()))) {
             continue;
         }
         if (sp->isGradualTempoChange() || crossesEdge(sp->tick(), sp->tick2())) {
@@ -590,16 +591,14 @@ RetVal<QString> StarScoreService::convertTimeOf(const INotationProjectPtr& proje
     for (const DoubleTimeAnnotation& a : annotations) {
         const Fraction at = mapTick(bars, a.oldTick);
         Measure* m = ms->tick2measure(at);
-        if (!m) {
-            continue;
-        }
-        Segment* seg = m->findSegment(SegmentType::ChordRest, at);
-        if (!seg) {
+        Segment* seg = m ? m->findSegment(SegmentType::ChordRest, at) : nullptr;
+        if (m && !seg) {
             for (Segment* s = m->first(SegmentType::ChordRest); s && s->tick() <= at; s = s->next(SegmentType::ChordRest)) {
                 seg = s;
             }
         }
         if (!seg) {
+            delete a.clone;   // (never added to the score: no bar to put it in)
             continue;
         }
         if (a.tempo) {

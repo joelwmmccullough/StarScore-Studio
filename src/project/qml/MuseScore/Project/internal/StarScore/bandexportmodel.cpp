@@ -364,6 +364,8 @@ QString BandExportModel::exportNow()
 
     // The version printed on these sheets (and kept in the score for next time)
     const QString version = exportVersion();
+    const QString versionBefore = starScore()->scoreVersion();
+    const int bumpBefore = m_bump;
     starScore()->setScoreVersion(version);
     m_version = version;
     m_bump = 0;
@@ -375,6 +377,14 @@ QString BandExportModel::exportNow()
     if (!paths.isEmpty()) {   // (no sheets ticked: only the demos; an empty list would mean every sheet)
         muse::RetVal<QString> summary = starScore()->exportToBandFolder(paths);
         if (!summary.ret) {
+            // nothing was printed (a failed export stops before its first sheet): the song keeps the version it had
+            if (versionBefore != version) {
+                starScore()->setScoreVersion(versionBefore);
+                m_version = versionBefore;
+                m_bump = bumpBefore;
+                emit loaded();
+                emit bumpChanged();
+            }
             setResult(muse::qtrc("starscore", "Export failed: %1").arg(QString::fromStdString(summary.ret.toString())));
             return m_result;
         }

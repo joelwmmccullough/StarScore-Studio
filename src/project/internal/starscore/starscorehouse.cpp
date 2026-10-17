@@ -551,7 +551,15 @@ bool instrumentNameShows(const Text* name, const QString& plain)
         return false;
     }
     auto flat = [](QString t) { return t.replace('\n', ' ').simplified(); };
-    if (flat(name->plainText().toQString()) != flat(plain)) {
+    // the name as given, or a shorter form of it (fitInstrumentName), with the same lines under it
+    const int nl = plain.indexOf('\n');
+    const QString rest = nl < 0 ? QString() : plain.mid(nl);
+    const QString shown = flat(name->plainText().toQString());
+    bool same = false;
+    for (const QString& v : instrumentNameVariants(nl < 0 ? plain : plain.left(nl))) {
+        same |= shown == flat(v + rest);
+    }
+    if (!same) {
         return false;
     }
     // with mute lines, they must be the smaller size already (sheets titled before 1.18.54 weren't)
@@ -633,7 +641,8 @@ bool fitArrangementLabel(Score* score)
     return changed;
 }
 
-QStringList instrumentNameVariants(const QString& firstLine)
+//! The instrument's name broken over two lines: "Contrabass Clarinet\nin B♭", then before the last word, the last two…
+static QStringList starscoreBrokenNames(const QString& firstLine)
 {
     QStringList out { firstLine };
     auto add = [&](const QString& v) {
@@ -648,6 +657,101 @@ QStringList instrumentNameVariants(const QString& firstLine)
     const QStringList words = firstLine.split(' ', Qt::SkipEmptyParts);
     for (int k = int(words.size()) - 1; k >= 1; --k) {
         add(words.mid(0, k).join(' ') + "\n" + words.mid(k).join(' '));
+    }
+    return out;
+}
+
+//! Each instrument's name and its shorter forms, longest first (Joel, 17 Oct 2026: "Soprano Saxophone -> Soprano Sax
+//! -> Sop Sax -> Sop"). A name already shortened finds its place in its list and goes on from there.
+static const std::vector<QStringList>& starscoreNameForms()
+{
+    static const std::vector<QStringList> FORMS {
+        { "Soprano Saxophone", "Soprano Sax", "Sop Sax", "Sop" },
+        { "Alto Saxophone", "Alto Sax", "Alto" },
+        { "Tenor Saxophone", "Tenor Sax", "Ten Sax", "Ten" },
+        { "Baritone Saxophone", "Bari Sax", "Bari" },
+        { "Bass Saxophone", "Bass Sax" },
+        { "Saxophone", "Sax" },                     // "E♭ Saxophone", "B♭ Saxophone"
+        { "Trumpet", "Tpt" },
+        { "Flugelhorn", "Flgh" },
+        { "Contrabass Clarinet", "Cb Clarinet", "Cb Cl" },
+        { "Bass Clarinet", "Bass Clar", "Bass Cl" },
+        { "Clarinet", "Clar", "Cl" },
+        { "Bass Trombone", "Bass Tbn" },
+        { "Trombone", "Tbn" },
+        { "Alto Flute", "Alto Fl" },
+        { "Flute", "Fl" },
+        { "Piccolo", "Picc" },
+        { "Oboe", "Ob" },
+        { "Contrabassoon", "Cbsn" },
+        { "Bassoon", "Bsn" },
+        { "Horn", "Hn" },
+        { "Euphonium", "Euph" },
+        { "Violin", "Vln" },
+        { "Viola", "Vla" },
+        { "Cello", "Vc" },
+        { "Electric Guitar", "Guitar", "Gtr" },
+        { "Guitar", "Gtr" },
+        { "Bass Guitar", "Bass" },
+        { "Electric Bass", "Bass" },
+        { "Piano", "Pno" },
+        { "Percussion", "Perc" },
+        { "Vibraphone", "Vibes" },
+    };
+    return FORMS;
+}
+
+QStringList instrumentNameVariants(const QString& firstLine)
+{
+    // "Trumpet 1 in B♭": the instrument, its number, its key after it ("in B♭") or before it ("E♭ Saxophone")
+    static const QRegularExpression KEY_AFTER(QString::fromUtf8("^(.+) in ([A-G][♭♯]?)$"));
+    static const QRegularExpression KEY_BEFORE(QString::fromUtf8("^([A-G][♭♯]?) (.+)$"));
+    static const QRegularExpression NUMBER("^(.+?)( \\d+)$");
+    QString base = firstLine.simplified();
+    QString keyAfter, keyBefore, number;
+    if (const QRegularExpressionMatch m = KEY_AFTER.match(base); m.hasMatch()) {
+        base = m.captured(1);
+        keyAfter = m.captured(2);
+    } else if (const QRegularExpressionMatch b = KEY_BEFORE.match(base); b.hasMatch()) {
+        keyBefore = b.captured(1) + " ";
+        base = b.captured(2);
+    }
+    if (const QRegularExpressionMatch m = NUMBER.match(base); m.hasMatch()) {
+        base = m.captured(1);
+        number = m.captured(2);
+    }
+    QStringList shorter;
+    bool known = false;
+    for (const QStringList& forms : starscoreNameForms()) {
+        const int at = int(forms.indexOf(base));
+        if (at >= 0) {
+            shorter = forms.mid(at + 1);
+            known = true;
+            break;
+        }
+    }
+    if (!known && keyAfter.isEmpty()) {
+        // a name with no shorter form: broken over two lines, as before 1.18.55
+        return starscoreBrokenNames(firstLine);
+    }
+    QStringList out { firstLine };
+    auto add = [&](const QString& v) {
+        if (!out.contains(v)) {
+            out << v;
+        }
+    };
+    if (!keyAfter.isEmpty()) {
+        // "Trumpet in B♭" -> "B♭ Trumpet" -> "Trumpet" -> "Tpt"
+        add(keyAfter + " " + base + number);
+        add(base + number);
+    }
+    for (const QString& s : shorter) {
+        add(keyBefore + s + number);
+    }
+    // the shortest form still too wide: broken over two lines ("Bass Tbn" -> "Bass" / "Tbn")
+    const QStringList broken = starscoreBrokenNames(out.last());
+    for (int i = 1; i < broken.size(); ++i) {
+        add(broken.at(i));
     }
     return out;
 }
@@ -704,7 +808,7 @@ bool instrumentNameOverlapsTitle(Score* score)
     return starscoreNameOverlaps(score, name, titles);
 }
 
-bool fitInstrumentName(Score* score)
+bool fitInstrumentName(Score* score, const QString& plain)
 {
     std::vector<const Text*> titles;
     Text* name = starscoreInstrumentNameText(score, titles);
@@ -714,8 +818,21 @@ bool fitInstrumentName(Score* score)
     auto overlaps = [&]() {
         return starscoreNameOverlaps(score, name, titles);
     };
+    bool changed = false;
+    if (!plain.isEmpty()) {
+        // a shorter form shown that the name doesn't need (a title made shorter since, or a part's own name that
+        // happens to be one, "Trumpet" for "Trumpet in B♭"): the full name first, then shortened only as needed
+        auto flat = [](QString t) { return t.replace('\n', ' ').simplified(); };
+        if (flat(name->plainText().toQString()) != flat(plain)) {
+            name->undoChangeProperty(Pid::TEXT, instrumentNameXml(plain, name->size()));
+            changed = true;
+            score->setLayoutAll();
+            score->doLayout();
+            levelArrangementLabel(score);
+        }
+    }
     if (!overlaps()) {
-        return false;
+        return changed;
     }
     // the instrument's own name is the first line, unless it was broken here before: then the first two
     const QString current = name->plainText().toQString();
@@ -727,7 +844,6 @@ bool fitInstrumentName(Score* score)
     }
     const QStringList variants = instrumentNameVariants(first.simplified());
     const QString rest = lines.isEmpty() ? QString() : "\n" + lines.join('\n');
-    bool changed = false;
     int i = std::max(1, int(variants.indexOf(current.left(current.size() - rest.size()))) + 1);
     for (; i < variants.size() && overlaps(); ++i) {
         name->undoChangeProperty(Pid::TEXT, instrumentNameXml(variants[i] + rest, name->size()));

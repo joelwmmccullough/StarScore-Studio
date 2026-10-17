@@ -43,6 +43,25 @@ inline QString hornSectionOfArrangement(const QString& arrangementKey)
     return m.hasMatch() ? m.captured(1) + "-horn" : QString();
 }
 
+//! How many horns a Flexible horn section has ("3-horn-any" -> 3); 0 for any other section
+inline int flexibleSectionSize(const QString& sectionKey)
+{
+    static const QRegularExpression re("^([1-9])-horn-any$");
+    const QRegularExpressionMatch m = re.match(sectionKey);
+    return m.hasMatch() ? m.captured(1).toInt() : 0;
+}
+
+//! The Standard arrangement of a Standard horn section ("3-horn" -> "3-horn-standard", "4-horn-2tpt" -> itself);
+//! empty for any other section
+inline QString standardArrangementOfSection(const QString& sectionKey)
+{
+    if (sectionKey == TWO_TRUMPET_4H) {
+        return sectionKey;
+    }
+    const int n = hornSectionSize(sectionKey);
+    return n > 0 ? QString("%1-horn-standard").arg(n) : QString();
+}
+
 //! How many horns a Standard arrangement has ("5-horn-standard" -> 5, "4-horn-2tpt" -> 4); 0 for any other
 inline int standardArrangementSize(const QString& arrangementKey)
 {

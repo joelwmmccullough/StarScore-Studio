@@ -53,13 +53,16 @@ QString arrangementLabelNote(const mu::engraving::Text* label);
 //! title (and subtitle), or the forms run out (the last one stays). Lays out after each change. Undoable. Returns
 //! whether it changed the label.
 bool fitArrangementLabel(mu::engraving::Score* score);
-//! The instrument name's first line and its forms broken over two lines, in the order tried (Joel, 13 Oct 2026):
-//! "Contrabass Clarinet in B♭", "Contrabass Clarinet\nin B♭", then a break before the last word, the last two…
+//! The instrument name's first line and its shorter forms, in the order tried (Joel, 17 Oct 2026): "Soprano
+//! Saxophone", "Soprano Sax", "Sop Sax", "Sop"; "Trumpet 1 in B♭", "B♭ Trumpet 1", "Trumpet 1", "Tpt 1". A name with
+//! no shorter form is broken over two lines instead, before the last word, the last two… (13 Oct 2026)
 QStringList instrumentNameVariants(const QString& firstLine);
-//! The instrument name (top left) running into the title: its first line broken (instrumentNameVariants) until it
+//! The instrument name (top left) running into the title: its first line shortened (instrumentNameVariants) until it
 //! clears the title and subtitle, or the forms run out. The lines under it (the mutes) stay. Lays out after each
 //! change. Undoable. Returns whether it changed the name.
-bool fitInstrumentName(mu::engraving::Score* score);
+//! With `plain` (the name as the sheet gives it, with its mute lines): a shorter form shown that isn't needed is put
+//! back to the full name first, so the name is always the longest form that clears the title.
+bool fitInstrumentName(mu::engraving::Score* score, const QString& plain = QString());
 //! Whether the instrument name (top left) runs into the title or subtitle as last laid out
 bool instrumentNameOverlapsTitle(mu::engraving::Score* score);
 

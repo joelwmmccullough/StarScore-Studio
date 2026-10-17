@@ -174,4 +174,8 @@ int copyEndBarlines(mu::engraving::MasterScore* master, const mu::engraving::Par
 //! Must be called inside a command. Returns an error message, or an empty string.
 QString applyAdditiveTimeSig(mu::engraving::MasterScore* score, mu::engraving::Measure* start, mu::engraving::Measure* last,
                              const std::vector<int>& numerators, int denominator);
+
+//! The part's name changed through the undo stack, so Undo puts the old name back with the rest of the command
+//! (Part::setPartName on its own isn't undoable). Inside a command; outside one it just changes the name.
+void undoSetPartName(mu::engraving::Part* part, const QString& name);
 }

@@ -574,6 +574,42 @@ bool autosaveArchiveEnabled()
     return QSettings().value("StarScore/autosaveArchive", true).toBool();
 }
 
+//! A song given its code ("Title" renamed "CODE - Title" by the organizer) keeps its history: the history and
+//! waiting copies kept under the old name move to the new one, when the new name has none of its own yet. (Until
+//! 1.18.55 the coded song started a history of its own and the old one was left out of the song's list.)
+static void adoptHistoryOfRenamedSong(const QString& base)
+{
+    static const QRegularExpression coded("^[A-Z0-9]{2,8} - (.+)$");
+    const QRegularExpressionMatch m = coded.match(base);
+    if (!m.hasMatch()) {
+        return;
+    }
+    const QString oldName = m.captured(1);
+    QMutexLocker lock(&s_packMutex);
+    const auto waiting = waitingCopies();
+    if (QFile::exists(historyPath(base)) || waiting.count(base)) {
+        return;
+    }
+    const bool oldHistory = QFile::exists(historyPath(oldName));
+    auto oldWaiting = waiting.find(oldName);
+    if (!oldHistory && oldWaiting == waiting.end()) {
+        return;
+    }
+    if (oldHistory && !QFile::rename(historyPath(oldName), historyPath(base))) {
+        LOGW() << "autosave archive: couldn't move the history of " << oldName.toStdString() << " to " << base.toStdString();
+        return;
+    }
+    if (oldWaiting != waiting.end()) {
+        for (const Waiting& w : oldWaiting->second) {
+            const QString to = incomingDir() + "/" + base + " " + w.time.toString(TIME_FORMAT) + ".starscore";
+            if (!QFile::exists(to) && !QFile::rename(w.path, to)) {
+                LOGW() << "autosave archive: couldn't rename " << w.path.toStdString();
+            }
+        }
+    }
+    LOGI() << "autosave archive: " << oldName.toStdString() << "'s history is now " << base.toStdString() << "'s";
+}
+
 QString archiveBeforeSave(const QString& songPath, const QDateTime& now, bool background)
 {
     if (!autosaveArchiveEnabled() || !songPath.endsWith(".starscore", Qt::CaseInsensitive)) {
@@ -588,8 +624,10 @@ QString archiveBeforeSave(const QString& songPath, const QDateTime& now, bool ba
         return QString();   // a version opened from the archive and saved: not archived again
     }
 
-    // the newest version kept: waiting in Incoming, else the newest in the history file
     const QString base = song.completeBaseName();
+    adoptHistoryOfRenamedSong(base);
+
+    // the newest version kept: waiting in Incoming, else the newest in the history file
     QDateTime newest;
     QByteArray newestSha1;
     const auto waiting = waitingCopies();

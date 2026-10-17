@@ -37,6 +37,7 @@
 #include <cmath>
 
 #include "engraving/dom/masterscore.h"
+#include "engraving/editing/editscoreproperties.h"
 #include "engraving/dom/excerpt.h"
 #include "engraving/dom/part.h"
 #include "engraving/dom/instrument.h"
@@ -1891,7 +1892,7 @@ StarScoreSection StarScoreService::finishNewParts(const std::vector<engraving::P
 
         if (!inst.partName.isEmpty()) {
             engraving::EditPart::setInstrumentName(ms, p, engraving::Fraction(0, 1), String::fromQString(inst.partName));
-            p->setPartName(String::fromQString(inst.partName));
+            starscore::undoSetPartName(p, inst.partName);
 
             // Short name: MuseScore numbers instruments of the same kind ("Pno. 2" when the lead sheet is also a
             // piano); use the instrument's own short name, numbered only when the part name is ("Tpt. 1")
@@ -3069,8 +3070,11 @@ void StarScoreService::moveArrangement(const QString& arrangementId, int newInde
 void StarScoreService::removeArrangement(const QString& arrangementId)
 {
     Data data = load();
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    engraving::MasterScore* ms = master ? master->masterScore() : nullptr;
+    const size_t stepsBefore = master ? master->notation()->undoStack()->currentStateIndex() : 0;
     // Its own score goes too
-    if (IMasterNotationPtr master = globalContext()->currentMasterNotation()) {
+    if (master) {
         for (const StarScoreArrangement& a : data.arrangements) {
             if (a.id != arrangementId) {
                 continue;
@@ -3086,6 +3090,17 @@ void StarScoreService::removeArrangement(const QString& arrangementId)
     data.arrangements.erase(std::remove_if(data.arrangements.begin(), data.arrangements.end(),
                                            [&](const StarScoreArrangement& a) { return a.id == arrangementId; }),
                             data.arrangements.end());
+    // through the undo stack, as one step with its score's removal: Undo brings back the arrangement and its score
+    // together (until 1.18.55 Undo brought back the score only)
+    if (ms && !data.unreadable) {
+        INotationUndoStackPtr stack = master->notation()->undoStack();
+        stack->prepareChanges(TranslatableString("undoableAction", "Remove arrangement"));
+        ms->undo(new engraving::ChangeMetaText(ms, STARSCORE_META_TAG, String::fromQString(toJson(data))));
+        stack->commitChanges();
+        if (stack->currentStateIndex() == stepsBefore + 2) {
+            stack->mergeCommands(stepsBefore);
+        }
+    }
     store(data);
 }
 
@@ -3221,13 +3236,15 @@ int StarScoreService::detectSections()
     }
 
     for (const StarScoreSection& s : data.sections) {
-        static const QRegularExpression hornKeyRe("^([2-9])-horn(-any)?$");
-        QRegularExpressionMatch km = hornKeyRe.match(s.templateKey);
-        if (!km.hasMatch()) {
+        // a Standard section's Standard arrangement (the two-trumpet 4-Horn's own too), a Flexible section's own
+        const int standard = starscore::hornSectionSize(s.templateKey);
+        const int flexible = starscore::flexibleSectionSize(s.templateKey);
+        if (standard < 2 && flexible < 2) {
             continue;
         }
-        const QString arrKey = km.captured(2).isEmpty() ? QString("%1-horn-standard").arg(km.captured(1)) : s.templateKey;
-        const QString arrName = km.captured(2).isEmpty() ? QString("%1-Horn Standard").arg(km.captured(1)) : s.name;
+        const QString arrKey = standard >= 2 ? starscore::standardArrangementOfSection(s.templateKey) : s.templateKey;
+        const QString arrName = s.templateKey == starscore::TWO_TRUMPET_4H ? QString("4-Horn 2-Trumpet")
+                                : standard >= 2 ? QString("%1-Horn Standard").arg(standard) : s.name;
         if (arrangementNames.contains(arrName.toLower())) {
             continue;
         }

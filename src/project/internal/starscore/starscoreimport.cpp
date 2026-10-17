@@ -420,7 +420,7 @@ void StarScoreService::standardizeImported()
         }
         const QString old = p->partName().toQString();
         master->parts()->setInstrumentName(InstrumentKey { p->instrumentId(), p->id(), engraving::Fraction(0, 1) }, name);
-        p->setPartName(String::fromQString(name));
+        starscore::undoSetPartName(p, name);
         // A part book holding just this instrument follows the new name
         for (const IExcerptNotationPtr& e : master->excerpts()) {
             engraving::Excerpt* ex = importExcerptOf(e);
@@ -1916,7 +1916,7 @@ int StarScoreService::standardizeHornNames()
     for (const auto& [p, name] : renames) {
         olds[p] = p->partName().toQString();
         engraving::EditPart::setInstrumentName(ms, p, engraving::Fraction(0, 1), String::fromQString(name));
-        p->setPartName(String::fromQString(name));
+        starscore::undoSetPartName(p, name);
     }
     master->notation()->undoStack()->commitChanges();
 

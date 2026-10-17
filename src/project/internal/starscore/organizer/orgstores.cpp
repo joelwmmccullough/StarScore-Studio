@@ -14,7 +14,7 @@ namespace mu::project::starscore::org {
 // ------------------------------------------------------------------ roster
 QJsonObject Player::toJson() const
 {
-    QJsonObject o;
+    QJsonObject o = extra;
     o["name"] = name;
     o["instruments"] = QJsonArray::fromStringList(instruments);
     o["blurb"] = blurb;
@@ -26,6 +26,8 @@ QJsonObject Player::toJson() const
     }
     if (!ch.isEmpty()) {
         o["chairs"] = ch;
+    } else {
+        o.remove("chairs");
     }
     return o;
 }
@@ -33,6 +35,10 @@ QJsonObject Player::toJson() const
 Player Player::fromJson(const QJsonObject& o)
 {
     Player p;
+    p.extra = o;
+    for (const char* known : { "name", "instruments", "blurb", "current", "horn", "chairs" }) {
+        p.extra.remove(QLatin1String(known));
+    }
     p.name = o.value("name").toString();
     for (const QJsonValue& v : o.value("instruments").toArray()) {
         p.instruments << v.toString();
@@ -60,6 +66,7 @@ QString Roster::load(const Paths& paths)
 {
     players.clear();
     fileNameHints.clear();
+    extra = QJsonObject();
     const JsonRead read = readJsonChecked(paths.toolkit + "/roster.json");
     if (read.unreadable()) {
         return unreadableMessage("roster.json", read);
@@ -68,6 +75,10 @@ QString Roster::load(const Paths& paths)
     if (o.isEmpty()) {
         // no roster yet: the band lives in roster.json (Dashboard > Band roster), never in the program
         return QString();
+    }
+    extra = o;
+    for (const char* known : { "version", "about", "players", "fileNameHints" }) {
+        extra.remove(QLatin1String(known));
     }
     for (const QJsonValue& v : o.value("players").toArray()) {
         players.push_back(Player::fromJson(v.toObject()));
@@ -85,7 +96,7 @@ bool Roster::save(const Paths& paths) const
     for (const Player& p : players) {
         a.append(p.toJson());
     }
-    QJsonObject o;
+    QJsonObject o = extra;   // (keys added by hand stay)
     o["version"] = 1;
     o["about"] = "The band, for changelogs and Horn Part Guides. Edit it in StarScore: Dashboard › Band roster.";
     o["players"] = a;

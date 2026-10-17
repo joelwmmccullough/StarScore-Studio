@@ -4,6 +4,22 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.55
+
+- **Shorter instrument names when they run into the title.** The instrument name top left is shortened one step at a time until it clears the title: "Soprano Saxophone" → "Soprano Sax" → "Sop Sax" → "Sop", "Trumpet 1 in B♭" → "B♭ Trumpet 1" → "Trumpet 1" → "Tpt 1", and the same for the other horns and strings. A name with no shorter form is still broken over two lines. Mute lines under it stay as they are.
+- **Fixes from the code audit:**
+  - The autosave archive never deletes a copy it hasn't archived. When the clocks go back in November, copies made in the repeated hour would have been lost. A copy that can't be read is kept as ".unreadable" instead of deleted.
+  - Saving never rewrites the song file with a part of it that couldn't be read back; the file stays as saved.
+  - If the song's StarScore data is ever damaged, StarScore leaves it in the file instead of writing empty data over it.
+  - Audio demos: the old demo is removed only after the new one is in place.
+  - A failed export no longer raises the song's version number (nothing was printed at that version).
+  - Undo after removing an arrangement brings back both the arrangement and its score (before, only the score came back). Renaming horn parts (Standardize, new sections) can be undone too.
+  - Standardize and "detect sections" make the 4-Horn 2-Trumpet arrangement again if a song has its section but not the arrangement.
+  - The autosave history of a song follows it when the organizer gives it its code ("Title" → "CODE - Title"); before, the coded song started a new history.
+  - Saving the band roster keeps anything added to roster.json by hand.
+  - Double-Time: markings with no bar to go to are freed (a small memory leak).
+  - The pre-print layout checks are faster on big Scores (same results).
+
 ## 1.18.54
 
 - **Sheets a song no longer makes are archived.** When a part is put on another instrument, a section is deleted, or a sheet is renamed, the export moves the sheets it wrote before that it no longer writes into Version History, and the old folder goes once it's empty. For example, Amplitudes' 4-Horn 2-Trumpet first made with the doubler on Clarinet left "4H 2Tpt Cla Ten" beside the new "4H 2Tpt Alt Ten". Only sheets StarScore itself exported are moved; anything else in the folder keeps it in place.

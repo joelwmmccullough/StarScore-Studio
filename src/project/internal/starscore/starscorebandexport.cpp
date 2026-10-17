@@ -1270,7 +1270,7 @@ static bool starscoreNeedsRetitle(const mu::engraving::Score* score, const QStri
                 }
             }
         } else {
-            // (or broken over two lines to clear the title: fitInstrumentName; its mute lines in the smaller size)
+            // (or a shorter form, to clear the title: fitInstrumentName; its mute lines in the smaller size)
             leftOk |= starscore::instrumentNameShows(t, left);
         }
     }
@@ -1387,7 +1387,7 @@ static void starscoreRetitleSheet(mu::engraving::Score* score, const QString& le
     score->setLayoutAll();
     score->doLayout();
     starscore::levelArrangementLabel(score);
-    starscore::fitInstrumentName(score);
+    starscore::fitInstrumentName(score, left);
     starscore::fitArrangementLabel(score);
     starscore::clearComposerCredit(score);
 }
@@ -1472,14 +1472,14 @@ int StarScoreService::labelPartBooks()
         INotationPtr n = it->second->notation();
         engraving::Score* es = n->elements()->msScore();
         if (!starscoreNeedsRetitle(es, f.sheetLeft, f.sheetRight)) {
-            // titled already, but its instrument name runs into the title: broken over two lines (Joel, 13 Oct 2026:
+            // titled already, but its instrument name runs into the title: shortened, "Soprano Sax"… (Joel, 17 Oct 2026; before, broken over two lines:
             // IPDW's "Contrabass Clarinet in B♭")
             if (starscore::instrumentNameOverlapsTitle(es)) {
                 if (!open) {
                     master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet titles"));
                     open = true;
                 }
-                if (starscore::fitInstrumentName(es)) {
+                if (starscore::fitInstrumentName(es, f.sheetLeft)) {
                     touched.push_back(n);
                     ++changed;
                 }
@@ -2590,8 +2590,8 @@ static Ret starscorePrintSheetAsIs(const INotationWriterPtr& writer, const INota
     }
     if (partSheet) {
         starscore::levelArrangementLabel(score);
-        // a long instrument name running into the title is broken over two lines ("Contrabass Clarinet" / "in B♭")
-        starscore::fitInstrumentName(score);
+        // a long instrument name running into the title is shortened ("Soprano Saxophone" -> "Soprano Sax" -> "Sop Sax"…)
+        starscore::fitInstrumentName(score, left);
         // a long label running into the title is shortened ("Flexible 2H Arrangement"), then broken over two lines
         starscore::fitArrangementLabel(score);
     }
