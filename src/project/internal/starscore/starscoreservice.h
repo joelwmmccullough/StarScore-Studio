@@ -346,6 +346,10 @@ public:
         // auditing; an arrangement whose sheets are all like that counts as audited
         std::map<QString, std::pair<QString, QString> > auditPartAudited;
         QStringList auditListened;                // approved listen steps
+
+        //! The "starscore" meta tag held something that isn't JSON (fromJson): the data read as empty, and storeTo
+        //! never writes such data back over the tag, so whatever is in the file stays there for Joel to recover
+        bool unreadable = false;
     };
     //! A sheet's status as the sheet record keeps it: the least finished of its parts (and a full score's own)
     static StarScoreStatus exportedSheetStatus(const Data& data, const StarScoreBandFile& f);

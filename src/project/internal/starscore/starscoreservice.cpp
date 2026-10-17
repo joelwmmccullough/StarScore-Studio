@@ -333,6 +333,7 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
     QJsonDocument doc = QJsonDocument::fromJson(json.toUtf8(), &err);
     if (err.error != QJsonParseError::NoError || !doc.isObject()) {
         LOGW() << "[starscore] ignoring unreadable starscore data: " << err.errorString();
+        data.unreadable = true;   // (never written back: see storeTo)
         return data;
     }
 
@@ -882,6 +883,13 @@ void StarScoreService::store(const Data& data)
 void StarScoreService::storeTo(engraving::MasterScore* ms, const Data& data, const INotationProjectPtr& project)
 {
     if (!ms) {
+        return;
+    }
+    // Data read from a tag that couldn't be parsed is empty: written back, it would wipe the sections, arrangements
+    // and export records the tag still holds (ensureFileId alone would have done that on opening). The tag is left
+    // for Joel to recover; the change asked for is dropped.
+    if (data.unreadable) {
+        LOGE() << "[starscore] not storing StarScore data: the score's starscore tag couldn't be read, so it is left as it is";
         return;
     }
 
@@ -3747,8 +3755,8 @@ void StarScoreService::ensureFileId()
         return;
     }
     Data data = fromJson(ms->metaTag(STARSCORE_META_TAG).toQString());
-    if (!data.fileId.isEmpty()) {
-        return;
+    if (!data.fileId.isEmpty() || data.unreadable) {
+        return;   // (unreadable: writing the empty data back would wipe whatever the tag holds)
     }
     // Carry over the reference PDF memory stored by path before the file had an id
     const QJsonObject view = loadReferenceView();
