@@ -384,8 +384,9 @@ QString StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, con
 
     needRole(yellow, "drums", "drums");
 
+    // (the 4-Horn 2-Trumpet too since 1.18.51, beside the 4-Horn with trombone: Joel, 16 Oct 2026)
     for (const QString& tpl : { QString("1-horn-standard"), QString("2-horn-any"), QString("2-horn-standard"), QString("3-horn-any"),
-                                QString("3-horn-standard"), QString("4-horn-standard") }) {
+                                QString("3-horn-standard"), QString("4-horn-standard"), QString("4-horn-2tpt") }) {
         const StarScoreArrangement* a = arrangementOf(tpl);
         if (!a) {
             green.missing << QString("no %1 arrangement").arg(nameOf(tpl));
@@ -542,6 +543,9 @@ QString StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, con
     }
 
     record["version"] = 1;
+    // which colour rules the tiers were made with (organizer/orgcolours.cpp holds older records to the new rules):
+    // 2 = the 4-Horn 2-Trumpet needed for green (1.18.51)
+    record["rules"] = 2;
     record["about"] = "StarScore Studio: each exported sheet's status when exported (with its size and md5), the sheets each "
                       "folder colour needs, and the files each sheet folder must have";
     record["code"] = full.code;

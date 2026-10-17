@@ -265,6 +265,7 @@ public:
     QString markPlayerAnnotations(const QString& player) override;
     QString unmarkPlayerAnnotations() override;
     void offerMatchingHornParts(const QStringList& sectionIdsBefore) override;
+    muse::Ret changePartInstrument(const QString& partId, const QString& instrumentId) override;
     //! (source part id, new part id) pairs, instrument by instrument in score order
     std::vector<std::pair<QString, QString> > matchingHornParts(const QString& fromSectionId, const QString& toSectionId) const;
     int copyHornParts(const std::vector<std::pair<QString, QString> >& pairs);

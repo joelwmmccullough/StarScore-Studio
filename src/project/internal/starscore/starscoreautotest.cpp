@@ -1598,6 +1598,24 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         } else {
             autotestLog("  no plan: " + QString::fromStdString(plan.ret.toString()));
         }
+    } else if (step.startsWith("instrument:")) {
+        // instrument:<part name>|<instrument id>: the part put on another instrument, as the StarScore bar's Change an
+        // instrument menu does; then its name and instrument
+        const QStringList a = step.mid(11).split('|');
+        QString pid;
+        for (const engraving::Part* p : ms->parts()) {
+            if (p->partName().toQString() == a.value(0)) {
+                pid = idText(p);
+            }
+        }
+        const Ret r = changePartInstrument(pid, a.value(1));
+        const engraving::Part* p = masterScore() ? masterScore()->partById(ID(pid)) : nullptr;
+        autotestLog(QString("  %1: %2 -> %3 (%4)").arg(a.value(0), r ? "ok" : QString::fromStdString(r.toString()),
+                                                       p ? p->partName().toQString() : QString("?"),
+                                                       p ? p->instrumentId().toQString() : QString("?")));
+    } else if (step.startsWith("doubler:")) {
+        // doubler:<horns>: what the doubler is recommended to play in a new <horns>-horn section of this song
+        autotestLog("  " + songDoublerInstrumentId(step.mid(8).toInt()));
     } else if (step.startsWith("arrangement:")) {
         // arrangement:<arrangement key>[:<doubler id>[:<low horn id>]], as the StarScore bar's Add arrangement menu makes
         // it (with the Add arrangement dialog's choices)

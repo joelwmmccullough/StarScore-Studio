@@ -6,10 +6,15 @@
  */
 #pragma once
 
+#include <utility>
+
 #include <QString>
+
+#include "global/types/string.h"
 
 namespace mu::engraving {
 class Score;
+class Text;
 }
 
 namespace mu::project::starscore {
@@ -30,6 +35,14 @@ bool levelArrangementLabel(mu::engraving::Score* score);
 //! The arrangement label and its shorter forms, in the order tried: "Flexible 2-Horn Arrangement", "Flexible 2H
 //! Arrangement", "Flexible\n2H Arrangement", "Flexible 2H\nArrangement" (no duplicates).
 QStringList arrangementLabelVariants(const QString& label);
+//! An arrangement label as the export gives it: its first line, and a second, smaller line under it when there is one
+//! ("4-Horn Arrangement\nwith 2 trumpets": Joel, 16 Oct 2026)
+std::pair<QString, QString> splitArrangementLabel(const QString& label);
+//! The label's text as XML: `main` (one of its forms) and, when given, `note` on a line of its own at about three
+//! quarters of `size` (the label's font size)
+muse::String arrangementLabelXml(const QString& main, const QString& note, double size);
+//! The smaller second line of an arrangement label in a score ("" when it has none)
+QString arrangementLabelNote(const mu::engraving::Text* label);
 //! The arrangement label (top right) running into the title: replaced by its next shorter form until it clears the
 //! title (and subtitle), or the forms run out (the last one stays). Lays out after each change. Undoable. Returns
 //! whether it changed the label.

@@ -503,6 +503,7 @@ struct StarScorePartInfo
     QString name;
     bool visible = true;
     QStringList sectionIds;
+    QString instrumentId;        // its main instrument ("alto-saxophone")
 };
 
 //! StarScore features for the current score. The data lives in the score itself
@@ -832,6 +833,10 @@ public:
     //! one horn more or fewer, asks whether to copy the parts on the same instruments into the new one (music, part
     //! score formatting and text positions; marked Sketch). Asks after the current dialog has closed.
     virtual void offerMatchingHornParts(const QStringList& sectionIdsBefore) = 0;
+    //! Puts a part on another instrument (Joel, 16 Oct 2026: a 4-Horn 2-Trumpet made with the doubler on Clarinet
+    //! instead of Alto Sax): the same music at the same sounding pitch, written for the new instrument; the part and
+    //! its part score named after it; mutes and the flugelhorn mark only where they still fit. Undoable.
+    virtual muse::Ret changePartInstrument(const QString& partId, const QString& instrumentId) = 0;
 
     //! Save a .mscz holding only the instruments and part books of this arrangement's sections.
     virtual muse::Ret exportArrangement(const QString& arrangementId, const muse::io::path_t& msczPath) = 0;

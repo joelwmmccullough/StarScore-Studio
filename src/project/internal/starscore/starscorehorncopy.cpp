@@ -40,6 +40,8 @@
 #include "notation/inotationelements.h"
 #include "notation/inotationstyle.h"
 #include "notation/inotation.h"
+#include "notation/inotationparts.h"
+#include "engraving/dom/instrtemplate.h"
 #include "translation.h"
 
 #include "log.h"
@@ -435,4 +437,68 @@ int StarScoreService::copyHornParts(const std::vector<std::pair<QString, QString
     scheduleChanged();
     LOGI() << "[starscore] copy parts: " << copied << " of " << pairs.size() << " copied";
     return copied;
+}
+
+Ret StarScoreService::changePartInstrument(const QString& partId, const QString& instrumentId)
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    engraving::MasterScore* ms = masterScore();
+    engraving::Part* part = ms ? ms->partById(ID(partId)) : nullptr;
+    if (!master || !part) {
+        return make_ret(Ret::Code::InternalError);
+    }
+    if (part->instrumentId().toQString() == instrumentId) {
+        return make_ok();
+    }
+    const InstrumentTemplate& tpl = instrumentsRepository()->instrumentTemplate(String::fromQString(instrumentId));
+    if (tpl.id.isEmpty()) {
+        return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "Unknown instrument"));
+    }
+    const QString oldName = partScoreName(partId);
+    // MuseScore's Replace instrument: the notes keep their sounding pitch and are written for the new instrument
+    // (its transposition, clef and sound). The part's main instrument is at MAIN_INSTRUMENT_TICK, not tick 0.
+    const engraving::Instrument instrument = engraving::Instrument::fromTemplate(&tpl);
+    const InstrumentKey key { part->instrumentId(), part->id(), engraving::Part::MAIN_INSTRUMENT_TICK };
+    master->parts()->replaceInstrument(key, instrument);
+    part = ms->partById(ID(partId));
+    if (!part || part->instrumentId().toQString() != instrumentId) {
+        return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "The instrument wasn't changed"));
+    }
+
+    // what StarScore keeps about the part: mutes only where the new instrument has them (and any typed in by hand);
+    // the flugelhorn mark only on a trumpet
+    Data data = load();
+    auto mutes = data.partMutes.find(partId);
+    if (mutes != data.partMutes.end()) {
+        const QStringList toMutes = starscore::muteOptions(instrumentId);
+        QStringList standard;
+        for (const char* id : { "trumpet", "trombone", "tuba", "horn" }) {
+            standard << starscore::muteOptions(id);
+        }
+        QStringList kept;
+        for (const QString& m : mutes->second) {
+            if (toMutes.contains(m) || !standard.contains(m)) {
+                kept << m;
+            }
+        }
+        if (kept.isEmpty()) {
+            data.partMutes.erase(mutes);
+        } else {
+            mutes->second = kept;
+        }
+    }
+    if (!((instrumentId.contains("trumpet") || instrumentId.contains("cornet")) && !instrumentId.contains("piccolo"))) {
+        data.flugelhornParts.erase(partId);
+    }
+    store(data);
+
+    // the part's name ("4H 2-Trumpet: Alto Sax"), its part score's title, its mixer levels
+    standardizeHornNames();
+    labelPartBooks();
+    applyMixerDefaults({ partId });
+    master->notation()->notationChanged().notify();
+    scheduleChanged();
+    LOGI() << "[starscore] " << oldName.toStdString() << " is now on " << instrumentId.toStdString() << ": "
+           << partScoreName(partId).toStdString();
+    return make_ok();
 }

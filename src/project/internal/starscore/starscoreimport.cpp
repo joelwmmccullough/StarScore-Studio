@@ -666,8 +666,12 @@ QString StarScoreService::songDoublerInstrumentId(int forHorns) const
         return QString();
     }
     const Data d = load();
-    for (const QString& key : { QString("3-horn"), QString("4-horn"), starscore::TWO_TRUMPET_4H, QString("5-horn"),
-                                QString("6-horn"), QString("7-horn") }) {
+    // The song's own 3- to 5-Horn sections decide for a 3- to 5-Horn, its 6- and 7-Horn for a 6- or 7-Horn: the doubler
+    // takes a different chair there (alto in 3-5H, soprano in 6-7H), and may play something else in each (Joel, 16 Oct
+    // 2026: Amplitudes' doubler plays Alto Sax in its 3-, 4- and 5-Horn and Clarinet in its 6- and 7-Horn; its new
+    // 4-Horn 2-Trumpet was offered Clarinet). The other group only when the song has no section of this one.
+    const bool small = forHorns <= 5;
+    auto doublerIn = [&](const QString& key, bool* found) -> QString {
         const int horns = starscore::hornSectionSize(key);
         const std::optional<StarScoreSectionTemplate> t = sectionTemplate(key);
         for (const StarScoreSection& s : d.sections) {
@@ -684,6 +688,7 @@ QString StarScoreService::songDoublerInstrumentId(int forHorns) const
             if (have.isEmpty()) {
                 continue;
             }
+            *found = true;
             // what's left once the template's own instruments are taken out is the doubler's
             QStringList left = have;
             for (const StarScoreInstrument& inst : t->instruments) {
@@ -697,8 +702,29 @@ QString StarScoreService::songDoublerInstrumentId(int forHorns) const
                     return c.instrumentId;
                 }
             }
-            // nothing left: the doubler plays the template's own chair (alto in 3-5H, soprano in 6-7H), which the
-            // new section's own default already matches
+            // nothing left: the doubler plays the template's own chair
+            return starscore::doublerChairOf(key);
+        }
+        return QString();
+    };
+    const QStringList same = small ? QStringList { "3-horn", "4-horn", starscore::TWO_TRUMPET_4H, "5-horn" }
+                                   : QStringList { "6-horn", "7-horn" };
+    const QStringList other = small ? QStringList { "6-horn", "7-horn" }
+                                    : QStringList { "3-horn", "4-horn", starscore::TWO_TRUMPET_4H, "5-horn" };
+    for (const QString& key : same) {
+        bool found = false;
+        const QString id = doublerIn(key, &found);
+        if (found) {
+            return id;
+        }
+    }
+    for (const QString& key : other) {
+        bool found = false;
+        const QString id = doublerIn(key, &found);
+        // from the other group, only an instrument other than that group's own chair (alto or soprano): the new
+        // section's own default stands otherwise
+        if (found) {
+            return id == starscore::doublerChairOf(key) ? QString() : id;
         }
     }
     return QString();

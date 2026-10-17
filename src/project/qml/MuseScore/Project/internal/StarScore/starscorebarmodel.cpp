@@ -300,8 +300,12 @@ QVariantList StarScoreBarModel::sectionMenu(const QString& id) const
     QStringList autoSkip;
     QStringList skip;
     QStringList partIds;
+    QString templateKey;
+    std::map<QString, QString> alternates;
     for (const StarScoreSection& s : starScore()->sections()) {
         if (s.id == id) {
+            templateKey = s.templateKey;
+            alternates = s.alternates;
             status = int(s.status);
             rhythm = s.templateKey == "rhythm" || s.templateKey == "bigband-rhythm";
             skip = s.skipSheets;
@@ -328,8 +332,10 @@ QVariantList StarScoreBarModel::sectionMenu(const QString& id) const
     // Each part's own tag
     const std::map<QString, StarScoreStatus> tags = starScore()->partStatuses();
     std::map<QString, QString> names;
+    std::map<QString, QString> instruments;
     for (const StarScorePartInfo& p : starScore()->parts()) {
         names[p.partId] = p.name;
+        instruments[p.partId] = p.instrumentId;
     }
     QVariantList partItems;
     QStringList usedTitles;
@@ -406,6 +412,35 @@ QVariantList StarScoreBarModel::sectionMenu(const QString& id) const
     if (!flexItems.isEmpty()) {
         items.insert(4, QVariantMap { { "title", muse::qtrc("starscore", "Edit one sheet by hand") }, { "subitems", flexItems },
                                       { "enabled", true } });
+    }
+    // a Standard horn section: any of its instruments put on another horn (Joel, 16 Oct 2026: the doubler made on
+    // Clarinet instead of Alto Sax), the music kept
+    if (starscore::hornSectionSize(templateKey) > 0) {
+        static const std::vector<std::pair<const char*, const char*> > HORNS {
+            { "bb-trumpet", "Trumpet" }, { "piccolo", "Piccolo" }, { "flute", "Flute" }, { "bb-clarinet", "Clarinet" },
+            { "soprano-saxophone", "Soprano Sax" }, { "alto-saxophone", "Alto Sax" }, { "tenor-saxophone", "Tenor Sax" },
+            { "baritone-saxophone", "Bari Sax" }, { "bb-bass-clarinet", "Bass Clarinet" }, { "trombone", "Trombone" },
+            { "bass-trombone", "Bass Trombone" }, { "tuba", "Tuba" },
+        };
+        QVariantList changeItems;
+        for (const QString& pid : partIds) {
+            if (alternates.count(pid)) {
+                continue;   // a stand-in version follows its main part
+            }
+            QVariantList choices;
+            for (const auto& [instrumentId, name] : HORNS) {
+                const bool current = instruments[pid] == instrumentId;
+                choices << QVariantMap { { "id", "part-instrument:" + pid + ":" + instrumentId },
+                                         { "title", muse::qtrc("starscore", name) },
+                                         { "checkable", true }, { "checked", current }, { "enabled", !current } };
+            }
+            changeItems << QVariantMap { { "title", names.count(pid) ? names[pid] : pid }, { "subitems", choices },
+                                         { "enabled", true } };
+        }
+        if (!changeItems.isEmpty()) {
+            items.insert(4, QVariantMap { { "title", muse::qtrc("starscore", "Change an instrument") }, { "subitems", changeItems },
+                                          { "enabled", true } });
+        }
     }
     if (!versionMains.isEmpty()) {
         // the other versions (Bari Sax, Bass Sax, Bassoon… of the low horn; a Flute of a piccolo): only the ones the
@@ -767,6 +802,13 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
             } else {
                 starScore()->offerMatchingHornParts(before);
             }
+        }
+    } else if (action == "part-instrument") {
+        // part-instrument:<part id>:<instrument id>
+        const int at = arg.lastIndexOf(':');
+        const Ret ret = starScore()->changePartInstrument(arg.left(at), arg.mid(at + 1));
+        if (!ret) {
+            interactive()->error(muse::trc("starscore", "Couldn't change the instrument"), ret.toString());
         }
     } else if (action == "sec-flexsheet") {
         const int bar = arg.indexOf('|');

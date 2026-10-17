@@ -1104,6 +1104,7 @@ std::vector<StarScorePartInfo> StarScoreService::parts() const
             info.name = p->instrument()->nameAsPlainText().toQString();
         }
         info.visible = p->show();
+        info.instrumentId = p->instrumentId().toQString();
         for (const StarScoreSection& s : data.sections) {
             if (s.partIds.contains(info.partId)) {
                 info.sectionIds << s.id;

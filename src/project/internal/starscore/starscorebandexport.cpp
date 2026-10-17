@@ -1036,8 +1036,18 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
                     scoreParts << pid;
                 }
             }
+            // the arrangement top right: "5-Horn Arrangement"; the two 4-Horns with a smaller second line saying which
+            // (Joel, 16 Oct 2026): "with 2 trumpets" or "with trombone"
+            QString arrLabel = QString("%1-Horn Arrangement").arg(players);
+            if (players == 4) {
+                if (playerCounts["Trumpet"] + playerCounts["Flugelhorn"] >= 2) {
+                    arrLabel += "\nwith 2 trumpets";
+                } else if (playerCounts.count("Trombone")) {
+                    arrLabel += "\nwith trombone";
+                }
+            }
             // the six Scores, the arrangement top right as on the parts
-            addScores(folder, scoreParts, QString("%1-Horn Arrangement").arg(players));
+            addScores(folder, scoreParts, arrLabel);
 
             // 7-Horn: the main low horn (Bass Trombone unless the song chose another 7th horn) and its stand-in versions
             // (Bari Sax, Bass Sax, Bassoon…) in a folder of their own. Any of the eight low horns goes there, so the
@@ -1091,7 +1101,7 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
                     }
                     plan.files.back().sheetLeft = printed == "Flugelhorn" ? label : starscoreSheetHornName(label);
                 }
-                plan.files.back().sheetRight = QString("%1-Horn Arrangement").arg(players);
+                plan.files.back().sheetRight = arrLabel;
                 // 4- to 7-Horn trombones in tenor clef too (Joel, 6 Oct 2026), as the 1-Horn and Flexible ones; not the
                 // bass trombone, which reads bass clef
                 if (horn == "Trombone" && players >= 4 && players <= 7) {
@@ -1099,7 +1109,7 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
                     addFile(bassHorns.count(pid) ? folder + "/" + STARSCORE_BASS_HORNS_FOLDER : folder, tenor, { pid }, false);
                     StarScoreBandFile& f = plan.files.back();
                     f.sheetLeft = starscoreSheetHornName(name);
-                    f.sheetRight = QString("%1-Horn Arrangement").arg(players);
+                    f.sheetRight = arrLabel;
                     f.isVersion = true;
                     f.transposeDiatonic = 0;
                     f.transposeChromatic = 0;
@@ -1258,9 +1268,13 @@ static bool starscoreNeedsRetitle(const mu::engraving::Score* score, const QStri
         }
         const mu::engraving::Text* t = mu::engraving::toText(e);
         if (t->position() == mu::engraving::AlignH::RIGHT) {
-            // the label as given, or as shortened to clear the title (fitArrangementLabel)
-            for (const QString& v : starscore::arrangementLabelVariants(right)) {
-                rightOk |= t->xmlText() == muse::String::fromQString(v.toHtmlEscaped());
+            // the label as given, or as shortened to clear the title (fitArrangementLabel), with its smaller second
+            // line ("with 2 trumpets") when it has one
+            const auto [main, note] = starscore::splitArrangementLabel(right);
+            if (starscore::arrangementLabelNote(t) == note) {
+                for (const QString& v : starscore::arrangementLabelVariants(main)) {
+                    rightOk |= t->plainText().toQString() == (note.isEmpty() ? v : v + "\n" + note);
+                }
             }
         } else {
             // (or broken over two lines to clear the title: fitInstrumentName)
@@ -1332,22 +1346,24 @@ static bool starscoreRetitleTexts(mu::engraving::Score* score, const QString& le
         }
     }
     if (!right.isEmpty()) {
+        // its smaller second line ("with 2 trumpets") when it has one
+        const auto [rightMain, rightNote] = starscore::splitArrangementLabel(right);
         bool fitted = false;   // already the label, or a shortened form of it (fitArrangementLabel)
-        if (label) {
-            for (const QString& v : starscore::arrangementLabelVariants(right)) {
-                fitted |= label->xmlText() == escape(v);
+        if (label && starscore::arrangementLabelNote(label) == rightNote) {
+            for (const QString& v : starscore::arrangementLabelVariants(rightMain)) {
+                fitted |= label->plainText().toQString() == (rightNote.isEmpty() ? v : v + "\n" + rightNote);
             }
         }
         if (label) {
             if (!fitted) {
-                label->undoChangeProperty(mu::engraving::Pid::TEXT, escape(right));
+                label->undoChangeProperty(mu::engraving::Pid::TEXT, starscore::arrangementLabelXml(rightMain, rightNote, label->size()));
                 changed = true;
             }
         } else {
             mu::engraving::Text* t = mu::engraving::Factory::createText(box, mu::engraving::TextStyleType::INSTRUMENT_EXCERPT);
             t->setParent(box);
             t->setTrack(0);
-            t->setXmlText(escape(right));
+            t->setXmlText(starscore::arrangementLabelXml(rightMain, rightNote, partText ? partText->size() : t->size()));
             // placed at the frame's right edge (position), and right-justified (align); on the same line as the
             // instrument name: its vertical alignment and its offset (often moved by hand in the part book)
             const mu::engraving::AlignV alignV = partText ? partText->align().vertical : mu::engraving::AlignV::TOP;
@@ -4312,7 +4328,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
             starscore::org::SheetChange c;
             c.relativePath = f.relativePath;
             c.isScore = f.isScore;
-            c.arrangement = f.sheetRight;
+            c.arrangement = QString(f.sheetRight).replace('\n', ' ');
             QString part = f.relativePath.section('/', -1);
             if (part.startsWith(plan.code + " - ")) {
                 part.remove(0, plan.code.size() + 3);

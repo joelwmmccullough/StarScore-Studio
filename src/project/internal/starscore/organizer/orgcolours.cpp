@@ -125,6 +125,11 @@ SongColours songColours(const Paths& paths, const QString& songRoot, const QJson
     for (const auto& [key, colour, need] : LADDER) {
         const QJsonObject t = tiers.value(key).toObject();
         QStringList why = strings(t.value("missing"));
+        // a record from before the 4-Horn 2-Trumpet was needed for green and up (StarScore 1.18.51; Joel, 16 Oct
+        // 2026): the song had none then, so it can't be green until it has one and is exported again
+        if (record.value("rules").toInt(1) < 2 && (key == "green" || key == "blue" || key == "purple")) {
+            why << QString("no 4-Horn 2-Trumpet arrangement");
+        }
         for (const QString& p : strings(t.value("paths"))) {
             const int s = check.status(p);
             // (until 1.18.5 an empty sheet in a Flexible folder was skipped, for the old optional flute staff; an

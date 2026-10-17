@@ -506,6 +506,32 @@ QStringList arrangementLabelVariants(const QString& label)
     return out;
 }
 
+std::pair<QString, QString> splitArrangementLabel(const QString& label)
+{
+    const int nl = label.indexOf('\n');
+    return nl < 0 ? std::make_pair(label, QString()) : std::make_pair(label.left(nl), label.mid(nl + 1));
+}
+
+String arrangementLabelXml(const QString& main, const QString& note, double size)
+{
+    QString xml = main.toHtmlEscaped();
+    if (!note.isEmpty()) {
+        const double small = std::max(5.0, std::round(size * 0.75 * 2.0) / 2.0);
+        xml += QString("\n<font size=\"%1\"/>").arg(small) + note.toHtmlEscaped();
+    }
+    return String::fromQString(xml);
+}
+
+QString arrangementLabelNote(const Text* label)
+{
+    if (!label || !label->xmlText().contains(u"<font size=")) {
+        return QString();
+    }
+    const QString plain = label->plainText().toQString();
+    const int nl = plain.lastIndexOf('\n');
+    return nl < 0 ? QString() : plain.mid(nl + 1);
+}
+
 bool fitArrangementLabel(Score* score)
 {
     MeasureBase* frame = nullptr;
@@ -552,12 +578,16 @@ bool fitArrangementLabel(Score* score)
     if (!overlaps()) {
         return false;
     }
-    // the forms after the one shown now
-    const QString current = label->plainText().toQString();
+    // the forms after the one shown now (its smaller second line, "with 2 trumpets", stays as it is)
+    const QString note = arrangementLabelNote(label);
+    QString current = label->plainText().toQString();
+    if (!note.isEmpty()) {
+        current = current.left(current.lastIndexOf('\n'));
+    }
     const QStringList variants = arrangementLabelVariants(QString(current).replace('\n', ' ').simplified());
     bool changed = false;
     for (int i = std::max(1, int(variants.indexOf(current)) + 1); i < variants.size() && overlaps(); ++i) {
-        label->undoChangeProperty(Pid::TEXT, String::fromQString(variants[i].toHtmlEscaped()));
+        label->undoChangeProperty(Pid::TEXT, arrangementLabelXml(variants[i], note, label->size()));
         changed = true;
         score->setLayoutAll();
         score->doLayout();
