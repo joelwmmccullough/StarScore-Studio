@@ -41,6 +41,12 @@ std::pair<QString, QString> splitArrangementLabel(const QString& label);
 //! The label's text as XML: `main` (one of its forms) and, when given, `note` on a line of its own at about three
 //! quarters of `size` (the label's font size)
 muse::String arrangementLabelXml(const QString& main, const QString& note, double size);
+//! The instrument name's text as XML (top left of a sheet): the name, and its mute lines ("with Harmon Mute", "and Cup
+//! Mute") at the size of the arrangement label's second line (Joel, 17 Oct 2026). `plain` is the text with line breaks.
+muse::String instrumentNameXml(const QString& plain, double size);
+//! Whether a sheet's instrument name shows these words, its mute lines in the smaller size
+bool instrumentNameShows(const mu::engraving::Text* name, const QString& plain);
+
 //! The smaller second line of an arrangement label in a score ("" when it has none)
 QString arrangementLabelNote(const mu::engraving::Text* label);
 //! The arrangement label (top right) running into the title: replaced by its next shorter form until it clears the

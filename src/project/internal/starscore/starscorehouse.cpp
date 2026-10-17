@@ -512,14 +512,51 @@ std::pair<QString, QString> splitArrangementLabel(const QString& label)
     return nl < 0 ? std::make_pair(label, QString()) : std::make_pair(label.left(nl), label.mid(nl + 1));
 }
 
+static double starscoreSmallSize(double size)
+{
+    return std::max(5.0, std::round(size * 0.75 * 2.0) / 2.0);
+}
+
 String arrangementLabelXml(const QString& main, const QString& note, double size)
 {
     QString xml = main.toHtmlEscaped();
     if (!note.isEmpty()) {
-        const double small = std::max(5.0, std::round(size * 0.75 * 2.0) / 2.0);
-        xml += QString("\n<font size=\"%1\"/>").arg(small) + note.toHtmlEscaped();
+        xml += QString("\n<font size=\"%1\"/>").arg(starscoreSmallSize(size)) + note.toHtmlEscaped();
     }
     return String::fromQString(xml);
+}
+
+String instrumentNameXml(const QString& plain, double size)
+{
+    QStringList lines = plain.split('\n');
+    int mutesAt = -1;
+    for (int i = 1; i < lines.size(); ++i) {
+        if (lines.at(i).startsWith("with ")) {
+            mutesAt = i;
+            break;
+        }
+    }
+    if (mutesAt < 0) {
+        return String::fromQString(plain.toHtmlEscaped());
+    }
+    const QString name = lines.mid(0, mutesAt).join('\n');
+    const QString mutes = lines.mid(mutesAt).join('\n');
+    return String::fromQString(name.toHtmlEscaped() + QString("\n<font size=\"%1\"/>").arg(starscoreSmallSize(size))
+                               + mutes.toHtmlEscaped());
+}
+
+bool instrumentNameShows(const Text* name, const QString& plain)
+{
+    if (!name) {
+        return false;
+    }
+    auto flat = [](QString t) { return t.replace('\n', ' ').simplified(); };
+    if (flat(name->plainText().toQString()) != flat(plain)) {
+        return false;
+    }
+    // with mute lines, they must be the smaller size already (sheets titled before 1.18.54 weren't)
+    const bool hasMutes = plain.contains("\nwith ");
+    return !hasMutes || name->xmlText().contains(u"<font size=");
 }
 
 QString arrangementLabelNote(const Text* label)
@@ -693,7 +730,7 @@ bool fitInstrumentName(Score* score)
     bool changed = false;
     int i = std::max(1, int(variants.indexOf(current.left(current.size() - rest.size()))) + 1);
     for (; i < variants.size() && overlaps(); ++i) {
-        name->undoChangeProperty(Pid::TEXT, String::fromQString((variants[i] + rest).toHtmlEscaped()));
+        name->undoChangeProperty(Pid::TEXT, instrumentNameXml(variants[i] + rest, name->size()));
         changed = true;
         score->setLayoutAll();
         score->doLayout();

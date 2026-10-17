@@ -4,6 +4,11 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.54
+
+- **Sheets a song no longer makes are archived.** When a part is put on another instrument, a section is deleted, or a sheet is renamed, the export moves the sheets it wrote before that it no longer writes into Version History, and the old folder goes once it's empty. For example, Amplitudes' 4-Horn 2-Trumpet first made with the doubler on Clarinet left "4H 2Tpt Cla Ten" beside the new "4H 2Tpt Alt Ten". Only sheets StarScore itself exported are moved; anything else in the folder keeps it in place.
+- **Mute lines are smaller.** The "with Harmon Mute" lines under the instrument name top left are now the same size as the "with 2 trumpets" line under the arrangement name.
+
 ## 1.18.53
 
 - **Show all / Hide all.** Two buttons after "+ New section" on the StarScore bar show or hide every section at once.

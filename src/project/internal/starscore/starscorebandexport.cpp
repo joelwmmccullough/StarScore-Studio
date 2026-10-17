@@ -1245,12 +1245,6 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
 }
 
 //! Whether the title frame doesn't show these names yet (told without laying anything out)
-//! The same text, whatever its line breaks (an instrument name broken to clear the title is still that name)
-static bool starscoreSameLines(const muse::String& a, const muse::String& b)
-{
-    return a.toQString().replace('\n', ' ').simplified() == b.toQString().replace('\n', ' ').simplified();
-}
-
 static bool starscoreNeedsRetitle(const mu::engraving::Score* score, const QString& left, const QString& right)
 {
     const mu::engraving::MeasureBase* mb = score ? score->first() : nullptr;
@@ -1260,8 +1254,6 @@ static bool starscoreNeedsRetitle(const mu::engraving::Score* score, const QStri
     if (!mb || !mb->isVBox()) {
         return false;   // no title frame to show them in
     }
-    const muse::String l = muse::String::fromQString(left.toHtmlEscaped());
-    const muse::String r = muse::String::fromQString(right.toHtmlEscaped());
     bool leftOk = left.isEmpty(), rightOk = right.isEmpty();
     for (const mu::engraving::EngravingItem* e : mb->el()) {
         if (!e || !e->isText() || mu::engraving::toText(e)->textStyleType() != mu::engraving::TextStyleType::INSTRUMENT_EXCERPT) {
@@ -1278,8 +1270,8 @@ static bool starscoreNeedsRetitle(const mu::engraving::Score* score, const QStri
                 }
             }
         } else {
-            // (or broken over two lines to clear the title: fitInstrumentName)
-            leftOk |= starscoreSameLines(t->xmlText(), l);
+            // (or broken over two lines to clear the title: fitInstrumentName; its mute lines in the smaller size)
+            leftOk |= starscore::instrumentNameShows(t, left);
         }
     }
     return !(leftOk && rightOk);
@@ -1308,10 +1300,6 @@ static bool starscoreRetitleTexts(mu::engraving::Score* score, const QString& le
     if (!box) {
         return false;
     }
-    auto escape = [](const QString& t) {
-        return muse::String::fromQString(t.toHtmlEscaped());
-    };
-
     mu::engraving::Text* partText = nullptr;
     mu::engraving::Text* label = nullptr;
     for (mu::engraving::EngravingItem* e : box->el()) {
@@ -1330,8 +1318,8 @@ static bool starscoreRetitleTexts(mu::engraving::Score* score, const QString& le
     bool changed = false;
     if (!left.isEmpty()) {
         if (partText) {
-            if (!starscoreSameLines(partText->xmlText(), escape(left))) {
-                partText->undoChangeProperty(mu::engraving::Pid::TEXT, escape(left));
+            if (!starscore::instrumentNameShows(partText, left)) {
+                partText->undoChangeProperty(mu::engraving::Pid::TEXT, starscore::instrumentNameXml(left, partText->size()));
                 changed = true;
             }
         } else {
@@ -1340,7 +1328,7 @@ static bool starscoreRetitleTexts(mu::engraving::Score* score, const QString& le
             t->setTrack(0);
             t->setPlacement(mu::engraving::PlacementV::ABOVE);
             t->setPropertyFlags(mu::engraving::Pid::PLACEMENT, mu::engraving::PropertyFlags::UNSTYLED);
-            t->setXmlText(escape(left));
+            t->setXmlText(starscore::instrumentNameXml(left, t->size()));
             score->undoAddElement(t);
             partText = t;
             changed = true;
@@ -4252,6 +4240,32 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                 const QString rel = folder + "/" + fileName;
                 if (!current.contains(rel)) {
                     supersede(rel);
+                }
+            }
+        }
+        // Sheets an earlier export of this song wrote that it no longer makes (Joel, 17 Oct 2026: Amplitudes' doubler
+        // put on Alto Sax instead of Clarinet left the whole "4H 2Tpt Cla Ten" folder in place beside the new "4H 2Tpt
+        // Alt Ten"; a section deleted, an instrument renamed): archived, and their folder (and its Section Scores) goes
+        // once nothing else is in it. Only sheets StarScore itself exported are touched (the song remembers them, with
+        // their bar signatures); anything else in the folder keeps it, untouched.
+        {
+            const QJsonObject before = loadFrom(ms).exportSignatures;
+            std::set<QString> folders;
+            for (auto it = before.begin(); it != before.end(); ++it) {
+                const QString rel = it.key();
+                if (current.contains(rel) || !rel.endsWith(".pdf", Qt::CaseInsensitive)
+                    || !QFileInfo::exists(songDir + "/" + rel)) {
+                    continue;
+                }
+                if (supersede(rel)) {
+                    LOGI() << "[starscore] archived a sheet this song no longer makes: " << rel.toStdString();
+                    folders.insert(rel.section('/', 0, -2));
+                }
+            }
+            for (const QString& folder : folders) {
+                QDir(songDir).rmdir(folder);   // ("Section Scores" first, then the arrangement folder above it)
+                if (folder.endsWith("/Section Scores")) {
+                    QDir(songDir).rmdir(folder.section('/', 0, -2));
                 }
             }
         }
