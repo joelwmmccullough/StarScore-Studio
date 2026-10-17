@@ -42,6 +42,7 @@
 #include <QSettings>
 #include <QThreadPool>
 
+#include <algorithm>
 #include <map>
 #include <set>
 
@@ -181,6 +182,10 @@ bool readSong(const QString& path, QByteArray& raw, std::vector<Entry>& entries)
             continue;
         }
         const muse::ByteArray data = zip.fileData(fi.filePath.toStdString());
+        // (fileData returns nothing, without setting the error, when an entry can't be unpacked: not a version to keep)
+        if (data.empty() && fi.size > 0) {
+            return false;
+        }
         entries.push_back({ fi.filePath.toQString(), qint64(data.size()) });
         raw.append(reinterpret_cast<const char*>(data.constData()), qsizetype(data.size()));
     }
@@ -416,11 +421,15 @@ int packSong(const QString& song, const std::vector<Waiting>& waiting, const QDa
     for (int i = 0; i < int(old.versions.size()); ++i) {
         items.push_back({ i, nullptr, old.versions[i].time });
     }
+    // A waiting copy is always taken in, at its place in time. (Until 1.18.53 a copy stamped older than the newest
+    // version already in the history was skipped here and then deleted with the others below, so it was lost: the
+    // stamps are local times without a zone, so the hour the clocks go back in autumn makes every copy of that hour
+    // "older" than the one before.) Old versions stay in their order among themselves; a copy between two of them
+    // only means the later one is patched afresh instead of keeping its stored patch.
     for (const Waiting& w : waiting) {
-        if (items.empty() || w.time > items.back().time) {
-            items.push_back({ -1, &w, w.time });
-        }
+        items.push_back({ -1, &w, w.time });
     }
+    std::stable_sort(items.begin(), items.end(), [](const Item& a, const Item& b) { return a.time < b.time; });
 
     // the newest item in each period is kept
     std::vector<bool> keep(items.size(), false);
@@ -439,6 +448,7 @@ int packSong(const QString& song, const std::vector<Waiting>& waiting, const QDa
     int added = 0;
     int dropped = 0;            // versions of a damaged history that no longer unpack
     bool prevOldOk = true;
+    std::set<QString> unreadable;   // waiting copies that couldn't be read as songs: kept aside, never deleted
     for (size_t i = 0; i < items.size(); ++i) {
         const Item& it = items[i];
         QByteArray raw;
@@ -458,6 +468,7 @@ int packSong(const QString& song, const std::vector<Waiting>& waiting, const QDa
         } else {
             if (!readSong(it.copy->path, raw, v.entries)) {
                 LOGW() << "autosave archive: not a song file: " << it.copy->path.toStdString();
+                unreadable.insert(it.copy->path);
                 continue;
             }
             v.time = it.time;
@@ -536,6 +547,15 @@ int packSong(const QString& song, const std::vector<Waiting>& waiting, const QDa
         return -1;
     }
     for (const Waiting& w : waiting) {
+        if (unreadable.count(w.path)) {
+            // (a copy that couldn't be read is never deleted; set aside under another suffix so it isn't tried
+            // on every pack, and Joel can still look at it)
+            QFile::remove(w.path + ".unreadable");
+            if (!QFile::rename(w.path, w.path + ".unreadable")) {
+                LOGW() << "autosave archive: couldn't set aside " << w.path.toStdString();
+            }
+            continue;
+        }
         QFile::remove(w.path);
     }
     LOGI() << "autosave archive: " << song.toStdString() << ": " << added << " added, " << out.versions.size()
