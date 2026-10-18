@@ -60,6 +60,8 @@
 #include "engraving/dom/fingering.h"
 #include "engraving/dom/hairpin.h"
 #include "engraving/dom/articulation.h"
+#include "engraving/dom/beam.h"
+#include "engraving/dom/rest.h"
 #include "starscoreengraving.h"
 #include "starscorechordchart.h"
 #include "organizer/organizer.h"
@@ -1131,6 +1133,74 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             const QString memory = sc->metaTag(u"starscoreLockMemory").toQString();
             if (!memory.isEmpty()) {
                 autotestLog("  lock memory: " + QString(memory).replace('\n', " | "));
+            }
+        }
+    } else if (step.startsWith("restsafteredit:")) {
+        // restsafteredit:<part score>|<bar>: the first articulation in that bar moved a little (as dragging it would),
+        // then each beamed rest's height and its beam's position after that partial layout, against a full layout
+        // (Joel, 18 Oct 2026: Bumper Cars bar 11's rests out of line after moving something earlier on the page)
+        const QString bn = step.mid(15).section('|', 0, 0);
+        const int bar = step.mid(15).section('|', 1).toInt();
+        INotationPtr n;
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            if (e->name() == bn && e->notation()) {
+                n = e->notation();
+            }
+        }
+        engraving::Score* sc = n ? n->elements()->msScore() : nullptr;
+        if (!sc) {
+            autotestLog("  part score not found");
+        } else {
+            auto rests = [&]() {
+                std::map<QString, QString> out;
+                for (const engraving::Measure* m = sc->firstMeasure(); m; m = m->nextMeasure()) {
+                    int k = 0;
+                    for (const engraving::Segment* seg = m->first(engraving::SegmentType::ChordRest); seg;
+                         seg = seg->next(engraving::SegmentType::ChordRest)) {
+                        const engraving::EngravingItem* e = seg->element(0);
+                        if (e && e->isRest() && engraving::toRest(e)->beam()) {
+                            const engraving::Beam* b = engraving::toRest(e)->beam();
+                            out[QString("bar %1 rest %2").arg(m->no() + 1).arg(++k)]
+                                = QString("y %1, beam y %2").arg(e->y() / sc->style().spatium(), 0, 'f', 2)
+                                  .arg(b->ldata() ? b->pagePos().y() - e->pagePos().y() + e->y() : 0.0, 0, 'f', 1);
+                        }
+                    }
+                }
+                return out;
+            };
+            sc->setLayoutAll();
+            sc->doLayout();
+            const auto before = rests();
+            engraving::Articulation* art = nullptr;
+            engraving::Measure* target = sc->firstMeasure();
+            for (int i = 1; i < bar && target; ++i) {
+                target = target->nextMeasure();
+            }
+            for (engraving::Segment* seg = target ? target->first(engraving::SegmentType::ChordRest) : nullptr; seg && !art;
+                 seg = seg->next(engraving::SegmentType::ChordRest)) {
+                engraving::EngravingItem* e = seg->element(0);
+                if (e && e->isChord() && !engraving::toChord(e)->articulations().empty()) {
+                    art = engraving::toChord(e)->articulations().front();
+                }
+            }
+            if (!art) {
+                autotestLog("  no articulation in that bar");
+            } else {
+                n->undoStack()->prepareChanges(TranslatableString::untranslatable("Move"));
+                art->undoChangeProperty(engraving::Pid::OFFSET, art->offset() + engraving::PointF(0.0, 0.5 * sc->style().spatium()));
+                n->undoStack()->commitChanges();
+                n->notationChanged().notify();
+                QCoreApplication::processEvents();
+                const auto after = rests();
+                int changed = 0;
+                for (const auto& [k, v] : after) {
+                    auto it = before.find(k);
+                    if (it == before.end() || it->second != v) {
+                        autotestLog("  " + k + ": " + (it == before.end() ? QString("-") : it->second) + "  ->  " + v);
+                        ++changed;
+                    }
+                }
+                autotestLog(QString("  %1 of %2 beamed rests placed differently after the edit").arg(changed).arg(after.size()));
             }
         }
     } else if (step.startsWith("formatdiff:")) {

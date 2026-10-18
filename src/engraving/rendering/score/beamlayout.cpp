@@ -435,6 +435,15 @@ void BeamLayout::restoreBeams(Measure* m, LayoutContext& ctx)
                 Beam* b = cr->beam();
                 if (b && !b->elements().empty() && b->elements().front() == cr) {
                     TLayout::layoutBeam(b, ctx);
+                    // StarScore (Joel, 18 Oct 2026): the rests in the beam moved clear of it again, as a full layout does
+                    // (layoutNonCrossBeams). The bar was laid out afresh just before, which put them back at their plain
+                    // height, so a partial layout that stopped here left the first bar of the next line with its beamed
+                    // rests out of line (Bumper Cars bar 11 after moving a staccato in bar 9).
+                    for (ChordRest* beamCR : b->elements()) {
+                        if (beamCR->isRest() && beamCR->vStaffIdx() == b->staffIdx()) {
+                            verticalAdjustBeamedRests(toRest(beamCR), b, ctx);
+                        }
+                    }
                     b->addSkyline(m->system()->staff(b->staffIdx())->skyline());
                 }
             }
