@@ -686,6 +686,11 @@ QString StarScoreBarModel::askTwoTrumpetSources()
     const StarScoreSection* five = sectionOf("5-horn");
     const bool has3 = three && hasArrangement("3-horn-standard");
     const bool has5 = five && hasArrangement("5-horn-standard");
+    // a 3H Standard and no 5H: nothing asked; Trumpet 1, the Tenor and the doubler all come from the 3H (Joel, 17 Oct
+    // 2026)
+    if (has3 && !five) {
+        return QString();
+    }
     QStringList why;
     if (!has3) {
         why << muse::qtrc("starscore", "There's no 3H Standard yet.");

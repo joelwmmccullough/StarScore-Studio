@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.59
+
+- **4-Horn 2-Trumpet without a 5H.** In a song that has a 3H Standard but no 5H, making the 4-Horn 2-Trumpet no longer asks you to create the 5H first. Its Trumpet 1, Tenor Sax and doubler are copied from the 3H Standard (Trumpet 2 starts empty). With a 5H, the Trumpets still come from the 5H.
+
 ## 1.18.58
 
 - **Rests inside a beam no longer sit on the next note's accidental.** MuseScore moves a rest in a beamed group up or down to keep it clear of the beam, but only after the notes have been spaced, so the rest could land on a sharp or flat beside it (Last Pint's Tenor Sax, bars 48 and 128, and many others). Now:

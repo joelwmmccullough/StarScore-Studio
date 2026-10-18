@@ -89,7 +89,8 @@ std::map<QString, QString> hornRoles(const mu::engraving::MasterScore* ms, const
 }
 
 //! The 4-Horn 2-Trumpet's parts and where they're copied from: (5-Horn Trumpet 1, its Trumpet 1), (5-Horn Trumpet 2,
-//! its Trumpet 2), (3-Horn Tenor Sax, its Tenor Sax), (3-Horn doubler, its doubler); only the sources with music
+//! its Trumpet 2), (3-Horn Tenor Sax, its Tenor Sax), (3-Horn doubler, its doubler); with no 5-Horn, Trumpet 1 from the
+//! 3-Horn's Trumpet; only the sources with music
 std::vector<std::pair<QString, QString> > StarScoreService::twoTrumpetSources(const StarScoreSection& made) const
 {
     std::vector<std::pair<QString, QString> > pairs;
@@ -98,12 +99,15 @@ std::vector<std::pair<QString, QString> > StarScoreService::twoTrumpetSources(co
         return pairs;
     }
     const std::map<QString, QString> to = hornRoles(ms, made);
-    for (const StarScoreSection& s : load().sections) {
+    const std::vector<StarScoreSection> sections = load().sections;
+    const bool has5 = std::any_of(sections.begin(), sections.end(), [](const StarScoreSection& s) { return s.templateKey == "5-horn"; });
+    for (const StarScoreSection& s : sections) {
         QStringList roles;
         if (s.templateKey == "5-horn") {
             roles = { "trumpet1", "trumpet2" };
         } else if (s.templateKey == "3-horn") {
-            roles = { "tenor", "doubler" };
+            // with no 5-Horn, the 3-Horn's Trumpet as Trumpet 1 too; Trumpet 2 starts empty (Joel, 17 Oct 2026)
+            roles = has5 ? QStringList { "tenor", "doubler" } : QStringList { "trumpet1", "tenor", "doubler" };
         }
         if (roles.isEmpty()) {
             continue;
