@@ -4,6 +4,8 @@
  * StarScore Studio — reading reference PDFs with macOS CoreGraphics
  */
 #include "starscorepdf.h"
+#include <QThread>
+#include <QFile>
 
 #include <algorithm>
 
@@ -200,4 +202,26 @@ bool renderPdfPage(const QString&, int, int, const QString&)
     return false;
 }
 #endif
+
+bool renderPdfPageToPng(const QString& pdfPath, int page, int widthPx, const QString& pngPath, bool invert)
+{
+    const QString part = pngPath + QString(".%1.part.png").arg(quintptr(QThread::currentThreadId()));
+    if (!renderPdfPage(pdfPath, page, widthPx, part)) {
+        QFile::remove(part);
+        return false;
+    }
+    if (invert) {
+        QImage image(part);
+        if (!image.isNull()) {
+            image.invertPixels(QImage::InvertRgb);
+            image.save(part, "PNG");
+        }
+    }
+    QFile::remove(pngPath);
+    if (!QFile::rename(part, pngPath)) {
+        QFile::remove(part);
+        return QFile::exists(pngPath);
+    }
+    return true;
+}
 }

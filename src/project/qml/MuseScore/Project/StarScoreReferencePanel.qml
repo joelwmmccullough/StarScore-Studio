@@ -206,7 +206,16 @@ Item {
             ScrollBar.horizontal: StyledScrollBar {}
 
             readonly property int pageWidth: Math.max(100, Math.round((flick.width - 12) * root.zoom))
-            readonly property int renderWidth: Math.max(100, Math.round((flick.width - 12) * root.renderZoom))
+            // the width the pages are drawn at: follows the panel only once resizing has paused, so the pages already
+            // drawn are just scaled while dragging (Joel, 18 Oct 2026: resizing was very laggy)
+            readonly property int targetRenderWidth: Math.max(100, Math.round((flick.width - 12) * root.renderZoom))
+            property int renderWidth: targetRenderWidth
+            onTargetRenderWidthChanged: renderDelay.restart()
+            Timer {
+                id: renderDelay
+                interval: 250
+                onTriggered: flick.renderWidth = flick.targetRenderWidth
+            }
 
             // Trackpad pinch to zoom, keeping the point under the cursor in place
             PinchHandler {
@@ -268,7 +277,7 @@ Item {
                             cache: false
                             smooth: true
                             mipmap: true
-                            source: refModel.currentId !== "" && (refModel.invert || !refModel.invert) ? refModel.pageUrl(parent.index, Math.round(flick.renderWidth * Screen.devicePixelRatio)) : ""
+                            source: refModel.currentId !== "" && (refModel.invert || !refModel.invert) && refModel.revision >= 0 ? refModel.pageUrl(parent.index, Math.round(flick.renderWidth * Screen.devicePixelRatio)) : ""
                         }
                     }
                 }

@@ -5,9 +5,15 @@
  */
 #include "referencepanelmodel.h"
 
+#include <QCoreApplication>
 #include <QFileInfo>
+#include <QPointer>
+#include <QThreadPool>
+
+#include <algorithm>
 
 #include "translation.h"
+#include "project/internal/starscore/starscorepdf.h"
 
 using namespace mu::project;
 
@@ -161,8 +167,40 @@ QUrl ReferencePanelModel::pageUrl(int page, int widthPx) const
     if (m_currentId.isEmpty() || page < 0 || page >= m_pageCount) {
         return QUrl();
     }
-    const QString png = starScore()->referencePageImage(m_currentId, page, widthPx);
-    return png.isEmpty() ? QUrl() : QUrl::fromLocalFile(png);
+    const QString png = starScore()->referencePageCachePath(m_currentId, page, widthPx);
+    if (png.isEmpty()) {
+        return QUrl();
+    }
+    const QString key = m_currentId + "/" + QString::number(page);
+    if (QFileInfo::exists(png)) {
+        m_lastShown[key] = png;
+        return QUrl::fromLocalFile(png);
+    }
+    // Drawn in the background, not here: drawing every page on the spot each time the panel got 100 px wider or
+    // narrower held up the whole app while resizing (Joel, 18 Oct 2026). Meanwhile the page as last shown, scaled.
+    if (!m_drawing.contains(png) && !m_failed.contains(png)) {
+        m_drawing.insert(png);
+        const QString pdf = starScore()->referencePath(m_currentId).toQString();
+        const int w = std::clamp(((widthPx + 99) / 100) * 100, 200, 4000);
+        const bool invert = png.endsWith("-inv.png");
+        QPointer<ReferencePanelModel> self(const_cast<ReferencePanelModel*>(this));
+        QThreadPool::globalInstance()->start([self, pdf, page, w, png, invert]() {
+            const bool ok = starscore::renderPdfPageToPng(pdf, page, w, png, invert);
+            QMetaObject::invokeMethod(qApp, [self, png, ok]() {
+                if (self) {
+                    self->m_drawing.remove(png);
+                    if (!ok) {
+                        self->m_failed.insert(png);
+                        return;
+                    }
+                    ++self->m_revision;
+                    emit self->revisionChanged();
+                }
+            }, Qt::QueuedConnection);
+        });
+    }
+    auto last = m_lastShown.constFind(key);
+    return last != m_lastShown.constEnd() && QFileInfo::exists(*last) ? QUrl::fromLocalFile(*last) : QUrl();
 }
 
 void ReferencePanelModel::addReference()

@@ -3993,7 +3993,7 @@ int StarScoreService::referencePageCount(const QString& referenceId) const
     return starscore::pdfPageCount(referencePath(referenceId).toQString());
 }
 
-QString StarScoreService::referencePageImage(const QString& referenceId, int page, int widthPx) const
+QString StarScoreService::referencePageCachePath(const QString& referenceId, int page, int widthPx) const
 {
     // Cached per width, in steps of 100 px so resizing the panel doesn't redraw every pixel
     const int w = std::clamp(((widthPx + 99) / 100) * 100, 200, 4000);
@@ -4003,22 +4003,23 @@ QString StarScoreService::referencePageImage(const QString& referenceId, int pag
             invert = r.invert;
         }
     }
-    const QString png = QString("%1/ref-%2-p%3-w%4%5.png").arg(m_workDir, referenceId).arg(page).arg(w).arg(invert ? "-inv" : "");
+    if (m_workDir.isEmpty()) {
+        return QString();
+    }
+    return QString("%1/ref-%2-p%3-w%4%5.png").arg(m_workDir, referenceId).arg(page).arg(w).arg(invert ? "-inv" : "");
+}
+
+QString StarScoreService::referencePageImage(const QString& referenceId, int page, int widthPx) const
+{
+    const QString png = referencePageCachePath(referenceId, page, widthPx);
+    if (png.isEmpty()) {
+        return QString();
+    }
     if (QFileInfo::exists(png)) {
         return png;
     }
-    if (m_workDir.isEmpty() || !starscore::renderPdfPage(referencePath(referenceId).toQString(), page, w, png)) {
-        return QString();
-    }
-    if (invert) {
-        // white-on-black to match the app's dark theme; the stored PDF and exports are unchanged
-        QImage image(png);
-        if (!image.isNull()) {
-            image.invertPixels(QImage::InvertRgb);
-            image.save(png, "PNG");
-        }
-    }
-    return png;
+    const int w = std::clamp(((widthPx + 99) / 100) * 100, 200, 4000);
+    return starscore::renderPdfPageToPng(referencePath(referenceId).toQString(), page, w, png, png.endsWith("-inv.png")) ? png : QString();
 }
 
 void StarScoreService::setReferenceInvert(const QString& referenceId, bool invert)

@@ -175,6 +175,7 @@ public:
     void moveReference(const QString& referenceId, int newIndex) override;
     QStringList referenceInstrumentChoices() const override;
     QString referencePageImage(const QString& referenceId, int page, int widthPx) const override;
+    QString referencePageCachePath(const QString& referenceId, int page, int widthPx) const override;
     muse::Ret saveAll() override;
 
     QString bandFolder() const override;

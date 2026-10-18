@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.61
+
+- **Resizing the Reference PDF panel is smooth.** Every time the panel got about 100 pixels wider or narrower (50 on a Retina screen), StarScore drew every page of the PDF again on the spot, holding up the whole app while you dragged. Now the pages already drawn are just stretched while you resize, and the sharp ones are drawn in the background a quarter of a second after you stop. The same goes for zooming.
+
 ## 1.18.60
 
 - **Rests in beams stay in line after an edit.** Moving something on a page (a staccato, a text) could leave the beamed rests in the first bar of a later line at their plain height, out of line with the bars around them (Bumper Cars, 3H Bass Clarinet, bar 11). This was a MuseScore bug: when it re-laid out only part of the page, it redrew that bar's beams without moving their rests clear of the beam. Exported sheets weren't affected (an export lays out the whole sheet); it showed while editing.

@@ -712,6 +712,8 @@ public:
     virtual QStringList referenceInstrumentChoices() const = 0;
     //! One page (0-based) drawn at widthPx wide; the PNG's path, or empty on failure
     virtual QString referencePageImage(const QString& referenceId, int page, int widthPx) const = 0;
+    //! Where that page's PNG is kept (drawn or not yet): the width rounded up to a step of 100 px
+    virtual QString referencePageCachePath(const QString& referenceId, int page, int widthPx) const = 0;
     //! Save changed solos and the main score (used when Save is pressed while a solo is showing)
     virtual muse::Ret saveAll() = 0;
 
