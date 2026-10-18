@@ -887,6 +887,53 @@ void BeamLayout::verticalAdjustBeamedRests(Rest* rest, Beam* beam, LayoutContext
             mergedRest->mutldata()->moveY(yMove);
         }
 
+        // StarScore (Joel, 17 Oct 2026): the move happens after the notes are spaced, so a rest moved clear of the beam
+        // could land on the next note's accidental (or the previous note's head or stem). It goes on moving away from
+        // the beam, a line at a time, to the first place clear of the notes either side, as long as it stays within a
+        // space of the staff; with no such place it stays where it was (StarScore widens the bar before printing).
+        {
+            const staff_idx_t restStaff = rest->vStaffIdx();
+            Segment* restSeg = rest->segment();
+            Shape around;
+            for (Segment* nb : { restSeg->prev1(SegmentType::ChordRest), restSeg->next1(SegmentType::ChordRest) }) {
+                if (nb && nb->system() == restSeg->system() && restStaff < static_cast<const Segment*>(nb)->shapes().size()) {
+                    around.add(nb->staffShape(restStaff).translated(nb->pagePos()));
+                }
+            }
+            auto clear = [&]() {
+                return !rest->shape().translate(rest->pagePos() - rest->offset()).padded(0.15 * spatium).intersects(around);
+            };
+            const int staffLines = rest->staff()->lines(rest->tick());
+            const double staffBottom = (staffLines - 1) * lineDistance;
+            auto nearStaff = [&]() {
+                const RectF box = rest->ldata()->bbox().translated(PointF(0.0, rest->y()));
+                return box.top() >= -spatium - 0.01 && box.bottom() <= staffBottom + spatium + 0.01;
+            };
+            if (!clear()) {
+                const double step = (up ? 1 : -1) * lineDistance;
+                double moved = 0.0;
+                bool found = false;
+                for (int extra = 0; extra < 6; ++extra) {
+                    rest->mutldata()->moveY(step);
+                    moved += step;
+                    if (!nearStaff()) {
+                        break;
+                    }
+                    if (clear()) {
+                        found = true;
+                        break;
+                    }
+                }
+                const double back = found ? 0.0 : -moved;
+                if (back != 0.0) {
+                    rest->mutldata()->moveY(back);
+                }
+                for (Rest* mergedRest : rest->ldata()->mergedRests) {
+                    mergedRest->mutldata()->moveY(moved + back);
+                }
+            }
+        }
+
         Segment* segment = rest->segment();
         staff_idx_t staffIdx = rest->vStaffIdx();
         const Staff* staff = ctx.dom().staff(staffIdx);

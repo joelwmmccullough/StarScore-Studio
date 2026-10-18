@@ -4,6 +4,13 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.58
+
+- **Rests inside a beam no longer sit on the next note's accidental.** MuseScore moves a rest in a beamed group up or down to keep it clear of the beam, but only after the notes have been spaced, so the rest could land on a sharp or flat beside it (Last Pint's Tenor Sax, bars 48 and 128, and many others). Now:
+  - In the score, such a rest keeps moving away from the beam to the first spot clear of the notes on either side, as long as it stays within a space of the staff.
+  - Before a sheet is printed, any beamed rest still touching a note is moved sideways into the free space beside it. If there's no room, its bar is made a little wider. In a bar too crowded for either, the rest goes just above (or below) the accidental, unless a chord symbol is in the way.
+  - The export log lists any that are left ("rest on a note").
+
 ## 1.18.57
 
 - **The 4-Horn 2-Trumpet's horns are bracketed.** Its four horns are in one bracket in the main score and in the 4-Horn 2-Trumpet arrangement's score, like the other Standard sections. Songs that already have the section get the bracket when they're opened (save the song to keep it); a new 4-Horn 2-Trumpet gets it when it's made.

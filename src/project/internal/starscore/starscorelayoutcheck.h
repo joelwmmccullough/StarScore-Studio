@@ -50,6 +50,12 @@ int alignCombinedLabels(mu::engraving::Score* score);
 //! Undoable; call inside a command. Lays the score out again when it moved anything. Returns how many it moved.
 int separateOverlappingTexts(mu::engraving::Score* score);
 
+//! A rest inside a beam printed over the next or previous note's accidental or head (MuseScore moves such a rest clear
+//! of the beam after the notes are spaced): its bar a little wider, until it clears them (Joel, 17 Oct 2026). On this
+//! score only. Undoable; call inside a command. Lays the score out again when it changed anything. Returns how many
+//! bars it widened.
+int spaceOutBeamedRests(mu::engraving::Score* score);
+
 //! The issues as log lines ("p2 b89 off page: Chords provided to help…")
 QStringList describeIssues(const std::vector<LayoutIssue>& issues);
 }

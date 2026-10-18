@@ -2601,6 +2601,7 @@ static Ret starscorePrintSheetAsIs(const INotationWriterPtr& writer, const INota
     // (on the page first: a text moved in can land on a chord symbol)
     const int onPage = starscore::keepTextsOnPage(score);
     const int separated = starscore::separateOverlappingTexts(score);
+    starscore::spaceOutBeamedRests(score);
     const int movedIn = onPage + separated;
     const std::vector<starscore::LayoutIssue> issues = starscore::layoutIssues(score);
     if (movedIn > 0 || !issues.empty()) {

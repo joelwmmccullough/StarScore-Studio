@@ -20,6 +20,11 @@
 #include "engraving/dom/textbase.h"
 #include "engraving/dom/measurenumber.h"
 #include "engraving/dom/staff.h"
+#include "engraving/dom/rest.h"
+#include "engraving/dom/beam.h"
+#include "engraving/dom/chord.h"
+#include "engraving/dom/note.h"
+#include "engraving/dom/accidental.h"
 #include "engraving/editing/editproperty.h"
 
 #include "log.h"
@@ -140,6 +145,94 @@ double offPageBy(const PlacedText& t)
 }
 }
 
+//! A rest inside a beam printed over the next or previous note's accidental or head, as laid out now
+struct BeamedRestHit {
+    int pageNo = 0;
+    Measure* measure = nullptr;
+    QString what;   // "accidental", "note"
+    Rest* rest = nullptr;
+    double moveBy = 0.0;    // sideways, to clear what it is over (negative: to the left)
+    double room = 0.0;      // free space on that side, up to the neighbour there
+    RectF over;             // what it is over (the lowest top / highest bottom of them, for a move up or down)
+};
+
+static std::vector<BeamedRestHit> beamedRestHits(const Score* score)
+{
+    std::vector<BeamedRestHit> hits;
+    const double sp = score->style().spatium();
+    int pageNo = 0;
+    for (const Page* page : score->pages()) {
+        ++pageNo;
+        for (const System* sys : page->systems()) {
+            for (MeasureBase* mb : sys->measures()) {
+                if (!mb->isMeasure()) {
+                    continue;
+                }
+                Measure* m = toMeasure(mb);
+                for (const Segment* seg = m->first(SegmentType::ChordRest); seg; seg = seg->next(SegmentType::ChordRest)) {
+                    for (EngravingItem* e : seg->elist()) {
+                        if (!e || !e->isRest() || !e->visible() || !toRest(e)->beam() || !e->ldata()) {
+                            continue;
+                        }
+                        const RectF full = e->pageBoundingRect();
+                        const RectF r = full.adjusted(0.05 * sp, 0.05 * sp, -0.05 * sp, -0.05 * sp);
+                        QString hit;
+                        double moveBy = 0.0;
+                        RectF over;
+                        // the nearest right edge of the previous chord, the nearest left edge of the next one
+                        double leftLimit = -1e9, rightLimit = 1e9;
+                        bool hitBefore = false;
+                        for (const Segment* nb : { seg->prev1(SegmentType::ChordRest), seg->next1(SegmentType::ChordRest) }) {
+                            if (!nb || nb->system() != seg->system()) {
+                                continue;
+                            }
+                            const bool before = nb->tick() < seg->tick();
+                            for (const EngravingItem* o : nb->elist()) {
+                                if (!o || !o->isChord() || o->vStaffIdx() != e->vStaffIdx()) {
+                                    continue;
+                                }
+                                for (const Note* n : toChord(o)->notes()) {
+                                    std::vector<RectF> parts;
+                                    if (n->visible() && n->ldata()) {
+                                        parts.push_back(n->pageBoundingRect());
+                                    }
+                                    if (n->accidental() && n->accidental()->visible() && n->accidental()->ldata()) {
+                                        parts.push_back(n->accidental()->pageBoundingRect());
+                                    }
+                                    for (const RectF& pr : parts) {
+                                        if (before) {
+                                            leftLimit = std::max(leftLimit, pr.right());
+                                        } else {
+                                            rightLimit = std::min(rightLimit, pr.left());
+                                        }
+                                        if (!r.intersects(pr)) {
+                                            continue;
+                                        }
+                                        const bool acc = pr == parts.back() && n->accidental() && parts.size() > 1;
+                                        if (acc || hit.isEmpty()) {
+                                            hit = acc ? QString("accidental") : QString("note");
+                                        }
+                                        hitBefore = before;
+                                        over = over.isNull() ? pr : over.united(pr);
+                                        moveBy = before ? std::max(moveBy, pr.right() - full.left() + 0.15 * sp)
+                                                 : std::min(moveBy, pr.left() - full.right() - 0.15 * sp);
+                                    }
+                                }
+                            }
+                        }
+                        if (!hit.isEmpty()) {
+                            const double room = hitBefore ? rightLimit - full.right() - 0.15 * sp
+                                                : full.left() - leftLimit - 0.15 * sp;
+                            hits.push_back({ pageNo, m, hit, toRest(e), moveBy, room, over });
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return hits;
+}
+
 std::vector<LayoutIssue> layoutIssues(const Score* score)
 {
     std::vector<LayoutIssue> issues;
@@ -170,6 +263,10 @@ std::vector<LayoutIssue> layoutIssues(const Score* score)
                                                                         wordsOf(b.item)) });
             }
         }
+    }
+    // a rest inside a beam printed over the next or previous note's accidental or head (Joel, 17 Oct 2026)
+    for (const BeamedRestHit& h : beamedRestHits(score)) {
+        issues.push_back({ h.pageNo, h.measure->no() + 1, QString("rest on a note"), QString("beamed rest over a %1").arg(h.what) });
     }
     return issues;
 }
@@ -541,6 +638,106 @@ int separateOverlappingTexts(Score* score)
         score->doLayout();
     }
     return moved + int(everShifted.size());
+}
+
+int spaceOutBeamedRests(Score* score)
+{
+    if (!score) {
+        return 0;
+    }
+    // first sideways, into the free space on its other side, when there is enough of it; then, for those that still
+    // touch, their bars a little wider, and sideways again
+    int nudged = 0;
+    auto nudge = [&]() {
+        bool any = false;
+        for (const BeamedRestHit& h : beamedRestHits(score)) {
+            if (h.rest && std::abs(h.moveBy) <= h.room) {
+                const PointF off = h.rest->offset() + PointF(h.moveBy, 0.0);
+                score->undo(new ChangeProperty(h.rest, Pid::OFFSET, PropertyValue(off), PropertyFlags::UNSTYLED));
+                if (!score->isMaster()) {
+                    h.rest->unlinkPropertyFromMaster(Pid::OFFSET);
+                }
+                ++nudged;
+                any = true;
+            }
+        }
+        if (any) {
+            score->setLayoutAll();
+            score->doLayout();
+        }
+    };
+    nudge();
+    std::set<Measure*> widened;
+    for (int round = 0; round < 4; ++round) {
+        const std::vector<BeamedRestHit> hits = beamedRestHits(score);
+        std::set<Measure*> now;
+        for (const BeamedRestHit& h : hits) {
+            now.insert(h.measure);
+        }
+        bool changed = false;
+        for (Measure* m : now) {
+            const double stretch = m->userStretch();
+            if (stretch >= 2.0) {
+                continue;
+            }
+            // on this bar of this score only (not through the links to the main score and the other part scores)
+            score->undo(new ChangeProperty(m, Pid::USER_STRETCH, PropertyValue(std::min(2.0, stretch + 0.15)), PropertyFlags::UNSTYLED));
+            widened.insert(m);
+            changed = true;
+        }
+        if (!changed) {
+            break;
+        }
+        score->setLayoutAll();
+        score->doLayout();
+    }
+    if (!widened.empty()) {
+        nudge();
+    }
+    // and those still touching (a bar too crowded for both): up or down, away from the beam, just clear of what they
+    // are over
+    int lifted = 0;
+    for (const BeamedRestHit& h : beamedRestHits(score)) {
+        if (!h.rest || h.over.isNull()) {
+            continue;
+        }
+        const double sp = score->style().spatium();
+        const RectF r = h.rest->pageBoundingRect();
+        const bool beamAbove = h.rest->beam() && h.rest->beam()->up();
+        const double dy = beamAbove ? h.over.bottom() + 0.15 * sp - r.top() : h.over.top() - 0.15 * sp - r.bottom();
+        if (std::abs(dy) > 5.0 * sp) {
+            continue;
+        }
+        // not onto a chord symbol or other text above or below the bar
+        const RectF moved = r.translated(0.0, dy);
+        bool blocked = false;
+        for (const Segment* seg = h.measure->first(); seg && !blocked; seg = seg->next()) {
+            for (const EngravingItem* a : seg->annotations()) {
+                if (a && a->visible() && a->ldata() && a->staffIdx() == h.rest->staffIdx() && moved.intersects(a->pageBoundingRect())) {
+                    blocked = true;
+                }
+            }
+        }
+        if (blocked) {
+            continue;
+        }
+        const PointF off = h.rest->offset() + PointF(0.0, dy);
+        score->undo(new ChangeProperty(h.rest, Pid::OFFSET, PropertyValue(off), PropertyFlags::UNSTYLED));
+        if (!score->isMaster()) {
+            h.rest->unlinkPropertyFromMaster(Pid::OFFSET);
+        }
+        ++lifted;
+    }
+    if (lifted > 0) {
+        score->setLayoutAll();
+        score->doLayout();
+    }
+    nudged += lifted;
+    if (nudged > 0 || !widened.empty()) {
+        LOGI() << "[starscore] layout check: beamed rests clear of the notes beside them: " << (nudged - lifted) << " moved sideways, "
+               << widened.size() << " bar(s) widened, " << lifted << " moved up or down";
+    }
+    return nudged + int(widened.size());
 }
 
 QStringList describeIssues(const std::vector<LayoutIssue>& issues)
