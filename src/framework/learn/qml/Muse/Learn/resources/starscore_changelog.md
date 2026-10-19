@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.63
+
+- **Tenutos and staccatos no longer sit on a tie.** On the second of two tied notes, an articulation on the tie's side could land on the tie, most of all on a note on the middle line (its tenuto went in the space above, where the tie's arc is). This was a MuseScore bug: it placed the articulation before laying out the tie and only guessed how much room the tie needed. Now, once the ties are laid out, such an articulation moves away from the note until it clears the tie: a space at a time inside the staff, a little at a time outside it.
+
 ## 1.18.62
 
 - **Projects and Sheets has a STARSIGN folder.** The Starsign songs move into it the next time the organizer runs (after an export, or ⋯ › Run folder organization…):

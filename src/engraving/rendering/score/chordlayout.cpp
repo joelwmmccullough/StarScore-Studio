@@ -1007,6 +1007,62 @@ void ChordLayout::layoutArticulations(Chord* item, LayoutContext& ctx)
         }
 //            measure()->system()->staff(a->staffIdx())->skyline().add(a->shape().translated(a->pos() + segment()->pos() + measure()->pos()));
     }
+
+    // StarScore (Joel, 19 Oct 2026): a tenuto or staccato on the tie's side of a tied note could sit on the tie, a
+    // note on the middle line most of all (its tenuto goes in the space above, where the tie's arc is). The space
+    // left for the tie above is a guess made before the tie is laid out; the system's ties are laid out by now, so
+    // such an articulation is moved away from the note until it clears the tie: a space at a time inside the staff
+    // (to stay between the lines), in small steps outside it.
+    moveArticulationsOffTies(item, ctx);
+}
+
+void ChordLayout::moveArticulationsOffTies(Chord* item, LayoutContext& ctx)
+{
+    const System* system = item->measure() ? item->measure()->system() : nullptr;
+    if (!system) {
+        return;
+    }
+    const StaffType* staffType = item->staff()->staffTypeForElement(item);
+    const double mag = (staffType->isSmall() ? ctx.conf().styleD(Sid::smallStaffMag) : 1.0) * staffType->userMag();
+    const double sp = ctx.conf().spatium() * mag;
+    const double lineDist = sp * staffType->lineDistance().val();
+    const double staffHeight = (staffType->lines() - 1) * lineDist;
+    const double clearance = 0.2 * sp;
+
+    for (Articulation* a : item->articulations()) {
+        if (!a->visible() || !a->layoutCloseToNote() || !leaveSpaceForTie(a)) {
+            continue;
+        }
+        const bool up = a->ldata()->up;
+        const Note* note = up ? item->upNote() : item->downNote();
+        Shape ties;
+        for (const Tie* tie : { note->tieBack(), note->tieFor() }) {
+            if (!tie || tie->up() != up || tie->segmentsEmpty()) {
+                continue;
+            }
+            const TieSegment* seg = tie == note->tieBack() ? tie->backSegment() : tie->frontSegment();
+            if (!seg || seg->system() != system || !seg->ldata()->isSetShape()) {
+                continue;
+            }
+            ties.add(seg->ldata()->shape().translated(seg->pos()));
+        }
+        if (ties.empty()) {
+            continue;
+        }
+        // the chord's place in the system (the tie segments' coordinates)
+        const PointF chordInSystem = item->pos() + item->segment()->pos() + item->measure()->pos();
+        for (int step = 0; step < 12; ++step) {
+            const RectF box = a->ldata()->bbox().translated(a->pos() + chordInSystem).adjusted(-clearance, -clearance, clearance, clearance);
+            if (!ties.intersects(box)) {
+                break;
+            }
+            // inside the staff: to the next space; outside it: a quarter space
+            const double y = a->pos().y();
+            const bool inStaff = y > 0.0 && y < staffHeight;
+            const double by = inStaff ? lineDist : 0.25 * sp;
+            a->mutldata()->moveY(up ? -by : by);
+        }
+    }
 }
 
 //---------------------------------------------------------

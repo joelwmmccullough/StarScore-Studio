@@ -150,6 +150,7 @@ private:
     static Shape chordRestShape(const ChordRest* item);
 
     static bool leaveSpaceForTie(const Articulation* item);
+    static void moveArticulationsOffTies(Chord* item, LayoutContext& ctx);
 
     static bool computeUpBeamCase(const Chord* item, Beam* beam);
     static bool computeUpTremoloCase(const Chord* item, TremoloTwoChord* tremolo, const LayoutContext& ctx);
