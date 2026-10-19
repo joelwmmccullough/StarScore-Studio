@@ -183,6 +183,13 @@ bool NewStarScoreModel::create(const QVariantMap& o)
         return false;
     }
 
+    // saved and filed at once in Projects and Sheets (Joel, 19 Oct 2026), rather than at the first export
+    const QString kind = o.value("songKind", "original").toString();
+    const muse::RetVal<QString> filed = starScore()->fileNewSong(kind);
+    if (!filed.ret) {
+        interactive()->warning(muse::trc("starscore", "The new score isn't saved yet"), filed.ret.toString());
+    }
+
     // Remembered for the next New (the doubler and 7th horn as chosen, even when this arrangement didn't use them)
     QSettings settings;
     settings.setValue(SETTING_ARRANGEMENT, options.arrangementTemplateKey);

@@ -148,6 +148,22 @@ QString BandExportModel::suggestedCode() const
     return m_suggestedCode;
 }
 
+int BandExportModel::suggestedCategory() const
+{
+    const QString kind = starScore()->songKind();
+    const QString group = starScore()->songGroup();
+    if (kind == "cover") {
+        return 2;
+    }
+    if (kind == "vocal") {
+        return 3;
+    }
+    if (kind == "original") {
+        return group.endsWith("/1 Repertoire") ? 1 : 4;
+    }
+    return 0;
+}
+
 QString BandExportModel::createSong(const QString& title, int category, const QString& code)
 {
     const muse::Ret ret = starScore()->registerBandSong(title, category, code);

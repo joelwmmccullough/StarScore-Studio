@@ -15,6 +15,7 @@
  * plus the listen-through (each horn section at each rehearsal mark) and the library scan.
  */
 #include "starscoreservice.h"
+#include "organizer/orgfiling.h"
 #include "starscorestatus.h"
 
 #include <algorithm>
@@ -2084,9 +2085,16 @@ QStringList StarScoreService::auditLibraryFiles(const QString& folder) const
     if (folder.isEmpty()) {
         return files;
     }
-    // The band's songs: only "1 Starsign Originals" and "2 Starsign Covers" when the folder has them
+    // The band's songs: the STARSIGN folders but Sketches (before 19 Oct 2026 "1 Starsign Originals" and "2 Starsign
+    // Covers") when the folder has them
     QStringList roots;
-    for (const QString& sub : { QString("1 Starsign Originals"), QString("2 Starsign Covers") }) {
+    QStringList subs { QString("1 Starsign Originals"), QString("2 Starsign Covers") };
+    for (const QString& g : starscore::org::starsignSongGroups()) {
+        if (!g.endsWith("/3 Sketches")) {
+            subs << g;
+        }
+    }
+    for (const QString& sub : subs) {
         if (QDir(folder + "/" + sub).exists()) {
             roots << folder + "/" + sub;
         }

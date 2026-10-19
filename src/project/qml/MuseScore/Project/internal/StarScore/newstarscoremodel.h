@@ -10,6 +10,7 @@
 #include <qqmlintegration.h>
 
 #include "modularity/ioc.h"
+#include "iinteractive.h"
 #include "project/istarscoreservice.h"
 
 namespace mu::project {
@@ -28,6 +29,7 @@ class NewStarScoreModel : public QObject, public muse::Contextable
     QML_ELEMENT
 
     muse::ContextInject<IStarScoreService> starScore = { this };
+    muse::ContextInject<muse::IInteractive> interactive = { this };
 
 public:
     explicit NewStarScoreModel(QObject* parent = nullptr);

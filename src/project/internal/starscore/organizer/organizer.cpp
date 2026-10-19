@@ -66,8 +66,10 @@ Since October 2026 StarScore Studio does all of this. It runs after every "Expor
 5. Rebuilds the PDFs that are out of date: What's Here, Recordings, changelogs, Horn Part Guides (from the score,
    for songs exported from StarScore), the Band Guide, the Progress tracker and the Maintenance Report;
    All Recordings and the Projects Maintenance Report in Projects and Sheets.
-6. Projects and Sheets: files `9 Inbox` and loose top-level files into the right tune (older MuseScore material
-   into the tune's `MuseScore Files/`), moves empty folders to `Z Empty Folders (safe to delete)`.
+6. Projects and Sheets: the Starsign songs are in `STARSIGN/1 Originals` (`1 Repertoire`, `2 In Progress`,
+   `3 Sketches`), `STARSIGN/2 Covers` and `STARSIGN/3 Vocal Covers` (`1 Repertoire`, `2 In Progress`); a song moves
+   between them with StarScore's Move to… menu. Files `9 Inbox` and loose top-level files into the right tune (older
+   MuseScore material into the tune's `MuseScore Files/`), moves empty folders to `Z Empty Folders (safe to delete)`.
 7. Colours the song folders in Finder from the status each sheet had when it was exported from StarScore
    (6 Inbox/.organizer/sheets/CODE.json, written at every export). Each colour needs everything below it:
    Purple = Big Band and Marching Band charts; Blue = every sheet the songbooks and the 4- to 7-Horn charts need;
@@ -311,6 +313,24 @@ void Organizer::prepare(std::shared_ptr<Run> r)
         const bool cacheWasEmpty = r->cache.isEmpty();
         // the tune folders of Projects and Sheets, listed once for the whole run
         const bool haveProjects = !paths.projects.isEmpty() && QFileInfo(paths.projects).isDir();
+        // the songs moved into the STARSIGN folders, once (Joel, 19 Oct 2026)
+        if (haveProjects) {
+            const LayoutReport layout = migrateProjectsLayout(paths);
+            for (const Move& m : layout.moved) {
+                r->summary.projectMoves.push_back({ paths.projects + "/" + m.from, paths.projects + "/" + m.to });
+            }
+            if (!layout.moved.empty()) {
+                projActions.append(action("Reorganized", "change",
+                                          QString("The Starsign songs moved into <span class=\"mono\">STARSIGN</span>: Originals, Covers and "
+                                                  "Vocal Covers, each in Repertoire and In Progress (and the originals&rsquo; Sketches). "
+                                                  "%1: %2.").arg(plural(int(layout.moved.size()), "item"), movesHtml(layout.moved))));
+                plainLines << QString("Moved %1 into the STARSIGN folders of Projects and Sheets.").arg(plural(int(layout.moved.size()), "item"));
+            }
+            for (const QString& p : layout.problems) {
+                warnings << "Projects and Sheets: " + p;
+                projActions.append(action("Needs a look", "warn", "<span class=\"mono\">" + esc(p) + "</span>"));
+            }
+        }
         std::vector<ProjectTune> tunes = haveProjects ? listProjectTunes(paths) : std::vector<ProjectTune>();
 
         // --- first run: retire the Python toolkits, write the new rule book
@@ -584,6 +604,9 @@ void Organizer::prepare(std::shared_ptr<Run> r)
         if (haveProjects) {
             bg.at("Filing Projects and Sheets", 0.65);
             const ProjectsFilingReport pf = fileProjects(paths, tunes, bg);
+            for (const Move& m : pf.filed) {
+                r->summary.projectMoves.push_back({ paths.projects + "/" + m.from, paths.projects + "/" + m.to });
+            }
             if (!pf.filed.empty()) {
                 projActions.append(action("Filed", "change", QString("%1: %2.").arg(plural(int(pf.filed.size()), "file"), movesHtml(pf.filed))));
                 plainLines << QString("Filed %1 in Projects and Sheets.").arg(plural(int(pf.filed.size()), "file"));
@@ -716,7 +739,7 @@ void Organizer::prepare(std::shared_ptr<Run> r)
             colourOfCode[s.code] = c;
         }
         if (haveProjects) {
-            // only the Starsign groups (1 Originals, 2 Covers, 3 WIP): "4 Other Projects" can hold a tune of the same
+            // only the Starsign groups (STARSIGN, or the old 1-3): "4 Other Projects" can hold a tune of the same
             // name as a band song and must not take its colour (filing and the snapshot do take group 4)
             for (const ProjectTune& t : tunes) {
                 if (!t.starsign) {

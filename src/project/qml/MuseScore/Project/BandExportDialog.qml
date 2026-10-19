@@ -49,6 +49,10 @@ StyledDialogView {
         exportModel.load()
         root.newTitle = exportModel.songTitle
         root.newCode = exportModel.suggestedCode
+        // the kind of song from where it's kept in Projects and Sheets (an original not yet in Repertoire: 4)
+        if (exportModel.suggestedCategory > 0) {
+            root.newCategory = exportModel.suggestedCategory
+        }
     }
 
     function folderPreview() {

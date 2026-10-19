@@ -23,7 +23,7 @@ StyledDialogView {
     property int page: 0
 
     contentWidth: 460
-    contentHeight: root.page === 0 ? 220 : 620
+    contentHeight: root.page === 0 ? 220 : 680
     margins: 20
 
     NewStarScoreModel {
@@ -31,6 +31,8 @@ StyledDialogView {
     }
 
     property string scoreTitle: ""
+    // what the song is (Joel, 19 Oct 2026): where it's filed in Projects and Sheets, and a vocal cover gets a Voice part
+    property string songKind: "original"
     property string subtitle: ""
     property string composer: ""
     property int keyFifths: 0
@@ -87,7 +89,8 @@ StyledDialogView {
             "measures": root.measures,
             "arrangementTemplateKey": root.arrangementKey,
             "doublerInstrumentId": root.doublerId,
-            "lowHornInstrumentId": root.lowHornId
+            "lowHornInstrumentId": root.lowHornId,
+            "songKind": root.songKind
         })) {
             root.ret = { "errcode": 0, "value": "created" }
             root.hide()
@@ -163,6 +166,18 @@ StyledDialogView {
         anchors.fill: parent
         visible: root.page === 1
         spacing: 10
+
+        StyledTextLabel { text: qsTrc("starscore", "Type"); font: ui.theme.bodyBoldFont }
+        StyledDropdown {
+            Layout.fillWidth: true
+            model: [
+                { "text": qsTrc("starscore", "Original (saved in Originals › Sketches)"), "value": "original" },
+                { "text": qsTrc("starscore", "Cover (saved in Covers › In Progress)"), "value": "cover" },
+                { "text": qsTrc("starscore", "Vocal Cover (saved in Vocal Covers › In Progress, with a Voice part)"), "value": "vocal" }
+            ]
+            currentIndex: indexOfValue(root.songKind)
+            onActivated: function(index, value) { root.songKind = value }
+        }
 
         StyledTextLabel { text: qsTrc("starscore", "Title"); font: ui.theme.bodyBoldFont }
         TextInputField {

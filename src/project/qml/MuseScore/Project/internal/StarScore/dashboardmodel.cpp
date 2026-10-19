@@ -4,6 +4,7 @@
  * StarScore Studio — Home › Dashboard: every Starsign song's arrangements, what's done, and what to work on next
  */
 #include "dashboardmodel.h"
+#include "project/internal/starscore/organizer/orgfiling.h"
 
 #include <algorithm>
 #include <map>
@@ -155,7 +156,7 @@ void DashboardModel::load()
             Song song;
             song.path = path;
             song.title = QFileInfo(path).absoluteDir().dirName();
-            song.cover = path.contains("/2 Starsign Covers/");
+            song.cover = !starscore::org::starsignKindOf(path).isEmpty() && starscore::org::starsignKindOf(path) != "original";
             song.legacy = isLegacy(song.title);
             song.plays = plays2026(song.title);
             auto it = cached.find(path);

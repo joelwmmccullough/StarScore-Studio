@@ -14,6 +14,7 @@
 
 #include "project/internal/starscore/starscorehornkeys.h"
 #include "project/internal/starscore/starscorestatus.h"
+#include "project/internal/starscore/organizer/orgfiling.h"
 #include "types/uri.h"
 #include "log.h"
 
@@ -540,7 +541,22 @@ QVariantList StarScoreBarModel::moreMenu() const
         };
     }
 
+    // Where the song is kept in Projects and Sheets (Joel, 19 Oct 2026): Originals / Covers / Vocal Covers, each in
+    // Repertoire (ready to play) or In Progress, the originals also in Sketches
+    QVariantList moveItems;
+    const QString group = starScore()->songGroup();
+    for (const QString& g : starscore::org::starsignSongGroups()) {
+        const QStringList seg = g.split('/');
+        auto plain = [](QString n) { return n.mid(n.indexOf(' ') + 1); };   // "1 Originals" -> "Originals"
+        moveItems << QVariantMap { { "id", "song-move:" + g }, { "title", plain(seg.value(1)) + " › " + plain(seg.value(2)) },
+                                   { "checkable", true }, { "checked", g == group }, { "enabled", !group.isEmpty() && g != group } };
+    }
+
     return {
+        QVariantMap { { "title", group.isEmpty() ? muse::qtrc("starscore", "Move to (only for songs in STARSIGN)")
+                                                 : muse::qtrc("starscore", "Move to") },
+                      { "subitems", moveItems }, { "enabled", !group.isEmpty() } },
+        QVariantMap {},
         QVariantMap { { "title", refs.empty() ? muse::qtrc("starscore", "Reference PDFs")
                                               : muse::qtrc("starscore", "Reference PDFs (%1)").arg(refs.size()) },
                       { "subitems", refItems }, { "enabled", true } },
@@ -807,6 +823,12 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
             } else {
                 starScore()->offerMatchingHornParts(before);
             }
+        }
+    } else if (action == "song-move") {
+        // song-move:<STARSIGN song folder>
+        const muse::RetVal<QString> r = starScore()->moveSongTo(arg);
+        if (!r.ret) {
+            interactive()->error(muse::trc("starscore", "The song wasn't moved"), r.ret.toString());
         }
     } else if (action == "part-instrument") {
         // part-instrument:<part id>:<instrument id>

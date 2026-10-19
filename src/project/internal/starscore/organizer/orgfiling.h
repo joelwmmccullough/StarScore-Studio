@@ -59,21 +59,43 @@ BandFilingReport fileBand(const Paths& paths, Codes& codes, const Roster& roster
 //! songRoots: songs whose sheets changed this run
 void redateUpdateNotes(const Paths& paths, const Codes& codes, const QStringList& songRoots, BandFilingReport& report);
 
+//! Projects and Sheets' Starsign song folders (Joel, 19 Oct 2026): STARSIGN, then Originals, Covers and Vocal Covers,
+//! each split into Repertoire (ready to play) and In Progress, and the originals also into Sketches (first ideas)
+const QStringList& starsignSongGroups();
+//! The song folder for a kind ("original", "cover", "vocal") and stage ("repertoire", "progress", "sketch"); a cover
+//! has no Sketches, so its sketch is In Progress
+QString starsignGroupFor(const QString& kind, const QString& stage);
+//! A Projects and Sheets path's kind and stage ("" when it isn't in a Starsign song folder)
+QString starsignKindOf(const QString& relOrPath);
+QString starsignStageOf(const QString& relOrPath);
+
+struct LayoutReport {
+    std::vector<Move> moved;
+    QStringList problems;
+};
+//! The one move into the STARSIGN folders, while "1 Starsign Originals", "2 Starsign Covers" or "3 Starsign WIP" is
+//! still there: originals to Repertoire (but for the ones in progress), WIP songs to Sketches (but for the ones in
+//! progress), covers to Repertoire when Sheets and Demos has a folder for them and In Progress when not, the vocal
+//! covers to Vocal Covers; "4 Other Projects/Mxter Shirts" merged into the Starsign Mxter Shirts. Only moves; an old
+//! group folder goes once it's empty.
+LayoutReport migrateProjectsLayout(const Paths& paths);
+
 //! A tune folder in Projects and Sheets, listed once per run (listProjectTunes) and shared by everything below
 struct ProjectTune {
     QString name;            // "Amplitudes"
-    QString group;           // "1 Starsign Originals"
-    QString rel;             // "1 Starsign Originals/Amplitudes"
+    QString group;           // "STARSIGN/1 Originals/1 Repertoire" ("1 Starsign Originals" before the move)
+    QString rel;             // "STARSIGN/1 Originals/1 Repertoire/Amplitudes"
     QString fileCode;        // the code its "CODE - Title.starscore" carries ("" without one)
     bool hasStarScore = false;
-    //! Groups 1-3 (Originals, Covers, WIP). Filing, codes and the snapshot take every group 1-4; the folder colours
-    //! take only these, because "4 Other Projects" can hold a tune of the same name as a band song.
+    //! In STARSIGN (or the old groups 1-3). Filing, codes and the snapshot take "4 Other Projects" too; the folder
+    //! colours take only these, because "4 Other Projects" can hold a tune of the same name as a band song.
     bool starsign = false;
 
     //! codes_proj.json's code for it, else fileCode (codes_proj.json may have been brought up to date this run)
     QString codeIn(const Codes& codes) const;
 };
-//! Every tune folder of groups 1-4, by group then name. Shortcuts (symlinks) and hidden names are left out.
+//! Every tune folder of the STARSIGN song folders and "4 Other Projects" (and the old groups 1-3 while they're there),
+//! by group then name. Shortcuts (symlinks) and hidden names are left out.
 std::vector<ProjectTune> listProjectTunes(const Paths& paths);
 
 struct ProjectsFilingReport {

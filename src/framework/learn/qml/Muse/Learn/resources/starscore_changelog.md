@@ -4,6 +4,18 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.62
+
+- **Projects and Sheets has a STARSIGN folder.** The Starsign songs move into it the next time the organizer runs (after an export, or ⋯ › Run folder organization…):
+  - `STARSIGN/1 Originals`: `1 Repertoire`, `2 In Progress` (Mxter Shirts, Intern, Big Milk, Jeju, Meevin) and `3 Sketches` (the rest of the old WIP folder).
+  - `STARSIGN/2 Covers`: `1 Repertoire` (the covers that have a folder in Sheets and Demos) and `2 In Progress`.
+  - `STARSIGN/3 Vocal Covers`: `1 Repertoire` and `2 In Progress` (Ghostbusters, Another Star, Move On Up).
+  - The old `4 Other Projects/Mxter Shirts` goes into the Starsign Mxter Shirts' `MuseScore Files`. 4 Other Projects, Templates, Sketches and the Inbox stay where they are, and Sheets and Demos doesn't change.
+  - If the open song is moved, StarScore saves it at its new place.
+- **New Starsign scores are saved and filed right away.** File › New has a Type choice: Original, Cover or Vocal Cover. On Create, the song gets a code and is saved as `CODE - Title.starscore` in its own folder: originals in Originals › Sketches, covers and vocal covers in their In Progress folder. Scores that aren't Starsign scores work as before.
+- **Move to…** in the StarScore bar's ⋯ menu moves the open song (its whole folder) to another STARSIGN folder, e.g. from In Progress to Repertoire.
+- When a song is first exported to Sheets and Demos, its "Kind of song" is picked from its STARSIGN folder (a vocal cover: "Cover that needs a vocalist"; an original not yet in Repertoire: "Work in progress"). You can still change it.
+
 ## 1.18.61
 
 - **Resizing the Reference PDF panel is smooth.** Every time the panel got about 100 pixels wider or narrower (50 on a Retina screen), StarScore drew every page of the PDF again on the spot, holding up the whole app while you dragged. Now the pages already drawn are just stretched while you resize, and the sharp ones are drawn in the background a quarter of a second after you stop. The same goes for zooming.

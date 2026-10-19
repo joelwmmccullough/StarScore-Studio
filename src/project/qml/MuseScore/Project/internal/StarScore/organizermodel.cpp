@@ -215,6 +215,8 @@ void OrganizerModel::done(const org::RunSummary& summary)
     for (const QString& w : summary.warnings) {
         m_log << "⚠ " + w;
     }
+    // the open song moved into the STARSIGN folders (or filed from the Inbox) is saved where it now is
+    starScore()->followMovedSong(summary.projectMoves);
     // the open song keeps its own copy of its recordings
     const QString code = starScore()->songCode();
     if (!code.isEmpty() && summary.changedCodes.contains(code)) {

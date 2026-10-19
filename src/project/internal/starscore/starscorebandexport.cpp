@@ -601,6 +601,134 @@ void StarScoreService::setProjectsFolder(const QString& path)
     QSettings().setValue("StarScore/projectsFolder", path);
 }
 
+//! The song's file relative to Projects and Sheets ("" when it's elsewhere or not saved)
+static QString starscoreProjectsRel(const QString& projects, const QString& path)
+{
+    if (projects.isEmpty() || path.isEmpty()) {
+        return QString();
+    }
+    const QString base = QDir::cleanPath(projects), file = QDir::cleanPath(path);
+    return file.startsWith(base + "/") ? file.mid(base.size() + 1) : QString();
+}
+
+QString StarScoreService::songKind() const
+{
+    const QString rel = starscoreProjectsRel(projectsFolder(), mainProjectPath().toQString());
+    return rel.isEmpty() ? QString() : starscore::org::starsignKindOf(rel);
+}
+
+QString StarScoreService::songGroup() const
+{
+    // "STARSIGN/1 Originals/2 In Progress/Mxter Shirts/MXTR - Mxter Shirts.starscore"
+    const QStringList seg = starscoreProjectsRel(projectsFolder(), mainProjectPath().toQString()).split('/');
+    if (seg.size() != 5) {
+        return QString();
+    }
+    const QString group = seg.mid(0, 3).join('/');
+    return starscore::org::starsignSongGroups().contains(group) ? group : QString();
+}
+
+RetVal<QString> StarScoreService::moveSongTo(const QString& groupRel)
+{
+    const QString projects = projectsFolder();
+    const QString from = songGroup();
+    if (!m_mainProject || from.isEmpty() || !starscore::org::starsignSongGroups().contains(groupRel)) {
+        return RetVal<QString>::make_ret(Ret::Code::UnknownError,
+                                         muse::trc("starscore", "This song isn't in one of the STARSIGN song folders of Projects and Sheets."));
+    }
+    if (from == groupRel) {
+        return RetVal<QString>::make_ok(QString());
+    }
+    const QFileInfo file(mainProjectPath().toQString());
+    const QString tune = file.absolutePath();
+    const QString dst = QDir::cleanPath(projects) + "/" + groupRel + "/" + QFileInfo(tune).fileName();
+    if (QFileInfo::exists(dst)) {
+        return RetVal<QString>::make_ret(Ret::Code::UnknownError,
+                                         muse::qtrc("starscore", "%1 already has a folder called “%2”, so the song stays where it is.")
+                                         .arg(groupRel, QFileInfo(tune).fileName()).toStdString());
+    }
+    QDir().mkpath(QFileInfo(dst).absolutePath());
+    // the whole tune folder (the .starscore, its MuseScore Files, Version History…), by a rename: nothing is copied
+    if (!QDir().rename(tune, dst)) {
+        return RetVal<QString>::make_ret(Ret::Code::UnknownError,
+                                         muse::trc("starscore", "The song's folder couldn't be moved (is a file in it open in another app?)."));
+    }
+    m_mainProject->setPath(io::path_t(dst + "/" + file.fileName()));
+    LOGI() << "[starscore] song moved: " << tune.toStdString() << " -> " << dst.toStdString();
+    return RetVal<QString>::make_ok(muse::qtrc("starscore", "Moved to %1.").arg(groupRel));
+}
+
+void StarScoreService::followMovedSong(const std::vector<std::pair<QString, QString> >& moves)
+{
+    if (!m_mainProject) {
+        return;
+    }
+    QString path = QDir::cleanPath(mainProjectPath().toQString());
+    if (path.isEmpty() || QFileInfo::exists(path)) {
+        return;
+    }
+    // follow the moves in order (a folder may be moved and then a file in it filed)
+    for (const auto& m : moves) {
+        const QString from = QDir::cleanPath(m.first);
+        const QString to = QDir::cleanPath(m.second);
+        if (path.compare(from, Qt::CaseInsensitive) == 0) {
+            path = to;
+        } else if (path.startsWith(from + "/", Qt::CaseInsensitive)) {
+            path = to + path.mid(from.size());
+        }
+    }
+    if (QFileInfo::exists(path)) {
+        m_mainProject->setPath(io::path_t(path));
+        LOGI() << "[starscore] the open song was moved by the organizer: now " << path.toStdString();
+    }
+}
+
+RetVal<QString> StarScoreService::fileNewSong(const QString& kind)
+{
+    INotationProjectPtr project = globalContext()->currentProject();
+    const QString projects = projectsFolder();
+    if (!project || projects.isEmpty() || !QDir(projects).exists()) {
+        return RetVal<QString>::make_ret(Ret::Code::UnknownError,
+                                         muse::trc("starscore", "The Projects and Sheets folder wasn't found, so the new score isn't saved yet."));
+    }
+    const QString title = starscoreSafeFileName(starscoreSongTitle(project));
+    if (title.isEmpty()) {
+        return RetVal<QString>::make_ret(Ret::Code::UnknownError, muse::trc("starscore", "The new score has no title, so it isn't saved yet."));
+    }
+    const QString group = starscore::org::starsignGroupFor(kind, kind == "original" ? "sketch" : "progress");
+    // a code as the organizer gives one, not taken in either codes file
+    namespace org = starscore::org;
+    const org::Paths paths = org::Paths::make(bandFolder(), projects);
+    org::Codes codes;
+    codes.load(paths);
+    QString code;
+    for (const auto& [name, c] : codes.projects) {
+        if (QString::compare(name, title, Qt::CaseInsensitive) == 0) {
+            code = c;   // (a song of this name had a code before: it keeps it)
+        }
+    }
+    if (code.isEmpty()) {
+        code = org::suggestCode(title, codes.allCodes());
+    }
+    const QString dir = QDir::cleanPath(projects) + "/" + group + "/" + title;
+    const QString path = dir + "/" + code + " - " + title + ".starscore";
+    if (QFileInfo::exists(path)) {
+        return RetVal<QString>::make_ret(Ret::Code::UnknownError,
+                                         muse::qtrc("starscore", "%1 is already there, so the new score isn't saved over it. Save it "
+                                                                 "under another name with File › Save.").arg(QDir(projects).relativeFilePath(path))
+                                         .toStdString());
+    }
+    QDir().mkpath(dir);
+    if (!projectFilesController()->saveProject(io::path_t(path))) {
+        return RetVal<QString>::make_ret(Ret::Code::UnknownError, muse::trc("starscore", "The new score couldn't be saved."));
+    }
+    codes.projects[title] = code;
+    codes.projectsChanged = true;
+    codes.saveProjectsMerged(paths);
+    LOGI() << "[starscore] new song filed: " << path.toStdString();
+    return RetVal<QString>::make_ok(path);
+}
+
 QString StarScoreService::songCode() const
 {
     INotationProjectPtr project = exportSourceProject();

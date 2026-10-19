@@ -1012,7 +1012,7 @@ h2{color:#2c3a2e;border-bottom-color:#2c3a2e;}
          .arg(thousands(state.value("files").toInt())).arg(state.value("starscore").toInt()).arg(thousands(state.value("mscz").toInt()))
          .arg(tunes.size()).arg(state.value("quarantined").toInt());
     const std::vector<std::pair<QString, QString> > rows {
-        { "Structure", "grouped by purpose, then tune &mdash; Starsign Originals, Starsign Covers, Starsign WIP, Other Projects" },
+        { "Structure", "STARSIGN &mdash; Originals (Repertoire, In Progress, Sketches), Covers and Vocal Covers (Repertoire, In Progress) &mdash; then Other Projects" },
         { "The live file", "each tune&rsquo;s <span class=\"mono\">CODE - Title.starscore</span>, at the top of its folder. Older "
                            "MuseScore files live in <span class=\"mono\">MuseScore Files/</span>." },
         { "Drop zone", "<span class=\"mono\">9 Inbox</span> &mdash; filed whenever StarScore runs the folder organization" },

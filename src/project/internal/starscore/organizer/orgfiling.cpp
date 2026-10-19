@@ -726,19 +726,211 @@ void redateUpdateNotes(const Paths& paths, const Codes& codes, const QStringList
 }
 
 // ------------------------------------------------------------------ Projects and Sheets
+const QStringList& starsignSongGroups()
+{
+    static const QStringList GROUPS {
+        "STARSIGN/1 Originals/1 Repertoire", "STARSIGN/1 Originals/2 In Progress", "STARSIGN/1 Originals/3 Sketches",
+        "STARSIGN/2 Covers/1 Repertoire", "STARSIGN/2 Covers/2 In Progress",
+        "STARSIGN/3 Vocal Covers/1 Repertoire", "STARSIGN/3 Vocal Covers/2 In Progress",
+    };
+    return GROUPS;
+}
+
+QString starsignGroupFor(const QString& kind, const QString& stage)
+{
+    const QString k = kind == "cover" ? "STARSIGN/2 Covers" : kind == "vocal" ? "STARSIGN/3 Vocal Covers" : "STARSIGN/1 Originals";
+    if (stage == "repertoire") {
+        return k + "/1 Repertoire";
+    }
+    if (stage == "sketch" && kind != "cover" && kind != "vocal") {
+        return k + "/3 Sketches";
+    }
+    return k + "/2 In Progress";
+}
+
+QString starsignKindOf(const QString& relOrPath)
+{
+    const QString p = "/" + QString(relOrPath).replace('\\', '/');
+    if (p.contains("/STARSIGN/1 Originals/") || p.contains("/1 Starsign Originals/") || p.contains("/3 Starsign WIP/")) {
+        return "original";
+    }
+    if (p.contains("/STARSIGN/2 Covers/") || p.contains("/2 Starsign Covers/")) {
+        return "cover";
+    }
+    if (p.contains("/STARSIGN/3 Vocal Covers/")) {
+        return "vocal";
+    }
+    return QString();
+}
+
+QString starsignStageOf(const QString& relOrPath)
+{
+    const QString p = "/" + QString(relOrPath).replace('\\', '/');
+    if (starsignKindOf(relOrPath).isEmpty()) {
+        return QString();
+    }
+    if (p.contains("/1 Repertoire/") || p.contains("/1 Starsign Originals/") || p.contains("/2 Starsign Covers/")) {
+        return "repertoire";
+    }
+    if (p.contains("/3 Sketches/") || p.contains("/3 Starsign WIP/")) {
+        return "sketch";
+    }
+    return "progress";
+}
+
+namespace {
+//! A folder's contents moved into another (made when missing); a name already there gets " 2"… (freeName)
+void mergeFolder(const QString& base, const QString& srcRel, const QString& dstRel, LayoutReport& report)
+{
+    for (const QFileInfo& fi : QDir(base + "/" + srcRel).entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden, QDir::Name)) {
+        if (fi.fileName() == ".DS_Store") {
+            continue;
+        }
+        const QString dst = freeName(base + "/" + dstRel + "/" + fi.fileName());
+        if (fi.isDir() && !fi.isSymLink() && !isBundle(fi.filePath()) && QFileInfo(base + "/" + dstRel + "/" + fi.fileName()).isDir()) {
+            mergeFolder(base, srcRel + "/" + fi.fileName(), dstRel + "/" + fi.fileName(), report);
+            continue;
+        }
+        if (moveItem(fi.filePath(), dst)) {
+            report.moved.push_back({ srcRel + "/" + fi.fileName(), relativeTo(base, dst) });
+        } else {
+            report.problems << srcRel + "/" + fi.fileName() + " (couldn't move it)";
+        }
+    }
+    QDir(base + "/" + srcRel).remove(".DS_Store");
+    QDir(base).rmdir(srcRel);
+}
+
+//! A tune folder moved whole to a group (or merged into the tune folder of the same name already there)
+void moveTune(const QString& base, const QString& srcRel, const QString& group, LayoutReport& report)
+{
+    const QString name = QFileInfo(srcRel).fileName();
+    const QString dstRel = group + "/" + name;
+    if (QFileInfo::exists(base + "/" + dstRel)) {
+        mergeFolder(base, srcRel, dstRel, report);
+        return;
+    }
+    if (moveItem(base + "/" + srcRel, base + "/" + dstRel)) {
+        report.moved.push_back({ srcRel, dstRel });
+    } else {
+        report.problems << srcRel + " (couldn't move it)";
+    }
+}
+}
+
+LayoutReport migrateProjectsLayout(const Paths& paths)
+{
+    LayoutReport report;
+    if (paths.projects.isEmpty()) {
+        return report;
+    }
+    const QString base = paths.projects;
+    static const QString ORIGINALS = "1 Starsign Originals", COVERS = "2 Starsign Covers", WIP = "3 Starsign WIP";
+    if (!QDir(base + "/" + ORIGINALS).exists() && !QDir(base + "/" + COVERS).exists() && !QDir(base + "/" + WIP).exists()) {
+        return report;
+    }
+    for (const QString& g : starsignSongGroups()) {
+        QDir().mkpath(base + "/" + g);
+    }
+    auto key = [](QString name) { return name.toLower().simplified(); };
+    // Joel, 19 Oct 2026: the originals in progress, and the vocal covers
+    static const QStringList IN_PROGRESS { "mxter shirts", "intern", "big milk", "jeju", "meevin" };
+    static const QStringList VOCAL { "ghostbusters", "another star", "move on up" };
+    // the songs with a folder in Sheets and Demos ("2 Bumper Cars"): the covers ready to play
+    std::set<QString> inBand;
+    static const QRegularExpression bandSong("^[123] (.+)$");
+    for (const QString& d : QDir(paths.band).entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+        const QRegularExpressionMatch m = bandSong.match(d);
+        if (m.hasMatch()) {
+            inBand.insert(key(m.captured(1)));
+        }
+    }
+    auto tunesOf = [&](const QString& group) {
+        return QDir(base + "/" + group).entryInfoList(QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
+    };
+    for (const QString& group : { ORIGINALS, WIP, COVERS }) {
+        if (!QDir(base + "/" + group).exists()) {
+            continue;
+        }
+        for (const QFileInfo& t : tunesOf(group)) {
+            const QString name = t.fileName();
+            if (name.startsWith('.') || t.isSymLink()) {
+                continue;
+            }
+            const QString rel = group + "/" + name;
+            if (t.isFile()) {
+                if (t.suffix().toLower() == "starscore") {
+                    // a song file with no folder of its own (WIP's "Yenom Terces.starscore"): a folder named after it
+                    const QString stage = group == ORIGINALS ? "repertoire" : "sketch";
+                    const QString dst = starsignGroupFor(group == COVERS ? "cover" : "original", stage) + "/" + t.completeBaseName() + "/" + name;
+                    if (moveItem(t.filePath(), base + "/" + dst)) {
+                        report.moved.push_back({ rel, dst });
+                    } else {
+                        report.problems << rel + " (couldn't move it)";
+                    }
+                } else if (moveItem(t.filePath(), freeName(base + "/9 Inbox/" + name))) {
+                    report.moved.push_back({ rel, "9 Inbox/" + name });   // (filed by the usual filing)
+                }
+                continue;
+            }
+            QString kind = "original", stage;
+            if (group == COVERS) {
+                kind = VOCAL.contains(key(name)) ? "vocal" : "cover";
+                stage = inBand.count(key(name)) ? "repertoire" : "progress";
+            } else if (IN_PROGRESS.contains(key(name))) {
+                stage = "progress";
+            } else {
+                stage = group == ORIGINALS ? "repertoire" : "sketch";
+            }
+            moveTune(base, rel, starsignGroupFor(kind, stage), report);
+        }
+        // what's left is hidden (MuseScore's .mscbackup beside a loose file): into the group the songs went to
+        const QString leftoversTo = starsignGroupFor(group == COVERS ? "cover" : "original", group == WIP ? "sketch" : "repertoire");
+        for (const QFileInfo& h : QDir(base + "/" + group).entryInfoList(QDir::AllEntries | QDir::Hidden | QDir::NoDotAndDotDot)) {
+            if (h.fileName() == ".DS_Store") {
+                continue;
+            }
+            if (h.isDir() && QFileInfo(base + "/" + leftoversTo + "/" + h.fileName()).isDir()) {
+                mergeFolder(base, group + "/" + h.fileName(), leftoversTo + "/" + h.fileName(), report);
+            } else if (moveItem(h.filePath(), freeName(base + "/" + leftoversTo + "/" + h.fileName()))) {
+                report.moved.push_back({ group + "/" + h.fileName(), leftoversTo + "/" + h.fileName() });
+            }
+        }
+        QDir(base + "/" + group).remove(".DS_Store");
+        if (!QDir(base).rmdir(group)) {
+            report.problems << group + " (not empty, so it stays)";
+        }
+    }
+    // "4 Other Projects/Mxter Shirts": its files into the Starsign Mxter Shirts' MuseScore Files
+    const QString otherMxter = "4 Other Projects/Mxter Shirts";
+    if (QDir(base + "/" + otherMxter).exists()) {
+        QString starsignMxter;
+        for (const QString& g : starsignSongGroups()) {
+            if (QDir(base + "/" + g + "/Mxter Shirts").exists()) {
+                starsignMxter = g + "/Mxter Shirts";
+            }
+        }
+        if (!starsignMxter.isEmpty()) {
+            mergeFolder(base, otherMxter, starsignMxter + "/MuseScore Files", report);
+        }
+    }
+    return report;
+}
+
 std::vector<ProjectTune> listProjectTunes(const Paths& paths)
 {
     // Listed once per run and shared (syncCodes, fileProjects, projectsSnapshot and the folder colours each used
-    // to list the groups and every tune's *.starscore again). Groups 1-4; the colours take only 1-3 from this list,
-    // see ProjectTune::starsign.
+    // to list the groups and every tune's *.starscore again). The STARSIGN song folders and "4 Other Projects" (and
+    // the old groups 1-3 while they're still there); the colours take only the Starsign ones, see ProjectTune::starsign.
     std::vector<ProjectTune> tunes;
     if (paths.projects.isEmpty()) {
         return tunes;
     }
-    static const QRegularExpression anyGroup("^[1234] "), starsignGroup("^[123] ");
+    QStringList groups = starsignSongGroups();
+    groups << "1 Starsign Originals" << "2 Starsign Covers" << "3 Starsign WIP" << "4 Other Projects";
     const QDir base(paths.projects);
-    for (const QString& group : base.entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
-        if (!anyGroup.match(group).hasMatch()) {
+    for (const QString& group : groups) {
+        if (!base.exists(group)) {
             continue;
         }
         for (const QFileInfo& t : QDir(base.filePath(group)).entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
@@ -750,7 +942,7 @@ std::vector<ProjectTune> listProjectTunes(const Paths& paths)
             tune.name = t.fileName();
             tune.group = group;
             tune.rel = group + "/" + tune.name;
-            tune.starsign = starsignGroup.match(group).hasMatch();
+            tune.starsign = group != "4 Other Projects";
             for (const QString& f : QDir(t.filePath()).entryList({ "*.starscore" }, QDir::Files, QDir::Name)) {
                 tune.hasStarScore = true;
                 const QRegularExpressionMatch m = CODE_PREFIX.match(f);
@@ -932,7 +1124,11 @@ ProjectsFilingReport fileProjects(const Paths& paths, const std::vector<ProjectT
                 continue;
             }
             sweep(rel);
-            if (rel.count('/') >= 2 && isEmpty(fi.filePath())
+            // group folders (and STARSIGN and its kinds) and tune folders stay, even empty
+            const bool groupOrTune = std::any_of(starsignSongGroups().begin(), starsignSongGroups().end(), [&](const QString& g) {
+                return g == rel || g.startsWith(rel + "/") || QFileInfo(rel).path() == g;
+            });
+            if (!groupOrTune && rel.count('/') >= 2 && isEmpty(fi.filePath())
                 && QFileInfo(fi.filePath()).lastModified().toMSecsSinceEpoch() < quiet) {
                 const QString d = freeName(base + "/" + EMPTY + "/" + rel);
                 if (moveItem(base + "/" + rel, d)) {
@@ -978,14 +1174,16 @@ QJsonObject projectsSnapshot(const Paths& paths, const Codes& codes, const std::
             templates += rel.startsWith("6 Templates/");
         }
         quarantined += rel.startsWith("8 Quarantine");
-        // "1 Starsign Originals/Amplitudes/MuseScore Files/…": the tune is the first two segments
-        const int slash1 = rel.indexOf('/');
-        const int slash2 = slash1 < 0 ? -1 : rel.indexOf('/', slash1 + 1);
-        if (slash2 < 0 || !tuneByRel.count(rel.left(slash2))) {
+        // "STARSIGN/1 Originals/1 Repertoire/Amplitudes/MuseScore Files/…": the tune is the first two segments
+        // ("4 Other Projects/…") or the first four (STARSIGN)
+        const QStringList seg = rel.split('/');
+        const int depth = seg.value(0) == "STARSIGN" ? 4 : 2;
+        const QString tuneRel = seg.mid(0, depth).join('/');
+        if (seg.size() <= depth || !tuneByRel.count(tuneRel)) {
             continue;
         }
-        Counts& c = perTune[rel.left(slash2)];
-        const QString inTune = rel.mid(slash2 + 1);
+        Counts& c = perTune[tuneRel];
+        const QString inTune = seg.mid(depth).join('/');
         c.museScoreFiles += inTune.startsWith("MuseScore Files/");
         c.versionHistory += inTune.startsWith("Version History/");
         c.deprecated += inTune.startsWith("Deprecated/") || inTune.startsWith("MuseScore Files/Deprecated/");

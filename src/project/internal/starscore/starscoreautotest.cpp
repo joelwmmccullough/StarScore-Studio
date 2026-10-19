@@ -1702,6 +1702,29 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
                 autotestLog(QString("  copied %1").arg(copyHornParts(pairs)));
             }
         }
+    } else if (step.startsWith("filenew:") || step.startsWith("movesong:") || step == "songplace") {
+        // filenew:<kind>: the open new score filed as File › New does (STARSCORE_AUTOTEST_PROJECTS is Projects and
+        // Sheets); movesong:<STARSIGN song folder>: Move to…; songplace: the song's kind, folder and file
+        const QString projects = qEnvironmentVariable("STARSCORE_AUTOTEST_PROJECTS");
+        if (!projects.isEmpty()) {
+            setProjectsFolder(projects);
+        }
+        const QString band = qEnvironmentVariable("STARSCORE_AUTOTEST_BAND");
+        if (!band.isEmpty()) {
+            setBandFolder(band);
+        }
+        if (step.startsWith("filenew:")) {
+            const RetVal<QString> r = fileNewSong(step.mid(8));
+            for (int i = 0; i < 20; ++i) {
+                QCoreApplication::processEvents();
+            }
+            autotestLog("  " + (r.ret ? QDir(projects).relativeFilePath(r.val) : QString::fromStdString(r.ret.toString())));
+        } else if (step.startsWith("movesong:")) {
+            const RetVal<QString> r = moveSongTo(step.mid(9));
+            autotestLog("  " + (r.ret ? r.val : QString::fromStdString(r.ret.toString())));
+        }
+        autotestLog(QString("  kind %1, folder %2, file %3").arg(songKind(), songGroup(),
+                                                               QDir(projects).relativeFilePath(mainProjectPath().toQString())));
     } else if (step.startsWith("new:")) {
         // new:<arrangement key>[:<doubler id>[:<low horn id>]]: a new StarScore as File › New makes it (title "Autotest"),
         // which replaces the open song; its parts and sections are logged
@@ -1987,7 +2010,8 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             prompts.askShows = [](const std::vector<org::NewShow>&, std::function<void(std::vector<org::ShowAnswer>)> answer) { answer({}); };
             prompts.confirmSongs = [](std::vector<org::ShowVideo>&, const QStringList&, std::function<void()> next) { next(); };
             org::Fetcher fetch = [](const QString&, bool, std::function<void(const QString&, int)> done) { done(QString(), 0); };
-            std::shared_ptr<org::Organizer> organizer = org::Organizer::create(org::Paths::make(band, QString()), fetch, prompts);
+            // (STARSCORE_AUTOTEST_PROJECTS: a Projects and Sheets folder for the run too)
+            std::shared_ptr<org::Organizer> organizer = org::Organizer::create(org::Paths::make(band, qEnvironmentVariable("STARSCORE_AUTOTEST_PROJECTS")), fetch, prompts);
             organizer->setWriteHtmlInstead(autotestDir() + "/org-html");
             QEventLoop loop;
             org::RunSummary result;
@@ -2007,6 +2031,9 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             for (const QString& w : result.warnings) {
                 autotestLog("  ! " + w);
             }
+            // as the Organize window does: the open song follows its moved file
+            followMovedSong(result.projectMoves);
+            autotestLog("  open song: " + mainProjectPath().toQString());
         }
     } else if (step.startsWith("updateall:")) {
         // updateall:<Projects and Sheets folder>: "Update all sheets" on every song it offers (then waitupdate)

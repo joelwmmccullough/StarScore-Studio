@@ -183,6 +183,11 @@ public:
     std::optional<starscore::org::ExportInfo> takeLastExport() override;
     QString projectsFolder() const override;
     void setProjectsFolder(const QString& path) override;
+    QString songKind() const override;
+    QString songGroup() const override;
+    muse::RetVal<QString> moveSongTo(const QString& groupRel) override;
+    void followMovedSong(const std::vector<std::pair<QString, QString> >& moves) override;
+    muse::RetVal<QString> fileNewSong(const QString& kind) override;
     QString songCode() const override;
     QJsonObject songRecordings() const override;
     void setSongRecordings(const QJsonObject& recordings) override;

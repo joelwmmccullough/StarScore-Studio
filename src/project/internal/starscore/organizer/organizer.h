@@ -42,6 +42,8 @@ struct RunSummary {
     int pdfsWritten = 0;
     int pdfsFailed = 0;
     QStringList changedCodes;           // songs whose recordings changed (open .starscore files refresh their copy)
+    //! files and folders of Projects and Sheets this run moved (full paths, from -> to), so an open song can follow its file
+    std::vector<std::pair<QString, QString> > projectMoves;
 };
 
 //! The windows Joel answers. Both are called on the main thread and must call their continuation exactly once.
