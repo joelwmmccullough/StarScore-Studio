@@ -1364,6 +1364,14 @@ void StarScoreService::syncSectionTabs(const QStringList& turnedOnSectionIds)
             }
             continue;
         }
+        if (es->parts().size() != 1 && e->name().endsWith(" + Voice")) {
+            // a "+ Voice" part score (Joel, 19 Oct 2026): opens with its instruments' sections, as their own part scores
+            const std::vector<engraving::Part*> ps = masterPartsOf(es, ms);
+            if (!n->isOpen() && std::any_of(ps.begin(), ps.end(), [&](const engraving::Part* p) { return openParts.count(idText(p)) > 0; })) {
+                master->setExcerptIsOpen(n, true);
+            }
+            continue;
+        }
         if (es->parts().size() != 1) {
             // any other score of several parts (the full horn scores kept from the converted files, "2-Horn
             // Arrangement"): closed with the switch off
@@ -1562,6 +1570,8 @@ std::vector<StarScoreSectionTemplate> StarScoreService::sectionTemplates() const
               lead.autoHideLowerStaff = true;
               return lead;
           }() } },
+        // vocal covers only (Joel, 19 Oct 2026): the singer's line, written at sounding pitch in treble clef
+        { "voice", "Voice", { inst("voice", "Voice") } },
         { "rhythm", "Rhythm Section", {
               inst("piano", "Piano"), inst("electric-guitar", "Electric Guitar"), inst("electric-bass", "Electric Bass"),
               inst("drumset", "Drum Kit"), inst("congas", "Congas", true) } },
@@ -2006,6 +2016,39 @@ RetVal<QString> StarScoreService::createSection(const QString& templateKey, cons
     order.customized = true;
     master->parts()->setParts(list, order);
 
+    // the Voice right under the lead sheet (Joel, 19 Oct 2026), not at the bottom: the top staff keeps the tempo
+    // and rehearsal marks
+    if (templateKey == "voice") {
+        QString leadPid;
+        for (const StarScoreSection& s : load().sections) {
+            if (s.templateKey == "lead-sheet" && !s.partIds.isEmpty()) {
+                leadPid = s.partIds.front();
+                break;
+            }
+        }
+        PartInstrumentList reordered, added;
+        int leadAt = -1;
+        for (const engraving::Part* p : ms->parts()) {
+            PartInstrument pi;
+            pi.isExistingPart = true;
+            pi.partId = p->id();
+            if (!before.count(idText(p))) {
+                added << pi;
+                continue;
+            }
+            reordered << pi;
+            if (idText(p) == leadPid) {
+                leadAt = reordered.size();
+            }
+        }
+        if (leadAt >= 0 && !added.isEmpty()) {
+            for (int i = 0; i < added.size(); ++i) {
+                reordered.insert(leadAt + i, added.at(i));
+            }
+            master->parts()->setParts(reordered, order);
+        }
+    }
+
     std::vector<engraving::Part*> newParts;
     for (engraving::Part* p : ms->parts()) {
         if (!before.count(idText(p))) {
@@ -2432,7 +2475,8 @@ void StarScoreService::setSectionStatus(const QString& sectionId, StarScoreStatu
     store(data);
     if (status == StarScoreStatus::Finished) {
         lockFinishedParts(partIds);
-    }
+    }    // a vocal cover's Lead Sheet + Voice, once the Voice and the lead sheet are Finished
+    QTimer::singleShot(0, &m_timerGuard, [this]() { makeLeadSheetVoiceWhenReady(); });
 }
 
 void StarScoreService::setSectionAutoStatus(const QString& sectionId)
@@ -2443,7 +2487,8 @@ void StarScoreService::setSectionAutoStatus(const QString& sectionId)
             s.autoStatus = true;
         }
     }
-    store(data);
+    store(data);    // a vocal cover's Lead Sheet + Voice, once the Voice and the lead sheet are Finished
+    QTimer::singleShot(0, &m_timerGuard, [this]() { makeLeadSheetVoiceWhenReady(); });
 }
 
 std::map<QString, StarScoreStatus> StarScoreService::partStatuses() const
@@ -2712,8 +2757,8 @@ int StarScoreService::partScoreStatus(const engraving::Score* score) const
 void StarScoreService::setPartScoreStatus(const engraving::Score* score, int status)
 {
     engraving::MasterScore* ms = score ? const_cast<engraving::MasterScore*>(score->masterScore()) : nullptr;
-    const QStringList ids = starscorePartIdsOfScore(score, ms);
-    if (ids.isEmpty()) {
+    const QStringList idsIn = starscorePartIdsOfScore(score, ms);
+    if (idsIn.isEmpty()) {
         return;
     }
     Data data = loadFrom(ms);
@@ -2732,6 +2777,14 @@ void StarScoreService::setPartScoreStatus(const engraving::Score* score, int sta
         }
         return;
     }
+    // a "+ Voice" part score is the sheet of the part under the Voice: the Voice keeps its own status
+    QStringList ids = idsIn;
+    {
+        const QString voice = voicePartIdOf(data);
+        if (!voice.isEmpty() && ids.size() > 1 && ids.contains(voice)) {
+            ids.removeAll(voice);
+        }
+    }
     for (const QString& id : ids) {
         if (status < 0) {
             data.partStatus.erase(id);
@@ -2744,7 +2797,8 @@ void StarScoreService::setPartScoreStatus(const engraving::Score* score, int sta
     if (status == int(StarScoreStatus::Finished)) {
         lockFinishedScore(const_cast<engraving::Score*>(score));
         offerLowAlternates(ids);
-    }
+    }    // a vocal cover's Lead Sheet + Voice, once the Voice and the lead sheet are Finished
+    QTimer::singleShot(0, &m_timerGuard, [this]() { makeLeadSheetVoiceWhenReady(); });
 }
 
 //! A sheet marked Finished keeps its layout: every system locked, a page break after each page's last system
@@ -2795,7 +2849,8 @@ void StarScoreService::setPartStatus(const QString& partId, int status)
     if (status == int(StarScoreStatus::Finished)) {
         lockFinishedParts({ partId });
         offerLowAlternates({ partId });
-    }
+    }    // a vocal cover's Lead Sheet + Voice, once the Voice and the lead sheet are Finished
+    QTimer::singleShot(0, &m_timerGuard, [this]() { makeLeadSheetVoiceWhenReady(); });
 }
 
 void StarScoreService::setSectionSkipSheet(const QString& sectionId, const QString& which, bool skip)

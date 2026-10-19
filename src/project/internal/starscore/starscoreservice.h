@@ -188,6 +188,9 @@ public:
     muse::RetVal<QString> moveSongTo(const QString& groupRel) override;
     void followMovedSong(const std::vector<std::pair<QString, QString> >& moves) override;
     muse::RetVal<QString> fileNewSong(const QString& kind) override;
+    bool hasVoiceSection() const override;
+    QStringList voicePartScoreChoices() const override;
+    muse::RetVal<QString> addVoiceToPartScore(const QString& partScoreName) override;
     QString songCode() const override;
     QJsonObject songRecordings() const override;
     void setSongRecordings(const QJsonObject& recordings) override;
@@ -558,6 +561,27 @@ private:
     void lockFinishedScore(engraving::Score* score);
     void lockFinishedParts(const QStringList& partIds);
     void openPartBooks(const QStringList& partIds);
+    // --- vocal covers (starscorevoice.cpp) ---
+    //! A "+ Voice" part score: the Voice above another part score's instruments
+    struct VoiceScore {
+        notation::IExcerptNotationPtr score;   // "Bass Guitar + Voice"
+        notation::INotationPtr source;         // "Bass Guitar" (null when that part score is gone)
+        QString sourceName;
+        QStringList sourcePartIds;          // the instruments under the Voice
+        QString voicePartId;
+    };
+    static QString voicePartIdOf(const Data& data);
+    std::vector<VoiceScore> voiceScores(const notation::IMasterNotationPtr& master) const;
+    //! The + Voice part score made (no undo step of its own: call inside one)
+    notation::INotationPtr makeVoiceScore(const notation::IMasterNotationPtr& master, const QString& sourceName, const QString& name);
+    //! Its style, breaks, locks, text positions and bar widths from the source part score; the Voice staff small.
+    //! Inside an undo step. Returns whether anything was copied.
+    bool formatVoiceScore(const VoiceScore& v);
+    //! Every + Voice part score formatted from its source again (the export does this first). Returns how many.
+    int refreshVoiceScores();
+    //! The "Lead Sheet + Voice" part score made once the Voice and the lead sheet are both Finished (a vocal cover);
+    //! nothing when it exists already. Returns whether it was made.
+    bool makeLeadSheetVoiceWhenReady();
     // Automatic test run (starscoreautotest.cpp): STARSCORE_AUTOTEST=<output folder>
     static bool autotestRequested();
     void startAutotest();

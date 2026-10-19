@@ -4,6 +4,17 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.64
+
+- **Vocal covers have a Voice.** The Voice is a section of its own (one "Voice" staff in treble clef, at sounding pitch, under the lead sheet in the main score) with its own status.
+  - A new Vocal Cover (File › New, Type: Vocal Cover) starts with it. For a song already in Vocal Covers (Ghostbusters, Another Star, Move On Up), add it with "+ New section" › Voice. Other songs don't offer it.
+  - Once the Voice is marked Finished, the export writes `CODE - Voice.pdf` into the lead sheet's folder, which is then called `1 Lead Sheet + Voice` (the lead sheet moves along with it).
+- **Lead Sheet + Voice.** Once the Voice and the lead sheet are both Finished, StarScore makes a "Lead Sheet + Voice" part score: the Voice in a small staff on top, the lead sheet below, with its chord symbols and texts. It's exported as `CODE - Lead Sheet + Voice.pdf`.
+- **Add Voice to a part…** (StarScore bar, ⋯ menu) makes a part score like "Bass Guitar + Voice": the Voice in a small staff above that part. It's exported beside the part's own sheet, named after it (`1 Rhythm/CODE - Bass + Voice.pdf`), once the Voice is Finished. The instruments are named beside the staves, without their section ("Tenor Sax", not "3H: Tenor Sax").
+- Every "+ Voice" part score takes its part score's formatting again at each export: its style, system breaks, system locks, text positions and bar widths. Page breaks aren't copied: with the Voice above, a page of the part's systems doesn't fit on one page, so the systems fill the pages as they come.
+- Marking a "+ Voice" part score Finished marks the part under the Voice; the Voice keeps its own status.
+- **Fewer sheets rewritten for nothing.** Sheets are compared with the ones already in Sheets and Demos with a tiny allowance for rounding (0.003 pt). Before, a note moved by a ten-thousandth of a point could count as a change, archive the old sheet and write it again.
+
 ## 1.18.63
 
 - **Tenutos and staccatos no longer sit on a tie.** On the second of two tied notes, an articulation on the tie's side could land on the tie, most of all on a note on the middle line (its tenuto went in the space above, where the tie's arc is). This was a MuseScore bug: it placed the articulation before laying out the tie and only guessed how much room the tie needed. Now, once the ties are laid out, such an articulation moves away from the note until it clears the tie: a space at a time inside the staff, a little at a time outside it.

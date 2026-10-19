@@ -511,6 +511,13 @@ QStringList StarScoreService::standardizeSong(bool apply)
             keptScoreNames.insert(a.scoreName);
         }
     }
+    // the "+ Voice" part scores (Joel, 19 Oct 2026: the Voice above a part), while their instruments stay
+    for (size_t i = 0; i < books.size(); ++i) {
+        if (books[i]->name().endsWith(" + Voice") && bookParts[i].size() > 1
+            && std::none_of(bookParts[i].begin(), bookParts[i].end(), [&](const engraving::Part* p) { return doomedParts.contains(idText(p)); })) {
+            keptScoreNames.insert(books[i]->name());
+        }
+    }
     std::set<int> doomedBooks;
     std::map<QString, int> bookForPart;   // surviving part -> its part score
     for (size_t i = 0; i < books.size(); ++i) {

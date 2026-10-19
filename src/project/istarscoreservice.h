@@ -351,6 +351,9 @@ struct StarScoreBandFile
     //! or put it on a sheet with another instrument ("1 Rhythm/GIJO - Bass Synth.pdf", now on "GIJO - Keys.pdf"):
     //! archived once the sheet is written under its new name
     QStringList formerPaths;
+    //! A "+ Voice" sheet (Joel, 19 Oct 2026): the Voice above another sheet's instruments ("CODE - Bass + Voice.pdf"),
+    //! printed from its "+ Voice" part score. Not counted as one of the song's own sheets in the sheet record.
+    bool withVoice = false;
 };
 
 //! Export to Sheets and Demos: which version number to raise for this export, judged from what changed in the music
@@ -743,6 +746,17 @@ public:
     //! folder in STARSIGN (originals in Sketches, covers and vocal covers in In Progress), "CODE - Title.starscore",
     //! the code recorded in codes_proj.json. kind: "original", "cover", "vocal". Returns the file's path.
     virtual muse::RetVal<QString> fileNewSong(const QString& kind) = 0;
+
+    // --- vocal covers (Joel, 19 Oct 2026) ---
+    //! The song has a Voice section (vocal covers only; template "voice")
+    virtual bool hasVoiceSection() const = 0;
+    //! Part scores that can get the Voice above them ("Bass Guitar" -> "Bass Guitar + Voice"): single-part part
+    //! scores and rhythm books, not those that have it already, the Voice's own or the arrangements' scores
+    virtual QStringList voicePartScoreChoices() const = 0;
+    //! "Add Voice to a part…": a part score "<name> + Voice" with the Voice (small staff) above the part score's
+    //! instruments, formatted like that part score (style, breaks, system locks, text positions, bar widths). It
+    //! takes that part score's formatting again at every export. Returns the new part score's name.
+    virtual muse::RetVal<QString> addVoiceToPartScore(const QString& partScoreName) = 0;
 
     // --- export to the band's "Sheets and Demos" folder ---
     virtual QString bandFolder() const = 0;          // saved choice, or the usual Google Drive location if it exists

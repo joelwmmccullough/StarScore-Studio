@@ -83,6 +83,13 @@ QString md5OfFile(const QString& path);
 //     Extras, String Duo, Combined Parts…) is inside "<song>/Sheet Music/"; the song folder itself keeps Chord Charts,
 //     Demos, Reference PDFs, Horn Part Guides, Update Notes, Version History and the song's own PDFs.
 extern const QString SHEET_MUSIC;   // "Sheet Music"
+//! The lead sheet's folder in Sheet Music: "1 Lead Sheet", or "1 Lead Sheet + Voice" in a vocal cover with a Voice
+//! sheet (Joel, 19 Oct 2026)
+extern const QString LEAD_SHEET_FOLDER;
+extern const QString LEAD_SHEET_VOICE_FOLDER;
+bool isLeadSheetFolder(const QString& folder);
+//! The lead sheet's folder of a song (`songDir` is the song folder's full path): the "+ Voice" one when it's there
+QString leadSheetFolderOf(const QString& songDir);
 //! The Half-Time and Double-Time sheets' folder in the song folder, beside Sheet Music (Joel, 15 Oct 2026):
 //! "Sheet Music (Double-Time)/4H Tpt Alt Ten/CODE - Trumpet.pdf". variant: "Half-Time" or "Double-Time"
 QString sheetMusicFor(const QString& variant);

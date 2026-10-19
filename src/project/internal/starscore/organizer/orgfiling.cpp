@@ -412,7 +412,7 @@ struct BandFiler {
         }
         static const QRegularExpression leadSheet("lead[_ ]sheet", QRegularExpression::CaseInsensitiveOption);
         if (leadSheet.match(base).hasMatch() || pdfFirstPageText(abs(rel)).toLower().startsWith("lead sheet")) {
-            return place(rel, song, "1 Lead Sheet", code + " - Lead Sheet.pdf");
+            return place(rel, song, leadSheetFolderOf(paths.band + "/" + song), code + " - Lead Sheet.pdf");
         }
         if (base.toLower().startsWith("arrangement guide")) {
             return place(rel, song, "Version History/" + paths.todayIso() + " Superseded Guides", name);
@@ -694,7 +694,14 @@ BandFilingReport fileBand(const Paths& paths, Codes& codes, const Roster& roster
                 }
             }
         }
-        for (const QString& name : QStringList { "1 Lead Sheet", "1 Rhythm", "Horn Part Guides" }) {
+        // (a vocal cover's "1 Lead Sheet + Voice" stands for "1 Lead Sheet": an empty "1 Lead Sheet" left beside it goes)
+        const QString lead = leadSheetFolderOf(dir.absolutePath());
+        if (lead == LEAD_SHEET_VOICE_FOLDER) {
+            const QString old = songFolderPath(LEAD_SHEET_FOLDER);
+            QDir(dir.filePath(old)).remove(".DS_Store");
+            dir.rmdir(old);
+        }
+        for (const QString& name : QStringList { lead, "1 Rhythm", "Horn Part Guides" }) {
             const QString want = songFolderPath(name);
             if (!dir.exists(want)) {
                 dir.mkpath(want);

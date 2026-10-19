@@ -364,8 +364,9 @@ Library buildLibrary(const ScanResult& scan, const std::map<QString, QString>& c
             bool generic = false;
             int sn = 0;
             QStringList strings;
-            if (folder == "1 Lead Sheet") {
+            if (isLeadSheetFolder(folder)) {
                 s.lead = files;
+                s.leadFolder = folder;
                 for (const QString& f : files) {
                     s.leadq[f] = qualityOf(folder, f);
                 }
@@ -469,7 +470,7 @@ Library buildLibrary(const ScanResult& scan, const std::map<QString, QString>& c
         // --- sheets that exist but aren't written
         for (const QString& f : s.lead) {
             if (s.leadq[f] != Quality::Ok) {
-                s.issues.push_back({ "1 Lead Sheet", f, s.leadq[f] });
+                s.issues.push_back({ s.leadFolder, f, s.leadq[f] });
             }
         }
         for (const auto& [part, q] : s.rhythmq) {

@@ -381,7 +381,7 @@ std::vector<Task> buildTasks(const Library& lib, const PlayCounts& plays)
             add("lead", "Fill in the lead sheet &mdash; it is currently a blank form template", "blank template &mdash; fill it in");
         } else {
             for (const SheetIssue& i : d.issues) {
-                if (i.folder == "1 Lead Sheet" && i.quality == Quality::Thin) {
+                if (isLeadSheetFolder(i.folder) && i.quality == Quality::Thin) {
                     add("lead", "Check the lead sheet &mdash; it runs short of the rest of the tune", "runs short &mdash; check it");
                 }
             }

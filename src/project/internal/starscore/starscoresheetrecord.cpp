@@ -214,7 +214,8 @@ QString StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, con
     std::map<QString, QString> scoreOfFolder;        // folder -> its Score
     std::map<QString, QStringList> filesOfFolder;    // folder -> its sheets (not scores)
     for (const StarScoreBandFile& f : full.files) {
-        if (!f.sourceFile.isEmpty()) {
+        // (a "+ Voice" sheet isn't one a folder's colour waits for: the part's own sheet is)
+        if (!f.sourceFile.isEmpty() || f.withVoice) {
             continue;
         }
         // (a Score in "Section Scores" and a Flexible horn's sheet in "Horn 1" belong to the folder above)
@@ -472,7 +473,8 @@ QString StarScoreService::writeSheetRecord(const engraving::MasterScore* ms, con
     };
 
     if (!lead.isEmpty()) {
-        setFolder(starscore::org::songFolderPath("1 Lead Sheet"), lead, {});
+        // ("1 Lead Sheet + Voice" in a vocal cover with a Voice sheet)
+        setFolder(starscoreSectionFolderOf(lead.front()), lead, {});
     }
     if (!roleParts.empty()) {
         // Joel, 5 Oct 2026: the Rhythm folder is green once drums, bass and guitar (a drummer who reads the lead sheet:

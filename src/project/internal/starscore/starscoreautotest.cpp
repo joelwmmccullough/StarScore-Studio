@@ -1460,6 +1460,27 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
                 autotestLog(QString("  %1 staff %2: %3").arg(p->partName().toQString()).arg(i + 1).arg(where.join(", ")));
             }
         }
+    } else if (step.startsWith("voiceadd:") || step == "voicescores") {
+        // voiceadd:<part score name>: Add Voice to a part…; voicescores: the + Voice part scores, what each is made
+        // from and its staves (the Voice's small or not), and the part scores that could get one
+        if (step.startsWith("voiceadd:")) {
+            const RetVal<QString> r = addVoiceToPartScore(step.mid(9));
+            autotestLog("  " + (r.ret ? QString("made ") + r.val : QString("refused: ") + QString::fromStdString(r.ret.toString())));
+        }
+        for (int i = 0; i < 20; ++i) {
+            QCoreApplication::processEvents();
+        }
+        for (const VoiceScore& v : voiceScores(master)) {
+            QStringList staves;
+            INotationPtr n = v.score->notation();
+            if (engraving::Score* es = n && n->elements() ? n->elements()->msScore() : nullptr) {
+                for (const engraving::Part* p : es->parts()) {
+                    staves << p->partName().toQString() + (p->staves().front()->staffType(engraving::Fraction(0, 1))->isSmall() ? " (small)" : "");
+                }
+            }
+            autotestLog(QString("  %1 <- %2: %3").arg(v.score->name(), v.sourceName, staves.join(", ")));
+        }
+        autotestLog("  choices: " + voicePartScoreChoices().join(", "));
     } else if (step == "parts") {
         for (const engraving::Part* p : ms->parts()) {
             autotestLog(QString("  %1 (%2)").arg(p->partName().toQString(), p->instrumentId().toQString()));

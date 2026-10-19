@@ -57,6 +57,7 @@ struct SongInfo {
     QString root;                // "1 Amplitudes", "4 Works In Progress/Jeju"
     QString code;
     QStringList lead;
+    QString leadFolder = QStringLiteral("1 Lead Sheet");   // "1 Lead Sheet + Voice" in a vocal cover with a Voice sheet
     std::map<QString, Quality> leadq;
     QStringList rhythm;          // "Bass", "Drums", "Bass (Name)"
     std::map<QString, Quality> rhythmq;

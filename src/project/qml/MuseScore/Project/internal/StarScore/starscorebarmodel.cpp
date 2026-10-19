@@ -504,6 +504,10 @@ QVariantList StarScoreBarModel::addSectionMenu() const
 {
     QVariantList items;
     for (const StarScoreSectionTemplate& t : starScore()->sectionTemplates()) {
+        // the Voice: vocal covers only, and one per song (Joel, 19 Oct 2026)
+        if (t.key == "voice" && (starScore()->songKind() != "vocal" || starScore()->hasVoiceSection())) {
+            continue;
+        }
         QStringList names;
         for (const StarScoreInstrument& i : t.instruments) {
             names << i.partName;
@@ -552,10 +556,23 @@ QVariantList StarScoreBarModel::moreMenu() const
                                    { "checkable", true }, { "checked", g == group }, { "enabled", !group.isEmpty() && g != group } };
     }
 
+    // Add Voice to a part… (Joel, 19 Oct 2026): "Bass Guitar + Voice", the Voice in a small staff above the part
+    QVariantList voiceItems;
+    const bool hasVoice = starScore()->hasVoiceSection();
+    if (hasVoice) {
+        for (const QString& name : starScore()->voicePartScoreChoices()) {
+            voiceItems << QVariantMap { { "id", "voice-add:" + name }, { "title", name }, { "enabled", true } };
+        }
+    }
+
     return {
         QVariantMap { { "title", group.isEmpty() ? muse::qtrc("starscore", "Move to (only for songs in STARSIGN)")
                                                  : muse::qtrc("starscore", "Move to") },
                       { "subitems", moveItems }, { "enabled", !group.isEmpty() } },
+        QVariantMap { { "title", !hasVoice ? muse::qtrc("starscore", "Add Voice to a part… (needs a Voice section)")
+                                 : voiceItems.isEmpty() ? muse::qtrc("starscore", "Add Voice to a part… (every part has it)")
+                                 : muse::qtrc("starscore", "Add Voice to a part…") },
+                      { "subitems", voiceItems }, { "enabled", hasVoice && !voiceItems.isEmpty() } },
         QVariantMap {},
         QVariantMap { { "title", refs.empty() ? muse::qtrc("starscore", "Reference PDFs")
                                               : muse::qtrc("starscore", "Reference PDFs (%1)").arg(refs.size()) },
@@ -829,6 +846,12 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
         const muse::RetVal<QString> r = starScore()->moveSongTo(arg);
         if (!r.ret) {
             interactive()->error(muse::trc("starscore", "The song wasn't moved"), r.ret.toString());
+        }
+    } else if (action == "voice-add") {
+        // voice-add:<part score name>
+        const muse::RetVal<QString> r = starScore()->addVoiceToPartScore(arg);
+        if (!r.ret) {
+            interactive()->error(muse::trc("starscore", "The Voice wasn't added"), r.ret.toString());
         }
     } else if (action == "part-instrument") {
         // part-instrument:<part id>:<instrument id>

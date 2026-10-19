@@ -199,6 +199,18 @@ QString md5OfFile(const QString& path)
 }
 
 const QString SHEET_MUSIC = QStringLiteral("Sheet Music");
+const QString LEAD_SHEET_FOLDER = QStringLiteral("1 Lead Sheet");
+const QString LEAD_SHEET_VOICE_FOLDER = QStringLiteral("1 Lead Sheet + Voice");
+
+bool isLeadSheetFolder(const QString& folder)
+{
+    return folder == LEAD_SHEET_FOLDER || folder == LEAD_SHEET_VOICE_FOLDER;
+}
+
+QString leadSheetFolderOf(const QString& songDir)
+{
+    return QFileInfo(songDir + "/" + SHEET_MUSIC + "/" + LEAD_SHEET_VOICE_FOLDER).isDir() ? LEAD_SHEET_VOICE_FOLDER : LEAD_SHEET_FOLDER;
+}
 
 QString sheetMusicFor(const QString& variant)
 {

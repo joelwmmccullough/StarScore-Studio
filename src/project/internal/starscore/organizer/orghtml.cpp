@@ -190,7 +190,9 @@ QString whatsHereHtml(const SongInfo& d, const Roster& roster, const QDate& toda
         return out.join(", ");
     };
     if (!d.lead.isEmpty()) {
-        rows.push_back({ "1 Lead Sheet", FOLDER_BLURB["1 Lead Sheet"], names(d.lead) });
+        rows.push_back({ d.leadFolder, d.leadFolder == LEAD_SHEET_VOICE_FOLDER
+                         ? QString("The tune itself &mdash; melody, chords and form &mdash; and the Voice, the singer&rsquo;s line.")
+                         : FOLDER_BLURB["1 Lead Sheet"], names(d.lead) });
     }
     if (!d.rhythm.isEmpty()) {
         QStringList lab;

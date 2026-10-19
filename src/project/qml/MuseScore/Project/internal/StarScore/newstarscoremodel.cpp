@@ -185,6 +185,13 @@ bool NewStarScoreModel::create(const QVariantMap& o)
 
     // saved and filed at once in Projects and Sheets (Joel, 19 Oct 2026), rather than at the first export
     const QString kind = o.value("songKind", "original").toString();
+    // a vocal cover starts with its Voice section (Joel, 19 Oct 2026)
+    if (kind == "vocal") {
+        const muse::RetVal<QString> voice = starScore()->createSectionFromTemplate("voice");
+        if (!voice.ret) {
+            LOGE() << "[starscore] the Voice section wasn't made: " << voice.ret.toString();
+        }
+    }
     const muse::RetVal<QString> filed = starScore()->fileNewSong(kind);
     if (!filed.ret) {
         interactive()->warning(muse::trc("starscore", "The new score isn't saved yet"), filed.ret.toString());

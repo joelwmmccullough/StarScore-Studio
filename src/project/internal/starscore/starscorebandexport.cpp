@@ -368,6 +368,12 @@ static QStringList starscoreFormerPathsOf(const StarScoreBandFile& f)
             out << v18;
         }
     }
+    // the lead sheet's folder is "1 Lead Sheet + Voice" while the song has a Voice sheet (Joel, 19 Oct 2026)
+    if (folder == starscore::org::LEAD_SHEET_VOICE_FOLDER) {
+        out << starscore::org::LEAD_SHEET_FOLDER + "/" + file;
+    } else if (folder == starscore::org::LEAD_SHEET_FOLDER) {
+        out << starscore::org::LEAD_SHEET_VOICE_FOLDER + "/" + file;
+    }
     static const QRegularExpression hornSub("^(\\d+H Flexible)/Horn \\d+/(.+)$");
     const QRegularExpressionMatch m = hornSub.match(rel);
     if (m.hasMatch()) {
@@ -875,6 +881,19 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
     std::map<QString, QString> renamedFolders;     // older horn folder name -> its name now (a Piccolo was a "Flute")
     std::map<QString, QString> chairOfSheetPart;   // a Flexible sheet made into a part of its own -> its chair's part
 
+    // A vocal cover's Voice (Joel, 19 Oct 2026): its sheet, once Finished, goes in the lead sheet's folder, which is then
+    // called "1 Lead Sheet + Voice"; the "+ Voice" sheets come with it (below)
+    bool voiceFinished = false;
+    for (const StarScoreSection& sec : data.sections) {
+        if (sec.templateKey == "voice" && !sec.partIds.isEmpty()) {
+            voiceFinished = sec.status == StarScoreStatus::Finished;
+            if (!voiceFinished) {
+                plan.notes << muse::qtrc("starscore", "The Voice isn't marked Finished yet, so its sheets aren't exported.");
+            }
+        }
+    }
+    const QString leadFolder = voiceFinished ? starscore::org::LEAD_SHEET_VOICE_FOLDER : starscore::org::LEAD_SHEET_FOLDER;
+
     for (const StarScoreSection& sec : data.sections) {
         if (sec.partIds.isEmpty()) {
             continue;
@@ -883,13 +902,20 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
 
         if (key == "lead-sheet") {
             if (sec.partIds.size() == 1) {
-                addFile("1 Lead Sheet", "Lead Sheet", sec.partIds, false);
+                addFile(leadFolder, "Lead Sheet", sec.partIds, false);
             } else {
                 for (const QString& pid : sec.partIds) {
                     if (engraving::Part* p = partById(pid)) {
-                        addFile("1 Lead Sheet", "Lead Sheet (" + p->partName().toQString() + ")", { pid }, false);
+                        addFile(leadFolder, "Lead Sheet (" + p->partName().toQString() + ")", { pid }, false);
                     }
                 }
+            }
+            continue;
+        }
+
+        if (key == "voice") {
+            if (voiceFinished) {
+                addFile(leadFolder, "Voice", sec.partIds.mid(0, 1), false);
             }
             continue;
         }
@@ -1352,6 +1378,45 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
         }
     }
 
+    // "+ Voice" sheets (Joel, 19 Oct 2026): beside the sheet of the instruments under the Voice, named after it
+    // ("CODE - Bass + Voice.pdf"), once the Voice is Finished
+    if (voiceFinished) {
+        std::set<QString> paths;
+        for (const StarScoreBandFile& f : plan.files) {
+            paths.insert(f.relativePath);
+        }
+        std::vector<StarScoreBandFile> added;
+        for (const VoiceScore& v : voiceScores(project->masterNotation())) {
+            const StarScoreBandFile* src = nullptr;
+            for (const StarScoreBandFile& f : plan.files) {
+                if (!f.isScore && !f.isVersion && !f.withVoice && f.sourceFile.isEmpty() && f.partIds.size() == v.sourcePartIds.size()
+                    && std::all_of(f.partIds.begin(), f.partIds.end(), [&](const QString& id) { return v.sourcePartIds.contains(id); })) {
+                    src = &f;
+                    break;
+                }
+            }
+            if (!src) {
+                plan.notes << muse::qtrc("starscore", "%1: the instruments under the Voice have no sheet of their own, so it isn't "
+                                                      "exported.").arg(v.score->name());
+                continue;
+            }
+            StarScoreBandFile g = *src;
+            g.relativePath = src->relativePath.left(src->relativePath.size() - 4) + " + Voice.pdf";
+            g.partIds = QStringList { v.voicePartId } + v.sourcePartIds;
+            g.withVoice = true;
+            g.formerPaths.clear();
+            if (!g.sheetLeft.isEmpty()) {
+                QStringList lines = g.sheetLeft.split('\n');
+                lines[0] += " + Voice";
+                g.sheetLeft = lines.join('\n');
+            }
+            if (paths.insert(g.relativePath).second) {
+                added.push_back(g);
+            }
+        }
+        plan.files.insert(plan.files.end(), added.begin(), added.end());
+    }
+
     // Joel, 14 Oct 2026: the sheet folders are inside the song folder's "Sheet Music" folder ("Sheet Music/1 Rhythm/…");
     // Reference PDFs stay at the top of the song folder (and Chord Charts and Demos, written apart from the plan)
     for (StarScoreBandFile& f : plan.files) {
@@ -1804,21 +1869,44 @@ static QStringList starscorePdfDrawing(const QByteArray& pdf)
             last = m.capturedEnd();
         }
         named += drawing.mid(last);
-        last = 0;
-        for (auto it = number.globalMatch(named); it.hasNext();) {
-            const QRegularExpressionMatch m = it.next();
-            out += named.mid(last, m.capturedStart() - last);
-            out += QString::number(std::round(m.captured(0).toDouble() * 100.0) / 100.0, 'f', 2);
-            last = m.capturedEnd();
-        }
-        out += named.mid(last);
-        pages << out;
+        // (the numbers are compared with a tolerance by starscoreSameDrawing, not rounded here: rounded, a coordinate a
+        // ten-thousandth of a unit either side of a rounding step read as a change; Bet's lead sheet was rewritten after
+        // a Voice was added, its notes moved by 0.0002 of a 1200th of an inch)
+        Q_UNUSED(out);
+        Q_UNUSED(number);
+        pages << named;
     }
     return pages;
 }
 
 //! True when a freshly exported PDF (its bytes) shows exactly what the existing file shows: the same bytes apart
 //! from the export date and the random document id, or else the same drawing on every page
+//! Two pages' drawing instructions the same, numbers allowed to differ by 0.05 (a 1200th of an inch in Qt's PDFs:
+//! 0.003 pt), which layout arithmetic does from one run to the next
+static bool starscoreSameDrawing(const QString& a, const QString& b)
+{
+    if (a == b) {
+        return true;
+    }
+    static const QRegularExpression number("-?\\d*\\.\\d+|-?\\d+(?=[\\s\\]\\[/<>()]|$)");
+    QRegularExpressionMatchIterator ia = number.globalMatch(a);
+    QRegularExpressionMatchIterator ib = number.globalMatch(b);
+    qsizetype lastA = 0, lastB = 0;
+    while (ia.hasNext() && ib.hasNext()) {
+        const QRegularExpressionMatch ma = ia.next();
+        const QRegularExpressionMatch mb = ib.next();
+        if (QStringView(a).mid(lastA, ma.capturedStart() - lastA) != QStringView(b).mid(lastB, mb.capturedStart() - lastB)) {
+            return false;
+        }
+        if (std::abs(ma.captured(0).toDouble() - mb.captured(0).toDouble()) > 0.05) {
+            return false;
+        }
+        lastA = ma.capturedEnd();
+        lastB = mb.capturedEnd();
+    }
+    return !ia.hasNext() && !ib.hasNext() && QStringView(a).mid(lastA) == QStringView(b).mid(lastB);
+}
+
 static bool starscoreSamePdf(const QByteArray& fresh, const QString& existingPath)
 {
     QFile b(existingPath);
@@ -1835,7 +1923,16 @@ static bool starscoreSamePdf(const QByteArray& fresh, const QString& existingPat
         return true;
     }
     const QStringList drawn = starscorePdfDrawing(fresh);
-    return !drawn.isEmpty() && drawn == starscorePdfDrawing(y);
+    const QStringList before = starscorePdfDrawing(y);
+    if (drawn.isEmpty() || drawn.size() != before.size()) {
+        return false;
+    }
+    for (qsizetype i = 0; i < drawn.size(); ++i) {
+        if (!starscoreSameDrawing(drawn.at(i), before.at(i))) {
+            return false;
+        }
+    }
+    return true;
 }
 
 //! True when two .mscz files hold the same files with the same contents (the zip's own dates are ignored)
@@ -3159,6 +3256,15 @@ struct UpdatesLock {
 
 RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPaths)
 {
+    // the "+ Voice" part scores take their part score's formatting again (Joel, 19 Oct 2026), and a vocal cover's
+    // Lead Sheet + Voice is made if it's due
+    if (m_exportVariant.isEmpty() && !m_exportSource && !m_exportDryRun) {
+        makeLeadSheetVoiceWhenReady();
+        const int formatted = refreshVoiceScores();
+        if (formatted > 0) {
+            LOGI() << "[starscore] formatted " << formatted << " + Voice part score(s) from their part scores";
+        }
+    }
     // The plan is made once: the sheets to write come from it, and so do the archiving of sheets under older names
     // and the sheet record, which need every sheet, not only the ticked ones (each plan reads codes.json from Drive)
     const RetVal<StarScoreBandExportPlan> fullPlan = planBandExport();
@@ -3395,8 +3501,8 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         std::vector<engraving::EngravingItem*> shownAgain;
         if (oneHornSax.match(file.relativePath).hasMatch()) {
             starscore::hideMuteMarkings(book->elements()->msScore());
-        } else if (bookScore->parts().size() == 1
-                   && starscore::isWoodwindInstrument(bookScore->parts().front()->instrumentId().toQString())) {
+        } else if ((bookScore->parts().size() == 1 || (file.withVoice && bookScore->parts().size() == 2))
+                   && starscore::isWoodwindInstrument(bookScore->parts().back()->instrumentId().toQString())) {
             // any other woodwind sheet (Joel, 14 Oct 2026: no mute text on a sheet for an instrument without a mute):
             // hidden for the PDF only, the part score keeps them
             starscore::hideMuteMarkings(bookScore, &shownAgain);
@@ -4770,6 +4876,14 @@ int StarScoreService::moveSheetsToCurrentPaths(const StarScoreBandExportPlan& pl
     }
     if (moved.empty()) {
         return 0;
+    }
+    // a folder left empty by the moves goes ("1 Lead Sheet", once its sheets are in "1 Lead Sheet + Voice")
+    for (const auto& [old, now] : moved) {
+        const QString folder = QFileInfo(songDir + "/" + old).absolutePath();
+        QDir(folder).remove(".DS_Store");
+        if (QDir().rmdir(folder)) {
+            LOGI() << "[starscore] removed the empty folder " << folder;
+        }
     }
     // the sheet record: every mention of the old path (its entry, and the lists of sheets each folder colour needs)
     const QString recordPath = plan.bandFolder + "/6 Inbox/.organizer/sheets/" + plan.code + ".json";

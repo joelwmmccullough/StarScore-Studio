@@ -125,6 +125,7 @@ target_sources(project PRIVATE
     internal/starscore/starscorecombined.cpp
     internal/starscore/starscorecombined.h
     internal/starscore/starscorehorncopy.cpp
+    internal/starscore/starscorevoice.cpp
     internal/starscore/starscoreautoarchive.cpp
     internal/starscore/starscoreautoarchive.h
     internal/starscore/starscorepdf.cpp

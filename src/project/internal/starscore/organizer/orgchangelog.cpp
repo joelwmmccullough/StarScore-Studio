@@ -60,7 +60,7 @@ static QStringList readersOfSheet(const QString& relInSong, const QString& code,
     if (file.contains(" - Score.pdf") || file.contains(" Score (") || file.endsWith(" Score.pdf") || folder == "Reference PDFs") {
         return {};
     }
-    if (folder == "1 Lead Sheet") {
+    if (isLeadSheetFolder(folder)) {
         QStringList all;
         for (const Player* p : roster.current()) {
             all << p->name;
@@ -78,7 +78,7 @@ static QString fileref(const QString& relInSong)
 static QString folderLabel(const QString& relInSong)
 {
     const QString folder = withoutSheetMusic(relInSong).section('/', 0, 0);
-    if (folder == "1 Lead Sheet") {
+    if (isLeadSheetFolder(folder)) {
         return "Lead Sheet";
     }
     if (folder == "1 Rhythm") {
@@ -134,7 +134,7 @@ int addChangelogEntries(QJsonObject& changelog, const SongInfo& song, const Rost
             }
             const QString arr = c.arrangement.isEmpty() ? folderLabel(c.relativePath) : c.arrangement;
             const QString folder = withoutSheetMusic(c.relativePath).section('/', 0, 0);
-            const bool lead = folder == "1 Lead Sheet";
+            const bool lead = isLeadSheetFolder(folder);
             // Any Horns: every version of a chair says the same thing; one line per chair
             const QRegularExpressionMatch chair = chairNo.match(c.part);
             if ((folder.contains("Any Horns") || folder.contains("Flexible")) && chair.hasMatch()) {
@@ -207,7 +207,7 @@ int addChangelogEntries(QJsonObject& changelog, const SongInfo& song, const Rost
                 continue;
             }
             const QString arr = folderLabel(rel);
-            if (withoutSheetMusic(rel).startsWith("1 Lead Sheet/")) {
+            if (isLeadSheetFolder(withoutSheetMusic(rel).section('/', 0, 0))) {
                 addFor(who, kind == "added" ? QString("New <b>lead sheet</b>: %1").arg(fileref(rel))
                        : kind == "changed" ? QString("The <b>lead sheet</b> was updated: %1").arg(fileref(rel))
                        : QString("The <b>lead sheet</b> %1 was retired (it&rsquo;s kept in Version History).").arg(fileref(rel)),

@@ -2215,6 +2215,7 @@ void StarScoreService::tidyOpenedScore()
     renamePersonNamedPartScores();
     renameOffSchemePartScores();
     bracketTwoTrumpetSections();
+    makeLeadSheetVoiceWhenReady();
     labelPartBooks();
     // the Keys player's bass staff: always in the full score, only where it has music in the part scores
     if (starscore::applyKeysStaffRules(ms, leadSheetPartsOf(ms)) > 0) {
@@ -2400,7 +2401,8 @@ int StarScoreService::renameOffSchemePartScores()
     int renamed = 0;
     for (const IExcerptNotationPtr& e : master->excerpts()) {
         const QString name = e->name();
-        if (arrangementScores.contains(name)) {
+        // (and the "+ Voice" part scores, named for the part score they're made from)
+        if (arrangementScores.contains(name) || name.endsWith(" + Voice")) {
             continue;
         }
         engraving::Excerpt* ex = importExcerptOf(e);
