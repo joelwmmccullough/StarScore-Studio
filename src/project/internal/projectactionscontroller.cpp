@@ -219,6 +219,21 @@ void ProjectActionsController::init()
             }
         });
     }
+    dispatcher()->reg(this, "starscore-rhythm-normal", [this]() {
+        INotationPtr notation = globalContext()->currentNotation();
+        if (!notation) {
+            return;
+        }
+        mu::engraving::Score* score = notation->elements()->msScore();
+        notation->undoStack()->prepareChanges(TranslatableString::untranslatable("Rhythm markings back to normal notes"));
+        const int n = starscore::unmakeRhythmMarkings(score);
+        notation->undoStack()->commitChanges();
+        notation->notationChanged().notify();
+        if (n == 0) {
+            interactive()->info(muse::trc("starscore", "Rhythm markings"),
+                                muse::trc("starscore", "Select the rhythm markings to make normal notes first."));
+        }
+    });
     dispatcher()->reg(this, "starscore-make-keys", [this]() {
         interactive()->info(muse::trc("starscore", "Keys part"), starScoreService()->makeKeysPart().toStdString());
     });

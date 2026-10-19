@@ -225,6 +225,13 @@ const UiActionList ProjectUiActions::m_actions = {
              TranslatableString("action", "Make the selected notes rhythm markings on the space below the staff: small, silent, "
                                           "slash heads, kept there whatever their pitch")
              ),
+    UiAction("starscore-rhythm-normal",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Rhythm markings back to normal notes"),
+             TranslatableString("action", "Make the selected rhythm markings normal notes again: normal size, played, normal "
+                                          "heads, at their own pitch")
+             ),
     UiAction("starscore-make-keys",
              mu::context::UiCtxProjectOpened,
              mu::context::CTX_ANY,

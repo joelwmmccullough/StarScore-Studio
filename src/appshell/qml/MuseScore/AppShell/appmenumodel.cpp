@@ -393,6 +393,7 @@ MenuItem* AppMenuModel::makeFormatMenu()
         makeMenuItem("starscore-part-flugelhorn"),
         makeMenuItem("starscore-rhythm-above"),
         makeMenuItem("starscore-rhythm-below"),
+        makeMenuItem("starscore-rhythm-normal"),
         makeMenuItem("starscore-make-keys"),
         makeMenuItem("starscore-compare-parts"),
         makeMenuItem("starscore-voice-order"),

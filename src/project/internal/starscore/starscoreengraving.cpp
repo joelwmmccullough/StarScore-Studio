@@ -1315,6 +1315,70 @@ int mu::project::starscore::makeRhythmMarkings(Score* score, bool below)
     return count;
 }
 
+int mu::project::starscore::unmakeRhythmMarkings(Score* score)
+{
+    if (!score) {
+        return 0;
+    }
+    std::set<Chord*> chords;
+    for (EngravingItem* e : score->selection().elements()) {
+        if (e && e->isNote()) {
+            chords.insert(toNote(e)->chord());
+        } else if (e && e->isChord()) {
+            chords.insert(toChord(e));
+        }
+    }
+    std::set<Chord*> linked;
+    for (Chord* c : chords) {
+        if (!c || c->isGrace()) {
+            continue;
+        }
+        // (only chords that are markings: a normal note in the selection is left as it is)
+        const bool marking = std::any_of(c->notes().begin(), c->notes().end(), [](const Note* n) {
+            return n->fixed() || isRhythmMarking(n);
+        });
+        if (!marking) {
+            continue;
+        }
+        for (EngravingObject* o : c->linkList()) {
+            if (o && o->isChord()) {
+                linked.insert(toChord(o));
+            }
+        }
+    }
+    int count = 0;
+    for (Chord* c : linked) {
+        const bool counted = chords.count(c) > 0;
+        c->undoChangeProperty(Pid::SMALL, false);
+        c->undoChangeProperty(Pid::STEM_DIRECTION, PropertyValue::fromValue<DirectionV>(DirectionV::AUTO));
+        for (Note* n : c->notes()) {
+            if (n->headGroup() == NoteHeadGroup::HEAD_SLASH) {
+                n->undoChangeProperty(Pid::HEAD_GROUP, NoteHeadGroup::HEAD_NORMAL);
+            }
+            n->undoChangeProperty(Pid::SMALL, false);
+            n->undoChangeProperty(Pid::PLAY, true);
+            n->undoChangeProperty(Pid::FIXED, false);
+            n->undoChangeProperty(Pid::FIXED_LINE, 0);
+            count += counted ? 1 : 0;
+        }
+    }
+    // in the part scores, linked to the full score's look again (changing them there had unlinked it; now they match)
+    for (Chord* c : linked) {
+        if (c->score()->isMaster()) {
+            continue;
+        }
+        if (!c->isAppearanceLinkedToMaster()) {
+            c->undoChangeProperty(Pid::APPEARANCE_LINKED_TO_MASTER, true);
+        }
+        for (Note* n : c->notes()) {
+            if (!n->isAppearanceLinkedToMaster()) {
+                n->undoChangeProperty(Pid::APPEARANCE_LINKED_TO_MASTER, true);
+            }
+        }
+    }
+    return count;
+}
+
 bool mu::project::starscore::partHasNotes(const Part* part)
 {
     if (!part || !part->score()) {

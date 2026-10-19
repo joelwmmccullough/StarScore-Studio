@@ -298,6 +298,7 @@ MenuItemList NotationContextMenuModel::makeElementItems()
         items << makeMenu(TranslatableString("notation", "Rhythm markings"), {
             makeMenuItem("starscore-rhythm-above"),
             makeMenuItem("starscore-rhythm-below"),
+            makeMenuItem("starscore-rhythm-normal"),
         });
     }
 

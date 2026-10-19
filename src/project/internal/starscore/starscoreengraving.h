@@ -112,6 +112,10 @@ int clearRhythmRestOffsets(mu::engraving::MasterScore* master, bool apply);
 //! The selected notes made rhythm markings: small, silent, slash heads (a marking's own head kept), stems up and pinned
 //! to the space above the staff, or stems down below it. Undoable (inside a command). Returns how many notes.
 int makeRhythmMarkings(mu::engraving::Score* score, bool below);
+//! The selected rhythm markings made normal notes again (Joel, 19 Oct 2026): normal size, played, normal heads (a slash
+//! head goes back to a normal one; a diamond or x head stays), stems automatic, no longer pinned, so they sit at their
+//! own pitch. In the full score and every part score. Undoable (inside a command). Returns how many notes.
+int unmakeRhythmMarkings(mu::engraving::Score* score);
 //! Whether the part has any note (a rest-only part is empty)
 bool partHasNotes(const mu::engraving::Part* part);
 

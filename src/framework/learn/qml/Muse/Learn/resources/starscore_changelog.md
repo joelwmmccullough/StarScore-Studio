@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.65
+
+- **Rhythm markings back to normal notes.** Next to "Rhythm markings above the staff" and "…below the staff" (Format menu and the right-click menu) there's now "Rhythm markings back to normal notes". It makes the selected markings normal notes again: normal size, played, normal noteheads (slashes become normal heads; diamond and x heads stay), stems automatic, and back at their own pitch. It works in the full score or a part score, and changes the notes in every score they appear in. Normal notes in the selection are left alone.
+
 ## 1.18.64
 
 - **Vocal covers have a Voice.** The Voice is a section of its own (one "Voice" staff in treble clef, at sounding pitch, under the lead sheet in the main score) with its own status.

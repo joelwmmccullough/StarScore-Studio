@@ -485,7 +485,7 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             autotestLog("  fermatas: " + out.join(", "));
         }
     } else if (step.startsWith("makerhythm:")) {
-        // makerhythm:<staff>:<bar>:above|below: the notes of that staff's bar selected and made rhythm markings
+        // makerhythm:<staff>:<bar>:above|below|normal: the notes of that staff's bar selected and made rhythm markings
         // (makerhythm:<staff in that score>:<bar>:above|below:<part score name>: in that part score)
         const QStringList a = step.split(':');
         engraving::Score* sc = ms;
@@ -503,7 +503,9 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             sc->selection().updateSelectedElements();
         }
         where->undoStack()->prepareChanges(TranslatableString::untranslatable("Rhythm markings"));
-        const int made = starscore::makeRhythmMarkings(sc, a.value(3) == "below");
+        // (normal: the markings made normal notes again)
+        const int made = a.value(3) == "normal" ? starscore::unmakeRhythmMarkings(sc)
+                         : starscore::makeRhythmMarkings(sc, a.value(3) == "below");
         where->undoStack()->commitChanges();
         sc->deselectAll();
         autotestLog(QString("  %1 note(s)").arg(made));
