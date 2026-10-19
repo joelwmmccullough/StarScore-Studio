@@ -39,6 +39,7 @@
  * Everything is logged to log.txt.
  */
 #include "starscoreservice.h"
+#include "starscorelayoutcheck.h"
 #include "starscorehornkeys.h"
 #include "starscoreautoarchive.h"
 #include "engraving/dom/layoutbreak.h"
@@ -484,6 +485,31 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             }
             autotestLog("  fermatas: " + out.join(", "));
         }
+    } else if (step == "restclashes") {
+        // restclashes: in the main score and every part score as laid out on screen, the beamed rests on a note or an
+        // accidental (a grace note's too)
+        std::vector<std::pair<QString, engraving::Score*> > all { { QString("(main score)"), ms } };
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            if (e->notation()) {
+                all.push_back({ e->name(), e->notation()->elements()->msScore() });
+            }
+        }
+        int total = 0;
+        for (auto& [name, sc] : all) {
+            sc->setLayoutAll();
+            sc->doLayout();
+            QStringList found;
+            for (const starscore::LayoutIssue& i : starscore::layoutIssues(sc)) {
+                if (i.kind == "rest on a note") {
+                    found << QString("b%1 %2").arg(i.bar).arg(i.what);
+                }
+            }
+            if (!found.isEmpty()) {
+                autotestLog("  " + name + ": " + found.join(", "));
+                total += int(found.size());
+            }
+        }
+        autotestLog(QString("  %1 in all").arg(total));
     } else if (step.startsWith("makerhythm:")) {
         // makerhythm:<staff>:<bar>:above|below|normal: the notes of that staff's bar selected and made rhythm markings
         // (makerhythm:<staff in that score>:<bar>:above|below:<part score name>: in that part score)

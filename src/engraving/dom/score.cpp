@@ -6037,6 +6037,10 @@ void Score::doLayoutRange(const Fraction& st, const Fraction& et)
     }
 
     renderer()->layoutScore(this, start, end);
+    // StarScore: again while a bar was found to need room for a rest in a beam (on screen only; a few times at most)
+    for (int again = 0; again < 6 && takeStarscoreRestRoomGrew(); ++again) {
+        renderer()->layoutScore(this, start, end);
+    }
 
     if (m_resetAutoplace) {
         m_resetAutoplace = false;

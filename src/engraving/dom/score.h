@@ -28,6 +28,7 @@
 */
 
 #include <set>
+#include <map>
 #include <memory>
 #include <optional>
 #include <utility>
@@ -712,6 +713,15 @@ public:
     bool savedCapture() const { return m_savedCapture; }
     void setSavedCapture(bool v) { m_savedCapture = v; }
     bool printing() const { return m_printing; }
+
+    // StarScore (Joel, 19 Oct 2026): rests in beams on the notes beside them. On screen, a bar where one has no room
+    // is laid out a little wider (extra stretch by bar tick, not saved) and the score laid out again; on a printed
+    // sheet (starscoreSheetLayout) that extra is left out, and StarScore widens the bar itself before printing.
+    bool starscoreSheetLayout() const { return m_starscoreSheetLayout; }
+    void setStarscoreSheetLayout(bool v) { m_starscoreSheetLayout = v; }
+    std::map<int, double>& starscoreRestRoom() const { return m_starscoreRestRoom; }
+    void setStarscoreRestRoomGrew() const { m_starscoreRestRoomGrew = true; }
+    bool takeStarscoreRestRoomGrew() const { bool g = m_starscoreRestRoomGrew; m_starscoreRestRoomGrew = false; return g; }
     void setPrinting(bool val) { m_printing = val; }
     virtual bool playlistDirty() const;
     virtual void setPlaylistDirty();
@@ -1212,6 +1222,9 @@ private:
     bool m_markIrregularMeasures = true;
     bool m_showInstrumentNames = true;
     bool m_printing = false;                // True if we are drawing to a printer
+    bool m_starscoreSheetLayout = false;
+    mutable std::map<int, double> m_starscoreRestRoom;
+    mutable bool m_starscoreRestRoomGrew = false;
     bool m_savedCapture = false;            // True if we saved an image capture
     bool m_corrupted = false;
 

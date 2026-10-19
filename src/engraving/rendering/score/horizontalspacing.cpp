@@ -733,6 +733,14 @@ double HorizontalSpacing::chordRestSegmentNaturalWidth(Segment* segment, Horizon
 
     Measure* measure = segment->measure();
     double userStretch = std::clamp(measure->userStretch(), 0.1, 10.0); // TODO: enforce via UI, not here
+    // StarScore: on screen, the room a rest in a beam needs (Score::starscoreRestRoom)
+    if (!measure->score()->starscoreSheetLayout()) {
+        const std::map<int, double>& room = measure->score()->starscoreRestRoom();
+        auto roomIt = room.find(measure->tick().ticks());
+        if (roomIt != room.end()) {
+            userStretch += roomIt->second;
+        }
+    }
 
     double segTotalStretch = durationStretch * userStretch;
     segment->setStretch(segTotalStretch);

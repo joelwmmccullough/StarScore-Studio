@@ -43,6 +43,8 @@
 #include "dom/tuplet.h"
 #include "dom/utils.h"
 #include "dom/note.h"
+#include "dom/accidental.h"
+#include "dom/stem.h"
 
 #include "layoutcontext.h"
 #include "tlayout.h"
@@ -852,6 +854,128 @@ void BeamLayout::layoutNonCrossBeams(ChordRest* cr, LayoutContext& ctx)
     }
 }
 
+// StarScore (Joel, 19 Oct 2026): Seagrass, on screen: rests in beams on the next note's accidental (a grace note's too)
+// or the previous note, with the line's spacing final. Each one is moved sideways into the free space between the notes
+// either side when there is enough; else its bar is laid out a little wider (Score::starscoreRestRoom, not saved) and
+// the score laid out again (Score::doLayoutRange), up to 1.0 more stretch (twice as wide), as a printed sheet's bar is
+// widened. Not on
+// a printed sheet (Score::starscoreSheetLayout): StarScore widens the bar itself before printing (spaceOutBeamedRests).
+void BeamLayout::clearBeamedRestsOfNotes(System* system)
+{
+    if (!system || system->measures().empty()) {
+        return;
+    }
+    const Score* score = system->score();
+    if (score->starscoreSheetLayout()) {
+        return;
+    }
+    const double spatium = score->style().spatium();
+    const double pad = 0.15 * spatium;
+    for (MeasureBase* mb : system->measures()) {
+        if (!mb->isMeasure()) {
+            continue;
+        }
+        Measure* m = toMeasure(mb);
+        for (Segment* seg = m->first(SegmentType::ChordRest); seg; seg = seg->next(SegmentType::ChordRest)) {
+            for (EngravingItem* e : seg->elist()) {
+                if (!e || !e->isRest() || !e->visible() || !toRest(e)->beam() || toRest(e)->isGap()) {
+                    continue;
+                }
+                Rest* rest = toRest(e);
+                const staff_idx_t restStaff = rest->vStaffIdx();
+                Shape around;
+                for (Segment* nb : { seg->prev1(SegmentType::ChordRest), seg->next1(SegmentType::ChordRest) }) {
+                    if (!nb || nb->system() != system) {
+                        continue;
+                    }
+                    for (EngravingItem* o : nb->elist()) {
+                        if (!o || !o->isChord() || o->vStaffIdx() != restStaff) {
+                            continue;
+                        }
+                        Chord* c = toChord(o);
+                        for (Note* n : c->notes()) {
+                            if (n->visible()) {
+                                around.add(n->pageBoundingRect());
+                            }
+                            if (n->accidental() && n->accidental()->visible()) {
+                                around.add(n->accidental()->pageBoundingRect());
+                            }
+                        }
+                        if (c->stem() && c->stem()->visible()) {
+                            around.add(c->stem()->pageBoundingRect());
+                        }
+                        for (Chord* grace : c->graceNotes()) {
+                            for (Note* n : grace->notes()) {
+                                if (n->visible()) {
+                                    around.add(n->pageBoundingRect());
+                                }
+                                if (n->accidental() && n->accidental()->visible()) {
+                                    around.add(n->accidental()->pageBoundingRect());
+                                }
+                            }
+                        }
+                    }
+                }
+                // as the printed sheets' check sees it (starscorelayoutcheck: the rest's box a little inside)
+                const RectF full = rest->pageBoundingRect();
+                const RectF r = full.adjusted(0.05 * spatium, 0.05 * spatium, -0.05 * spatium, -0.05 * spatium);
+                bool hit = false;
+                for (const ShapeElement& el : around.elements()) {
+                    hit = hit || r.intersects(el);
+                }
+                if (!hit) {
+                    continue;
+                }
+                // sideways: between what is beside it (only what reaches its height), when it fits
+                double leftLimit = -1e9, rightLimit = 1e9;
+                for (const ShapeElement& el : around.elements()) {
+                    if (el.top() >= full.bottom() + pad || el.bottom() <= full.top() - pad) {
+                        continue;
+                    }
+                    if (el.center().x() < full.center().x()) {
+                        leftLimit = std::max(leftLimit, el.right());
+                    } else {
+                        rightLimit = std::min(rightLimit, el.left());
+                    }
+                }
+                if (rightLimit - leftLimit - 2.0 * pad >= full.width()) {
+                    const double dx = full.left() < leftLimit + pad ? leftLimit + pad - full.left() : rightLimit - pad - full.right();
+                    rest->mutldata()->moveX(dx);
+                    for (Rest* mergedRest : rest->ldata()->mergedRests) {
+                        mergedRest->mutldata()->moveX(dx);
+                    }
+                    seg->createShape(restStaff);
+                    continue;
+                }
+                // else a wider bar
+                double& room = score->starscoreRestRoom()[m->tick().ticks()];
+                if (room < 1.0 - 0.001) {
+                    room += 0.2;
+                    score->setStarscoreRestRoomGrew();
+                    continue;
+                }
+                // and with the bar as wide as that: away from the beam, just clear of what it is on (up to 5 spaces),
+                // as on a printed sheet
+                RectF over;
+                for (const ShapeElement& el : around.elements()) {
+                    if (r.intersects(el)) {
+                        over = over.isNull() ? RectF(el) : over.united(el);
+                    }
+                }
+                const bool beamAbove = rest->beam()->up();
+                const double dy = beamAbove ? over.bottom() + pad - full.top() : over.top() - pad - full.bottom();
+                if (!over.isNull() && std::abs(dy) <= 5.0 * spatium) {
+                    rest->mutldata()->moveY(dy);
+                    for (Rest* mergedRest : rest->ldata()->mergedRests) {
+                        mergedRest->mutldata()->moveY(dy);
+                    }
+                    seg->createShape(restStaff);
+                }
+            }
+        }
+    }
+}
+
 void BeamLayout::verticalAdjustBeamedRests(Rest* rest, Beam* beam, LayoutContext& ctx)
 {
     const double spatium = rest->spatium();
@@ -907,6 +1031,16 @@ void BeamLayout::verticalAdjustBeamedRests(Rest* rest, Beam* beam, LayoutContext
             for (Segment* nb : { restSeg->prev1(SegmentType::ChordRest), restSeg->next1(SegmentType::ChordRest) }) {
                 if (nb && nb->system() == restSeg->system() && restStaff < static_cast<const Segment*>(nb)->shapes().size()) {
                     around.add(nb->staffShape(restStaff).translated(nb->pagePos()));
+                    // (grace notes aren't in the segment's shape: they hang off their chord)
+                    for (EngravingItem* o : nb->elist()) {
+                        if (o && o->isChord() && o->vStaffIdx() == restStaff) {
+                            for (Chord* grace : toChord(o)->graceNotes()) {
+                                if (grace->ldata()->isSetShape()) {
+                                    around.add(grace->shape().translate(grace->pagePos()));
+                                }
+                            }
+                        }
+                    }
                 }
             }
             auto clear = [&]() {

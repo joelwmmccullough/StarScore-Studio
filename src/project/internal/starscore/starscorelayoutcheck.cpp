@@ -191,7 +191,12 @@ static std::vector<BeamedRestHit> beamedRestHits(const Score* score)
                                 if (!o || !o->isChord() || o->vStaffIdx() != e->vStaffIdx()) {
                                     continue;
                                 }
-                                for (const Note* n : toChord(o)->notes()) {
+                                // the chord's notes and its grace notes' (Seagrass: a grace note's sharp on a rest)
+                                std::vector<const Note*> notes(toChord(o)->notes().begin(), toChord(o)->notes().end());
+                                for (const Chord* grace : toChord(o)->graceNotes()) {
+                                    notes.insert(notes.end(), grace->notes().begin(), grace->notes().end());
+                                }
+                                for (const Note* n : notes) {
                                     std::vector<RectF> parts;
                                     if (n->visible() && n->ldata()) {
                                         parts.push_back(n->pageBoundingRect());
@@ -266,7 +271,13 @@ std::vector<LayoutIssue> layoutIssues(const Score* score)
     }
     // a rest inside a beam printed over the next or previous note's accidental or head (Joel, 17 Oct 2026)
     for (const BeamedRestHit& h : beamedRestHits(score)) {
-        issues.push_back({ h.pageNo, h.measure->no() + 1, QString("rest on a note"), QString("beamed rest over a %1").arg(h.what) });
+        const double sp = score->style().spatium();
+        const RectF r = h.rest->pageBoundingRect();
+        issues.push_back({ h.pageNo, h.measure->no() + 1, QString("rest on a note"),
+                           QString("beamed rest over a %1 (rest %2..%3 sp, over %4..%5, offset %6, beam %7)").arg(h.what)
+                           .arg(r.top() / sp, 0, 'f', 1).arg(r.bottom() / sp, 0, 'f', 1).arg(h.over.top() / sp, 0, 'f', 1)
+                           .arg(h.over.bottom() / sp, 0, 'f', 1).arg(h.rest->offset().y() / sp, 0, 'f', 1)
+                           .arg(h.rest->beam() && h.rest->beam()->up() ? "up" : "down") });
     }
     return issues;
 }

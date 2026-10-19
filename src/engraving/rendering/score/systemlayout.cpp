@@ -1263,6 +1263,7 @@ void SystemLayout::layoutSystemElements(System* system, LayoutContext& ctx)
 
     RestLayout::alignRests(elementsToLayout.system, ctx);
     RestLayout::checkFullMeasureRestCollisions(elementsToLayout.system, ctx);
+    BeamLayout::clearBeamedRestsOfNotes(elementsToLayout.system);
 
     for (BarLine* bl : elementsToLayout.barlines) {
         TLayout::updateBarlineShape(bl, bl->mutldata(), ctx);

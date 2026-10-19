@@ -4,6 +4,16 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.66
+
+- **Rests in beams no longer sit on accidentals on screen.** A rest inside a beam is moved up or down to clear the beam after the bar is spaced, so it could land on the next note's sharp or natural (or a grace note's) or the note before it. The printed sheets already fixed these by widening the bar; the score on screen now does too:
+  - the rest moves sideways into the free space between the notes either side, when there's room;
+  - otherwise its bar is laid out a little wider on screen (up to twice as wide, as on a printed sheet). This isn't saved and doesn't change your file;
+  - if even that isn't enough, the rest moves away from the beam until it clears.
+  - Seagrass had 90 of these across its scores, G.I. Jorge 183, Drum Battle 38, Bet 12; all now 0. Printed sheets come out as before.
+- Grace notes' accidentals now count when the printed sheets check rests in beams, too.
+- **1-Horn Bb Saxophone.** Made from the 1H Trumpet sheet, it now plays at the Trumpet's pitch (written an octave above the Trumpet's notes) instead of an octave lower. Parts already made keep their notes. The Trombone still plays an octave lower.
+
 ## 1.18.65
 
 - **Rhythm markings back to normal notes.** Next to "Rhythm markings above the staff" and "…below the staff" (Format menu and the right-click menu) there's now "Rhythm markings back to normal notes". It makes the selected markings normal notes again: normal size, played, normal noteheads (slashes become normal heads; diamond and x heads stay), stems automatic, and back at their own pitch. It works in the full score or a part score, and changes the notes in every score they appear in. Normal notes in the selection are left alone.

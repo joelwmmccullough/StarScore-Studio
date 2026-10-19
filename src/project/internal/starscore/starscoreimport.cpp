@@ -1416,9 +1416,10 @@ RetVal<QStringList> StarScoreService::createLowAlternates(const QString& section
             }
             engraving::XmlReader reader(mime);
             ms->pasteStaff(reader, start, to->staves().front()->idx());
-            // 1-Horn: the B♭ Saxophone and the Trombone play the Trumpet's melody an octave lower (Joel, 5 Oct 2026)
+            // 1-Horn: the Trombone plays the Trumpet's melody an octave lower (Joel, 5 Oct 2026). The B♭ Saxophone plays
+            // it at the Trumpet's pitch (Joel, 19 Oct 2026: not moved down an octave; until then it was)
             const QString toName = starscore::bandHornName(to->instrumentId().toQString());
-            const bool oneHornLower = templateKey == "1-horn" && (toName == "Tenor Sax" || toName == "Trombone");
+            const bool oneHornLower = templateKey == "1-horn" && toName == "Trombone";
             if (sameWrittenNotes || oneHornLower) {
                 // the piccolo's Flute: pasted at sounding pitch, so written an octave above the piccolo's notes: back
                 // down by an octave, same spelling (the written notes of both parts match)

@@ -2803,6 +2803,27 @@ static Ret starscorePrintSheetAsIs(const INotationWriterPtr& writer, const INota
     if (!score) {
         return make_ret(Ret::Code::InternalError);
     }
+    // laid out as a sheet: a rest in a beam on the note beside it isn't moved sideways or given the extra room it gets
+    // on screen (Score::starscoreRestRoom), for spaceOutBeamedRests to deal with as before; laid out again before and
+    // after when the screen's layout had any extra room
+    score->setStarscoreSheetLayout(true);
+    const bool screenRoom = !score->starscoreRestRoom().empty();
+    struct SheetLayoutEnd {
+        mu::engraving::Score* score;
+        bool relayout;
+        ~SheetLayoutEnd()
+        {
+            score->setStarscoreSheetLayout(false);
+            if (relayout) {
+                score->setLayoutAll();
+                score->doLayout();
+            }
+        }
+    } sheetLayoutEnd { score, screenRoom };
+    if (screenRoom) {
+        score->setLayoutAll();
+        score->doLayout();
+    }
     if (partSheet) {
         starscoreRetitleTexts(score, left, right);
     }

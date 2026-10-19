@@ -37,6 +37,7 @@ class ChordRest;
 class Measure;
 class Score;
 class Segment;
+class System;
 }
 
 namespace mu::engraving::rendering::score {
@@ -45,6 +46,8 @@ class BeamLayout
 public:
 
     static void layout(Beam* item, const LayoutContext& ctx);
+    //! StarScore: rests in beams on the notes beside them, on screen (see beamlayout.cpp)
+    static void clearBeamedRestsOfNotes(System* system);
     static void layoutIfNeed(Beam* item, const LayoutContext& ctx);
     static void layout1(Beam* item, LayoutContext& ctx);
 
