@@ -2217,6 +2217,7 @@ void StarScoreService::tidyOpenedScore()
 
     standardizeHornNames();
     renamePersonNamedPartScores();
+    addMissingPartScores();
     renameOffSchemePartScores();
     bracketTwoTrumpetSections();
     makeLeadSheetVoiceWhenReady();
@@ -2365,6 +2366,92 @@ int StarScoreService::renamePersonNamedPartScores()
 //!   words for them, or "Keys", "Drums", "Percussion", "Guitar", "Bass", "Lead"): its instruments in the band's words
 //!   ("Electric Piano", "Drums", "Piano & Hammond Organ"). "Bass (5-String)", "Hammond Organ (1)", "Keys" stay.
 //! The arrangements' own scores are left alone, and a name another part score has already is not given again.
+//! Joel, 20 Oct 2026 (Ciao Ferrari had no Drums part score, and no Keys): every instrument of the Rhythm Section with
+//! music in it has a part score of its own, or is in a rhythm part score with others (Keys). Not counted: the arrangements'
+//! scores and the "+ Voice" scores, which hold it beside other instruments. Returns how many were made.
+int StarScoreService::addMissingPartScores()
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    engraving::MasterScore* ms = masterScore();
+    if (!master || !ms) {
+        return 0;
+    }
+    const Data data = load();
+    std::set<QString> arrangementScores;
+    for (const StarScoreArrangement& a : data.arrangements) {
+        arrangementScores.insert(a.scoreName);
+    }
+    std::set<QString> covered;
+    for (const IExcerptNotationPtr& e : master->excerpts()) {
+        engraving::Excerpt* ex = starscoreExcerptOf(e);
+        if (!ex || arrangementScores.count(e->name()) || e->name().endsWith(" + Voice")) {
+            continue;
+        }
+        for (const engraving::Part* p : ex->parts()) {
+            covered.insert(idText(p));
+        }
+    }
+    QStringList missing;
+    QStringList names;
+    for (const StarScoreSection& s : data.sections) {
+        // (the Rhythm Section only: a horn chair or string part without one may be left out on purpose)
+        if (s.templateKey != "rhythm" && !s.templateKey.endsWith("-rhythm")) {
+            continue;
+        }
+        for (const QString& pid : s.partIds) {
+            const engraving::Part* p = ms->partById(ID(pid));
+            if (p && !covered.count(pid) && !missing.contains(pid) && starscore::partHasNotes(p)) {
+                missing << pid;
+                names << p->partName().toQString();
+            }
+        }
+    }
+    if (missing.isEmpty()) {
+        return 0;
+    }
+    QSet<QString> taken;
+    for (const IExcerptNotationPtr& e : master->excerpts()) {
+        taken.insert(e->name().toLower());
+    }
+    // made directly (MuseScore's ready-made part score isn't offered for an instrument another score was started
+    // from: Fish Oil's Drumset), named as the band says and as the sheet is called: "Drums", "Keys" (a rhythm
+    // section keyboard), "Guitar 2"
+    ExcerptNotationList excerpts = master->excerpts();
+    int made = 0;
+    for (const QString& pid : missing) {
+        engraving::Part* p = ms->partById(ID(pid));
+        if (!p) {
+            continue;
+        }
+        const QString partName = p->partName().toQString();
+        QString want = rhythmRole(p->instrumentId().toQString()) == "keys" ? QString("Keys") : starscoreBandWords(partName);
+        if (want.isEmpty()) {
+            want = partName;
+        }
+        const QString base = want;
+        for (int n = 2; taken.contains(want.toLower()); ++n) {
+            want = QString("%1 (%2)").arg(base).arg(n);
+        }
+        taken.insert(want.toLower());
+        IExcerptNotationPtr score = master->createEmptyExcerpt(want);
+        score->setMasterParts({ p });
+        excerpts.push_back(score);
+        ++made;
+    }
+    if (made > 0) {
+        master->setExcerpts(excerpts);
+        applyStyles(missing);
+    }
+    LOGI() << "[starscore] part scores made for " << names.join(", ").toStdString() << ": " << made;
+    if (made > 0) {
+        if (INotationProjectPtr project = globalContext()->currentProject()) {
+            project->markAsUnsaved();
+        }
+        scheduleChanged();
+    }
+    return made;
+}
+
 int StarScoreService::renameOffSchemePartScores()
 {
     IMasterNotationPtr master = globalContext()->currentMasterNotation();

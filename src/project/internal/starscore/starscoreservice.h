@@ -620,6 +620,7 @@ private:
     //! instrument ("Bass (5-String)", "Percussion Lead", "Bassoon"); how many
     int renamePersonNamedPartScores();
     int renameOffSchemePartScores();
+    int addMissingPartScores();
     StarScoreUpdateAllStatus m_updateStatus;
     int m_updateWaits = 0;
     void updateAllNext();

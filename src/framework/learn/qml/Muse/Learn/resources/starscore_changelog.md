@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.69
+
+- **Every Rhythm Section instrument with music gets a part score.** When a song opens, a Rhythm Section instrument that has notes but no part score of its own (and isn't in one with others, like Keys) gets one, named as its sheet: Drums, Keys, Guitar 2, Bass 2… It's styled like the others. Ciao Ferrari gets Drums and Keys. Other songs that had gaps: Deimos (Guitar 2, Bass), Fish Oil (Drums), Intern (Keys), Pick Up The Pieces (Drums), Porcupine (Guitar 2, Keys, Bass 2, Bass Drum). Horn and string parts without a part score are left as they are.
+
 ## 1.18.68
 
 - **Composers follow the main score.** Changing the composer (or lyricist) text in the main score now changes it in every part score too, in the same undo step. In many songs the part scores' composer texts weren't linked to the main score's (Ciao Ferrari: 12 of 20), so they kept the old names. The part scores are also brought in line when a song opens and before each export.
