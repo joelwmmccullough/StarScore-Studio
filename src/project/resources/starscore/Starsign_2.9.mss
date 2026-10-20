@@ -40,14 +40,14 @@
     <lyricsDashMinLength>0.4</lyricsDashMinLength>
     <lyricsDashMaxLength>0.6</lyricsDashMaxLength>
     <lyricsDashMaxDistance>16</lyricsDashMaxDistance>
-    <lyricsDashForce>1</lyricsDashForce>
+    <lyricsDashForce>0</lyricsDashForce>
     <lyricsDashFirstAndLastGapAreHalf>1</lyricsDashFirstAndLastGapAreHalf>
     <lyricsAlignVerseNumber>1</lyricsAlignVerseNumber>
     <lyricsLineThickness>0.16</lyricsLineThickness>
     <lyricsMelismaAlign>left,baseline</lyricsMelismaAlign>
     <lyricsMelismaPad>0.2</lyricsMelismaPad>
     <lyricsDashPad>0.05</lyricsDashPad>
-    <lyricsDashLineThickness>0.1</lyricsDashLineThickness>
+    <lyricsDashLineThickness>0.23</lyricsDashLineThickness>
     <lyricsDashYposRatio>0.5</lyricsDashYposRatio>
     <lyricsShowDashIfSyllableOnFirstNote>1</lyricsShowDashIfSyllableOnFirstNote>
     <lyricsMelismaForce>0</lyricsMelismaForce>
@@ -57,7 +57,7 @@
     <lyricsLimitDashCount>0</lyricsLimitDashCount>
     <lyricsMaxDashCount>1</lyricsMaxDashCount>
     <lyricsCenterDashedSyllables>0</lyricsCenterDashedSyllables>
-    <lyricsOddFontFace>Jost</lyricsOddFontFace>
+    <lyricsOddFontFace>Futura</lyricsOddFontFace>
     <lyricsOddFontSize>10</lyricsOddFontSize>
     <lyricsOddLineSpacing>1</lyricsOddLineSpacing>
     <lyricsOddFontSpatiumDependent>1</lyricsOddFontSpatiumDependent>
