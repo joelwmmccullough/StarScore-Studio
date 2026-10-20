@@ -3537,7 +3537,7 @@ void StarScoreService::saveStyleSettings(const StyleSettings& settings)
 //! Done once per bundled version. A default the user chose themselves (not an older bundled one) is kept.
 void StarScoreService::installBuiltinDefaultStyle()
 {
-    static const int BUILTIN_STYLE_VERSION = 14;   // 1 = Starsign 2.0, 2 = 2.1, 3 = 2.2, 4 = 2.3, 5 = 2.4, 6 = 2.5, 7 = 2.6, 8 = 2.6 with H-bar 0.7sp, 9 = Futura staff text and text lines, 10 = alternate chord symbols 11pt, 11 = 2.7 (glissando text off), 12 = 2.8 (hairpin text Futura 9pt), 13 = 2.9 (expression text 9pt, Joel 15 Oct 2026), 14 = 2.9 with Joel's lyrics (no forced dash, dash 0.23sp, odd verses Futura; 20 Oct 2026)
+    static const int BUILTIN_STYLE_VERSION = 15;   // 1 = Starsign 2.0, 2 = 2.1, 3 = 2.2, 4 = 2.3, 5 = 2.4, 6 = 2.5, 7 = 2.6, 8 = 2.6 with H-bar 0.7sp, 9 = Futura staff text and text lines, 10 = alternate chord symbols 11pt, 11 = 2.7 (glissando text off), 12 = 2.8 (hairpin text Futura 9pt), 13 = 2.9 (expression text 9pt, Joel 15 Oct 2026), 14 = 2.9 with Joel's lyrics (no forced dash, dash 0.23sp, odd verses Futura; 20 Oct 2026), 15 = even verses Futura too
 
     const QString dir = globalConfiguration()->userAppDataPath().appendingComponent("StarScoreStyles").toQString();
     const QString target = dir + "/Starsign 2.9.mss";
@@ -3555,8 +3555,8 @@ void StarScoreService::installBuiltinDefaultStyle()
         const bool opened = mine.open(QIODevice::ReadOnly) && there.open(QIODevice::ReadOnly);
         const QByteArray thereData = opened ? there.readAll() : QByteArray();
         there.close();
-        // an earlier built-in 2.9 (before Joel's lyric settings, 20 Oct 2026) is replaced, not kept
-        static const QSet<QByteArray> EARLIER_BUILTIN { "a543e63ed187dd630992d60b0de59a11" };
+        // an earlier built-in 2.9 (before Joel's lyric settings, 20 Oct 2026, and with verses 2 and 4 still in Jost) is replaced, not kept
+        static const QSet<QByteArray> EARLIER_BUILTIN { "a543e63ed187dd630992d60b0de59a11", "2d5a28fd271406d9e72409647e3dd87e" };
         const bool same = opened && mine.readAll() == thereData;
         const bool earlierBuiltin = EARLIER_BUILTIN.contains(QCryptographicHash::hash(thereData, QCryptographicHash::Md5).toHex());
         if (!same && !earlierBuiltin) {

@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.73
+
+- **Starsign 2.9: all lyric verses in Futura.** Verses 2 and 4 were still in Jost; now every verse is Futura. The installed Starsign 2.9.mss is replaced again; songs take it when you Apply styles or Update all sheets.
+
 ## 1.18.72
 
 - **Starsign 2.9 style: Joel's lyric settings.** Lyric hyphens are no longer forced between syllables that are close together, hyphens are thicker (0.23 sp), and verse 1 and 3 lyrics are in Futura. The built-in Starsign 2.9.mss is replaced (the earlier built-in 2.9 isn't kept beside it). Songs take it when you Apply styles or Update all sheets.
