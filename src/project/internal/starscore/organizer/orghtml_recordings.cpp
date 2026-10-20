@@ -230,13 +230,22 @@ QString recordingsBlock(const RecordingsData& rec, const QString& name, const QS
               code.isEmpty() ? QString() : "<div class=\"code\">" + esc(code) + "</div>");
 
     const QString key = swOnly ? "sw:" + swName : code;
-    const auto groups = groupedTakes(rec, rec.performancesOf(key));
-    std::vector<std::vector<Take> > swGroups;
+    // Each take goes with the band that played the show (Joel, 20 Oct 2026: Ciao Ferrari's and Intern's Sweater
+    // Weather shows are filed under the Starsign song, and were listed as Starsign shows)
+    QJsonArray starsignPerfs, swPerfs;
+    auto byBand = [&](const QJsonArray& perfs) {
+        for (const QJsonValue& v : perfs) {
+            auto show = rec.shows.find(v.toObject().value("show").toString());
+            const bool sweater = show != rec.shows.end() && show->second.value("band").toString() == "Sweater Weather";
+            (sweater || swOnly ? swPerfs : starsignPerfs).append(v);
+        }
+    };
+    byBand(rec.performancesOf(key));
     if (!swName.isEmpty() && !swOnly) {
-        swGroups = groupedTakes(rec, rec.performancesOf("sw:" + swName));
-    } else if (swOnly) {
-        swGroups = groups;
+        byBand(rec.performancesOf("sw:" + swName));
     }
+    const auto groups = groupedTakes(rec, swOnly ? swPerfs : starsignPerfs);
+    const std::vector<std::vector<Take> > swGroups = groupedTakes(rec, swPerfs);
     std::vector<QJsonObject> album, wip, sessions, sources, swRel;
     for (const QJsonValue& v : rec.releasesOf(key)) {
         const QJsonObject r = v.toObject();

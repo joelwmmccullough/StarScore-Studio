@@ -67,6 +67,8 @@
 #include "starscoreengraving.h"
 #include "starscorechordchart.h"
 #include "organizer/organizer.h"
+#include "organizer/orghtml.h"
+#include "organizer/orglibrary.h"
 #include <QEventLoop>
 
 #include <QCoreApplication>
@@ -859,6 +861,22 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             });
         }
         autotestLog(QString("  parentheses %1, wrong %2").arg(all).arg(wrong));
+    } else if (step.startsWith("recordingshtml:")) {
+        // recordingshtml:<recordings.json>|<code>|<song name>: that song's Recordings page as HTML, in recordings-<code>.html
+        const QStringList a = step.mid(15).split('|');
+        QFile f(a.value(0));
+        mu::project::starscore::org::RecordingsData rec;
+        if (f.open(QIODevice::ReadOnly)) {
+            rec.load(QJsonDocument::fromJson(f.readAll()).object());
+        }
+        mu::project::starscore::org::SongInfo song;
+        song.code = a.value(1);
+        song.name = a.value(2);
+        QFile out(autotestDir() + "/recordings-" + song.code + ".html");
+        if (out.open(QIODevice::WriteOnly)) {
+            out.write(mu::project::starscore::org::recordingsHtml(rec, song, QDate::currentDate()).toUtf8());
+        }
+        autotestLog(QString("  %1 performances, written %2").arg(rec.performancesOf(song.code).size()).arg(out.fileName()));
     } else if (step.startsWith("mutetext:")) {
         // mutetext:<text>|<text>…: whether each counts as a mute marking (hidden on woodwind sheets)
         for (const QString& t : step.mid(9).split('|')) {

@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.71
+
+- **Recordings PDFs separate Sweater Weather shows from Starsign shows again.** Each live take now goes with the band that played the show. Ciao Ferrari's page had listed 17 Sweater Weather shows as Starsign shows, and Intern's page all 8 of its shows; they're now under "Sweater Weather, live". Every song's Recordings PDF and All Recordings.pdf are rebuilt once on the next organizer run.
+
 ## 1.18.70
 
 - **Fixed a crash when clicking a chord symbol with parentheses in a part score.** When parentheses were added to a chord symbol, the copies in the part scores were put on the main score's staff instead of the part score's. Clicking one crashed StarScore (twice in Ciao Ferrari's Bass and Guitar part scores). New parentheses now go on the right staff, songs saved with the wrong staff are repaired when they open, and selecting an item on a missing staff no longer crashes.

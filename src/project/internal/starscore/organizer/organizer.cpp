@@ -531,6 +531,10 @@ void Organizer::prepare(std::shared_ptr<Run> r)
         }() } }).toJson(QJsonDocument::Compact), QCryptographicHash::Md5).toHex());
         const bool everything = r->request.scope == RunRequest::RebuildAll || firstRun
                                 || orgState.value("rosterHash").toString() != rosterHash;
+        // the Recordings pages are rebuilt for every song once when the way they're made changes (2: each take goes
+        // with the band that played the show, Joel 20 Oct 2026)
+        constexpr int RECORDINGS_PAGES = 2;
+        const bool recordingsPages = orgState.value("recordingsPages").toInt() != RECORDINGS_PAGES;
         std::set<QString> songsToBuild;
         for (const SongInfo& s : lib.songs) {
             if (s.code == "????") {
@@ -546,7 +550,7 @@ void Organizer::prepare(std::shared_ptr<Run> r)
             // (a song whose sheet folders just moved into Sheet Music: its What's Here names the new places)
             const bool moved = std::any_of(filing.intoSheetMusic.begin(), filing.intoSheetMusic.end(),
                                            [&](const QString& m) { return m.startsWith(s.root + ": "); });
-            if (everything || missing || exportedSong || moved || changedRoots.contains(s.root) || r->recordingsChanged.contains(s.code)) {
+            if (everything || recordingsPages || missing || exportedSong || moved || changedRoots.contains(s.root) || r->recordingsChanged.contains(s.code)) {
                 songsToBuild.insert(s.root);
             }
         }
@@ -707,7 +711,7 @@ void Organizer::prepare(std::shared_ptr<Run> r)
                 "Maintenance Report", BASE_M);
         }
         if (haveProjects) {
-            const bool recordingsMoved = !r->recordingsChanged.isEmpty() || everything
+            const bool recordingsMoved = !r->recordingsChanged.isEmpty() || everything || recordingsPages
                                          || !QFileInfo::exists(paths.projects + "/All Recordings.pdf");
             if (recordingsMoved) {
                 job(allRecordingsHtml(recData, lib, paths.today), paths.projects + "/All Recordings.pdf", "All Recordings", REC_M);
@@ -774,6 +778,7 @@ void Organizer::prepare(std::shared_ptr<Run> r)
         }
         orgState["lastRun"] = QDateTime::currentDateTime().toString(Qt::ISODate);
         orgState["rosterHash"] = rosterHash;
+        orgState["recordingsPages"] = RECORDINGS_PAGES;
         r->state.doc = QJsonDocument(orgState);
         r->state.changed = true;
         r->recordings.doc = QJsonDocument(rec);
