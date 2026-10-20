@@ -1591,7 +1591,10 @@ void TLayout::layoutChordLine(const ChordLine* item, ChordLine::LayoutData* ldat
 
     if (!item->isToTheLeft()) {
         // Always place lines to the right of dots
-        double xMin = chordShape.left();
+        // (StarScore, Joel 20 Oct 2026: not from chordShape.left(), which is how far the chord reaches to the left as a
+        // positive distance; with an accidental, a parenthesized one most of all, it pushed the fall that far to the
+        // right of the notehead: Double Entendre 6H Trumpet 1, bar 57)
+        double xMin = -DBL_MAX;
         for (ShapeElement& shapeEl : chordShape.elements()) {
             if (!shapeEl.item() || !shapeEl.item()->isNoteDot()) {
                 continue;

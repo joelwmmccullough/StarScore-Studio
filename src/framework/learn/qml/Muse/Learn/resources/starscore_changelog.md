@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.76
+
+- **Falls (and other lines after a note) start next to the notehead when the note has an accidental.** MuseScore pushed them right by the accidental's width, a parenthesized accidental most of all (Double Entendre 6H Trumpet 1, bar 57).
+
 ## 1.18.75
 
 - **System text no longer breaks multimeasure rests, unless you tick it to.** Select a system text and tick "Breaks multimeasure rests" in its Properties (off by default). A text that doesn't break a rest is drawn on the rest where its bar falls ("End solo 1" on the last of 8 bars shows near the right end of the 8-bar rest).
