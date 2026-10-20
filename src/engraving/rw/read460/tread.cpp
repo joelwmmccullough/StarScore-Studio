@@ -702,6 +702,10 @@ bool TRead::readProperties(StaffTextBase* t, XmlReader& e, ReadContext& ctx)
 {
     const AsciiStringView tag(e.name());
 
+    if (t->isSystemText() && TRead::readProperty(t, tag, e, ctx, Pid::BREAK_MMR)) {   // StarScore
+        return true;
+    }
+
     if (tag == "MidiAction") {
         int channel = e.intAttribute("channel", 0);
         String name = e.attribute("name");

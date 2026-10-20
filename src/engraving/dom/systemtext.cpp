@@ -65,9 +65,29 @@ bool SystemText::isEditAllowed(EditData& ed) const
 //   propertyDefault
 //---------------------------------------------------------
 
+engraving::PropertyValue SystemText::getProperty(Pid id) const
+{
+    if (id == Pid::BREAK_MMR && type() == ElementType::SYSTEM_TEXT) {
+        return m_breaksMMRest;
+    }
+    return StaffTextBase::getProperty(id);
+}
+
+bool SystemText::setProperty(Pid id, const PropertyValue& v)
+{
+    if (id == Pid::BREAK_MMR && type() == ElementType::SYSTEM_TEXT) {
+        m_breaksMMRest = v.toBool();
+        triggerLayoutAll();
+        return true;
+    }
+    return StaffTextBase::setProperty(id, v);
+}
+
 engraving::PropertyValue SystemText::propertyDefault(Pid id) const
 {
     switch (id) {
+    case Pid::BREAK_MMR:
+        return false;
     case Pid::TEXT_STYLE:
         return TextStyleType::SYSTEM;
     default:

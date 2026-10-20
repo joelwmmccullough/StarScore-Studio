@@ -4,6 +4,12 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.75
+
+- **System text no longer breaks multimeasure rests, unless you tick it to.** Select a system text and tick "Breaks multimeasure rests" in its Properties (off by default). A text that doesn't break a rest is drawn on the rest where its bar falls ("End solo 1" on the last of 8 bars shows near the right end of the 8-bar rest).
+- **Lead Sheet + Voice (and every "+ Voice" sheet):** the Voice staff is full size, the Voice and the instrument are in one bracket, and rehearsal marks, tempo and system texts are above the Voice. A "+ Voice" sheet holding instruments its part score doesn't (Ghostbusters' had the Congas, so it was never formatted and some rehearsal marks didn't show) is made again.
+- **Triplet brackets clear the slurs** on the same staff (Break Out, bar 43).
+
 ## 1.18.74
 
 - **Mutes show on the part score as soon as you set them, in a song that hasn't been exported yet.** A song not yet in Sheets and Demos had no sheet titles on its part scores (instrument name, arrangement, mutes) until its first export; they're now worked out as if it were there.

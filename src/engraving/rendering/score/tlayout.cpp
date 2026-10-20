@@ -5488,6 +5488,25 @@ void TLayout::layoutSystemText(const SystemText* item, SystemText::LayoutData* l
     LAYOUT_CALL_ITEM(item);
     TextLayout::layoutBaseTextBase(item, ldata);
 
+    // StarScore (Joel, 20 Oct 2026): a system text from inside a multimeasure rest (one that doesn't break it) is drawn
+    // where its bar falls along the rest, kept inside the rest's end
+    if (item->mmRestPlace() > 0.0 && item->explicitParent() && item->explicitParent()->isSegment()) {
+        const Segment* s = toSegment(item->explicitParent());
+        const Measure* m = s->measure();
+        if (m && m->isMMRest()) {
+            // (its own sideways offset was for its own bar, so it's left out here; the height offset stays)
+            // the text's left edge at its place, its right edge not past the rest's end, its left not before its start
+            const double area = m->width() - s->x();
+            const double width = ldata->bbox().width();
+            double left = item->mmRestPlace() * area;
+            if (left + width > area) {
+                left = area - width;
+            }
+            left = std::max(0.0, left);
+            ldata->moveX(left - (ldata->pos().x() + ldata->bbox().left()) - item->offset().x());
+        }
+    }
+
     if (item->autoplace() && item->explicitParent()) {
         const Segment* s = toSegment(item->explicitParent());
         const Measure* m = s->measure();

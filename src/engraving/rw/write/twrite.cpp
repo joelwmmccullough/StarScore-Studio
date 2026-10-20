@@ -2853,6 +2853,9 @@ void TWrite::write(const StaffTextBase* item, XmlWriter& xml, WriteContext& ctx)
 
 void TWrite::writeProperties(const StaffTextBase* item, XmlWriter& xml, WriteContext& ctx)
 {
+    if (item->isSystemText()) {
+        writeProperty(item, xml, Pid::BREAK_MMR);   // StarScore: written only when ticked
+    }
     for (const ChannelActions& s : item->channelActions()) {
         int channel = s.channel;
         for (const String& name : s.midiActionNames) {

@@ -582,9 +582,11 @@ private:
     std::vector<VoiceScore> voiceScores(const notation::IMasterNotationPtr& master) const;
     //! The + Voice part score made (no undo step of its own: call inside one)
     notation::INotationPtr makeVoiceScore(const notation::IMasterNotationPtr& master, const QString& sourceName, const QString& name);
-    //! Its style, breaks, locks, text positions and bar widths from the source part score; the Voice staff small.
-    //! Inside an undo step. Returns whether anything was copied.
+    //! Its style, breaks, locks, text positions and bar widths from the source part score; the Voice staff full
+    //! size, bracketed with the instrument, and the rehearsal marks and system texts above it. Inside an undo step.
+    //! Returns whether anything was copied.
     bool formatVoiceScore(const VoiceScore& v);
+    int remakeStrayVoiceScores(const notation::IMasterNotationPtr& master);
     //! Every + Voice part score formatted from its source again (the export does this first). Returns how many.
     int refreshVoiceScores();
     //! The "Lead Sheet + Voice" part score made once the Voice and the lead sheet are both Finished (a vocal cover);

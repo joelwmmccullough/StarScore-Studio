@@ -240,6 +240,19 @@ Column {
         }
     }
 
+    // StarScore: a system text breaks multimeasure rests only when ticked (Joel, 20 Oct 2026); unticked, it shows on
+    // the rest where its bar falls
+    PropertyCheckBox {
+        id: breaksMMRestCheckBox
+
+        text: qsTrc("inspector", "Breaks multimeasure rests")
+        propertyItem: root.model ? root.model.breaksMMRest : null
+
+        navigation.name: "BreaksMultimeasureRests"
+        navigation.panel: root.navigationPanel
+        navigation.row: textPlacementSection.navigationRowEnd + 1
+    }
+
     // StarScore: whether this text appears on the song's chord charts (made from the lead sheet)
     CheckBox {
         id: chordChartCheckBox

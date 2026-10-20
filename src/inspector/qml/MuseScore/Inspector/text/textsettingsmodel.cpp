@@ -111,6 +111,7 @@ void TextSettingsModel::createProperties()
     });
     m_textPlacement = buildPropertyItem(mu::engraving::Pid::PLACEMENT);
     m_textScriptAlignment = buildPropertyItem(mu::engraving::Pid::TEXT_SCRIPT_ALIGN);
+    m_breaksMMRest = buildPropertyItem(mu::engraving::Pid::BREAK_MMR);
 }
 
 void TextSettingsModel::requestElements()
@@ -151,7 +152,8 @@ void TextSettingsModel::loadProperties()
         Pid::FRAME_ROUND,
         Pid::TEXT_STYLE,
         Pid::PLACEMENT,
-        Pid::TEXT_SCRIPT_ALIGN
+        Pid::TEXT_SCRIPT_ALIGN,
+        Pid::BREAK_MMR
     };
 
     loadProperties(textPropertyIdSet);
@@ -369,6 +371,18 @@ void TextSettingsModel::loadProperties(const PropertyIdSet& propertyIdSet)
         });
     }
 
+    if (muse::contains(propertyIdSet, Pid::BREAK_MMR)) {
+        // only for system texts (every selected text one)
+        bool allSystemText = !m_elementList.isEmpty();
+        for (const EngravingItem* item : m_elementList) {
+            allSystemText &= item && item->type() == ElementType::SYSTEM_TEXT;
+        }
+        m_breaksMMRest->setIsVisible(allSystemText);
+        if (allSystemText) {
+            loadPropertyItem(m_breaksMMRest);
+        }
+    }
+
     updateTextPropertiesAvailability();
     updateFramePropertiesAvailability();
     updateStaffPropertiesAvailability();
@@ -536,6 +550,11 @@ PropertyItem* TextSettingsModel::textPlacement() const
 PropertyItem* TextSettingsModel::textScriptAlignment() const
 {
     return m_textScriptAlignment;
+}
+
+PropertyItem* TextSettingsModel::breaksMMRest() const
+{
+    return m_breaksMMRest;
 }
 
 QVariantList TextSettingsModel::textStyles()

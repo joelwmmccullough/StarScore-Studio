@@ -29,6 +29,9 @@
 #include "engraving/dom/measure.h"
 #include "engraving/dom/part.h"
 #include "engraving/dom/staff.h"
+#include "engraving/dom/bracketItem.h"
+#include "engraving/editing/editbrackets.h"
+#include "engraving/editing/editpart.h"
 #include "engraving/style/style.h"
 #include "io/file.h"
 
@@ -219,13 +222,84 @@ bool StarScoreService::formatVoiceScore(const VoiceScore& v)
         dst->loadStyle(styleFile, true);
     }
     QFile::remove(mss);
-    // the Voice staff small
+    // the Voice staff full size (Joel, 20 Oct 2026: small wasn't legible enough; it was small since 1.18.64)
+    engraving::Staff* voiceStaff = nullptr;
     for (engraving::Part* p : dst->parts()) {
         for (engraving::Staff* st : p->staves()) {
             const engraving::Staff* linked = st->findLinkedInScore(dst->masterScore());
-            if (linked && idText(linked->part()) == v.voicePartId && !st->staffType(engraving::Fraction(0, 1))->isSmall()) {
-                st->undoChangeProperty(engraving::Pid::SMALL, true);
+            if (linked && idText(linked->part()) == v.voicePartId) {
+                voiceStaff = voiceStaff ? voiceStaff : st;
+                if (st->staffType(engraving::Fraction(0, 1))->isSmall()) {
+                    st->undoChangeProperty(engraving::Pid::SMALL, false);
+                }
             }
+        }
+    }
+    // The Voice and the instrument in one bracket (Joel, 20 Oct 2026). The sheet's brackets are made again: the
+    // instrument's own (a lead sheet's brace) as in the part score it's made from, then the bracket outside them
+    const size_t nstaves = dst->nstaves();
+    for (engraving::staff_idx_t i = 0; i < nstaves; ++i) {
+        engraving::Staff* st = dst->staff(i);
+        const std::vector<engraving::BracketItem*> brackets = st->brackets();
+        for (auto it = brackets.rbegin(); it != brackets.rend(); ++it) {
+            const engraving::BracketItem* b = *it;
+            if (b && b->bracketType() != engraving::BracketType::NO_BRACKET) {
+                dst->undo(new engraving::RemoveBracket(st, b->column(), b->bracketType(), b->bracketSpan()));
+            }
+        }
+    }
+    size_t outer = 0;
+    for (engraving::staff_idx_t i = 0; i < nstaves; ++i) {
+        engraving::Staff* st = dst->staff(i);
+        const engraving::Staff* from = nullptr;
+        for (engraving::Staff* s2 : src->staves()) {
+            if (s2->findLinkedInScore(dst) == st) {
+                from = s2;
+            }
+        }
+        if (!from) {
+            continue;
+        }
+        for (const engraving::BracketItem* b : from->brackets()) {
+            if (b && b->bracketType() != engraving::BracketType::NO_BRACKET && b->bracketType() != engraving::BracketType::NORMAL
+                && b->bracketSpan() > 0) {
+                dst->undoAddBracket(st, b->column(), b->bracketType(), b->bracketSpan());
+                outer = std::max(outer, b->column() + 1);
+            }
+        }
+    }
+    if (nstaves > 1) {
+        dst->undoAddBracket(dst->staff(0), outer, engraving::BracketType::NORMAL, nstaves);
+    }
+    // Rehearsal marks, tempo and system texts above the Voice, the sheet's top staff, not above the instrument
+    // (Joel, 20 Oct 2026: the sheet took them from the part score's staff, under the Voice, and some didn't show)
+    if (voiceStaff && voiceStaff->idx() == 0) {
+        for (engraving::staff_idx_t i = 1; i < nstaves; ++i) {
+            if (dst->staff(i)->isSystemObjectStaff()) {
+                engraving::EditPart::moveSystemObjects(dst, dst->staff(i), voiceStaff);
+            }
+        }
+        std::vector<engraving::EngravingItem*> below;
+        auto take = [&](engraving::EngravingItem* e) {
+            if (e && e->systemFlag() && e->staffIdx() > 0 && !e->isTimeSig()) {
+                below.push_back(e);
+            }
+        };
+        for (engraving::Measure* m = dst->firstMeasure(); m; m = m->nextMeasure()) {
+            for (engraving::EngravingItem* e : m->el()) {
+                take(e);
+            }
+            for (engraving::Segment* seg = m->first(); seg; seg = seg->next()) {
+                for (engraving::EngravingItem* e : seg->annotations()) {
+                    take(e);
+                }
+            }
+        }
+        for (const auto& [t, sp] : dst->spanner()) {
+            take(sp);
+        }
+        for (engraving::EngravingItem* e : below) {
+            e->undoChangeProperty(engraving::Pid::TRACK, engraving::staff2track(0, e->voice()));
         }
     }
     // the instruments named without their section ("Tenor Sax", not "3H: Tenor Sax") beside the staves: the sheet
@@ -254,9 +328,56 @@ bool StarScoreService::formatVoiceScore(const VoiceScore& v)
     return true;
 }
 
+//! A "+ Voice" part score holding instruments besides the Voice that its part score doesn't (Joel, 20 Oct 2026:
+//! Ghostbusters' Lead Sheet + Voice also held the Congas, so it matched no part score and was never formatted) is
+//! made again from the part score named like it. Returns how many were remade.
+int StarScoreService::remakeStrayVoiceScores(const IMasterNotationPtr& master)
+{
+    if (!master) {
+        return 0;
+    }
+    int remade = 0;
+    for (const VoiceScore& v : voiceScores(master)) {
+        if (v.source) {
+            continue;
+        }
+        const QString name = v.score->name();
+        const QString base = name.left(name.size() - VOICE_SUFFIX.size());
+        bool haveBase = false;
+        ExcerptNotationList kept;
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            haveBase |= e->name() == base;
+            if (e != v.score) {
+                kept.push_back(e);
+            }
+        }
+        if (!haveBase) {
+            continue;
+        }
+        master->setExcerpts(kept);
+        INotationPtr n = makeVoiceScore(master, base, name);
+        if (!n) {
+            continue;
+        }
+        for (const VoiceScore& made : voiceScores(master)) {
+            if (made.score->notation() == n) {
+                master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Format the + Voice part score"));
+                formatVoiceScore(made);
+                master->notation()->undoStack()->commitChanges();
+                n->style()->styleChanged().notify();
+                n->notationChanged().notify();
+            }
+        }
+        LOGI() << "[starscore] " << name.toStdString() << " made again from " << base.toStdString();
+        ++remade;
+    }
+    return remade;
+}
+
 int StarScoreService::refreshVoiceScores()
 {
     IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    remakeStrayVoiceScores(master);
     const std::vector<VoiceScore> scores = voiceScores(master);
     if (scores.empty()) {
         return 0;
@@ -324,6 +445,7 @@ bool StarScoreService::makeLeadSheetVoiceWhenReady()
     if (voice.isEmpty()) {
         return false;
     }
+    remakeStrayVoiceScores(master);
     bool voiceDone = false;
     QString leadPid;
     bool leadDone = false;

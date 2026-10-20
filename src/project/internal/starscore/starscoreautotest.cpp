@@ -81,6 +81,7 @@
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include "io/buffer.h"
 #include <QJsonObject>
 #include <QRegularExpression>
 #include <QTimer>
@@ -901,6 +902,30 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         }
         master->notation()->undoStack()->commitChanges();
         autotestLog(QString("  removed %1").arg(gone.size()));
+    } else if (step.startsWith("bookpdf:")) {
+        // bookpdf:<part score name>: that part score as it is now, written to <part score name>.pdf (laid out first)
+        const QString name = step.mid(8);
+        int written = 0;
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            if (e->name() != name || !e->notation()) {
+                continue;
+            }
+            engraving::Score* es = e->notation()->elements()->msScore();
+            es->setLayoutAll();
+            es->doLayout();
+            io::Buffer out;
+            out.open(io::IODevice::WriteOnly);
+            INotationWriter::Options options { { INotationWriter::OptionKey::UNIT_TYPE, Val(INotationWriter::UnitType::PER_PART) } };
+            if (writers()->writer("pdf")->write(e->notation(), out, options)) {
+                QFile f(autotestDir() + "/" + QString(name).replace('/', '-') + ".pdf");
+                if (f.open(QIODevice::WriteOnly)) {
+                    f.write(out.data().toQByteArray());
+                    ++written;
+                }
+            }
+            out.close();
+        }
+        autotestLog(QString("  written %1").arg(written));
     } else if (step.startsWith("mutetext:")) {
         // mutetext:<text>|<text>…: whether each counts as a mute marking (hidden on woodwind sheets)
         for (const QString& t : step.mid(9).split('|')) {
@@ -1576,6 +1601,36 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
                 autotestLog(QString("  %1 staff %2: %3").arg(p->partName().toQString()).arg(i + 1).arg(where.join(", ")));
             }
         }
+    } else if (step.startsWith("breakmmr:")) {
+        // breakmmr:<system text>|<0 or 1>: whether that system text breaks multimeasure rests (as the Properties
+        // panel's box sets it), then every system text that does
+        const QString text = step.mid(9).section('|', 0, 0);
+        const bool on = step.mid(9).section('|', 1) == "1";
+        int set = 0;
+        master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Breaks multimeasure rests"));
+        for (engraving::Segment* seg = ms->firstSegment(engraving::SegmentType::ChordRest); seg;
+             seg = seg->next1(engraving::SegmentType::ChordRest)) {
+            for (engraving::EngravingItem* e : seg->annotations()) {
+                if (e->isSystemText() && toTextBase(e)->plainText().toQString().trimmed() == text) {
+                    e->undoChangeProperty(engraving::Pid::BREAK_MMR, on);
+                    ++set;
+                }
+            }
+        }
+        master->notation()->undoStack()->commitChanges();
+        QStringList breaking;
+        for (engraving::Segment* seg = ms->firstSegment(engraving::SegmentType::ChordRest); seg;
+             seg = seg->next1(engraving::SegmentType::ChordRest)) {
+            for (engraving::EngravingItem* e : seg->annotations()) {
+                if (e->isSystemText() && e->getProperty(engraving::Pid::BREAK_MMR).toBool()) {
+                    breaking << toTextBase(e)->plainText().toQString().trimmed();
+                }
+            }
+        }
+        autotestLog(QString("  set %1; breaking: %2").arg(set).arg(breaking.join(", ")));
+    } else if (step == "voicerefresh") {
+        // voicerefresh: the + Voice part scores remade where broken and formatted again, as at the start of an export
+        autotestLog(QString("  formatted %1").arg(refreshVoiceScores()));
     } else if (step.startsWith("voiceadd:") || step == "voicescores") {
         // voiceadd:<part score name>: Add Voice to a part…; voicescores: the + Voice part scores, what each is made
         // from and its staves (the Voice's small or not), and the part scores that could get one

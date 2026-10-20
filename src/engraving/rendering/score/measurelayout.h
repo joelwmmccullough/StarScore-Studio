@@ -90,7 +90,8 @@ public:
 private:
 
     static void createMMRest(LayoutContext& ctx, Measure* firstMeasure, Measure* lastMeasure, const Fraction& len);
-    static void cloneAnnotationsToMMRest(Segment* underlyingSeg, Segment* mmrSeg, LayoutContext& ctx);
+    static void cloneAnnotationsToMMRest(Segment* underlyingSeg, Segment* mmrSeg, LayoutContext& ctx,
+                                         const std::vector<std::pair<EngravingItem*, double> >& inside = {});
 
     static int adjustMeasureNo(MeasureBase* m, int measureNo);
 

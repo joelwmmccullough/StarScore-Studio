@@ -32,6 +32,7 @@
 #include "dom/lyrics.h"
 #include "dom/marker.h"
 #include "dom/measure.h"
+#include "dom/systemtext.h"
 #include "dom/measurenumber.h"
 #include "dom/measurerepeat.h"
 #include "dom/mmrest.h"
@@ -162,6 +163,12 @@ static const std::unordered_set<ElementType> BREAK_TYPES {
     ElementType::PLAY_COUNT_TEXT,
     ElementType::BREATH,
 };
+
+//! StarScore (Joel, 20 Oct 2026): a system text breaks a multimeasure rest only when it's ticked to
+static bool keepsMMRest(const EngravingItem* e)
+{
+    return e->isSystemText() && !toSystemText(e)->breaksMMRest();
+}
 
 static const std::unordered_set<ElementType> ALWAYS_BREAK_TYPES {
     ElementType::TEMPO_TEXT,
@@ -546,17 +553,54 @@ void MeasureLayout::createMMRest(LayoutContext& ctx, Measure* firstMeasure, Meas
     // check for rehearsal mark etc.
     //
     underlyingSeg = firstMeasure->findSegmentR(SegmentType::ChordRest, Fraction(0, 1));
-    cloneAnnotationsToMMRest(underlyingSeg, s, ctx);
+    // StarScore: the system texts inside the rest that don't break it, each drawn where its bar falls along the rest
+    std::vector<std::pair<EngravingItem*, double> > inside;
+    const double runTicks = std::max(1.0, (lastMeasure->endTick() - firstMeasure->tick()).toDouble());
+    for (Measure* m = firstMeasure; m; m = m->nextMeasure()) {
+        for (Segment* seg = m->first(SegmentType::ChordRest); seg; seg = seg->next(SegmentType::ChordRest)) {
+            if (seg == underlyingSeg) {
+                continue;
+            }
+            for (EngravingItem* e : seg->annotations()) {
+                if (keepsMMRest(e) && e->visible()) {
+                    inside.emplace_back(e, (seg->tick() - firstMeasure->tick()).toDouble() / runTicks);
+                }
+            }
+        }
+        if (m == lastMeasure) {
+            break;
+        }
+    }
+    cloneAnnotationsToMMRest(underlyingSeg, s, ctx, inside);
 
     MeasureBase* nm = ctx.conf().isShowVBox() ? lastMeasure->next() : lastMeasure->nextMeasure();
     mmrMeasure->setNext(nm);
     mmrMeasure->setPrev(firstMeasure->prev());
 }
 
-void MeasureLayout::cloneAnnotationsToMMRest(Segment* underlyingSeg, Segment* mmrSeg, LayoutContext& ctx)
+void MeasureLayout::cloneAnnotationsToMMRest(Segment* underlyingSeg, Segment* mmrSeg, LayoutContext& ctx,
+                                             const std::vector<std::pair<EngravingItem*, double> >& inside)
 {
     if (!underlyingSeg) {
         return;
+    }
+    // StarScore: system texts later in the rest that don't break it (with their place along the rest)
+    for (const auto& [e, place] : inside) {
+        EngravingItem* clone = nullptr;
+        for (EngravingItem* ee : mmrSeg->annotations()) {
+            if (muse::contains(e->linkList(), static_cast<EngravingObject*>(ee))) {
+                clone = ee;
+                break;
+            }
+        }
+        if (!clone) {
+            clone = e->linkedClone();
+            clone->setParent(mmrSeg);
+            ctx.mutDom().doUndoAddElement(clone);
+        }
+        if (clone->isSystemText()) {
+            toSystemText(clone)->setMMRestPlace(place);
+        }
     }
     // clone elements from underlying measure to mmr
     for (EngravingItem* e : underlyingSeg->annotations()) {
@@ -595,6 +639,9 @@ void MeasureLayout::cloneAnnotationsToMMRest(Segment* underlyingSeg, Segment* mm
                 break;
             }
         }
+        for (const auto& [ee, place] : inside) {
+            found |= muse::contains(e->linkList(), static_cast<EngravingObject*>(ee));
+        }
         // remove from mmr if no match found
         if (!found) {
             ctx.mutDom().doUndoRemoveElement(e);
@@ -627,7 +674,7 @@ static bool validMMRestMeasure(const LayoutContext& ctx, const Measure* m)
             if (e->staffIdx() >= nstaves || !e->staff()->show() || !e->visible()) {
                 continue;
             }
-            if (muse::contains(BREAK_TYPES, e->type()) && !s->rtick().isZero()) {
+            if (muse::contains(BREAK_TYPES, e->type()) && !s->rtick().isZero() && !keepsMMRest(e)) {
                 // play count text is permitted at the end of a measure
                 if (!e->isPlayCountText()) {
                     return false;
@@ -762,6 +809,9 @@ static bool breakMultiMeasureRest(const LayoutContext& ctx, Measure* m)
     auto breakForAnnotation = [&](EngravingItem* e) {
         if (muse::contains(ALWAYS_BREAK_TYPES, e->type())) {
             return true;
+        }
+        if (keepsMMRest(e)) {
+            return false;
         }
         bool breakForElement = e->systemFlag() || e->staff()->show();
         if (muse::contains(CONDITIONAL_BREAK_TYPES, e->type()) && breakForElement) {

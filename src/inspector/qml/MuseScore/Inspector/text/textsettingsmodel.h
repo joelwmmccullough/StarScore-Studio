@@ -58,6 +58,7 @@ class TextSettingsModel : public AbstractInspectorModel
     Q_PROPERTY(mu::inspector::PropertyItem * textType READ textType CONSTANT)
     Q_PROPERTY(mu::inspector::PropertyItem * textPlacement READ textPlacement CONSTANT)
     Q_PROPERTY(mu::inspector::PropertyItem * textScriptAlignment READ textScriptAlignment CONSTANT)
+    Q_PROPERTY(mu::inspector::PropertyItem * breaksMMRest READ breaksMMRest CONSTANT)
 
     Q_PROPERTY(QVariantList textStyles READ textStyles NOTIFY textStylesChanged)
 
@@ -122,6 +123,7 @@ public:
     PropertyItem* textType() const;
     PropertyItem* textPlacement() const;
     PropertyItem* textScriptAlignment() const;
+    PropertyItem* breaksMMRest() const;
 
     QVariantList textStyles();
 
@@ -214,6 +216,7 @@ private:
     PropertyItem* m_textType = nullptr;
     PropertyItem* m_textPlacement = nullptr;
     PropertyItem* m_textScriptAlignment = nullptr;
+    PropertyItem* m_breaksMMRest = nullptr;   // StarScore: a system text breaks multimeasure rests (Joel, 20 Oct 2026)
 
     QVariantList m_textStyles;
 

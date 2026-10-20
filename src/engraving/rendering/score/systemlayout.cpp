@@ -1309,6 +1309,49 @@ void SystemLayout::layoutSystemElements(System* system, LayoutContext& ctx)
         }
     }
 
+    // StarScore (Joel, 20 Oct 2026): a tuplet's bracket and number clear the slurs on its staff (Break Out, bar 43:
+    // the brackets sat on the slurs over the same notes; bar 1 only looked right because its brackets were raised by
+    // hand). The tuplet moves away from the slur: up when it's above the notes, down when below.
+    {
+        const double pad = 0.4 * system->spatium();
+        std::set<Tuplet*> seen;
+        for (ChordRest* cr : elementsToLayout.chordRests) {
+            Tuplet* t = cr->tuplet();
+            if (!t || seen.count(t) || t->cross() || !t->visible() || !t->measure() || t->measure()->system() != system) {
+                continue;
+            }
+            seen.insert(t);
+            if (!t->hasBracket() && !t->number()) {
+                continue;
+            }
+            const PointF at = t->pos() + t->measure()->pos();
+            double move = 0.0;
+            for (SpannerSegment* seg : system->spannerSegments()) {
+                if (!seg->isSlurSegment() || !seg->visible() || seg->staffIdx() != t->staffIdx()) {
+                    continue;
+                }
+                Shape tupletShape = t->shape();
+                if (t->number()) {   // (its number in full: the shape has only a part of it)
+                    tupletShape.add(t->number()->ldata()->bbox().translated(t->number()->pos()));
+                }
+                tupletShape.translate(at + PointF(0.0, move));
+                const Shape slurShape = seg->shape().translate(seg->pos());
+                if (!tupletShape.intersects(slurShape)) {
+                    continue;
+                }
+                if (t->isUp()) {
+                    move -= tupletShape.minVerticalDistance(slurShape) + pad;
+                } else {
+                    move += slurShape.minVerticalDistance(tupletShape) + pad;
+                }
+            }
+            if (!muse::RealIsNull(move)) {
+                t->mutldata()->moveY(move);
+                system->staff(t->staffIdx())->skyline().add(t->shape().translate(t->pos() + t->measure()->pos()));
+            }
+        }
+    }
+
     processLines(system, ctx, elementsToLayout.trills);
 
     layoutSticking(elementsToLayout.stickings, system, ctx);

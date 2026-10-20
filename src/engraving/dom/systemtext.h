@@ -45,8 +45,23 @@ public:
 
     bool canBeExcludedFromOtherParts() const override { return true; }
 
+    // StarScore (Joel, 20 Oct 2026): a system text breaks a multimeasure rest only when it's ticked to (Pid::BREAK_MMR,
+    // off by default). One that doesn't is drawn on the rest where its bar falls: mmRestPlace() is that place, from 0
+    // (the rest's first bar) towards 1, on the copy shown on the rest; -1 elsewhere.
+    bool breaksMMRest() const { return m_breaksMMRest; }
+    void setBreaksMMRest(bool v) { m_breaksMMRest = v; }
+    double mmRestPlace() const { return m_mmRestPlace; }
+    void setMMRestPlace(double v) { m_mmRestPlace = v; }
+
+    PropertyValue getProperty(Pid id) const override;
+    bool setProperty(Pid id, const PropertyValue& v) override;
+
 protected:
     PropertyValue propertyDefault(Pid id) const override;
+
+private:
+    bool m_breaksMMRest = false;
+    double m_mmRestPlace = -1.0;
 };
 } // namespace mu::engraving
 #endif
