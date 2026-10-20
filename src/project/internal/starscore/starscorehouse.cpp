@@ -12,6 +12,8 @@
 #include <QRegularExpression>
 
 #include "engraving/dom/score.h"
+#include "engraving/dom/masterscore.h"
+#include "engraving/dom/excerpt.h"
 #include "engraving/dom/part.h"
 #include "engraving/dom/staff.h"
 #include "engraving/dom/box.h"
@@ -942,5 +944,61 @@ QString copyrightWithVersion(const QString& copyright, const QString& version)
         return text;
     }
     return "Version " + version;
+}
+namespace {
+//! The first text of that style in the score's title frames
+mu::engraving::Text* frameText(const mu::engraving::Score* score, mu::engraving::TextStyleType type)
+{
+    for (mu::engraving::MeasureBase* mb = score->first(); mb && !mb->isMeasure(); mb = mb->next()) {
+        if (!mb->isVBox()) {
+            continue;
+        }
+        for (mu::engraving::EngravingItem* e : mb->el()) {
+            if (e && e->isText() && mu::engraving::toText(e)->textStyleType() == type) {
+                return mu::engraving::toText(e);
+            }
+        }
+    }
+    return nullptr;
+}
+}
+
+QString creditTexts(const mu::engraving::Score* score)
+{
+    QString out;
+    for (mu::engraving::TextStyleType type : { mu::engraving::TextStyleType::COMPOSER, mu::engraving::TextStyleType::LYRICIST }) {
+        const mu::engraving::Text* t = score ? frameText(score, type) : nullptr;
+        out += (t ? t->xmlText().toQString() : QString()) + QChar(0x1F);
+    }
+    return out;
+}
+
+int syncCreditTexts(mu::engraving::MasterScore* master, bool apply)
+{
+    if (!master) {
+        return 0;
+    }
+    int count = 0;
+    for (mu::engraving::TextStyleType type : { mu::engraving::TextStyleType::COMPOSER, mu::engraving::TextStyleType::LYRICIST }) {
+        const mu::engraving::Text* from = frameText(master, type);
+        if (!from) {
+            continue;
+        }
+        const muse::String want = from->xmlText();
+        for (mu::engraving::Excerpt* ex : master->excerpts()) {
+            mu::engraving::Score* es = ex ? ex->excerptScore() : nullptr;
+            mu::engraving::Text* to = es ? frameText(es, type) : nullptr;
+            if (!to || to->xmlText() == want) {
+                continue;
+            }
+            ++count;
+            if (apply) {
+                // (this text only: a linked one already shows the main score's)
+                to->undoChangeProperty(mu::engraving::Pid::TEXT, want);
+                es->setLayoutAll();
+            }
+        }
+    }
+    return count;
 }
 }

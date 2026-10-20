@@ -29,6 +29,13 @@ void applyHouseStyle(mu::engraving::Score* score, bool partBook, const QString& 
 
 //! Moves a long composer credit down, clear of the title, the subtitle and the arrangement label (laid out first)
 void clearComposerCredit(mu::engraving::Score* score);
+//! The part scores' composer and lyricist texts (title frame) made the main score's (Joel, 19 Oct 2026: Ciao Ferrari's
+//! composers changed in the main score stayed as they were in the part scores, whose texts weren't linked to it). A
+//! part score without that text, or a main score without it, is left alone. Undoable when apply; else only counts.
+//! Returns how many texts differ (were changed).
+int syncCreditTexts(mu::engraving::MasterScore* master, bool apply);
+//! The main score's composer and lyricist texts, as one string (to see whether they changed)
+QString creditTexts(const mu::engraving::Score* score);
 
 //! Levels the arrangement label with the instrument name (laid out first; undoable). Returns whether it moved.
 bool levelArrangementLabel(mu::engraving::Score* score);

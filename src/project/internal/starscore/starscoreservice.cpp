@@ -145,7 +145,59 @@ void StarScoreService::listenCurrentProject()
     master->notation()->undoStack()->stackChanged().onNotify(this, [this]() {
         scheduleChanged();
         scheduleIntegrityCheck();
+        QTimer::singleShot(0, &m_timerGuard, [this]() { syncCreditsAfterEdit(); });
     });
+    // (an undo or redo of a composer change isn't followed by another step: that would clear what can be redone)
+    master->notation()->undoStack()->undoRedoNotification().onNotify(this, [this]() {
+        m_creditsUndoRedo = true;
+    });
+    m_lastCredits = starscore::creditTexts(masterScore());
+}
+
+void StarScoreService::syncCreditsAfterEdit()
+{
+    engraving::MasterScore* ms = masterScore();
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    if (!ms || !master) {
+        return;
+    }
+    const QString now = starscore::creditTexts(ms);
+    const bool undoRedo = m_creditsUndoRedo;
+    m_creditsUndoRedo = false;
+    if (now == m_lastCredits) {
+        return;
+    }
+    m_lastCredits = now;
+    if (undoRedo || m_exportProgress.running || starscore::syncCreditTexts(ms, false) == 0) {
+        return;
+    }
+    // one undo step with the edit that changed the main score's
+    INotationUndoStackPtr stack = master->notation()->undoStack();
+    const size_t before = stack->currentStateIndex();
+    stack->prepareChanges(TranslatableString::untranslatable("Composer in the part scores"));
+    const int n = starscore::syncCreditTexts(ms, true);
+    stack->commitChanges();
+    if (before != muse::nidx && before >= 1 && stack->currentStateIndex() == before + 1) {
+        stack->mergeCommands(before - 1);
+    }
+    master->notation()->notationChanged().notify();
+    LOGI() << "[starscore] composer/lyricist of " << n << " part score text(s) made the main score's";
+}
+
+void StarScoreService::syncCreditsNow(const char* why)
+{
+    engraving::MasterScore* ms = masterScore();
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    if (!ms || !master || starscore::syncCreditTexts(ms, false) == 0) {
+        m_lastCredits = starscore::creditTexts(ms);
+        return;
+    }
+    master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Composer in the part scores"));
+    const int n = starscore::syncCreditTexts(ms, true);
+    master->notation()->undoStack()->commitChanges();
+    master->notation()->notationChanged().notify();
+    m_lastCredits = starscore::creditTexts(ms);
+    LOGI() << "[starscore] composer/lyricist of " << n << " part score text(s) made the main score's (" << why << ")";
 }
 
 void StarScoreService::scheduleIntegrityCheck()

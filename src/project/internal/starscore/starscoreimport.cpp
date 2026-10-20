@@ -2151,6 +2151,9 @@ void StarScoreService::tidyOpenedScore()
     // the arrangements' own score tabs as the "Section scores visible" switch says
     syncSectionTabs({});
 
+    // the part scores' composer and lyricist as the main score's (Joel, 19 Oct 2026)
+    syncCreditsNow("opened");
+
     // Tempo marks in the text style's font, title frames of a fixed height
     if (starscore::tidyTempoAndFrames(ms, false) > 0) {
         master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Tempo fonts and title frames"));

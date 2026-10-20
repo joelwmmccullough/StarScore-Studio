@@ -438,6 +438,12 @@ private:
     //! top of a whole note): checked a moment after each edit, so the warning comes while Undo can still fix it
     void scheduleIntegrityCheck();
     void checkIntegrity();
+    //! The part scores' composer and lyricist made the main score's, after an edit that changed the main score's
+    //! (in the same undo step), when a song opens and before an export (Joel, 19 Oct 2026)
+    void syncCreditsAfterEdit();
+    void syncCreditsNow(const char* why);
+    QString m_lastCredits;
+    bool m_creditsUndoRedo = false;
     int m_integrityGeneration = 0;
     bool m_integrityBroken = false;
     //! Rests that start inside a note or rest of the same voice (nothing valid does): removed when `remove`,

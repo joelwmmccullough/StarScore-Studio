@@ -40,6 +40,7 @@
  */
 #include "starscoreservice.h"
 #include "starscorelayoutcheck.h"
+#include "starscorehouse.h"
 #include "starscorehornkeys.h"
 #include "starscoreautoarchive.h"
 #include "engraving/dom/layoutbreak.h"
@@ -2579,6 +2580,37 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             }
         }
         autotestLog(QString("  full score staff texts: %1").arg(texts.join(" | ")));
+    } else if (step.startsWith("setcomposer:")) {
+        // setcomposer:<text>: the main score's composer text changed, as editing it does (one undo step)
+        engraving::Text* t = nullptr;
+        for (engraving::MeasureBase* mb = ms->first(); mb && !mb->isMeasure() && !t; mb = mb->next()) {
+            for (engraving::EngravingItem* e : mb->el()) {
+                if (!t && e && e->isText() && engraving::toText(e)->textStyleType() == engraving::TextStyleType::COMPOSER) {
+                    t = engraving::toText(e);
+                }
+            }
+        }
+        if (t) {
+            master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Edit text"));
+            t->undoChangeProperty(engraving::Pid::TEXT, String::fromQString(step.mid(12)));
+            master->notation()->undoStack()->commitChanges();
+            master->notation()->notationChanged().notify();
+        }
+        autotestLog(t ? "  changed" : "  no composer text");
+    } else if (step == "credits") {
+        // credits: the composer text of the main score and every part score
+        std::vector<std::pair<QString, engraving::Score*> > all { { QString("(main score)"), ms } };
+        for (engraving::Excerpt* ex : ms->excerpts()) {
+            all.push_back({ ex->name().toQString(), ex->excerptScore() });
+        }
+        std::map<QString, QStringList> byText;
+        for (auto& [name, sc] : all) {
+            byText[starscore::creditTexts(sc).section(QChar(0x1F), 0, 0)] << name;
+        }
+        for (const auto& [text, names] : byText) {
+            autotestLog(QString("  \"%1\": %2 score(s)%3").arg(text).arg(names.size())
+                        .arg(names.contains("(main score)") ? QString(" incl. main") : QString()));
+        }
     } else if (step == "undo") {
         if (INotationPtr n = globalContext()->currentNotation()) {
             n->undoStack()->undo(nullptr);

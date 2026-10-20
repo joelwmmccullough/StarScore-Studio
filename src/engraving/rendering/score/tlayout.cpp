@@ -4498,6 +4498,13 @@ void TLayout::layoutRehearsalMark(const RehearsalMark* item, RehearsalMark::Layo
 
     double w = e ? e->ldata()->bbox().width() : header->ldata()->bbox().width();
     ldata->setPosX(header->x() + w - s->x());
+    // StarScore (Joel, 19 Oct 2026): a multimeasure rest's empty key signature slot isn't placed (its x is 0), so a mark
+    // on a multimeasure rest at the start of a line went to the very start of the bar, left of the clef (Ciao Ferrari's
+    // M on Trombone 1, against K and L above it). An empty key signature takes no room: the mark goes where it does on
+    // any other bar at the start of a line, at the first note or rest.
+    if (header->isKeySigType() && muse::RealIsNull(w) && header->x() < s->x() && m->isMMRest()) {
+        ldata->setPosX(0.0);
+    }
 
     // special case for right aligned rehearsal marks at start of system
     // left align with start of measure if that is further left

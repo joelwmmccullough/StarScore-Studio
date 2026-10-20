@@ -4,6 +4,11 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.68
+
+- **Composers follow the main score.** Changing the composer (or lyricist) text in the main score now changes it in every part score too, in the same undo step. In many songs the part scores' composer texts weren't linked to the main score's (Ciao Ferrari: 12 of 20), so they kept the old names. The part scores are also brought in line when a song opens and before each export.
+- **Rehearsal marks on multimeasure rests at the start of a line** are placed like the others. Ciao Ferrari's M (Trombone 1, a 4-bar rest at the start of the last line) sat left of the clef, far left of K and L.
+
 ## 1.18.67
 
 - **Projects and Sheets' top folders numbered from 1.** The next folder organization renames them once: STARSIGN → `1 Starsign`, `4 Other Projects` → `2 Other Projects`, `6 Templates` → `3 Templates`, `7 Sketches` → `4 Sketches`, `8 Quarantine (empty template copies)` → `5 Quarantine (empty template copies)`, `9 Inbox` → `6 Inbox`, and the `10 Sweater Weather` shortcut → `7 Sweater Weather`. The folders inside `1 Starsign` (Originals, Covers, Vocal Covers…) don't change. A song that's open follows its folder. Everything in StarScore that uses these folders (Move to…, filing, the Inbox, new songs, the reports) uses the new names.

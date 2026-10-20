@@ -3280,6 +3280,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     // the "+ Voice" part scores take their part score's formatting again (Joel, 19 Oct 2026), and a vocal cover's
     // Lead Sheet + Voice is made if it's due
     if (m_exportVariant.isEmpty() && !m_exportSource && !m_exportDryRun) {
+        syncCreditsNow("export");
         makeLeadSheetVoiceWhenReady();
         const int formatted = refreshVoiceScores();
         if (formatted > 0) {
