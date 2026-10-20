@@ -195,6 +195,7 @@ public:
     QJsonObject songRecordings() const override;
     void setSongRecordings(const QJsonObject& recordings) override;
     muse::RetVal<StarScoreBandExportPlan> planBandExport() const override;
+    muse::RetVal<StarScoreBandExportPlan> planBandExportFor(bool titlesOnly) const;
     void makeBassHornVersions(const QString& sectionId) override;
     std::vector<std::pair<QString, QString> > versionMains(const QString& sectionId) const override;
     std::pair<QString, QString> mainLowHorn(const QString& sectionId) const override;

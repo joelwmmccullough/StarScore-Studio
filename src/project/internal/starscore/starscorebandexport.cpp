@@ -798,6 +798,14 @@ static QString starscoreVariantPath(const QString& rel, const QString& variant)
 
 RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
 {
+    return planBandExportFor(false);
+}
+
+//! titlesOnly: for the part scores' titles (labelPartBooks), a song not yet in Sheets and Demos (or with no Sheets
+//! and Demos folder chosen) is planned too, as if it were there under its suggested code (Joel, 20 Oct 2026: a new
+//! song's mutes didn't show on its part scores until its first export)
+RetVal<StarScoreBandExportPlan> StarScoreService::planBandExportFor(bool titlesOnly) const
+{
     StarScoreBandExportPlan plan;
     INotationProjectPtr project = exportSourceProject();
     if (!project) {
@@ -805,7 +813,7 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
     }
 
     plan.bandFolder = bandFolder();
-    if (plan.bandFolder.isEmpty()) {
+    if (plan.bandFolder.isEmpty() && !titlesOnly) {
         return RetVal<StarScoreBandExportPlan>::make_ret(Ret::Code::UnknownError,
                                                          muse::trc("starscore", "Choose the Sheets and Demos folder first."));
     }
@@ -847,7 +855,11 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
         plan.title = title;
         plan.suggestedCode = !codeFromName.isEmpty() && !taken.count(codeFromName) ? codeFromName
                              : starscoreSuggestCode(title, taken);
-        return RetVal<StarScoreBandExportPlan>::make_ok(plan);
+        if (!titlesOnly) {
+            return RetVal<StarScoreBandExportPlan>::make_ok(plan);
+        }
+        plan.code = plan.suggestedCode;
+        plan.songFolder = starscoreSafeFileName(title);
     }
     plan.title = title;
 
@@ -1591,7 +1603,7 @@ static void starscoreRetitleSheet(mu::engraving::Score* score, const QString& le
 int StarScoreService::labelPartBooks()
 {
     INotationProjectPtr project = exportSourceProject();
-    if (!project || project != globalContext()->currentProject() || bandFolder().isEmpty()) {
+    if (!project || project != globalContext()->currentProject()) {
         return 0;
     }
     IMasterNotationPtr master = project->masterNotation();
@@ -1599,7 +1611,7 @@ int StarScoreService::labelPartBooks()
     if (!ms || loadFrom(ms).sections.empty()) {
         return 0;
     }
-    const RetVal<StarScoreBandExportPlan> plan = planBandExport();
+    const RetVal<StarScoreBandExportPlan> plan = planBandExportFor(true);
     if (!plan.ret) {
         return 0;
     }
