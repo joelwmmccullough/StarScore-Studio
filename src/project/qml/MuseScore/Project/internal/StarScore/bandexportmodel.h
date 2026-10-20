@@ -39,7 +39,7 @@ class BandExportModel : public QAbstractListModel, public muse::Contextable
     Q_PROPERTY(bool newSong READ newSong NOTIFY loaded)                 // not in Sheets and Demos yet
     Q_PROPERTY(QString songTitle READ songTitle NOTIFY loaded)
     Q_PROPERTY(QString suggestedCode READ suggestedCode NOTIFY loaded)
-    //! The Sheets and Demos category (1-4) for a new song, from its STARSIGN folder (0 when it isn't in one)
+    //! The Sheets and Demos category (1-4) for a new song, from its 1 Starsign folder (0 when it isn't in one)
     Q_PROPERTY(int suggestedCategory READ suggestedCategory NOTIFY loaded)
     Q_PROPERTY(bool runOrganizer READ runOrganizer WRITE setRunOrganizer NOTIFY runOrganizerChanged)
     //! "Export Audio Demos": off each time the window opens

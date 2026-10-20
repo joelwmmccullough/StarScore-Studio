@@ -735,7 +735,7 @@ public:
     // --- the song's place in Projects and Sheets (Joel, 19 Oct 2026) ---
     //! "original", "cover" or "vocal" from the folder the song is in ("" when it isn't in a Starsign song folder)
     virtual QString songKind() const = 0;
-    //! The Starsign song folder it's in ("STARSIGN/1 Originals/2 In Progress"; "" when it isn't in one)
+    //! The Starsign song folder it's in ("1 Starsign/1 Originals/2 In Progress"; "" when it isn't in one)
     virtual QString songGroup() const = 0;
     //! The song's tune folder moved to another Starsign song folder (starsignSongGroups()); the open file follows.
     //! Returns what happened, for a message.
@@ -743,7 +743,7 @@ public:
     //! The open song's file or one of its folders was moved by the organizer (full paths): the song is saved at the new place from now on
     virtual void followMovedSong(const std::vector<std::pair<QString, QString> >& moves) = 0;
     //! A new Starsign score saved at once into Projects and Sheets: a code (as the organizer gives one), its tune
-    //! folder in STARSIGN (originals in Sketches, covers and vocal covers in In Progress), "CODE - Title.starscore",
+    //! folder in 1 Starsign (originals in Sketches, covers and vocal covers in In Progress), "CODE - Title.starscore",
     //! the code recorded in codes_proj.json. kind: "original", "cover", "vocal". Returns the file's path.
     virtual muse::RetVal<QString> fileNewSong(const QString& kind) = 0;
 

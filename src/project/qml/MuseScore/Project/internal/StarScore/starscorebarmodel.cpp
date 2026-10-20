@@ -566,7 +566,7 @@ QVariantList StarScoreBarModel::moreMenu() const
     }
 
     return {
-        QVariantMap { { "title", group.isEmpty() ? muse::qtrc("starscore", "Move to (only for songs in STARSIGN)")
+        QVariantMap { { "title", group.isEmpty() ? muse::qtrc("starscore", "Move to (only for songs in 1 Starsign)")
                                                  : muse::qtrc("starscore", "Move to") },
                       { "subitems", moveItems }, { "enabled", !group.isEmpty() } },
         QVariantMap { { "title", !hasVoice ? muse::qtrc("starscore", "Add Voice to a part… (needs a Voice section)")
@@ -842,7 +842,7 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
             }
         }
     } else if (action == "song-move") {
-        // song-move:<STARSIGN song folder>
+        // song-move:<1 Starsign song folder>
         const muse::RetVal<QString> r = starScore()->moveSongTo(arg);
         if (!r.ret) {
             interactive()->error(muse::trc("starscore", "The song wasn't moved"), r.ret.toString());

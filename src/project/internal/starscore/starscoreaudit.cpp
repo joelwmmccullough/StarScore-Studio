@@ -2085,7 +2085,7 @@ QStringList StarScoreService::auditLibraryFiles(const QString& folder) const
     if (folder.isEmpty()) {
         return files;
     }
-    // The band's songs: the STARSIGN folders but Sketches (before 19 Oct 2026 "1 Starsign Originals" and "2 Starsign
+    // The band's songs: the 1 Starsign folders but Sketches (before 19 Oct 2026 "1 Starsign Originals" and "2 Starsign
     // Covers") when the folder has them
     QStringList roots;
     QStringList subs { QString("1 Starsign Originals"), QString("2 Starsign Covers") };

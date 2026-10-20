@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.67
+
+- **Projects and Sheets' top folders numbered from 1.** The next folder organization renames them once: STARSIGN → `1 Starsign`, `4 Other Projects` → `2 Other Projects`, `6 Templates` → `3 Templates`, `7 Sketches` → `4 Sketches`, `8 Quarantine (empty template copies)` → `5 Quarantine (empty template copies)`, `9 Inbox` → `6 Inbox`, and the `10 Sweater Weather` shortcut → `7 Sweater Weather`. The folders inside `1 Starsign` (Originals, Covers, Vocal Covers…) don't change. A song that's open follows its folder. Everything in StarScore that uses these folders (Move to…, filing, the Inbox, new songs, the reports) uses the new names.
+
 ## 1.18.66
 
 - **Rests in beams no longer sit on accidentals on screen.** A rest inside a beam is moved up or down to clear the beam after the bar is spaced, so it could land on the next note's sharp or natural (or a grace note's) or the note before it. The printed sheets already fixed these by widening the bar; the score on screen now does too:

@@ -625,7 +625,7 @@ QString StarScoreService::songKind() const
 
 QString StarScoreService::songGroup() const
 {
-    // "STARSIGN/1 Originals/2 In Progress/Mxter Shirts/MXTR - Mxter Shirts.starscore"
+    // "1 Starsign/1 Originals/2 In Progress/Mxter Shirts/MXTR - Mxter Shirts.starscore"
     const QStringList seg = starscoreProjectsRel(projectsFolder(), mainProjectPath().toQString()).split('/');
     if (seg.size() != 5) {
         return QString();
@@ -640,7 +640,7 @@ RetVal<QString> StarScoreService::moveSongTo(const QString& groupRel)
     const QString from = songGroup();
     if (!m_mainProject || from.isEmpty() || !starscore::org::starsignSongGroups().contains(groupRel)) {
         return RetVal<QString>::make_ret(Ret::Code::UnknownError,
-                                         muse::trc("starscore", "This song isn't in one of the STARSIGN song folders of Projects and Sheets."));
+                                         muse::trc("starscore", "This song isn't in one of the 1 Starsign song folders of Projects and Sheets."));
     }
     if (from == groupRel) {
         return RetVal<QString>::make_ok(QString());

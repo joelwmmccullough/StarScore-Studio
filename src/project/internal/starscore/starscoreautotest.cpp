@@ -1753,7 +1753,7 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         }
     } else if (step.startsWith("filenew:") || step.startsWith("movesong:") || step == "songplace") {
         // filenew:<kind>: the open new score filed as File › New does (STARSCORE_AUTOTEST_PROJECTS is Projects and
-        // Sheets); movesong:<STARSIGN song folder>: Move to…; songplace: the song's kind, folder and file
+        // Sheets); movesong:<1 Starsign song folder>: Move to…; songplace: the song's kind, folder and file
         const QString projects = qEnvironmentVariable("STARSCORE_AUTOTEST_PROJECTS");
         if (!projects.isEmpty()) {
             setProjectsFolder(projects);

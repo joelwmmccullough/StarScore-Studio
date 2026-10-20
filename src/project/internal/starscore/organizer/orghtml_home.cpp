@@ -1012,11 +1012,11 @@ h2{color:#2c3a2e;border-bottom-color:#2c3a2e;}
          .arg(thousands(state.value("files").toInt())).arg(state.value("starscore").toInt()).arg(thousands(state.value("mscz").toInt()))
          .arg(tunes.size()).arg(state.value("quarantined").toInt());
     const std::vector<std::pair<QString, QString> > rows {
-        { "Structure", "STARSIGN &mdash; Originals (Repertoire, In Progress, Sketches), Covers and Vocal Covers (Repertoire, In Progress) &mdash; then Other Projects" },
+        { "Structure", "1 Starsign &mdash; Originals (Repertoire, In Progress, Sketches), Covers and Vocal Covers (Repertoire, In Progress) &mdash; then Other Projects" },
         { "The live file", "each tune&rsquo;s <span class=\"mono\">CODE - Title.starscore</span>, at the top of its folder. Older "
                            "MuseScore files live in <span class=\"mono\">MuseScore Files/</span>." },
-        { "Drop zone", "<span class=\"mono\">9 Inbox</span> &mdash; filed whenever StarScore runs the folder organization" },
-        { "Templates", QString("%1 real templates kept in <span class=\"mono\">6 Templates</span>").arg(state.value("templates").toInt()) },
+        { "Drop zone", "<span class=\"mono\">6 Inbox</span> &mdash; filed whenever StarScore runs the folder organization" },
+        { "Templates", QString("%1 real templates kept in <span class=\"mono\">3 Templates</span>").arg(state.value("templates").toInt()) },
         { "Quarantine", QString("%1 byte-identical copies of an empty MuseScore template").arg(state.value("quarantined").toInt()) },
         { "Deletions", "none, ever &mdash; superseded files go to <span class=\"mono\">Version History/</span> or "
                        "<span class=\"mono\">Deprecated/</span>" },

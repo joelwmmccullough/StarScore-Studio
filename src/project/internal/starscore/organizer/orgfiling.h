@@ -6,7 +6,7 @@
  *   folder, register song folders that have a number but no code, make sure every song has 1 Lead Sheet, 1 Rhythm
  *   and Horn Part Guides (Demos, Extras and Version History appear when something is filed into them), and re-date
  *   Update Notes when a song's sheets changed.
- *   Projects and Sheets (the old maintain.py): empty 9 Inbox and the top level into the right tune (older
+ *   Projects and Sheets (the old maintain.py): empty 6 Inbox and the top level into the right tune (older
  *   MuseScore material into the tune's MuseScore Files/), move empty folders to "Z Empty Folders (safe to delete)".
  *   Codes: keep codes.json and codes_proj.json in step.
  * Nothing is ever deleted: a file that would be replaced moves to Version History (band) or Deprecated (Projects).
@@ -59,7 +59,7 @@ BandFilingReport fileBand(const Paths& paths, Codes& codes, const Roster& roster
 //! songRoots: songs whose sheets changed this run
 void redateUpdateNotes(const Paths& paths, const Codes& codes, const QStringList& songRoots, BandFilingReport& report);
 
-//! Projects and Sheets' Starsign song folders (Joel, 19 Oct 2026): STARSIGN, then Originals, Covers and Vocal Covers,
+//! Projects and Sheets' Starsign song folders (Joel, 19 Oct 2026): 1 Starsign, then Originals, Covers and Vocal Covers,
 //! each split into Repertoire (ready to play) and In Progress, and the originals also into Sketches (first ideas)
 const QStringList& starsignSongGroups();
 //! The song folder for a kind ("original", "cover", "vocal") and stage ("repertoire", "progress", "sketch"); a cover
@@ -73,28 +73,32 @@ struct LayoutReport {
     std::vector<Move> moved;
     QStringList problems;
 };
-//! The one move into the STARSIGN folders, while "1 Starsign Originals", "2 Starsign Covers" or "3 Starsign WIP" is
+//! The one move into the 1 Starsign folders, while "1 Starsign Originals", "2 Starsign Covers" or "3 Starsign WIP" is
 //! still there: originals to Repertoire (but for the ones in progress), WIP songs to Sketches (but for the ones in
 //! progress), covers to Repertoire when Sheets and Demos has a folder for them and In Progress when not, the vocal
-//! covers to Vocal Covers; "4 Other Projects/Mxter Shirts" merged into the Starsign Mxter Shirts. Only moves; an old
+//! covers to Vocal Covers; "2 Other Projects/Mxter Shirts" merged into the Starsign Mxter Shirts. Only moves; an old
 //! group folder goes once it's empty.
 LayoutReport migrateProjectsLayout(const Paths& paths);
+//! Projects and Sheets' top folders numbered from 1 (Joel, 19 Oct 2026): STARSIGN -> 1 Starsign, 4 Other Projects -> 2,
+//! 6 Templates -> 3, 7 Sketches -> 4, 8 Quarantine… -> 5, 9 Inbox -> 6, 10 Sweater Weather (a shortcut) -> 7. Each
+//! renamed once, while the old name is there and the new one isn't. Runs before migrateProjectsLayout.
+LayoutReport renumberProjectsTopFolders(const Paths& paths);
 
 //! A tune folder in Projects and Sheets, listed once per run (listProjectTunes) and shared by everything below
 struct ProjectTune {
     QString name;            // "Amplitudes"
-    QString group;           // "STARSIGN/1 Originals/1 Repertoire" ("1 Starsign Originals" before the move)
-    QString rel;             // "STARSIGN/1 Originals/1 Repertoire/Amplitudes"
+    QString group;           // "1 Starsign/1 Originals/1 Repertoire" ("1 Starsign Originals" before the move)
+    QString rel;             // "1 Starsign/1 Originals/1 Repertoire/Amplitudes"
     QString fileCode;        // the code its "CODE - Title.starscore" carries ("" without one)
     bool hasStarScore = false;
-    //! In STARSIGN (or the old groups 1-3). Filing, codes and the snapshot take "4 Other Projects" too; the folder
-    //! colours take only these, because "4 Other Projects" can hold a tune of the same name as a band song.
+    //! In 1 Starsign (or the old groups 1-3). Filing, codes and the snapshot take "2 Other Projects" too; the folder
+    //! colours take only these, because "2 Other Projects" can hold a tune of the same name as a band song.
     bool starsign = false;
 
     //! codes_proj.json's code for it, else fileCode (codes_proj.json may have been brought up to date this run)
     QString codeIn(const Codes& codes) const;
 };
-//! Every tune folder of the STARSIGN song folders and "4 Other Projects" (and the old groups 1-3 while they're there),
+//! Every tune folder of the 1 Starsign song folders and "2 Other Projects" (and the old groups 1-3 while they're there),
 //! by group then name. Shortcuts (symlinks) and hidden names are left out.
 std::vector<ProjectTune> listProjectTunes(const Paths& paths);
 
