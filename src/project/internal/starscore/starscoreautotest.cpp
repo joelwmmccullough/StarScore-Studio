@@ -877,6 +877,30 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             out.write(mu::project::starscore::org::recordingsHtml(rec, song, QDate::currentDate()).toUtf8());
         }
         autotestLog(QString("  %1 performances, written %2").arg(rec.performancesOf(song.code).size()).arg(out.fileName()));
+    } else if (step.startsWith("deltext:")) {
+        // deltext:<part name>|<text>: removes the staff texts reading exactly that from the part (and its part scores)
+        const QString name = step.mid(8).section('|', 0, 0), text = step.mid(8).section('|', 1);
+        std::vector<engraving::EngravingItem*> gone;
+        for (const engraving::Part* p : ms->parts()) {
+            if (p->partName().toQString() != name) {
+                continue;
+            }
+            for (engraving::Segment* seg = ms->firstSegment(engraving::SegmentType::ChordRest); seg;
+                 seg = seg->next1(engraving::SegmentType::ChordRest)) {
+                for (engraving::EngravingItem* e : seg->annotations()) {
+                    if (e->isStaffText() && e->track() >= p->startTrack() && e->track() < p->endTrack()
+                        && toTextBase(e)->plainText().toQString().trimmed() == text) {
+                        gone.push_back(e);
+                    }
+                }
+            }
+        }
+        master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Remove text"));
+        for (engraving::EngravingItem* e : gone) {
+            ms->undoRemoveElement(e);
+        }
+        master->notation()->undoStack()->commitChanges();
+        autotestLog(QString("  removed %1").arg(gone.size()));
     } else if (step.startsWith("mutetext:")) {
         // mutetext:<text>|<text>…: whether each counts as a mute marking (hidden on woodwind sheets)
         for (const QString& t : step.mid(9).split('|')) {
