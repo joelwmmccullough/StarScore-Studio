@@ -1226,8 +1226,8 @@ void StarScoreService::offerLowAlternates(const QStringList& partIds, bool asked
             }
             interactive()->info(muse::trc("starscore", "1-Horn sheets made"),
                                 muse::qtrc("starscore", "%1 now have the Trumpet's music, formatting and text positions, "
-                                                        "marked Needs review. The B\u266D Saxophone and the "
-                                                        "Trombone are an octave lower. Notes outside an instrument's range "
+                                                        "marked Needs review. The Trombone is an octave "
+                                                        "lower. Notes outside an instrument's range "
                                                         "are colored.").arg(list).toStdString());
         });
         return;

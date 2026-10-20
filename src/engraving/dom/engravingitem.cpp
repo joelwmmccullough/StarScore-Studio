@@ -1054,6 +1054,10 @@ void EngravingItem::add(EngravingItem* e)
     case ElementType::PARENTHESIS: {
         Parenthesis* p = toParenthesis(e);
         p->setVisible(visible());
+        // StarScore (Joel, 20 Oct 2026): a parenthesis is on its item's staff. The copies made for the part scores
+        // kept the main score's staff (a chord symbol's parentheses in the Bass part score on the main score's staff 5,
+        // which that part score doesn't have), saved that way, and clicking one crashed StarScore.
+        p->setTrack(track());
         if (p->direction() == DirectionH::LEFT) {
             m_leftParenthesis = p;
         } else if (p->direction() == DirectionH::RIGHT) {

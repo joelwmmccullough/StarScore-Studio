@@ -4,6 +4,12 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.70
+
+- **Fixed a crash when clicking a chord symbol with parentheses in a part score.** When parentheses were added to a chord symbol, the copies in the part scores were put on the main score's staff instead of the part score's. Clicking one crashed StarScore (twice in Ciao Ferrari's Bass and Guitar part scores). New parentheses now go on the right staff, songs saved with the wrong staff are repaired when they open, and selecting an item on a missing staff no longer crashes.
+- **A new 1-Horn takes the 2-Horn's Trumpet.** When you create the 1-Horn arrangement and the song has a 2-Horn whose Trumpet has music, that music is copied into the 1-Horn Trumpet without asking, with its part score's formatting and text positions, marked Sketch.
+- The message after the 1-Horn sheets are made no longer says the B♭ Saxophone is an octave lower (only the Trombone is).
+
 ## 1.18.69
 
 - **Every Rhythm Section instrument with music gets a part score.** When a song opens, a Rhythm Section instrument that has notes but no part score of its own (and isn't in one with others, like Keys) gets one, named as its sheet: Drums, Keys, Guitar 2, Bass 2… It's styled like the others. Ciao Ferrari gets Drums and Keys. Other songs that had gaps: Deimos (Guitar 2, Bass), Fish Oil (Drums), Intern (Keys), Pick Up The Pieces (Drums), Porcupine (Guitar 2, Keys, Bass 2, Bass Drum). Horn and string parts without a part score are left as they are.

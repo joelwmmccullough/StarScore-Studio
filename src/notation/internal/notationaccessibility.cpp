@@ -184,7 +184,7 @@ QString NotationAccessibility::singleElementAccessibilityInfo() const
         accessibilityInfo += "; " + barsAndBeats;
     }
 
-    if (element->hasStaff()) {
+    if (element->hasStaff() && element->staff()) {   // StarScore: an item on a staff its score doesn't have
         QString staff = muse::qtrc("notation", "Staff %1").arg(QString::number(element->staffIdx() + 1));
 
         QString staffName = element->staff()->part()->longName(element->tick());

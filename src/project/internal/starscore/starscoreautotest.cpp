@@ -814,6 +814,51 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             ++added;
         }
         autotestLog(QString("  added %1").arg(added));
+    } else if (step.startsWith("parenchords:")) {
+        // parenchords:<bar>: parentheses on every chord symbol in that bar of the main score, as the Properties panel
+        // adds them (to the linked chord symbols in the part scores too)
+        engraving::Measure* m = ms->firstMeasure();
+        for (int i = 1; i < step.mid(12).toInt() && m; ++i) {
+            m = m->nextMeasure();
+        }
+        int added = 0;
+        for (engraving::Segment* seg = m ? m->first() : nullptr; seg; seg = seg->next()) {
+            for (engraving::EngravingItem* a : seg->annotations()) {
+                if (!a->isHarmony()) {
+                    continue;
+                }
+                master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Parentheses"));
+                a->undoChangeProperty(engraving::Pid::HAS_PARENTHESES, engraving::ParenthesesMode::BOTH);
+                master->notation()->undoStack()->commitChanges();
+                ++added;
+            }
+        }
+        autotestLog(QString("  chord symbols %1").arg(added));
+    } else if (step == "parentracks") {
+        // parentracks: every parenthesis whose staff isn't its item's (or isn't in its score)
+        int all = 0, wrong = 0;
+        std::vector<engraving::Score*> scores { ms };
+        for (engraving::Excerpt* ex : ms->excerpts()) {
+            if (ex->excerptScore()) {
+                scores.push_back(ex->excerptScore());
+            }
+        }
+        for (engraving::Score* sc : scores) {
+            sc->scanElements([&](engraving::EngravingItem* e) {
+                if (!e->isParenthesis()) {
+                    return;
+                }
+                ++all;
+                const engraving::EngravingItem* parent = e->parentItem();
+                if (e->track() >= sc->ntracks() || !e->staff() || (parent && parent->track() != e->track())) {
+                    ++wrong;
+                    autotestLog(QString("  %1: parenthesis track %2, its %3's %4, score tracks %5").arg(
+                                    sc->isMaster() ? QString("main score") : sc->name().toQString()).arg(e->track())
+                                .arg(parent ? parent->typeName() : "-").arg(parent ? int(parent->track()) : -1).arg(sc->ntracks()));
+                }
+            });
+        }
+        autotestLog(QString("  parentheses %1, wrong %2").arg(all).arg(wrong));
     } else if (step.startsWith("mutetext:")) {
         // mutetext:<text>|<text>…: whether each counts as a mute marking (hidden on woodwind sheets)
         for (const QString& t : step.mid(9).split('|')) {
@@ -1740,12 +1785,18 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         // arrangement:<arrangement key>[:<doubler id>[:<low horn id>]], as the StarScore bar's Add arrangement menu makes
         // it (with the Add arrangement dialog's choices)
         const QStringList a = step.mid(QString("arrangement:").size()).split(':');
+        QStringList sectionsBefore;
+        for (const StarScoreSection& sec : load().sections) {
+            sectionsBefore << sec.id;
+        }
         const RetVal<QString> made = createArrangementFromTemplate(a.value(0), a.value(1), a.value(2));
         autotestLog(QString("  %1: %2").arg(a.value(0), made.ret ? made.val : QString::fromStdString(made.ret.toString())));
-        // the 4-Horn 2-Trumpet's parts copied from the 5-Horn and the 3-Horn Standard, as after the menu (no question)
+        // the 4-Horn 2-Trumpet's parts copied from the 5-Horn and the 3-Horn Standard, and the 1-Horn's Trumpet from
+        // the 2-Horn's, as after the menu (no question)
         for (const StarScoreSection& sec : load().sections) {
-            if (made.ret && sec.templateKey == starscore::TWO_TRUMPET_4H) {
-                const auto pairs = twoTrumpetSources(sec);
+            const bool twoTrumpet = sec.templateKey == starscore::TWO_TRUMPET_4H;
+            if (made.ret && (twoTrumpet || (sec.templateKey == "1-horn" && !sectionsBefore.contains(sec.id)))) {
+                const auto pairs = twoTrumpet ? twoTrumpetSources(sec) : oneHornSources(sec);
                 for (const auto& [from, to] : pairs) {
                     autotestLog(QString("  copy %1 -> %2").arg(partScoreName(from), partScoreName(to)));
                 }

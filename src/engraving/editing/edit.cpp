@@ -6895,6 +6895,9 @@ void Score::undoAddElement(EngravingItem* element, bool addToLinkedStaves, bool 
             ne->setScore(e->score());
             ne->setSelected(false);
             ne->setParent(e);
+            if (et == ElementType::PARENTHESIS) {
+                ne->setTrack(e->track());   // StarScore: on the linked item's staff, not the original's
+            }
             doUndoAddElement(ne);
         }
         return;
