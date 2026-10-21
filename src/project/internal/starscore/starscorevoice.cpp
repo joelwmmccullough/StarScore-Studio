@@ -500,3 +500,69 @@ bool StarScoreService::makeLeadSheetVoiceWhenReady()
     scheduleChanged();
     return true;
 }
+
+void StarScoreService::resetPartScore(const engraving::Score* score)
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    engraving::MasterScore* ms = master ? master->masterScore() : nullptr;
+    if (!ms || !score || score->isMaster()) {
+        return;
+    }
+    IExcerptNotationPtr excerpt;
+    for (const IExcerptNotationPtr& e : master->excerpts()) {
+        INotationPtr n = e ? e->notation() : nullptr;
+        if (n && n->elements() && n->elements()->msScore() == score) {
+            excerpt = e;
+        }
+    }
+    if (!excerpt) {
+        return;
+    }
+    const QString name = excerpt->name();
+    constexpr int Reset = static_cast<int>(muse::IInteractive::Button::CustomButton) + 1;
+    constexpr int Cancel = static_cast<int>(muse::IInteractive::Button::CustomButton) + 2;
+    const muse::IInteractive::Result answer = interactive()->questionSync(
+        muse::qtrc("starscore", "Reset “%1”?").arg(name).toStdString(),
+        muse::qtrc("starscore", "The part score is made again from the main score, as the Parts dialog's Reset does: its "
+                                "title frame comes back, and everything set in this part score only is lost (line and page "
+                                "breaks, moved or hidden items, its own style changes). StarScore then gives it the "
+                                "Starsign style, its sheet title and mutes again. You can undo it.").toStdString(),
+        { muse::IInteractive::ButtonData(Cancel, muse::trc("starscore", "Cancel")),
+          muse::IInteractive::ButtonData(Reset, muse::trc("starscore", "Reset"), true) }, Cancel);
+    if (answer.button() != Reset) {
+        return;
+    }
+    resetPartScoreNow(excerpt);
+}
+
+void StarScoreService::resetPartScoreNow(const IExcerptNotationPtr& excerpt)
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    engraving::MasterScore* ms = master ? master->masterScore() : nullptr;
+    INotationPtr before = excerpt ? excerpt->notation() : nullptr;
+    const engraving::Score* score = before && before->elements() ? before->elements()->msScore() : nullptr;
+    if (!ms || !score) {
+        return;
+    }
+    const QString name = excerpt->name();
+    QStringList partIds;
+    for (const engraving::Part* p : masterPartsOf(score, ms)) {
+        partIds << idText(p);
+    }
+    master->resetExcerpt(excerpt);
+    // StarScore's part of the part score: its style, its title and mutes, and a + Voice sheet's formatting
+    applyStyles(partIds);
+    for (const VoiceScore& v : voiceScores(master)) {
+        if (v.score == excerpt) {
+            master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Format the + Voice part score"));
+            formatVoiceScore(v);
+            master->notation()->undoStack()->commitChanges();
+        }
+    }
+    if (INotationPtr n = excerpt->notation()) {
+        n->style()->styleChanged().notify();
+        n->notationChanged().notify();
+    }
+    scheduleChanged();
+    LOGI() << "[starscore] reset " << name.toStdString();
+}

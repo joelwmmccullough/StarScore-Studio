@@ -125,6 +125,8 @@ public:
     void setPartStatus(const QString& partId, int status) override;
     int partScoreStatus(const mu::engraving::Score* score) const override;
     void setPartScoreStatus(const mu::engraving::Score* score, int status) override;
+    void resetPartScore(const mu::engraving::Score* score) override;
+    void resetPartScoreNow(const notation::IExcerptNotationPtr& excerpt);
     void setSectionSkipSheet(const QString& sectionId, const QString& which, bool skip) override;
     void renameSection(const QString& sectionId, const QString& name) override;
     void setSectionParts(const QString& sectionId, const QStringList& partIds) override;

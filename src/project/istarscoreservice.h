@@ -644,6 +644,9 @@ public:
     virtual int partScoreStatus(const mu::engraving::Score* score) const = 0;
     //! Tag every part in a part score
     virtual void setPartScoreStatus(const mu::engraving::Score* score, int status) = 0;
+    //! The part score made again from the main score, as the Parts dialog's Reset does (after asking), then given
+    //! StarScore's style, title and mutes again (Joel, 21 Oct 2026: the Parts dialog is hidden in StarScore)
+    virtual void resetPartScore(const mu::engraving::Score* score) = 0;
     //! which: "drums", "percussion" or "keys"
     virtual void setSectionSkipSheet(const QString& sectionId, const QString& which, bool skip) = 0;
     virtual void renameSection(const QString& sectionId, const QString& name) = 0;

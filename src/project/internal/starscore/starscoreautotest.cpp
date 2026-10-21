@@ -1628,6 +1628,16 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             }
         }
         autotestLog(QString("  set %1; breaking: %2").arg(set).arg(breaking.join(", ")));
+    } else if (step.startsWith("resetpart:")) {
+        // resetpart:<part score name>: the tab menu's Reset part score… after "Reset" in its question
+        int done = 0;
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            if (e->name() == step.mid(10)) {
+                resetPartScoreNow(e);
+                ++done;
+            }
+        }
+        autotestLog(QString("  reset %1").arg(done));
     } else if (step == "voicerefresh") {
         // voicerefresh: the + Voice part scores remade where broken and formatted again, as at the start of an export
         autotestLog(QString("  formatted %1").arg(refreshVoiceScores()));

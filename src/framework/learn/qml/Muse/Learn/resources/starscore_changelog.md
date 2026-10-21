@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.77
+
+- **Reset part score… on a part score's tab.** Right-click a part score's tab and choose Reset part score…; after you confirm, it's made again from the main score, as the (hidden) Parts dialog's Reset does: its title frame comes back, and what was set in that part score only is lost. StarScore then gives it the Starsign style, its sheet title and mutes again. You can undo it.
+
 ## 1.18.76
 
 - **Falls (and other lines after a note) start next to the notehead when the note has an accidental.** MuseScore pushed them right by the accidental's width, a parenthesized accidental most of all (Double Entendre 6H Trumpet 1, bar 57).
