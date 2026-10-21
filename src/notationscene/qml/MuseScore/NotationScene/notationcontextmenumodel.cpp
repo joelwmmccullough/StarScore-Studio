@@ -292,8 +292,8 @@ MenuItemList NotationContextMenuModel::makeElementItems()
         items << makeMenuItem("edit-element");
     }
 
-    // StarScore rhythm markings, on notes (Joel, 14 Oct 2026)
-    if (element && element->isNote()) {
+    // StarScore rhythm markings, on notes and rests (Joel, 14 Oct 2026; rests 21 Oct 2026)
+    if (element && (element->isNote() || element->isRest())) {
         items << makeSeparator();
         items << makeMenu(TranslatableString("notation", "Rhythm markings"), {
             makeMenuItem("starscore-rhythm-above"),

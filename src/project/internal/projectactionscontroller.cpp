@@ -215,7 +215,7 @@ void ProjectActionsController::init()
             notation->notationChanged().notify();
             if (n == 0) {
                 interactive()->info(muse::trc("starscore", "Rhythm markings"),
-                                    muse::trc("starscore", "Select the notes to make rhythm markings first."));
+                                    muse::trc("starscore", "Select the notes or rests to make rhythm markings first."));
             }
         });
     }

@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.81
+
+- **Rhythm markings: rests.** "Rhythm markings above/below the staff" and "back to normal notes" now work on rests too, and the Rhythm markings menu shows when you right-click a rest. Rests beside rhythm markings are cue size like the markings: making markings makes the rests in those bars small, selected rests are made small, and in a bar of rests only they're moved beyond the staff on that side. Back to normal makes them full size and puts them back. Rests beside existing markings are made small when a song opens.
+
 ## 1.18.80
 
 - **Respace lyrics on a part score's tab.** Right-click the tab of a part score with lyrics and choose Respace lyrics: the syllables get a word space between them, and where they're still squeezed their bars are widened and lines split in two, without resetting the part score. A message says what changed; you can undo it.

@@ -1260,10 +1260,21 @@ int mu::project::starscore::clearRhythmRestOffsets(MasterScore* master, bool app
             }
             for (Segment* s = m->first(SegmentType::ChordRest); s; s = s->next(SegmentType::ChordRest)) {
                 for (EngravingItem* e : s->elist()) {
-                    if (e && e->isRest() && markingTracks.count(e->track()) && !RealIsNull(e->offset().y())) {
+                    if (!e || !e->isRest() || !markingTracks.count(e->track())) {
+                        continue;
+                    }
+                    // placed by the layout, not moved by hand on top of that; and cue size like the markings
+                    // (Joel, 21 Oct 2026)
+                    if (!RealIsNull(e->offset().y())) {
                         ++count;
                         if (apply) {
                             e->undoChangeProperty(Pid::OFFSET, PointF(e->offset().x(), 0.0));
+                        }
+                    }
+                    if (!toRest(e)->isSmall()) {
+                        ++count;
+                        if (apply) {
+                            e->undoChangeProperty(Pid::SMALL, true);
                         }
                     }
                 }
@@ -1271,6 +1282,66 @@ int mu::project::starscore::clearRhythmRestOffsets(MasterScore* master, bool app
         }
     }
     return count;
+}
+
+namespace {
+//! A chord that is a rhythm marking: every note pinned, silent, small, not a normal head (as RestLayout reads it)
+bool isMarkingChord(const Chord* c)
+{
+    bool all = c && !c->notes().empty();
+    for (const Note* n : c ? c->notes() : std::vector<Note*>()) {
+        all = all && n->fixed() && !n->play() && (n->isSmall() || c->isSmall()) && n->headGroup() != NoteHeadGroup::HEAD_NORMAL;
+    }
+    return all;
+}
+
+//! Whether the bar holds a rhythm marking in that voice
+bool barHasMarking(const Measure* m, track_idx_t track)
+{
+    for (const Segment* s = m ? m->first(SegmentType::ChordRest) : nullptr; s; s = s->next(SegmentType::ChordRest)) {
+        const EngravingItem* e = s->element(track);
+        if (e && e->isChord() && isMarkingChord(toChord(e))) {
+            return true;
+        }
+    }
+    return false;
+}
+
+//! The rests of the selection, with their copies in the other scores
+std::set<Rest*> selectedRests(Score* score)
+{
+    std::set<Rest*> out;
+    for (EngravingItem* e : score->selection().elements()) {
+        if (e && e->isRest() && !toRest(e)->isGap()) {
+            for (EngravingObject* o : e->linkList()) {
+                if (o && o->isRest()) {
+                    out.insert(toRest(o));
+                }
+            }
+        }
+    }
+    return out;
+}
+
+//! A rest made a rhythm-marking rest (Joel, 21 Oct 2026: selecting only rests did nothing, and they stayed full size):
+//! cue size; in a bar with markings in its voice the layout puts it beside them (offset cleared), in a bar of rests only
+//! it's moved to the same place by hand: centred 2 spaces beyond the staff on that side
+void makeMarkingRest(Rest* r, bool below)
+{
+    r->undoChangeProperty(Pid::SMALL, true);
+    if (barHasMarking(r->measure(), r->track())) {
+        if (!RealIsNull(r->offset().y())) {
+            r->undoChangeProperty(Pid::OFFSET, PointF(r->offset().x(), 0.0));
+        }
+        return;
+    }
+    const StaffType* st = r->staffType();
+    const double lineDist = (st ? st->lineDistance().val() : 1.0) * r->spatium();
+    const int lines = st ? st->lines() : 5;
+    const double target = (below ? (lines - 1) + 2 : -2) * lineDist;
+    const double now = r->ldata()->pos().y();   // laid out, without its offset
+    r->undoChangeProperty(Pid::OFFSET, PointF(r->offset().x(), target - now));
+}
 }
 
 int mu::project::starscore::makeRhythmMarkings(Score* score, bool below)
@@ -1313,6 +1384,20 @@ int mu::project::starscore::makeRhythmMarkings(Score* score, bool below)
             n->undoChangeProperty(Pid::FIXED_LINE, rhythmMarkingLine(n, below));
             count += counted ? 1 : 0;
         }
+    }
+    // the rests: those selected, and every rest beside the new markings (cue size like them)
+    std::set<Rest*> rests = selectedRests(score);
+    for (Chord* c : linked) {
+        for (Segment* s = c->measure()->first(SegmentType::ChordRest); s; s = s->next(SegmentType::ChordRest)) {
+            EngravingItem* e = s->element(c->track());
+            if (e && e->isRest()) {
+                rests.insert(toRest(e));
+            }
+        }
+    }
+    for (Rest* r : rests) {
+        makeMarkingRest(r, below);
+        ++count;
     }
     return count;
 }
@@ -1362,6 +1447,26 @@ int mu::project::starscore::unmakeRhythmMarkings(Score* score)
             n->undoChangeProperty(Pid::FIXED, false);
             n->undoChangeProperty(Pid::FIXED_LINE, 0);
             count += counted ? 1 : 0;
+        }
+    }
+    // the rests: those selected, and those beside markings no longer there, back to normal size and place
+    std::set<Rest*> rests = selectedRests(score);
+    for (Chord* c : linked) {
+        for (Segment* s = c->measure()->first(SegmentType::ChordRest); s; s = s->next(SegmentType::ChordRest)) {
+            EngravingItem* e = s->element(c->track());
+            if (e && e->isRest() && !barHasMarking(c->measure(), c->track())) {
+                rests.insert(toRest(e));
+            }
+        }
+    }
+    for (Rest* r : rests) {
+        if (r->isSmall()) {
+            r->undoChangeProperty(Pid::SMALL, false);
+            ++count;
+        }
+        if (!RealIsNull(r->offset().y())) {
+            r->undoChangeProperty(Pid::OFFSET, PointF(r->offset().x(), 0.0));
+            ++count;
         }
     }
     // in the part scores, linked to the full score's look again (changing them there had unlinked it; now they match)

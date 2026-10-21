@@ -215,14 +215,14 @@ const UiActionList ProjectUiActions::m_actions = {
              mu::context::UiCtxProjectOpened,
              mu::context::CTX_ANY,
              TranslatableString("action", "Rhythm markings above the staff"),
-             TranslatableString("action", "Make the selected notes rhythm markings on the space above the staff: small, silent, "
+             TranslatableString("action", "Make the selected notes (and rests) rhythm markings on the space above the staff: small, silent, "
                                           "slash heads, kept there whatever their pitch")
              ),
     UiAction("starscore-rhythm-below",
              mu::context::UiCtxProjectOpened,
              mu::context::CTX_ANY,
              TranslatableString("action", "Rhythm markings below the staff"),
-             TranslatableString("action", "Make the selected notes rhythm markings on the space below the staff: small, silent, "
+             TranslatableString("action", "Make the selected notes (and rests) rhythm markings on the space below the staff: small, silent, "
                                           "slash heads, kept there whatever their pitch")
              ),
     UiAction("starscore-rhythm-normal",

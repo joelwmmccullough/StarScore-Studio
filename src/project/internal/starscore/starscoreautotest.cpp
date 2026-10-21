@@ -528,7 +528,15 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         }
         engraving::Measure* m = sc->crMeasure(a.value(2).toInt() - 1);
         sc->deselectAll();
-        if (m) {
+        if (m && a.value(5) == "rests") {
+            // (:rests after the part score name: only the bar's rests selected, one by one)
+            for (engraving::Segment* sg = m->first(engraving::SegmentType::ChordRest); sg; sg = sg->next(engraving::SegmentType::ChordRest)) {
+                engraving::EngravingItem* e = sg->element(a.value(1).toInt() * engraving::VOICES);
+                if (e && e->isRest()) {
+                    sc->select(e, engraving::SelectType::ADD);
+                }
+            }
+        } else if (m) {
             sc->selection().setRange(m->first(engraving::SegmentType::ChordRest), m->last(), a.value(1).toInt(), a.value(1).toInt() + 1);
             sc->selection().updateSelectedElements();
         }
