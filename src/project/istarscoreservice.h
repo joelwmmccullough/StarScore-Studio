@@ -647,6 +647,11 @@ public:
     //! The part score made again from the main score, as the Parts dialog's Reset does (after asking), then given
     //! StarScore's style, title and mutes again (Joel, 21 Oct 2026: the Parts dialog is hidden in StarScore)
     virtual void resetPartScore(const mu::engraving::Score* score) = 0;
+    //! Whether the part score has lyrics (for the tab menu's Respace lyrics)
+    virtual bool partScoreHasLyrics(const mu::engraving::Score* score) const = 0;
+    //! The lyrics given room, without a reset: a word space between syllables, then their bars widened and systems
+    //! split where they're still squeezed (Joel, 21 Oct 2026). Tells what changed.
+    virtual void respaceLyrics(const mu::engraving::Score* score) = 0;
     //! which: "drums", "percussion" or "keys"
     virtual void setSectionSkipSheet(const QString& sectionId, const QString& which, bool skip) = 0;
     virtual void renameSection(const QString& sectionId, const QString& name) = 0;

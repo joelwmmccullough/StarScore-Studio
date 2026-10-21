@@ -1167,6 +1167,221 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             store(d);
             autotestLog(QString("  added %1 (%2) to %3").arg(a.value(1), sec.partIds.join(","), a.value(2)));
         }
+    } else if (step.startsWith("restoresection:")) {
+        // restoresection:<file>|<section id>|<after part name>: a section of another copy of the song brought back:
+        // its instruments (same instrument, name and short name) placed after the named part, their music pasted bar
+        // for bar (the two must have the same bars), part scores for the parts that had one there, the section and
+        // the parts' status tags (Joel, 21 Oct 2026: Double Entendre's Rhythm Section deleted by mistake)
+        const QStringList a = step.mid(15).split('|');
+        INotationProjectPtr src = projectCreator()->newProject(iocContext());
+        if (!src->load(io::path_t(a.value(0))) || !src->masterNotation()) {
+            autotestLog("  couldn't load " + a.value(0));
+        } else {
+            engraving::MasterScore* ss = src->masterNotation()->masterScore();
+            const Data srcData = loadFrom(ss);
+            const StarScoreSection* srcSec = nullptr;
+            for (const StarScoreSection& sec : srcData.sections) {
+                if (sec.id == a.value(1)) {
+                    srcSec = &sec;
+                }
+            }
+            int bars = 0, same = 0;
+            for (engraving::Measure *x = ms->firstMeasure(), *y = ss->firstMeasure(); x || y;
+                 x = x ? x->nextMeasure() : nullptr, y = y ? y->nextMeasure() : nullptr) {
+                ++bars;
+                same += (x && y && x->tick() == y->tick() && x->ticks() == y->ticks()) ? 1 : 0;
+            }
+            autotestLog(QString("  bars: %1, the same in both: %2").arg(bars).arg(same));
+            if (!srcSec || same != bars) {
+                autotestLog("  not restored");
+            } else {
+                // the instruments
+                std::vector<engraving::Part*> srcParts;
+                for (const QString& pid : srcSec->partIds) {
+                    if (engraving::Part* p = ss->partById(ID(pid))) {
+                        srcParts.push_back(p);
+                    }
+                }
+                std::set<QString> before;
+                PartInstrumentList list;
+                for (const engraving::Part* p : ms->parts()) {
+                    before.insert(idText(p));
+                    PartInstrument pi;
+                    pi.isExistingPart = true;
+                    pi.partId = p->id();
+                    list << pi;
+                    if (p->partName().toQString() == a.value(2)) {
+                        for (const engraving::Part* sp : srcParts) {
+                            PartInstrument ni;
+                            ni.isExistingPart = false;
+                            ni.instrumentTemplate = instrumentsRepository()->instrumentTemplate(sp->instrumentId());
+                            list << ni;
+                        }
+                    }
+                }
+                engraving::ScoreOrder order = master->parts()->scoreOrder();
+                order.customized = true;
+                master->parts()->setParts(list, order);
+                std::vector<engraving::Part*> made;
+                for (engraving::Part* p : ms->parts()) {
+                    if (!before.count(idText(p))) {
+                        made.push_back(p);
+                    }
+                }
+                if (made.size() != srcParts.size()) {
+                    autotestLog(QString("  made %1 parts for %2").arg(made.size()).arg(srcParts.size()));
+                } else {
+                    std::vector<StarScoreInstrument> insts;
+                    for (const engraving::Part* sp : srcParts) {
+                        StarScoreInstrument inst;
+                        inst.instrumentId = sp->instrumentId().toQString();
+                        inst.partName = sp->partName().toQString();
+                        inst.shortName = sp->shortName(engraving::Fraction(0, 1)).toQString();
+                        insts.push_back(inst);
+                    }
+                    StarScoreSection sec = finishNewParts(made, insts);
+                    // the music, staff by staff
+                    master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Restore the section's music"));
+                    const bool mm = ms->style().styleB(engraving::Sid::createMultiMeasureRests);
+                    if (mm) {
+                        ms->undoChangeStyleVal(engraving::Sid::createMultiMeasureRests, false);
+                    }
+                    ss->style().set(engraving::Sid::createMultiMeasureRests, false);
+                    ss->setLayoutAll();
+                    ss->doLayout();
+                    ms->setLayoutAll();
+                    ms->doLayout();
+                    std::map<QString, int> keep;
+                    for (engraving::Segment* seg = ms->firstSegment(engraving::SegmentType::ChordRest); seg;
+                         seg = seg->next1(engraving::SegmentType::ChordRest)) {
+                        for (engraving::EngravingItem* e : seg->annotations()) {
+                            if (e->systemFlag() || e->isRehearsalMark() || e->isTempoText()) {
+                                keep[QString("%1|%2|%3").arg(int(e->type())).arg(seg->tick().ticks()).arg(e->track())]++;
+                            }
+                        }
+                    }
+                    for (size_t i = 0; i < made.size(); ++i) {
+                        for (size_t k = 0; k < srcParts[i]->staves().size() && k < made[i]->staves().size(); ++k) {
+                            const engraving::staff_idx_t from = srcParts[i]->staves().at(k)->idx();
+                            const engraving::staff_idx_t to = made[i]->staves().at(k)->idx();
+                            ss->deselectAll();
+                            ss->selection().setRangeTicks(engraving::Fraction(0, 1), ss->lastMeasure()->endTick(), from, from + 1);
+                            ss->selection().updateSelectedElements();
+                            const ByteArray mime = ss->selection().mimeData();
+                            ss->deselectAll();
+                            engraving::XmlReader reader(mime);
+                            const bool ok = !mime.empty()
+                                            && ms->pasteStaff(reader, ms->firstMeasure()->first(engraving::SegmentType::ChordRest), to);
+                            ms->deselectAll();
+                            autotestLog(QString("  %1 staff %2: %3").arg(made[i]->partName().toQString()).arg(k + 1)
+                                        .arg(ok ? "pasted" : "FAILED"));
+                        }
+                    }
+                    // system markings the paste brought a second time
+                    std::map<QString, int> seen;
+                    std::vector<engraving::EngravingItem*> extra;
+                    for (engraving::Segment* seg = ms->firstSegment(engraving::SegmentType::ChordRest); seg;
+                         seg = seg->next1(engraving::SegmentType::ChordRest)) {
+                        for (engraving::EngravingItem* e : seg->annotations()) {
+                            if (e->systemFlag() || e->isRehearsalMark() || e->isTempoText()) {
+                                const QString key = QString("%1|%2|%3").arg(int(e->type())).arg(seg->tick().ticks()).arg(e->track());
+                                if (++seen[key] > std::max(1, keep[key])) {
+                                    extra.push_back(e);
+                                }
+                            }
+                        }
+                    }
+                    for (engraving::EngravingItem* e : extra) {
+                        ms->undoRemoveElement(e);
+                    }
+                    if (mm) {
+                        ms->undoChangeStyleVal(engraving::Sid::createMultiMeasureRests, true);
+                    }
+                    master->notation()->undoStack()->commitChanges();
+                    autotestLog(QString("  removed %1 system marking(s) brought twice").arg(extra.size()));
+                    // the section, after the one holding the part it follows, and the status tags
+                    Data d = load();
+                    StarScoreSection restored = *srcSec;
+                    std::map<QString, QString> newId;
+                    for (size_t i = 0; i < made.size(); ++i) {
+                        newId[idText(srcParts[i])] = idText(made[i]);
+                    }
+                    auto mapIds = [&](const QStringList& ids) {
+                        QStringList out;
+                        for (const QString& id : ids) {
+                            if (newId.count(id)) {
+                                out << newId[id];
+                            }
+                        }
+                        return out;
+                    };
+                    restored.partIds = mapIds(srcSec->partIds);
+                    restored.shownPartIds = mapIds(srcSec->shownPartIds);
+                    restored.alternates.clear();
+                    restored.sheetParts.clear();
+                    size_t at = d.sections.size();
+                    for (size_t i = 0; i < d.sections.size(); ++i) {
+                        for (const QString& pid : d.sections[i].partIds) {
+                            const engraving::Part* p = ms->partById(ID(pid));
+                            if (p && p->partName().toQString() == a.value(2)) {
+                                at = i + 1;
+                            }
+                        }
+                    }
+                    d.sections.insert(d.sections.begin() + std::min(at, d.sections.size()), restored);
+                    int tags = 0;
+                    for (const auto& [oldId, nid] : newId) {
+                        d.partStatus.erase(nid);   // (new parts are tagged Sketch; they get the tag they had there, or none)
+                        auto st = srcData.partStatus.find(oldId);
+                        if (st != srcData.partStatus.end()) {
+                            d.partStatus[nid] = st->second;
+                            ++tags;
+                        }
+                    }
+                    store(d);
+                    autotestLog(QString("  section %1 with %2 part(s), %3 status tag(s)").arg(restored.name).arg(restored.partIds.size()).arg(tags));
+                    // part scores only for the parts that had one of their own there
+                    std::set<QString> hadBook;
+                    for (engraving::Excerpt* ex : ss->excerpts()) {
+                        engraving::Score* es = ex->excerptScore();
+                        if (es && es->parts().size() == 1) {
+                            if (const engraving::Staff* l = es->parts().front()->staff(0)->findLinkedInScore(ss)) {
+                                hadBook.insert(idText(l->part()));
+                            }
+                        }
+                    }
+                    ExcerptNotationList kept;
+                    int dropped = 0;
+                    for (const IExcerptNotationPtr& e : master->excerpts()) {
+                        INotationPtr n = e->notation();
+                        engraving::Score* es = n && n->elements() ? n->elements()->msScore() : nullptr;
+                        bool drop = false;
+                        if (es && es->parts().size() == 1) {
+                            const std::vector<engraving::Part*> mp = masterPartsOf(es, ms);
+                            for (size_t i = 0; i < made.size(); ++i) {
+                                if (mp.size() == 1 && mp.front() == made[i] && !hadBook.count(idText(srcParts[i]))) {
+                                    drop = true;
+                                }
+                            }
+                        }
+                        if (drop) {
+                            ++dropped;
+                        } else {
+                            kept.push_back(e);
+                        }
+                    }
+                    if (dropped) {
+                        master->setExcerpts(kept);
+                    }
+                    QStringList books;
+                    for (const IExcerptNotationPtr& e : master->excerpts()) {
+                        books << e->name();
+                    }
+                    autotestLog(QString("  part scores (%1 dropped): %2").arg(dropped).arg(books.join(", ")));
+                    applyStyles(restored.partIds);
+                }
+            }
+        }
     } else if (step.startsWith("removepart:")) {
         // removepart:<words>: parts whose instrument's long name contains the words (case ignored) removed, as the
         // Instruments panel's delete does; then the part scores left
@@ -1708,6 +1923,16 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             }
         }
         autotestLog(QString("  %1 dynamic(s) on notes, of %2").arg(total).arg(checked));
+    } else if (step.startsWith("respace:")) {
+        // respace:<part score name>: the tab menu's Respace lyrics (without its message)
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            if (e->name() == step.mid(8) && e->notation()) {
+                master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Respace lyrics"));
+                const int n = respaceLyricsIn(e->notation()->elements()->msScore());
+                master->notation()->undoStack()->commitChanges();
+                autotestLog(QString("  %1 change(s)").arg(n));
+            }
+        }
     } else if (step == "voicerefresh") {
         // voicerefresh: the + Voice part scores remade where broken and formatted again, as at the start of an export
         autotestLog(QString("  formatted %1").arg(refreshVoiceScores()));

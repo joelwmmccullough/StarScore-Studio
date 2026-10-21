@@ -29,6 +29,9 @@
 #include "engraving/dom/measure.h"
 #include "engraving/dom/part.h"
 #include "engraving/dom/staff.h"
+#include "engraving/dom/lyrics.h"
+#include "engraving/dom/chordrest.h"
+#include "engraving/dom/segment.h"
 #include "engraving/dom/bracketItem.h"
 #include "engraving/editing/editbrackets.h"
 #include "engraving/editing/editpart.h"
@@ -207,6 +210,9 @@ INotationPtr StarScoreService::makeVoiceScore(const IMasterNotationPtr& master, 
     return score->notation();
 }
 
+//! The space asked for between syllables on sheets whose lyrics StarScore spaces (Sid::lyricsMinDistance, in spaces)
+static const double LYRICS_WORD_GAP = 0.7;
+
 bool StarScoreService::formatVoiceScore(const VoiceScore& v)
 {
     INotationPtr n = v.score ? v.score->notation() : nullptr;
@@ -224,9 +230,8 @@ bool StarScoreService::formatVoiceScore(const VoiceScore& v)
     QFile::remove(mss);
     // the lyrics a word space apart, not a quarter of a space: the instrument's notes under them are spaced for that
     // (Joel, 21 Oct 2026: "Iain't'fraid ofnoghost")
-    static const double LYRICS_GAP = 0.7;
-    if (dst->style().styleV(engraving::Sid::lyricsMinDistance).value<engraving::Spatium>().val() < LYRICS_GAP) {
-        dst->undoChangeStyleVal(engraving::Sid::lyricsMinDistance, engraving::Spatium(LYRICS_GAP));
+    if (dst->style().styleV(engraving::Sid::lyricsMinDistance).value<engraving::Spatium>().val() < LYRICS_WORD_GAP) {
+        dst->undoChangeStyleVal(engraving::Sid::lyricsMinDistance, engraving::Spatium(LYRICS_WORD_GAP));
     }
     // the Voice staff full size (Joel, 20 Oct 2026: small wasn't legible enough; it was small since 1.18.64)
     engraving::Staff* voiceStaff = nullptr;
@@ -578,4 +583,76 @@ void StarScoreService::resetPartScoreNow(const IExcerptNotationPtr& excerpt)
     }
     scheduleChanged();
     LOGI() << "[starscore] reset " << name.toStdString();
+}
+
+//! The staves of the score that have lyrics
+static std::vector<mu::engraving::staff_idx_t> lyricStaves(const mu::engraving::Score* score)
+{
+    std::vector<mu::engraving::staff_idx_t> out;
+    if (!score) {
+        return out;
+    }
+    for (mu::engraving::staff_idx_t si = 0; si < score->nstaves(); ++si) {
+        bool found = false;
+        for (mu::engraving::Segment* seg = score->firstSegment(mu::engraving::SegmentType::ChordRest); seg && !found;
+             seg = seg->next1(mu::engraving::SegmentType::ChordRest)) {
+            for (mu::engraving::track_idx_t t = si * mu::engraving::VOICES; t < (si + 1) * mu::engraving::VOICES && !found; ++t) {
+                const mu::engraving::EngravingItem* e = seg->element(t);
+                found = e && e->isChordRest() && !mu::engraving::toChordRest(e)->lyrics().empty();
+            }
+        }
+        if (found) {
+            out.push_back(si);
+        }
+    }
+    return out;
+}
+
+bool StarScoreService::partScoreHasLyrics(const engraving::Score* score) const
+{
+    return !lyricStaves(score).empty();
+}
+
+int StarScoreService::respaceLyricsIn(engraving::Score* score)
+{
+    int changes = 0;
+    if (score->style().styleV(engraving::Sid::lyricsMinDistance).value<engraving::Spatium>().val() < LYRICS_WORD_GAP) {
+        score->undoChangeStyleVal(engraving::Sid::lyricsMinDistance, engraving::Spatium(LYRICS_WORD_GAP));
+        ++changes;
+    }
+    for (engraving::staff_idx_t si : lyricStaves(score)) {
+        changes += starscore::spaceLyrics(score, si);
+    }
+    return changes;
+}
+
+void StarScoreService::respaceLyrics(const engraving::Score* constScore)
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    engraving::Score* score = const_cast<engraving::Score*>(constScore);
+    if (!master || !score || score->isMaster()) {
+        return;
+    }
+    INotationPtr notation;
+    for (const IExcerptNotationPtr& e : master->excerpts()) {
+        INotationPtr n = e ? e->notation() : nullptr;
+        if (n && n->elements() && n->elements()->msScore() == score) {
+            notation = n;
+        }
+    }
+    if (!notation) {
+        return;
+    }
+    master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Respace lyrics"));
+    const int changes = respaceLyricsIn(score);
+    master->notation()->undoStack()->commitChanges();
+    notation->style()->styleChanged().notify();
+    notation->notationChanged().notify();
+    LOGI() << "[starscore] respaced lyrics: " << changes << " change(s)";
+    interactive()->info(muse::trc("starscore", "Respace lyrics"),
+                        changes == 0
+                        ? muse::trc("starscore", "The lyrics already have room: nothing was changed.")
+                        : muse::qtrc("starscore", "The syllables now have a word space between them, and %1 change(s) were made "
+                                                  "where they were still squeezed (wider bars, lines split in two). You can undo "
+                                                  "it.").arg(changes).toStdString());
 }

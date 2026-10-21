@@ -362,6 +362,11 @@ QVariantList NotationSwitchListModel::contextMenuItems(int index) const
         result << QVariantMap { { "title", muse::qtrc("starscore", "Part status") }, { "subitems", statusItems }, { "enabled", true } };
         // the Parts dialog's Reset (the dialog is hidden in StarScore; Joel, 21 Oct 2026)
         result << QVariantMap { { "id", "starscore-reset-part" }, { "title", muse::qtrc("starscore", "Reset part score…") }, { "enabled", true } };
+        // the lyrics given room, without a reset (Joel, 21 Oct 2026)
+        const INotationPtr n = m_notations[index];
+        if (n->elements() && starScore()->partScoreHasLyrics(n->elements()->msScore())) {
+            result << QVariantMap { { "id", "starscore-respace-lyrics" }, { "title", muse::qtrc("starscore", "Respace lyrics") }, { "enabled", true } };
+        }
     }
 
     return result;
@@ -375,6 +380,11 @@ void NotationSwitchListModel::handleContextMenuItem(int index, const QString& it
         closeOtherNotations(index);
     } else if (itemId == "close-all-tabs") {
         closeAllNotations();
+    } else if (itemId == "starscore-respace-lyrics" && isIndexValid(index)) {
+        const INotationPtr notation = m_notations[index];
+        if (notation->elements()) {
+            starScore()->respaceLyrics(notation->elements()->msScore());
+        }
     } else if (itemId == "starscore-reset-part" && isIndexValid(index)) {
         const INotationPtr notation = m_notations[index];
         if (notation->elements()) {

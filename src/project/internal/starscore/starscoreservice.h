@@ -126,6 +126,9 @@ public:
     int partScoreStatus(const mu::engraving::Score* score) const override;
     void setPartScoreStatus(const mu::engraving::Score* score, int status) override;
     void resetPartScore(const mu::engraving::Score* score) override;
+    bool partScoreHasLyrics(const mu::engraving::Score* score) const override;
+    void respaceLyrics(const mu::engraving::Score* score) override;
+    int respaceLyricsIn(mu::engraving::Score* score);
     void resetPartScoreNow(const notation::IExcerptNotationPtr& excerpt);
     void setSectionSkipSheet(const QString& sectionId, const QString& which, bool skip) override;
     void renameSection(const QString& sectionId, const QString& name) override;
