@@ -60,6 +60,11 @@ int copyTextPositions(const mu::engraving::Score* source, mu::engraving::Score* 
 //! Each bar's width ("stretch", Format › Stretch) from one score to another, bars matched by position in the song.
 //! Undoable (inside a command). Returns how many bars changed.
 int copyMeasureWidths(const mu::engraving::Score* source, mu::engraving::Score* target);
+//! Room for the lyrics on that staff (Joel, 21 Oct 2026: a Bass + Voice sheet with the bass part's systems squeezed
+//! a bar of eight syllables to a quarter of the line, "Iain't'fraid ofnoghost"). Lays the score out, finds syllables
+//! closer than a gap (more where a hyphen goes between), widens their bars (stretch), and splits a system in two
+//! halves where widening hasn't made room. Inside an undo step. Returns how many changes it made.
+int spaceLyrics(mu::engraving::Score* score, mu::engraving::staff_idx_t staffIdx);
 
 //! The clef saved at the very start of a part's staff (and of every staff linked to it, as in its part score) set to
 //! `concert`/`transposing`. A file keeps that first clef as an element of its own, which the staff's default clef

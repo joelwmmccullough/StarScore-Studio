@@ -222,6 +222,12 @@ bool StarScoreService::formatVoiceScore(const VoiceScore& v)
         dst->loadStyle(styleFile, true);
     }
     QFile::remove(mss);
+    // the lyrics a word space apart, not a quarter of a space: the instrument's notes under them are spaced for that
+    // (Joel, 21 Oct 2026: "Iain't'fraid ofnoghost")
+    static const double LYRICS_GAP = 0.7;
+    if (dst->style().styleV(engraving::Sid::lyricsMinDistance).value<engraving::Spatium>().val() < LYRICS_GAP) {
+        dst->undoChangeStyleVal(engraving::Sid::lyricsMinDistance, engraving::Spatium(LYRICS_GAP));
+    }
     // the Voice staff full size (Joel, 20 Oct 2026: small wasn't legible enough; it was small since 1.18.64)
     engraving::Staff* voiceStaff = nullptr;
     for (engraving::Part* p : dst->parts()) {
@@ -325,6 +331,13 @@ bool StarScoreService::formatVoiceScore(const VoiceScore& v)
     starscore::copyLayout(src, { dst }, options);
     starscore::copyTextPositions(src, dst);
     starscore::copyMeasureWidths(src, dst);
+    // the lyrics legible: their bars widened and systems split where the part score's layout squeezes them
+    if (voiceStaff) {
+        const int spaced = starscore::spaceLyrics(dst, voiceStaff->idx());
+        if (spaced) {
+            LOGI() << "[starscore] " << v.score->name().toStdString() << ": " << spaced << " change(s) to give the lyrics room";
+        }
+    }
     return true;
 }
 

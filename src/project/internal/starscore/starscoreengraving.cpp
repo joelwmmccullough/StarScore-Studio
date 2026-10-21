@@ -19,6 +19,8 @@
 #include "engraving/dom/rest.h"
 #include "engraving/dom/measure.h"
 #include "engraving/dom/segment.h"
+#include "engraving/dom/lyrics.h"
+#include "engraving/dom/chordrest.h"
 #include "engraving/dom/chord.h"
 #include "engraving/dom/note.h"
 #include "engraving/dom/part.h"
@@ -1481,6 +1483,140 @@ int mu::project::starscore::copyMeasureWidths(const Score* source, Score* target
         target->setLayoutAll();
     }
     return changed;
+}
+
+int mu::project::starscore::spaceLyrics(Score* score, staff_idx_t staffIdx)
+{
+    if (!score || staffIdx >= score->nstaves()) {
+        return 0;
+    }
+    const double sp = score->style().spatium();
+    // the gaps below which syllables are squeezed: a + Voice sheet asks for 0.7 sp between them (Sid::lyricsMinDistance),
+    // which MuseScore's spacing keeps unless the system has more bars than fit
+    const double WORD_GAP = 0.5 * sp;     // between two words
+    const double HYPHEN_GAP = 0.45 * sp;  // between two syllables of a word (the hyphen goes there)
+    const double MAX_STRETCH = 3.0;
+    int changes = 0;
+    std::set<const Measure*> stretched;   // widened once already in their present system
+    std::set<const Measure*> unsplittable;
+    for (int round = 0; round < 16; ++round) {
+        score->setLayoutAll();
+        score->doLayout();
+        struct Crowded {
+            std::vector<MeasureBase*> units;          // the system's bars (a multimeasure rest as one)
+            std::map<Measure*, double> deficit;       // room missing, by bar
+        };
+        std::vector<Crowded> crowded;
+        for (System* sys : score->systems()) {
+            Crowded c;
+            std::map<int, std::vector<const Lyrics*> > lines;   // by verse and side of the staff
+            for (MeasureBase* mb : sys->measures()) {
+                if (!mb || !mb->isMeasure()) {
+                    continue;
+                }
+                c.units.push_back(mb);
+                Measure* m = toMeasure(mb);
+                for (Segment* seg = m->first(SegmentType::ChordRest); seg; seg = seg->next(SegmentType::ChordRest)) {
+                    for (track_idx_t t = staffIdx * VOICES; t < (staffIdx + 1) * VOICES; ++t) {
+                        const EngravingItem* e = seg->element(t);
+                        if (!e || !e->isChordRest()) {
+                            continue;
+                        }
+                        for (const Lyrics* l : toChordRest(e)->lyrics()) {
+                            if (l && l->visible() && !l->plainText().isEmpty()) {
+                                lines[l->verse() * 2 + (l->placeBelow() ? 0 : 1)].push_back(l);
+                            }
+                        }
+                    }
+                }
+            }
+            for (auto& [key, ls] : lines) {
+                std::sort(ls.begin(), ls.end(), [](const Lyrics* a, const Lyrics* b) {
+                    return a->pageBoundingRect().left() < b->pageBoundingRect().left();
+                });
+                for (size_t i = 1; i < ls.size(); ++i) {
+                    const Lyrics* a = ls[i - 1];
+                    const Lyrics* b = ls[i];
+                    const bool hyphen = a->syllabic() == LyricsSyllabic::BEGIN || a->syllabic() == LyricsSyllabic::MIDDLE;
+                    const double need = a->pageBoundingRect().right() + (hyphen ? HYPHEN_GAP : WORD_GAP)
+                                        - b->pageBoundingRect().left();
+                    if (need <= 0.05 * sp) {
+                        continue;
+                    }
+                    Measure* ma = a->measure();
+                    Measure* mbm = b->measure();
+                    if (ma == mbm) {
+                        c.deficit[ma] += need;
+                    } else {
+                        c.deficit[ma] += need / 2;
+                        c.deficit[mbm] += need / 2;
+                    }
+                }
+            }
+            if (!c.deficit.empty()) {
+                crowded.push_back(c);
+            }
+        }
+        bool changedThisRound = false;
+        for (const Crowded& c : crowded) {
+            // first: wider bars where the syllables are (the other bars of the system give up the room)
+            bool widen = false;
+            for (const auto& [m, d] : c.deficit) {
+                widen |= !stretched.count(m) && m->userStretch() < MAX_STRETCH;
+            }
+            if (widen) {
+                for (const auto& [m, d] : c.deficit) {
+                    if (stretched.count(m)) {
+                        continue;
+                    }
+                    const double width = std::max(sp, m->width());
+                    const double s0 = m->userStretch();
+                    const double s1 = std::min(MAX_STRETCH, s0 * (width + 1.3 * d) / width);
+                    if (s1 > s0 + 0.01) {
+                        m->undoChangeProperty(Pid::USER_STRETCH, s1);
+                        ++changes;
+                        changedThisRound = true;
+                    }
+                    stretched.insert(m);
+                }
+                continue;
+            }
+            // then: the system in two halves (two bars of four, keeping the phrase), each laid out afresh
+            if (c.units.size() < 2 || unsplittable.count(toMeasure(c.units.front()))) {
+                continue;
+            }
+            auto firstOf = [](MeasureBase* mb) -> MeasureBase* {
+                return mb->isMeasure() && toMeasure(mb)->isMMRest() ? toMeasure(mb)->mmRestFirst() : mb;
+            };
+            auto lastOf = [](MeasureBase* mb) -> MeasureBase* {
+                return mb->isMeasure() && toMeasure(mb)->isMMRest() ? toMeasure(mb)->mmRestLast() : mb;
+            };
+            const size_t mid = (c.units.size() + 1) / 2;
+            MeasureBase* a1 = firstOf(c.units.front());
+            MeasureBase* a2 = lastOf(c.units[mid - 1]);
+            MeasureBase* b1 = firstOf(c.units[mid]);
+            MeasureBase* b2 = lastOf(c.units.back());
+            if (const SystemLock* lock = score->systemLocks()->lockContaining(a1)) {
+                EditSystemLocks::undoRemoveSystemLock(score, lock);
+                EditSystemLocks::undoAddSystemLock(score, new SystemLock(a1, a2));
+                EditSystemLocks::undoAddSystemLock(score, new SystemLock(b1, b2));
+            } else {
+                a2->undoSetLineBreak(true);
+            }
+            for (MeasureBase* u : c.units) {   // widened again, if need be, in their new systems
+                stretched.erase(toMeasure(u));
+            }
+            if (mid == 1) {
+                unsplittable.insert(toMeasure(firstOf(c.units.front())->isMeasure() ? firstOf(c.units.front()) : c.units.front()));
+            }
+            ++changes;
+            changedThisRound = true;
+        }
+        if (!changedThisRound) {
+            break;
+        }
+    }
+    return changes;
 }
 
 int mu::project::starscore::tidyTempoAndFrames(MasterScore* master, bool apply)
