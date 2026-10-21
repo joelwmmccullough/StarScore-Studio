@@ -1426,6 +1426,19 @@ void StarScoreService::syncSectionTabs(const QStringList& turnedOnSectionIds)
             continue;
         }
         if (es->parts().size() != 1) {
+            // a Keys part score (the Rhythm Section's keyboards in one, made with Make Keys part): a player's part
+            // score, so it opens with its section as a one-instrument part score does and the scores switch leaves it
+            // alone (Joel, 21 Oct 2026: Little Louie's Keys tab didn't show, Bass Guitar's and Drums' did)
+            const std::vector<engraving::Part*> ps = masterPartsOf(es, ms);
+            const bool keys = !ps.empty() && std::all_of(ps.begin(), ps.end(), [&](const engraving::Part* p) {
+                return rhythmRole(p->instrumentId().toQString()) == "keys";
+            });
+            if (keys) {
+                if (!n->isOpen() && std::any_of(ps.begin(), ps.end(), [&](const engraving::Part* p) { return openParts.count(idText(p)) > 0; })) {
+                    master->setExcerptIsOpen(n, true);
+                }
+                continue;
+            }
             // any other score of several parts (the full horn scores kept from the converted files, "2-Horn
             // Arrangement"): closed with the switch off
             if (!scoresShown && n->isOpen()) {

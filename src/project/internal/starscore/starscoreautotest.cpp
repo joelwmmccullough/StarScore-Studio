@@ -1160,6 +1160,7 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             StarScoreInstrument inst;
             inst.instrumentId = a.value(0);
             inst.partName = a.value(1);
+            inst.hidden = a.value(4) == "hidden";   // (|hidden after the part it follows: as the template's Congas)
             const StarScoreSection sec = finishNewParts(made, { inst });
             Data d = load();
             for (StarScoreSection& s : d.sections) {
@@ -1389,6 +1390,102 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
                     applyStyles(restored.partIds);
                 }
             }
+        }
+    } else if (step.startsWith("sectionadd:")) {
+        // sectionadd:<section id>|<part name>[|<part name>…]: parts already in the score put in the section (shown with
+        // it), in score order
+        const QStringList a = step.mid(11).split('|');
+        Data d = load();
+        QStringList added;
+        for (StarScoreSection& sec : d.sections) {
+            if (sec.id != a.value(0)) {
+                continue;
+            }
+            for (const engraving::Part* p : ms->parts()) {
+                const QString pid = idText(p);
+                if (a.mid(1).contains(p->partName().toQString()) && !sec.partIds.contains(pid)) {
+                    sec.partIds << pid;
+                    if (!sec.shownPartIds.isEmpty() || p->show()) {
+                        sec.shownPartIds << pid;
+                    }
+                    added << p->partName().toQString();
+                }
+            }
+            // in score order
+            QStringList ordered, shown;
+            for (const engraving::Part* p : ms->parts()) {
+                if (sec.partIds.contains(idText(p))) {
+                    ordered << idText(p);
+                }
+                if (sec.shownPartIds.contains(idText(p))) {
+                    shown << idText(p);
+                }
+            }
+            sec.partIds = ordered;
+            sec.shownPartIds = shown;
+        }
+        store(d);
+        autotestLog(QString("  added %1").arg(added.join(", ")));
+    } else if (step.startsWith("bookrename:")) {
+        // bookrename:<part score>|<new name>
+        const QStringList a = step.mid(11).split('|');
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            if (e->name() == a.value(0)) {
+                e->setName(a.value(1));
+                autotestLog(QString("  renamed %1 to %2").arg(a.value(0), a.value(1)));
+            }
+        }
+    } else if (step.startsWith("bookorder:")) {
+        // bookorder:<part score>|<part score>|…: the part scores in this order (the tabs' order), any others after them
+        // in the order they had
+        const QStringList want = step.mid(10).split('|');
+        ExcerptNotationList all = master->excerpts();
+        ExcerptNotationList ordered;
+        for (const QString& name : want) {
+            for (const IExcerptNotationPtr& e : all) {
+                if (e->name() == name) {
+                    ordered.push_back(e);
+                }
+            }
+        }
+        for (const IExcerptNotationPtr& e : all) {
+            if (!want.contains(e->name())) {
+                ordered.push_back(e);
+            }
+        }
+        master->setExcerpts(ordered);
+        QStringList books;
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            books << e->name();
+        }
+        autotestLog("  part scores: " + books.join(" | "));
+    } else if (step.startsWith("arrsection:")) {
+        // arrsection:<arrangement id>|<section id>: the section put first in the arrangement (as a Standard
+        // arrangement's Lead Sheet), if it isn't in it
+        const QStringList a = step.mid(11).split('|');
+        Data d = load();
+        for (StarScoreArrangement& arr : d.arrangements) {
+            if (arr.id == a.value(0) && !arr.sectionIds.contains(a.value(1))) {
+                arr.sectionIds.prepend(a.value(1));
+                autotestLog(QString("  %1: %2").arg(arr.name, arr.sectionIds.join(", ")));
+            }
+        }
+        store(d);
+    } else if (step.startsWith("movetop:")) {
+        // movetop:<part name>: the part to the top of the score, the system markings (rehearsal marks, tempo…) with it
+        // onto its top staff, as dragging it to the top in the Instruments panel and answering Move
+        engraving::Part* moving = nullptr;
+        for (engraving::Part* p : ms->parts()) {
+            if (p->partName().toQString() == step.mid(8)) {
+                moving = p;
+            }
+        }
+        engraving::Part* top = ms->parts().empty() ? nullptr : ms->parts().front();
+        if (moving && top && moving != top) {
+            const muse::ID oldTopStaff = top->staves().front()->id();
+            master->parts()->moveParts({ moving->id() }, top->id(), INotationParts::InsertMode::Before);
+            master->parts()->moveSystemObjects(oldTopStaff, moving->staves().front()->id());
+            autotestLog(QString("  %1 moved to the top").arg(step.mid(8)));
         }
     } else if (step.startsWith("removepart:")) {
         // removepart:<words>: parts whose instrument's long name contains the words (case ignored) removed, as the

@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.82
+
+- **Keys tab.** A Keys part score (the Rhythm Section's keyboards in one, made with Make Keys part) now opens with its section like any one-instrument part score, and the "Section scores visible" switch no longer closes it. Before, a song's Keys tab could disappear when the song opened and wouldn't come back.
+
 ## 1.18.81
 
 - **Rhythm markings: rests.** "Rhythm markings above/below the staff" and "back to normal notes" now work on rests too, and the Rhythm markings menu shows when you right-click a rest. Rests beside rhythm markings are cue size like the markings: making markings makes the rests in those bars small, selected rests are made small, and in a bar of rests only they're moved beyond the staff on that side. Back to normal makes them full size and puts them back. Rests beside existing markings are made small when a song opens.
