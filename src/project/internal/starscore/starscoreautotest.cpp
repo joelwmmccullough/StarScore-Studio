@@ -1638,6 +1638,76 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             }
         }
         autotestLog(QString("  reset %1").arg(done));
+    } else if (step.startsWith("dyncollide")) {
+        // dyncollide[:<part score>]: dynamics whose box overlaps a note, stem, ledger line, accidental or dot of their
+        // staff, in each part score (or that one), as laid out now
+        const QString only = step.section(':', 1);
+        int total = 0;
+        int checked = 0;
+        std::vector<std::pair<QString, engraving::Score*> > scores { { QString("main score"), ms } };
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            if (e->notation()) {
+                scores.emplace_back(e->name(), e->notation()->elements()->msScore());
+            }
+        }
+        for (const auto& [ename, es] : scores) {
+            if (!only.isEmpty() && ename != only) {
+                continue;
+            }
+            es->setLayoutAll();
+            es->doLayout();
+            for (engraving::Segment* seg = es->firstSegment(engraving::SegmentType::ChordRest); seg;
+                 seg = seg->next1(engraving::SegmentType::ChordRest)) {
+                for (engraving::EngravingItem* a : seg->annotations()) {
+                    if (!a->isDynamic() || !a->visible()) {
+                        continue;
+                    }
+                    ++checked;
+                    if (checked <= 3) {
+                        autotestLog(QString("    check %1 bar %2 box %3,%4 %5x%6").arg(ename).arg(seg->measure()->no() + 1)
+                                    .arg(a->pageBoundingRect().x()).arg(a->pageBoundingRect().y()).arg(a->pageBoundingRect().width()).arg(a->pageBoundingRect().height()));
+                    }
+                    const double near = 0.25 * es->style().spatium();
+                    const RectF box = a->pageBoundingRect().adjusted(-near, -near, near, near);
+                    QStringList hits;
+                    // the chords of its staff in this bar and the next one
+                    engraving::Measure* m = seg->measure();
+                    for (engraving::Measure* mm = m; mm && mm != (m->nextMeasure() ? m->nextMeasure()->nextMeasure() : nullptr);
+                         mm = mm->nextMeasure()) {
+                        for (engraving::Segment* s2 = mm->first(engraving::SegmentType::ChordRest); s2;
+                             s2 = s2->next(engraving::SegmentType::ChordRest)) {
+                            for (engraving::track_idx_t t = a->staffIdx() * engraving::VOICES; t < (a->staffIdx() + 1) * engraving::VOICES; ++t) {
+                                engraving::EngravingItem* cr = s2->element(t);
+                                if (!cr || !cr->isChord()) {
+                                    continue;
+                                }
+                                engraving::Chord* c = engraving::toChord(cr);
+                                c->scanElements([&](engraving::EngravingItem* el) {
+                                    if (!(el->isNote() || el->isStem() || el->isLedgerLine() || el->isAccidental() || el->isNoteDot())) {
+                                        return;
+                                    }
+                                    if (el->pageBoundingRect().intersects(box)) {
+                                        hits << QString("%1 bar %2").arg(el->typeName()).arg(mm->no() + 1);
+                                    }
+                                });
+                            }
+                        }
+                        if (!mm->nextMeasure()) {
+                            break;
+                        }
+                    }
+                    if (!hits.isEmpty()) {
+                        hits.removeDuplicates();
+                        ++total;
+                        autotestLog(QString("  %1: %2 at bar %3, offset %4,%5, autoplace %6: %7").arg(ename,
+                                    engraving::toDynamic(a)->plainText().toQString()).arg(seg->measure()->no() + 1)
+                                    .arg(a->offset().x() / es->style().spatium()).arg(a->offset().y() / es->style().spatium())
+                                    .arg(a->autoplace() ? "on" : "off").arg(hits.join(", ")));
+                    }
+                }
+            }
+        }
+        autotestLog(QString("  %1 dynamic(s) on notes, of %2").arg(total).arg(checked));
     } else if (step == "voicerefresh") {
         // voicerefresh: the + Voice part scores remade where broken and formatted again, as at the start of an export
         autotestLog(QString("  formatted %1").arg(refreshVoiceScores()));

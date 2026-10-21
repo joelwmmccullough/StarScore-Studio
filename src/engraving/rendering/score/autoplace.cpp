@@ -101,6 +101,28 @@ void Autoplace::autoplaceSegmentElement(const EngravingItem* item, EngravingItem
         double d = above ? filteredSkyline.minDistanceToShapeAbove(shape, minSkylineHorizontalClearance)
                    : filteredSkyline.minDistanceToShapeBelow(shape, minSkylineHorizontalClearance);
 
+        // StarScore (Joel, 21 Oct 2026): a dynamic keeps a whole space from the notes next to it (heads, ledger
+        // lines, stems, beams, accidentals, dots, articulations), not the half space it keeps from everything else:
+        // under low notes it sat right against them. Taken as the larger of the two moves.
+        if (item->isDynamic()) {
+            const double noteDistance = 1.0 * sp;
+            const SkylineLine notes = staffSkyline.getFilteredCopy([item](const ShapeElement& shapeEl) {
+                const EngravingItem* e = shapeEl.item();
+                if (!e || itemsShouldIgnoreEachOther(item, e)) {
+                    return true;
+                }
+                return !(e->isNote() || e->isLedgerLine() || e->isStem() || e->isHook() || e->isBeam() || e->isAccidental()
+                         || e->isNoteDot() || e->isArticulationFamily() || e->isChord() || e->isRest());
+            });
+            if (!notes.elements().empty()) {
+                const double dn = above ? notes.minDistanceToShapeAbove(shape, minSkylineHorizontalClearance)
+                                  : notes.minDistanceToShapeBelow(shape, minSkylineHorizontalClearance);
+                if (dn + noteDistance > d + minDistance) {
+                    d = dn + noteDistance - minDistance;
+                }
+            }
+        }
+
         if (d > -minDistance) {
             double yd = d + minDistance;
             if (above) {

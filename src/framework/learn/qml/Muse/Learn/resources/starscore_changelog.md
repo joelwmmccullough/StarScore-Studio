@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.79
+
+- **Dynamics keep a full space from the notes above or below them.** A dynamic under low notes (or their stems, beams, accidentals and articulations) used to sit half a space under them, right against them; now it's a whole space. Its distance from other things (hairpins, text) is unchanged. Double Entendre 6H Tenor Sax: the mf under the low D in bar 74, the f under bar 41's beam.
+
 ## 1.18.78
 
 - **Lyrics on "+ Voice" sheets get room.** A + Voice sheet (Bass + Voice, Lead Sheet + Voice…) keeps its part score's lines, but now asks for a word space between syllables (0.7 sp, not a quarter of a space), so the bars with lyrics come out wider. Where a line still squeezes the lyrics, StarScore widens their bars, and if that isn't enough splits the line in two (4 bars become 2 + 2). This runs every time the sheet is formatted, at every export. Ghostbusters' Bass + Voice: "I ain't 'fraid of no ghost" instead of "Iain't'fraid ofnoghost", still 4 pages.
