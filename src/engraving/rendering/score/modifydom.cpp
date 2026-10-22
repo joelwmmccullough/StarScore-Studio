@@ -113,15 +113,15 @@ void ModifyDom::cmdUpdateNotes(const Measure* measure, const DomAccessor& dom)
         }
 
         // StarScore (Joel, 22 Oct 2026): courtesy accidentals across the barline. A line (a step in an octave) whose
-        // last note in the bar before was altered otherwise than both bars' key signatures have it (D# there, in C;
-        // E natural there, in E flat): its first note here gets its accidental in parentheses ("(♮)D", "(♭)E").
-        // Only notes that show count (not hidden ones, not rhythm slashes).
+        // note still sounding in the bar before's last beat was altered otherwise than both bars' key signatures have it
+        // (D# there, in C; E natural there, in E flat): its note starting in this bar's first beat gets its accidental in
+        // parentheses ("(♮)D", "(♭)E"). Only notes that show count (not hidden ones, not rhythm slashes).
         static const bool noCourtesy = qEnvironmentVariableIsSet("STARSCORE_TEST_NO_COURTESY");   // (to compare)
         std::vector<int> courtesyLines;
         if (const Measure* prev = measure->prevMeasure(); prev && !noCourtesy && staff->isPitchedStaff(measure->tick())
             && !staff->isTabStaff(measure->tick())) {
-            // (STARSCORE_COURTESY_MODE=near: only a note altered that's still sounding in the bar before's last beat, for a note starting in this bar's first)
-            static const bool nearOnly = qEnvironmentVariable("STARSCORE_COURTESY_MODE") == "near";
+            // (STARSCORE_COURTESY_MODE=all, to compare: any note altered in the bar before, for a note anywhere in this one)
+            static const bool nearOnly = qEnvironmentVariable("STARSCORE_COURTESY_MODE") != "all";
             auto beat = [](const Measure* m) {
                 const Fraction ts = m->timesig();
                 return (ts.denominator() == 8 && ts.numerator() % 3 == 0 && ts.numerator() > 3) ? Fraction(3, 8)
