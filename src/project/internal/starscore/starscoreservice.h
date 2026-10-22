@@ -485,6 +485,8 @@ public:
     //! The copyright line of every score of the song ("copyright" meta tag, printed at the foot of each sheet's first
     //! page), made from its composer text; the year kept in the song once fixYear (exporting)
     void syncCopyrightNow(bool fixYear);
+    int copyrightYear() const override;
+    void setCopyrightYear(int year) override;
     bool songIsCover() const;
     int firstPublicYear() const;
 private:

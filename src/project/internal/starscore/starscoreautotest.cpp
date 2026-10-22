@@ -498,6 +498,10 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
                 autotestLog("    " + describe(item) + " (no copies)");
             }
         }
+    } else if (step.startsWith("copyrightyear:")) {
+        // copyrightyear:<year>: as the "…" menu's Copyright year
+        setCopyrightYear(step.mid(14).toInt());
+        autotestLog(QString("  year %1; notice: %2").arg(copyrightYear()).arg(ms->metaTag(u"copyright").toQString()));
     } else if (step == "copyright") {
         // copyright: the copyright line the song's sheets get, and what it was made from
         if (const QString band = qEnvironmentVariable("STARSCORE_AUTOTEST_BAND"); !band.isEmpty()) {

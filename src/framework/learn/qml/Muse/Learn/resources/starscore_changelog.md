@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.85
+
+- **Copyright year.** The StarScore bar's "…" menu has "Copyright year (2022)…" to set the year in an original's copyright line by hand. It's kept in the song and every score's line changes with it. Covers have no year, so the item is greyed out for them.
+
 ## 1.18.84
 
 - **Release notes show in full.** The update window cut 1.18.83's notes off at its first word in angle brackets, which it took for formatting. Angle brackets now show as written.

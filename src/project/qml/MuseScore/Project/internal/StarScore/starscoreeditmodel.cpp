@@ -5,6 +5,8 @@
  */
 #include "starscoreeditmodel.h"
 
+#include <QDate>
+
 #include <QRegularExpression>
 
 #include "translation.h"
@@ -32,6 +34,8 @@ QString StarScoreEditModel::dialogTitle() const
         return muse::qtrc("starscore", "Rename solo");
     } else if (m_mode == "version") {
         return muse::qtrc("starscore", "Score version number (e.g. 4.0.1)");
+    } else if (m_mode == "copyright-year") {
+        return muse::qtrc("starscore", "Copyright year (the year the song was first performed or released)");
     }
     return QString();
 }
@@ -77,6 +81,8 @@ void StarScoreEditModel::load(const QString& mode, const QString& itemId)
 
     if (mode == "version") {
         m_name = starScore()->scoreVersion();
+    } else if (mode == "copyright-year") {
+        m_name = QString::number(starScore()->copyrightYear());
     } else if (mode == "rename-solo") {
         for (const StarScoreSolo& solo : starScore()->solos()) {
             if (solo.id == itemId) {
@@ -172,6 +178,13 @@ bool StarScoreEditModel::apply()
             return false;
         }
         starScore()->setScoreVersion(name);
+    } else if (m_mode == "copyright-year") {
+        // a four-digit year, not after this one
+        const int year = name.toInt();
+        if (!QRegularExpression("^\\d{4}$").match(name).hasMatch() || year < 1900 || year > QDate::currentDate().year()) {
+            return false;
+        }
+        starScore()->setCopyrightYear(year);
     } else if (m_mode == "rename-solo") {
         starScore()->renameSolo(m_itemId, name);
     } else if (m_mode == "rename-section") {

@@ -1990,6 +1990,33 @@ int StarScoreService::firstPublicYear() const
     return year > 0 ? year : QDate::currentDate().year();
 }
 
+int StarScoreService::copyrightYear() const
+{
+    if (songIsCover()) {
+        return 0;
+    }
+    const int stored = const_cast<StarScoreService*>(this)->load().copyrightYear;
+    return stored > 0 ? stored : firstPublicYear();
+}
+
+void StarScoreService::setCopyrightYear(int year)
+{
+    if (year <= 0) {
+        return;
+    }
+    Data d = load();
+    if (d.copyrightYear == year) {
+        return;
+    }
+    d.copyrightYear = year;
+    store(d);
+    syncCopyrightNow(false);
+    if (INotationProjectPtr project = globalContext()->currentProject()) {
+        project->markAsUnsaved();
+    }
+    scheduleChanged();
+}
+
 void StarScoreService::syncCopyrightNow(bool fixYear)
 {
     engraving::MasterScore* ms = masterScore();

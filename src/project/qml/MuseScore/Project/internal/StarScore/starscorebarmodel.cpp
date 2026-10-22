@@ -616,6 +616,11 @@ QVariantList StarScoreBarModel::moreMenu() const
         QVariantMap { { "id", "check-ranges" }, { "title", muse::qtrc("starscore", "Check instrument ranges") }, { "enabled", true } },
         QVariantMap { { "id", "set-version" }, { "title", muse::qtrc("starscore", "Version number (%1)…").arg(starScore()->scoreVersion()) },
                       { "enabled", true } },
+        QVariantMap { { "id", "set-copyright-year" },
+                      { "title", starScore()->copyrightYear() > 0
+                        ? muse::qtrc("starscore", "Copyright year (%1)…").arg(starScore()->copyrightYear())
+                        : muse::qtrc("starscore", "Copyright year (none for a cover)") },
+                      { "enabled", starScore()->copyrightYear() > 0 } },
         QVariantMap { { "id", "export-band" }, { "title", muse::qtrc("starscore", "Export to Sheets and Demos…") }, { "enabled", true } },
         QVariantMap { { "id", "recordings" }, { "title", muse::qtrc("starscore", "Recordings…") }, { "enabled", true } },
         QVariantMap { { "id", "organize" }, { "title", muse::qtrc("starscore", "Run folder organization…") }, { "enabled", true } },
@@ -1104,6 +1109,8 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
         dispatcher()->dispatch("starscore-export-band");
     } else if (action == "set-version") {
         openEditDialog("version", QString());
+    } else if (action == "set-copyright-year") {
+        openEditDialog("copyright-year", QString());
     } else if (action == "export-arrangements") {
         dispatcher()->dispatch("starscore-export-arrangements");
     } else if (action == "recordings") {

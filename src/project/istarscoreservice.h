@@ -802,6 +802,10 @@ public:
     virtual StarScoreVersionSuggestion suggestVersionBump(const StarScoreBandExportPlan& plan) const = 0;
     virtual void setScoreVersion(const QString& version) = 0; // main score and every part book
 
+    // --- Copyright year (Joel, 22 Oct 2026): the year in an original's copyright line; 0 for a cover (none printed)
+    virtual int copyrightYear() const = 0;
+    virtual void setCopyrightYear(int year) = 0;      // kept in the song, the line remade in every score
+
     // --- Each arrangement's own score
     virtual void syncArrangementScores() = 0;                 // create / update / rename them to match the arrangements
     //! The rhythm section's keyboard instruments in one part score named "Keys" (a bass synth too when the section
