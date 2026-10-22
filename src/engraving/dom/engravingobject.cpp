@@ -30,7 +30,9 @@
 #include "style/textstyle.h"
 #include "types/typesconv.h"
 
+#include "accidental.h"
 #include "bracketItem.h"
+#include "note.h"
 #include "linkedobjects.h"
 #include "masterscore.h"
 #include "score.h"
@@ -422,6 +424,26 @@ static void changeProperties(EngravingObject* object, Pid propertyId, const Prop
             break;
         default:
             break;
+        }
+    }
+
+    // StarScore (Joel, 21 Oct 2026): an accidental isn't linked to its copies in the other scores (each score makes
+    // its own), so its brackets, parentheses and visibility are passed to the accidentals of the note's copies
+    if (object->isAccidental() && !EngravingItem::visibilityStaysLocal()
+        && (propertyId == Pid::ACCIDENTAL_BRACKET || propertyId == Pid::HAS_PARENTHESES || propertyId == Pid::VISIBLE)) {
+        const EngravingItem* acc = toEngravingItem(object);
+        const EngravingObject* note = acc->explicitParent();
+        if (note && note->isNote() && note->links()) {
+            for (EngravingObject* linked : *note->links()) {
+                if (linked == note || linked->score() == acc->score() || !linked->isNote()) {
+                    continue;
+                }
+                if (Accidental* other = toNote(linked)->accidental()) {
+                    if (other->getProperty(propertyId) != propertyValue) {
+                        changeProperty(other, propertyId, propertyValue, propertyFlag);
+                    }
+                }
+            }
         }
     }
 }

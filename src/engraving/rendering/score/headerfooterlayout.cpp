@@ -89,6 +89,35 @@ static String starscoreEvenVersionSpacing(const String& s, const String& face, d
     return out;
 }
 
+//! StarScore (Joel, 21 Oct 2026): the copyright line of a sheet's first page, wrapped to fit between the footer's left
+//! and right texts. While the centre footer is laid out, "$C"/"$c" give this instead of the copyright meta tag.
+static thread_local const String* s_copyrightOverride = nullptr;
+
+//! The words split into `lines` lines of about the same length (by characters), a line break between them
+static String starscoreBalancedLines(const String& s, int lines)
+{
+    StringList words = s.split(u' ');
+    if (lines <= 1 || words.size() < 2) {
+        return s;
+    }
+    const double target = double(s.size()) / lines;
+    String out;
+    String line;
+    int made = 1;
+    for (size_t i = 0; i < words.size(); ++i) {
+        const String& w = words.at(i);
+        // break before this word when the line is already long enough and lines are left to make
+        if (!line.empty() && made < lines
+            && std::abs(double(line.size() + 1 + w.size()) - target) > std::abs(double(line.size()) - target)) {
+            out += line + u"\n";
+            line.clear();
+            ++made;
+        }
+        line += (line.empty() ? String() : String(u" ")) + w;
+    }
+    return out + line;
+}
+
 void HeaderFooterLayout::layoutHeaderFooter(LayoutContext& ctx, Page* page)
 {
     const bool isPageMode = ctx.conf().isMode(LayoutMode::PAGE) || ctx.conf().isMode(LayoutMode::FLOAT);
@@ -128,8 +157,55 @@ void HeaderFooterLayout::layoutHeaderFooter(LayoutContext& ctx, Page* page)
             left = left.empty() ? note : note + u"\n" + left;
         }
         createUpdateFooterText(ctx, page, 0, left);
-        createUpdateFooterText(ctx, page, 1, footer ? ctx.conf().styleSt(odd ? Sid::oddFooterC : Sid::evenFooterC) : String());
         createUpdateFooterText(ctx, page, 2, footer ? ctx.conf().styleSt(odd ? Sid::oddFooterR : Sid::evenFooterR) : String());
+        const String centre = footer ? ctx.conf().styleSt(odd ? Sid::oddFooterC : Sid::evenFooterC) : String();
+        const String copyright = page->score()->metaTag(u"copyright");
+        const bool copyrightHere = !copyright.empty()
+                                   && (centre.contains(u"$c") || (centre.contains(u"$C") && page->pageNumber() == 0));
+        if (!copyrightHere) {
+            createUpdateFooterText(ctx, page, 1, centre);
+        } else {
+            // StarScore (Joel, 21 Oct 2026): the copyright line, centred, kept clear of the left text (the
+            // minor-major footnote) and the right one (the version): wrapped into up to four lines of even length
+            // within the room between them; where even that is too narrow, above them across the page
+            const double width = page->width() - page->lm() - page->rm();
+            const double gap = 2.0 * page->spatium();
+            double side = 0.0;
+            size_t sideRows = 0;
+            for (int area : { 0, 2 }) {
+                if (const Text* t = page->footerText(area)) {
+                    side = std::max(side, t->ldata()->bbox().width());
+                    sideRows = std::max(sideRows, t->ldata()->rows());
+                }
+            }
+            bool placed = false;
+            for (bool raised : { false, true }) {
+                const double room = raised ? width : width - 2.0 * (side + gap);
+                if (room < 0.3 * width) {
+                    continue;
+                }
+                for (int lines = 1; lines <= 4 && !placed; ++lines) {
+                    const String wrapped = starscoreBalancedLines(copyright, lines);
+                    s_copyrightOverride = &wrapped;
+                    String text = centre;
+                    if (raised) {
+                        for (size_t i = 0; i < sideRows; ++i) {
+                            text += u"\n";   // (empty lines under it, as many as the side texts have)
+                        }
+                    }
+                    createUpdateFooterText(ctx, page, 1, text);
+                    s_copyrightOverride = nullptr;
+                    const Text* t = page->footerText(1);
+                    placed = !t || t->ldata()->bbox().width() <= room;
+                }
+                if (placed) {
+                    break;
+                }
+            }
+            if (!placed) {
+                createUpdateFooterText(ctx, page, 1, centre);
+            }
+        }
     } else {
         for (int area = 0; area < MAX_FOOTERS; ++area) {
             removeFooterText(page, area);
@@ -418,7 +494,7 @@ TextBlock HeaderFooterLayout::replaceTextMacros(LayoutContext& ctx, const Page* 
                     [[fallthrough]];
                 case 'c':
                 {
-                    const String copyrightString = page->score()->metaTag(u"copyright");
+                    const String copyrightString = s_copyrightOverride ? *s_copyrightOverride : page->score()->metaTag(u"copyright");
                     const CharFormat copyrightFormat = formatForMacro(ctx, String('$' + nc));
                     appendFormattedString(newFragments, copyrightString, defaultFormat, copyrightFormat);
                 }
@@ -557,7 +633,14 @@ double HeaderFooterLayout::footerExtension(const LayoutContext& ctx, const Page*
             }
         }
         const double offset = ctx.conf().styleV(Sid::footerOffset).value<PointF>().y() * DPMM;
-        return std::max(0.0, maxHeight - offset);
+        double extension = std::max(0.0, maxHeight - offset);
+        // StarScore (Joel, 21 Oct 2026): a copyright line runs right across the page, so the music keeps at least
+        // 2.5 mm from it whatever the staff size (the style's padding is in staff spaces: 3.5 pt in a section score,
+        // where a tuplet number under the last staff touched it)
+        if (extension > 0.0 && page->footerText(1) && !page->score()->metaTag(u"copyright").empty()) {
+            extension += std::max(0.0, 2.5 * DPMM - ctx.conf().styleMM(Sid::staffHeaderFooterPadding));
+        }
+        return extension;
     }
     return 0.0;
 }

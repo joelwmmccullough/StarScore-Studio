@@ -4,6 +4,14 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.83
+
+- **Copyright line.** The first page of every sheet now carries a copyright line at the bottom, centred, in small type. An original reads "© <year> <composers>. All rights reserved. No part of this music may be copied, arranged, recorded or distributed without permission."; a co-written song lists the other composers first, then Joel McCullough, then Starsign. A cover reads "“<title>” by <composers>. All rights in the composition belong to its copyright owners. Arranged by Joel McCullough for Starsign’s own performance use. Not for sale or distribution." Arrangers ("arr. …", "Horns arr. …") are left out. The year is the song's first performance or release in the recordings, else its first export, and is kept once a sheet has been exported. The line wraps into even lines between the footnote on the left and the version on the right, or sits above them when there isn't room, and the music keeps at least 2.5 mm from it.
+- **Visibility and parentheses follow between the main score and the part scores.** Making something invisible, or putting it in parentheses, in the main score or in a part score now does the same in the other. Accidentals' parentheses and brackets follow too.
+- **Keys part scores: names and indent.** A Keys part score keeps only each keyboard's own brace (Make Keys also added one round all the keyboards, which pushed the staves right). A part whose top staff is hidden as empty still gets room for its name on the first system, so the first system is indented.
+- **Combined sheets: beat slashes over notes.** Only the slash's notehead is hidden, so a beat that had a hidden slash keeps its full width (Bumper Cars E1).
+- **Tabs.** The space right of a tab's name matches the space left of it.
+
 ## 1.18.82
 
 - **Keys tab.** A Keys part score (the Rhythm Section's keyboards in one, made with Make Keys part) now opens with its section like any one-instrument part score, and the "Section scores visible" switch no longer closes it. Before, a song's Keys tab could disappear when the song opened and wouldn't come back.

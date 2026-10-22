@@ -65,6 +65,9 @@ FlatRadioButton {
             Layout.fillWidth: root.implicitContentWidth > 200
             Layout.preferredWidth: implicitWidth
             Layout.leftMargin: root.statusColor !== "" ? 2 : 12
+            //! StarScore (Joel, 21 Oct 2026): as much room right of the name as left of it (12: this and the row's
+            //! spacing before the separator; the close button is hidden)
+            Layout.rightMargin: root.isCloud ? 0 : 8
 
             horizontalAlignment: Text.AlignLeft
 

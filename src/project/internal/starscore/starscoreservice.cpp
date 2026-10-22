@@ -5,6 +5,8 @@
  */
 #include <QSettings>
 #include "starscoreservice.h"
+#include "engraving/dom/bracketItem.h"
+#include "engraving/editing/editbrackets.h"
 #include "engraving/dom/starscoreprogress.h"
 #include "starscoreautoarchive.h"
 #include "settings.h"
@@ -462,6 +464,7 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
 
     data.version = root.value("scoreVersion").toString();
     data.fileId = root.value("fileId").toString();
+    data.copyrightYear = root.value("copyrightYear").toInt();
     const QJsonObject deco = root.value("decoRestore").toObject();
     for (auto it = deco.begin(); it != deco.end(); ++it) {
         QStringList fonts;
@@ -616,6 +619,9 @@ QString StarScoreService::toJson(const Data& data)
     root["arrangements"] = arrangements;
     if (!data.version.isEmpty()) {
         root["scoreVersion"] = data.version;
+    }
+    if (data.copyrightYear > 0) {
+        root["copyrightYear"] = data.copyrightYear;
     }
     if (!solos.isEmpty()) {
         root["solos"] = solos;
@@ -1924,6 +1930,7 @@ QString StarScoreService::makeKeysPart()
     if (oldName != "Keys") {
         book->setName("Keys");
     }
+    tidyKeysBrackets();
     if (INotationProjectPtr project = globalContext()->currentProject()) {
         project->markAsUnsaved();
     }
@@ -1935,6 +1942,154 @@ QString StarScoreService::makeKeysPart()
     return muse::qtrc("starscore", "The Keys part score now holds %1 (made from “%2”). Each part's status is kept; "
                                    "marking the Keys part marks them all. It exports as one sheet, “Keys”.")
            .arg(names.join(", "), oldName);
+}
+
+bool StarScoreService::songIsCover() const
+{
+    INotationProjectPtr project = globalContext()->currentProject();
+    const QString path = project ? project->path().toQString() : QString();
+    // in a covers folder ("2 Covers", "3 Vocal Covers"), or a subtitle like "Soulive (arr. for Starsign)" (Playground,
+    // a cover among the original sketches)
+    if (path.contains("Covers/")) {
+        return true;
+    }
+    const engraving::MasterScore* ms = const_cast<StarScoreService*>(this)->masterScore();
+    const engraving::Text* sub = ms ? starscore::titleFrameText(ms, engraving::TextStyleType::SUBTITLE) : nullptr;
+    return sub && sub->plainText().toQString().contains(QRegularExpression(R"(\barr(\.|anged)?\b)",
+                                                                           QRegularExpression::CaseInsensitiveOption));
+}
+
+int StarScoreService::firstPublicYear() const
+{
+    // the song's first performance or release in the organizer's recordings.json
+    const RetVal<StarScoreBandExportPlan> plan = planBandExportFor(true);
+    const QString code = plan.ret ? plan.val.code : QString();
+    QFile f(bandFolder() + "/6 Inbox/.organizer/recordings.json");
+    int year = 0;
+    if (!code.isEmpty() && f.open(QIODevice::ReadOnly)) {
+        const QJsonObject root = QJsonDocument::fromJson(f.readAll()).object();
+        static const QRegularExpression date(R"((\d{4})-\d{2}-\d{2})");
+        auto take = [&](const QString& text) {
+            const QRegularExpressionMatch m = date.match(text);
+            const int y = m.hasMatch() ? m.captured(1).toInt() : 0;
+            if (y > 1900 && (year == 0 || y < year)) {
+                year = y;
+            }
+        };
+        for (const QJsonValue& v : root.value("performances").toArray()) {
+            if (v.toObject().value("song").toString() == code) {
+                take(v.toObject().value("show").toString());
+            }
+        }
+        for (const QJsonValue& v : root.value("releases").toArray()) {
+            if (v.toObject().value("song").toString() == code) {
+                take(v.toObject().value("date").toString());
+            }
+        }
+    }
+    return year > 0 ? year : QDate::currentDate().year();
+}
+
+void StarScoreService::syncCopyrightNow(bool fixYear)
+{
+    engraving::MasterScore* ms = masterScore();
+    if (!ms) {
+        return;
+    }
+    Data d = load();
+    if (d.sections.empty()) {
+        return;
+    }
+    const bool cover = songIsCover();
+    int year = d.copyrightYear;
+    if (year <= 0 && !cover) {
+        year = firstPublicYear();
+        if (fixYear) {
+            d.copyrightYear = year;
+            store(d);
+        }
+    }
+    const QString notice = starscore::copyrightNotice(starscore::songTitle(ms), starscore::composerNames(ms), cover, year);
+    int changed = 0;
+    for (engraving::Score* sc : ms->scoreList()) {
+        if (sc->metaTag(u"copyright").toQString() != notice) {
+            sc->setMetaTag(u"copyright", notice);
+            sc->setLayoutAll();
+            ++changed;
+        }
+    }
+    if (changed) {
+        LOGI() << "[starscore] copyright line: " << notice.toStdString();
+        if (IMasterNotationPtr master = globalContext()->currentMasterNotation()) {
+            master->notation()->notationChanged().notify();
+        }
+    }
+}
+
+//! Joel, 21 Oct 2026 (Little Louie's Keys sheet: the names far left of the staves): in a part score of several
+//! keyboards, each keyboard keeps its own grand staff brace and nothing groups the instruments. Adding a part to a
+//! part score in score order adds a brace round every keyboard as well, and each brace column takes room left of the
+//! staves even where it isn't drawn. Returns how many part scores were changed.
+int StarScoreService::tidyKeysBrackets()
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    if (!master) {
+        return 0;
+    }
+    int changed = 0;
+    for (const IExcerptNotationPtr& e : master->excerpts()) {
+        INotationPtr n = e ? e->notation() : nullptr;
+        engraving::Score* sc = n && n->elements() ? n->elements()->msScore() : nullptr;
+        if (!sc || sc->parts().size() < 2 || e->name().endsWith(" + Voice")
+            || !std::all_of(sc->parts().begin(), sc->parts().end(), [&](const engraving::Part* p) {
+            const QString role = rhythmRole(p->instrumentId().toQString());
+            return role == "keys" || p->instrumentId().contains(u"synth");
+        })) {
+            continue;
+        }
+        // what it should be: (first staff, span) of each keyboard of two staves or more
+        std::set<std::pair<engraving::staff_idx_t, size_t> > want;
+        for (const engraving::Part* p : sc->parts()) {
+            if (p->nstaves() > 1) {
+                want.insert({ p->staff(0)->idx(), p->nstaves() });
+            }
+        }
+        std::set<std::pair<engraving::staff_idx_t, size_t> > have;
+        bool other = false;
+        for (const engraving::Staff* st : sc->staves()) {
+            for (const engraving::BracketItem* b : st->brackets()) {
+                if (!b || b->bracketType() == engraving::BracketType::NO_BRACKET) {
+                    continue;
+                }
+                if (b->bracketType() == engraving::BracketType::BRACE && b->column() == 0) {
+                    have.insert({ st->idx(), b->bracketSpan() });
+                } else {
+                    other = true;
+                }
+            }
+        }
+        if (!other && have == want) {
+            continue;
+        }
+        n->undoStack()->prepareChanges(TranslatableString::untranslatable("Keys braces"));
+        for (engraving::Staff* st : sc->staves()) {
+            const std::vector<engraving::BracketItem*> brackets = st->brackets();
+            for (auto it = brackets.rbegin(); it != brackets.rend(); ++it) {
+                const engraving::BracketItem* b = *it;
+                if (b && b->bracketType() != engraving::BracketType::NO_BRACKET) {
+                    sc->undo(new engraving::RemoveBracket(st, b->column(), b->bracketType(), b->bracketSpan()));
+                }
+            }
+        }
+        for (const auto& [first, span] : want) {
+            sc->undoAddBracket(sc->staff(first), 0, engraving::BracketType::BRACE, span);
+        }
+        n->undoStack()->commitChanges();
+        n->notationChanged().notify();
+        LOGI() << "[starscore] Keys braces tidied in " << e->name();
+        ++changed;
+    }
+    return changed;
 }
 
 StarScoreSection StarScoreService::finishNewParts(const std::vector<engraving::Part*>& newParts,

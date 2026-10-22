@@ -1169,6 +1169,8 @@ int mu::project::starscore::hideMuteMarkings(Score* score, std::vector<mu::engra
             }
         }
     }
+    // (only in this sheet: the main score and the other part scores keep them)
+    const mu::engraving::EngravingItem::LocalVisibilityScope local;
     for (mu::engraving::EngravingItem* e : hide) {
         e->undoChangeProperty(mu::engraving::Pid::VISIBLE, false);
     }

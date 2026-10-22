@@ -2312,8 +2312,22 @@ double SystemLayout::instrumentNamesWidth(System* system, LayoutContext& ctx, bo
 
     for (staff_idx_t staffIdx = 0; staffIdx < ctx.dom().nstaves(); ++staffIdx) {
         const SysStaff* staff = system->staff(staffIdx);
-        if (!staff || (isFirstSystem && !staff->show())) {
+        if (!staff) {
             continue;
+        }
+        if (isFirstSystem && !staff->show()) {
+            // StarScore (Joel, 21 Oct 2026: Little Louie's Keys sheet): a part's name is held by its first staff and
+            // drawn beside a staff of the part that shows, so a part showing only its lower staff (the treble staff
+            // hidden as empty) still needs the room for its name; else the name ran off the page's left margin
+            const Part* part = ctx.dom().staff(staffIdx)->part();
+            bool partShows = false;
+            for (const Staff* ps : part ? part->staves() : std::vector<Staff*>()) {
+                const SysStaff* other = system->staff(ps->idx());
+                partShows = partShows || (other && other->show());
+            }
+            if (!partShows) {
+                continue;
+            }
         }
 
         for (InstrumentName* name : staff->instrumentNames) {

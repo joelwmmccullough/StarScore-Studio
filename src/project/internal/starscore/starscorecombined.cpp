@@ -944,6 +944,9 @@ int hideSlashesOverNotes(Score* score)
                         continue;
                     }
                     Chord* c = toChord(e);
+                    if (std::none_of(c->notes().begin(), c->notes().end(), [](const Note* n) { return n->visible(); })) {
+                        continue;   // (already hidden)
+                    }
                     (beatSlash(c) ? slashes : notes).push_back(c);
                 }
             }
@@ -968,10 +971,13 @@ int hideSlashesOverNotes(Score* score)
                 if (!hit) {
                     continue;
                 }
+                const EngravingItem::LocalVisibilityScope local;   // (only in the combined sheet)
+                // the slash's notehead only: an invisible chord in a bar of several voices doesn't count in the spacing,
+                // so the beat it stood on was spaced by the other voice's longer note (Joel, 21 Oct 2026: Bumper Cars E1,
+                // the whole note's beat half as wide as each slash's)
                 for (Note* sn : s->notes()) {
                     sn->undoChangeProperty(Pid::VISIBLE, false);
                 }
-                s->undoChangeProperty(Pid::VISIBLE, false);
                 ++hidden;
             }
         }

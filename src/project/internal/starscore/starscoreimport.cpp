@@ -2153,6 +2153,7 @@ void StarScoreService::tidyOpenedScore()
 
     // the part scores' composer and lyricist as the main score's (Joel, 19 Oct 2026)
     syncCreditsNow("opened");
+    syncCopyrightNow(false);
 
     // Tempo marks in the text style's font, title frames of a fixed height
     if (starscore::tidyTempoAndFrames(ms, false) > 0) {
@@ -2228,6 +2229,11 @@ void StarScoreService::tidyOpenedScore()
             project->markAsUnsaved();
         }
         master->notation()->notationChanged().notify();
+    }
+    if (tidyKeysBrackets() > 0) {
+        if (INotationProjectPtr project = globalContext()->currentProject()) {
+            project->markAsUnsaved();
+        }
     }
     LOGI() << "[starscore] tidied the opened score in " << clock.elapsed() << " ms";
 }

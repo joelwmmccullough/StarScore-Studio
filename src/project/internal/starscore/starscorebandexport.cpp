@@ -3293,6 +3293,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     // Lead Sheet + Voice is made if it's due
     if (m_exportVariant.isEmpty() && !m_exportSource && !m_exportDryRun) {
         syncCreditsNow("export");
+        syncCopyrightNow(true);
         makeLeadSheetVoiceWhenReady();
         const int formatted = refreshVoiceScores();
         if (formatted > 0) {
@@ -3543,6 +3544,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         }
         const Ret ret = starscorePrintSheet(writer, book, file.sheetLeft, file.sheetRight, true, pdf, variant.isEmpty(),
                                             annotatedOut);
+        const engraving::EngravingItem::LocalVisibilityScope local;
         for (engraving::EngravingItem* e : shownAgain) {
             e->undoChangeProperty(engraving::Pid::VISIBLE, true);
         }
@@ -4300,6 +4302,30 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                 es->setLayoutAll();
                 es->doLayout();
                 const int hiddenSlashes = starscore::hideSlashesOverNotes(es);
+                if (const int dbg = qEnvironmentVariableIntValue("STARSCORE_DEBUG_COMBINED_BAR"); dbg > 0) {
+                    es->doLayout();
+                    if (engraving::Measure* dm = es->crMeasure(dbg - 1)) {
+                        for (engraving::Segment* sg = dm->first(engraving::SegmentType::ChordRest); sg;
+                             sg = sg->next(engraving::SegmentType::ChordRest)) {
+                            QStringList what;
+                            for (engraving::track_idx_t t = 0; t < es->ntracks(); ++t) {
+                                if (engraving::EngravingItem* el = sg->element(t); el && el->isChordRest()) {
+                                    what << QString("v%1 %2 x%3 off%4 vis%5").arg(t % 4 + 1)
+                                        .arg(engraving::toChordRest(el)->durationTypeTicks().toString()).arg(el->x(), 0, 'f', 1)
+                                        .arg(el->offset().x(), 0, 'f', 1).arg(el->visible());
+                                    if (el->isChord()) {
+                                        for (const engraving::Note* nn : engraving::toChord(el)->notes()) {
+                                            what << QString("note x%1 off%2 vis%3 head%4").arg(nn->x(), 0, 'f', 1)
+                                                .arg(nn->offset().x(), 0, 'f', 1).arg(nn->visible()).arg(int(nn->headGroup()));
+                                        }
+                                    }
+                                }
+                            }
+                            LOGI() << "[starscore] combined dbg " << chair.name.toStdString() << " " << sg->rtick().toString().toStdString()
+                                   << " x " << sg->x() << ": " << what.join("; ").toStdString();
+                        }
+                    }
+                }
                 const int aligned = starscore::alignCombinedLabels(es);
                 LOGI() << "[starscore] combined " << chair.name.toStdString() << ": " << aligned << " label(s) levelled";
                 n->undoStack()->commitChanges();

@@ -1470,6 +1470,23 @@ void EngravingItem::relinkPropertyToMaster(Pid propertyId)
     setPropertyFlags(propertyId, masterElement->propertyFlags(propertyId));
 }
 
+static int s_localVisibilityDepth = 0;
+
+EngravingItem::LocalVisibilityScope::LocalVisibilityScope()
+{
+    ++s_localVisibilityDepth;
+}
+
+EngravingItem::LocalVisibilityScope::~LocalVisibilityScope()
+{
+    --s_localVisibilityDepth;
+}
+
+bool EngravingItem::visibilityStaysLocal()
+{
+    return s_localVisibilityDepth > 0;
+}
+
 PropertyPropagation EngravingItem::propertyPropagation(const EngravingItem* destinationItem, Pid propertyId) const
 {
     assert(destinationItem != this);
@@ -1499,6 +1516,15 @@ PropertyPropagation EngravingItem::propertyPropagation(const EngravingItem* dest
             return PropertyPropagation::NONE;
         }
         // Maintain every other property synced
+        return PropertyPropagation::PROPAGATE;
+    }
+
+    // StarScore: visibility is the same in the main score and the part scores, whichever it's changed in (and
+    // whatever was changed in a part score before)
+    if (propertyId == Pid::VISIBLE && !visibilityStaysLocal()) {
+        if (systemFlag() && !isTopSystemObject() && sourceScore->isMaster()) {
+            return PropertyPropagation::NONE;
+        }
         return PropertyPropagation::PROPAGATE;
     }
 

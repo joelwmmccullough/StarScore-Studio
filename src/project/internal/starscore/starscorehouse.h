@@ -9,12 +9,15 @@
 #include <utility>
 
 #include <QString>
+#include <QStringList>
 
 #include "global/types/string.h"
 
 namespace mu::engraving {
 class Score;
+class MasterScore;
 class Text;
+enum class TextStyleType : unsigned char;
 }
 
 namespace mu::project::starscore {
@@ -36,6 +39,22 @@ void clearComposerCredit(mu::engraving::Score* score);
 int syncCreditTexts(mu::engraving::MasterScore* master, bool apply);
 //! The main score's composer and lyricist texts, as one string (to see whether they changed)
 QString creditTexts(const mu::engraving::Score* score);
+
+//! The composers the title frame's composer text names, in its order: one per line, or several on a line split at
+//! " / ", " & ", ", ", " and " or a wide space; arrangers left out ("arr. Joel McCullough", "(arr. …)", "Horns arr. …"),
+//! and the template's "Composer / arranger" too
+QStringList composerNames(const mu::engraving::Score* score);
+//! The first text of that style in the score's title frames
+const mu::engraving::Text* titleFrameText(const mu::engraving::Score* score, mu::engraving::TextStyleType type);
+//! The title frame's title (else the work title)
+QString songTitle(const mu::engraving::Score* score);
+//! "A", "A and B", "A, B and C"
+QString joinNames(const QStringList& names);
+//! The copyright line printed at the foot of a sheet's first page (Joel, 21 Oct 2026). An original: "© <year> <owners>.
+//! All rights reserved. …", the owners its composers, Joel McCullough after the others, and Starsign too when someone
+//! besides Joel wrote it. A cover: "“<title>” by <composers>. All rights in the composition belong to its copyright
+//! owners. Arranged by Joel McCullough …". Empty when the composer text names nobody.
+QString copyrightNotice(const QString& title, const QStringList& composers, bool cover, int year);
 
 //! Levels the arrangement label with the instrument name (laid out first; undoable). Returns whether it moved.
 bool levelArrangementLabel(mu::engraving::Score* score);

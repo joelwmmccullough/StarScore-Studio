@@ -973,6 +973,103 @@ QString creditTexts(const mu::engraving::Score* score)
     return out;
 }
 
+QStringList composerNames(const mu::engraving::Score* score)
+{
+    const mu::engraving::Text* t = score ? frameText(score, mu::engraving::TextStyleType::COMPOSER) : nullptr;
+    if (!t) {
+        return {};
+    }
+    QString text = t->plainText().toQString();
+    text.replace(QChar(0x2028), '\n').replace(QChar(0x2029), '\n').replace('\r', '\n');
+    // an arranger's credit, on its own line or after the names ("Toshiyuki Sudo(arr. Joel McCullough)")
+    static const QRegularExpression arranger(R"((?:\(\s*)?\b(?:(?:Horns?|Strings?|Rhythm|Band)\s+)?(?:arr\.|arr\b|arranged\b|arrangement\b).*$)",
+                                             QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression splitter(R"(\s+/\s+|\s+&\s+|,\s*|;\s*|\s+and\s+|\s{2,}|\t)");
+    QStringList names;
+    for (QString line : text.split('\n')) {
+        line.remove(arranger);
+        for (QString name : line.split(splitter)) {
+            name = name.trimmed();
+            name.remove(QRegularExpression(R"(^[(\[]+|[)\]]+$)"));
+            name = name.trimmed();
+            if (name.isEmpty() || name.compare("Composer / arranger", Qt::CaseInsensitive) == 0
+                || name.compare("Composer", Qt::CaseInsensitive) == 0 || name.compare("arranger", Qt::CaseInsensitive) == 0) {
+                continue;
+            }
+            if (!names.contains(name)) {
+                names << name;
+            }
+        }
+    }
+    return names;
+}
+
+const mu::engraving::Text* titleFrameText(const mu::engraving::Score* score, mu::engraving::TextStyleType type)
+{
+    return score ? frameText(score, type) : nullptr;
+}
+
+QString songTitle(const mu::engraving::Score* score)
+{
+    const mu::engraving::Text* t = score ? frameText(score, mu::engraving::TextStyleType::TITLE) : nullptr;
+    QString title = t ? t->plainText().toQString().simplified() : QString();
+    if (title.isEmpty() && score) {
+        title = score->metaTag(u"workTitle").toQString().simplified();
+    }
+    return title;
+}
+
+QString joinNames(const QStringList& names)
+{
+    if (names.size() <= 1) {
+        return names.value(0);
+    }
+    return names.mid(0, names.size() - 1).join(", ") + " and " + names.back();
+}
+
+//! The names with a full stop after them, unless the last already ends in one ("Ray Parker Jr.")
+static QString sentenceEnd(const QString& s)
+{
+    return s.endsWith('.') ? s : s + '.';
+}
+
+QString copyrightNotice(const QString& title, const QStringList& composers, bool cover, int year)
+{
+    static const QString JOEL = "Joel McCullough";
+    QStringList others;
+    bool joel = false;
+    for (const QString& c : composers) {
+        if (c.compare(JOEL, Qt::CaseInsensitive) == 0) {
+            joel = true;
+        } else {
+            others << c;
+        }
+    }
+    if (cover) {
+        // (Joel in a cover's composer text is its arranger: "Orkestar MÉZÉ / Joel McCullough")
+        if (others.isEmpty()) {
+            return QString();
+        }
+        return QString("“%1” by %2 All rights in the composition belong to its copyright owners. Arranged by Joel "
+                       "McCullough for Starsign’s own performance use. Not for sale or distribution.")
+               .arg(title, sentenceEnd(joinNames(others)));
+    }
+    if (others.isEmpty() && !joel) {
+        return QString();
+    }
+    // a co-written song: the other composers first (Joel, 21 Oct 2026: they usually had the idea first), then Joel,
+    // then Starsign
+    QStringList owners = others;
+    if (joel) {
+        owners << JOEL;
+    }
+    if (!others.isEmpty()) {
+        owners << "Starsign";
+    }
+    return QString("© %1 %2 All rights reserved. No part of this music may be copied, arranged, recorded or distributed "
+                   "without permission.").arg(year).arg(sentenceEnd(joinNames(owners)));
+}
+
 int syncCreditTexts(mu::engraving::MasterScore* master, bool apply)
 {
     if (!master) {

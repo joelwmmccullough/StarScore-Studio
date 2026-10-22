@@ -659,6 +659,15 @@ public:
     double staffOffsetY() const { return staffOffset().y(); }
 
     virtual bool isPropertyLinkedToMaster(Pid id) const;
+
+    //! StarScore (Joel, 21 Oct 2026): what's made visible or invisible in the main score or in a part score is made
+    //! so in the other scores too (MuseScore keeps a part score's visibility its own). Changes made inside this
+    //! scope stay in their own score (StarScore hiding things in one sheet while printing it).
+    struct LocalVisibilityScope {
+        LocalVisibilityScope();
+        ~LocalVisibilityScope();
+    };
+    static bool visibilityStaysLocal();
     virtual bool isUnlinkedFromMaster() const;
     void unlinkPropertyFromMaster(Pid id);
     void relinkPropertiesToMaster(PropertyGroup propGroup);

@@ -349,6 +349,165 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             }
             autotestLog(QString("  notes of %1 (%2): %3").arg(name, p->instrumentId().toQString(), out.join(' ')));
         }
+    } else if (step.startsWith("segx:")) {
+        // segx:<part score>|<bar>: that bar's segments in the part score (laid out): type, tick, x, width, stretch,
+        // and the chords/rests in each (voice, duration, visible)
+        const QString book = step.mid(5).section('|', 0, 0);
+        const int bar = step.section('|', 1).toInt();
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            if (e->name() != book) {
+                continue;
+            }
+            engraving::Score* es = e->notation()->elements()->msScore();
+            es->doLayout();
+            engraving::Measure* m = es->crMeasure(bar - 1);
+            if (!m) {
+                continue;
+            }
+            autotestLog(QString("  bar %1: x %2 width %3 stretch %4").arg(bar).arg(m->x()).arg(m->width()).arg(m->userStretch()));
+            for (engraving::Segment* sg = m->first(); sg; sg = sg->next()) {
+                QStringList what;
+                for (engraving::track_idx_t t = 0; t < es->ntracks(); ++t) {
+                    engraving::EngravingItem* el = sg->element(t);
+                    if (el && el->isChordRest()) {
+                        const engraving::ChordRest* cr = engraving::toChordRest(el);
+                        what << QString("v%1 %2%3 x%4 w%5").arg(t % 4 + 1).arg(cr->durationTypeTicks().toString())
+                            .arg(cr->visible() ? "" : " (hidden)").arg(cr->x(), 0, 'f', 2).arg(cr->shape().right(), 0, 'f', 2);
+                        if (cr->isChord()) {
+                            for (const engraving::Note* n : engraving::toChord(cr)->notes()) {
+                                what << QString("note vis%1").arg(n->visible());
+                            }
+                        }
+                    }
+                }
+                autotestLog(QString("    %1 tick %2 x %3 w %4 %5").arg(int(sg->segmentType()), 0, 16)
+                            .arg(sg->rtick().toString()).arg(sg->x(), 0, 'f', 2).arg(sg->width(), 0, 'f', 2).arg(what.join("; ")));
+            }
+        }
+    } else if (step.startsWith("linksync:")) {
+        // linksync:<main|part score>|<part name>|<bar>|<note|acc|harmony|dynamic|rest|artic>|<visible|paren>:
+        // in that score, the first such item of the part's bar selected and Toggle visible / Toggle parentheses done
+        // on it as the menu does; then logs the item and its copies in every score: visible, parentheses
+        const QStringList a = step.mid(9).split('|');
+        engraving::Score* sc = nullptr;
+        INotationPtr nt;
+        if (a.value(0) == "main") {
+            sc = ms;
+            nt = master->notation();
+        } else {
+            for (const IExcerptNotationPtr& e : master->excerpts()) {
+                if (e->name() == a.value(0)) {
+                    nt = e->notation();
+                    sc = nt->elements()->msScore();
+                }
+            }
+        }
+        engraving::Part* part = nullptr;
+        for (engraving::Part* p : sc ? sc->parts() : std::vector<engraving::Part*>()) {
+            if (p->partName().toQString() == a.value(1)) {
+                part = p;
+            }
+        }
+        if (!part && sc && sc->parts().size() == 1) {
+            part = sc->parts().front();   // (a part score's part keeps its instrument's name: "Trumpet in B♭")
+        }
+        engraving::Measure* m = sc ? sc->crMeasure(a.value(2).toInt() - 1) : nullptr;
+        engraving::EngravingItem* item = nullptr;
+        if (part && m) {
+            const engraving::track_idx_t t0 = part->startTrack();
+            const engraving::track_idx_t t1 = part->endTrack();
+            const QString what = a.value(3);
+            for (engraving::Segment* sg = m->first(); sg && !item; sg = sg->next()) {
+                for (engraving::EngravingItem* an : sg->annotations()) {
+                    if (an->track() >= t0 && an->track() < t1
+                        && ((what == "harmony" && an->isHarmony()) || (what == "dynamic" && an->isDynamic()))) {
+                        item = an;
+                        break;
+                    }
+                }
+                for (engraving::track_idx_t t = t0; t < t1 && !item; ++t) {
+                    engraving::EngravingItem* el = sg->element(t);
+                    if (!el) {
+                        continue;
+                    }
+                    if (what == "rest" && el->isRest()) {
+                        item = el;
+                    } else if (el->isChord()) {
+                        engraving::Chord* c = engraving::toChord(el);
+                        if (what == "note") {
+                            item = c->upNote();
+                        } else if (what == "acc") {
+                            for (engraving::Note* n : c->notes()) {
+                                if (n->accidental()) {
+                                    item = n->accidental();
+                                }
+                            }
+                        } else if (what == "artic" && !c->articulations().empty()) {
+                            item = c->articulations().front();
+                        }
+                    }
+                }
+            }
+        }
+        if (!item) {
+            QStringList names;
+            for (engraving::Part* p : sc ? sc->parts() : std::vector<engraving::Part*>()) {
+                names << p->partName().toQString();
+            }
+            autotestLog(QString("  nothing found (score %1, part %2, bar %3; parts: %4)").arg(sc != nullptr).arg(part != nullptr)
+                        .arg(m != nullptr).arg(names.join(", ")));
+        } else {
+            sc->select(item);
+            nt->undoStack()->prepareChanges(TranslatableString::untranslatable("linksync"));
+            if (a.value(4) == "visible") {
+                sc->cmdToggleVisible();
+            } else {
+                sc->cmdToggleParentheses();
+            }
+            nt->undoStack()->commitChanges();
+            nt->notationChanged().notify();
+            auto describe = [&](engraving::EngravingObject* o) {
+                engraving::EngravingItem* e = engraving::toEngravingItem(o);
+                QString where = e->score()->isMaster() ? QString("main") : QString();
+                for (const IExcerptNotationPtr& ex : master->excerpts()) {
+                    if (ex->notation()->elements()->msScore() == e->score()) {
+                        where = ex->name();
+                    }
+                }
+                QString paren = QString::number(int(e->getProperty(engraving::Pid::HAS_PARENTHESES).value<engraving::ParenthesesMode>()));
+                if (e->isAccidental()) {
+                    paren = "bracket " + QString::number(engraving::toAccidental(e)->getProperty(engraving::Pid::ACCIDENTAL_BRACKET).toInt());
+                }
+                return QString("%1: visible %2, parentheses %3, paren items %4%5").arg(where).arg(e->visible()).arg(paren)
+                       .arg((e->leftParen() ? 1 : 0) + (e->rightParen() ? 1 : 0))
+                       .arg(e->isPropertyLinkedToMaster(engraving::Pid::VISIBLE) ? "" : " (visible unlinked)");
+            };
+            autotestLog(QString("  %1 in %2:").arg(item->typeName(), a.value(0)));
+            if (item->isAccidental() && item->explicitParent() && item->explicitParent()->links()) {
+                // (an accidental has no copies of its own: the note's copies' accidentals)
+                for (engraving::EngravingObject* o : *item->explicitParent()->links()) {
+                    if (engraving::Accidental* acc = engraving::toNote(o)->accidental()) {
+                        autotestLog("    " + describe(acc));
+                    }
+                }
+            } else if (item->links()) {
+                for (engraving::EngravingObject* o : *item->links()) {
+                    autotestLog("    " + describe(o));
+                }
+            } else {
+                autotestLog("    " + describe(item) + " (no copies)");
+            }
+        }
+    } else if (step == "copyright") {
+        // copyright: the copyright line the song's sheets get, and what it was made from
+        if (const QString band = qEnvironmentVariable("STARSCORE_AUTOTEST_BAND"); !band.isEmpty()) {
+            setBandFolder(band);
+        }
+        syncCopyrightNow(false);
+        autotestLog(QString("  title: %1 | composers: %2 | %3 | year %4").arg(starscore::songTitle(ms))
+                    .arg(starscore::composerNames(ms).join(" + ")).arg(songIsCover() ? "cover" : "original")
+                    .arg(load().copyrightYear));
+        autotestLog("  notice: " + ms->metaTag(u"copyright").toQString());
     } else if (step.startsWith("mimedump:")) {
         // mimedump:<part name>|B1-B2: the clipboard text of those bars of the part's first staff, to mime-<n>.xml
         const QString name = step.mid(9).section('|', 0, 0);

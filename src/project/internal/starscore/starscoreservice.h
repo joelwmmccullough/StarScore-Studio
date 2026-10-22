@@ -343,6 +343,9 @@ public:
         // after that a clef Joel picks for a chair is kept
         bool flexibleClefsSet = false;
         QString fileId;    // permanent id of this .starscore (kept when the file is moved or renamed)
+        // The year in an original's copyright line (Joel, 21 Oct 2026): its first performance or release, else the
+        // year it was first exported; kept once a sheet has been exported with it (0 = not yet)
+        int copyrightYear = 0;
         // StarScore Deco switched on: score ("" = main score, else the part book's name) -> its fonts before
         // (music symbols, music text, dynamics)
         std::map<QString, QStringList> decoRestore;
@@ -478,6 +481,12 @@ private:
     void addPartBooksFor(const QStringList& partIds);
 public:
     QString makeKeysPart() override;
+    int tidyKeysBrackets();
+    //! The copyright line of every score of the song ("copyright" meta tag, printed at the foot of each sheet's first
+    //! page), made from its composer text; the year kept in the song once fixYear (exporting)
+    void syncCopyrightNow(bool fixYear);
+    bool songIsCover() const;
+    int firstPublicYear() const;
 private:
     int applyStylesOnly(const QStringList& partIds, const Data& data);
     void syncMinMajDefaults(const Data& data);
