@@ -48,7 +48,7 @@ QStringList composerNames(const mu::engraving::Score* score);
 const mu::engraving::Text* titleFrameText(const mu::engraving::Score* score, mu::engraving::TextStyleType type);
 //! The title frame's title (else the work title)
 QString songTitle(const mu::engraving::Score* score);
-//! "A", "A and B", "A, B and C"
+//! "A", "A and B", "A, B, and C"
 QString joinNames(const QStringList& names);
 //! The copyright line printed at the foot of a sheet's first page (Joel, 21 Oct 2026). An original: "© <year> <owners>.
 //! All rights reserved. …", the owners its composers, Joel McCullough after the others, and Starsign too when someone

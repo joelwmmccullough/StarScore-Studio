@@ -1024,7 +1024,11 @@ QString joinNames(const QStringList& names)
     if (names.size() <= 1) {
         return names.value(0);
     }
-    return names.mid(0, names.size() - 1).join(", ") + " and " + names.back();
+    if (names.size() == 2) {
+        return names.front() + " and " + names.back();
+    }
+    // (with the Oxford comma, Joel, 21 Oct 2026: "A, B, and C")
+    return names.mid(0, names.size() - 1).join(", ") + ", and " + names.back();
 }
 
 //! The names with a full stop after them, unless the last already ends in one ("Ray Parker Jr.")
@@ -1066,7 +1070,7 @@ QString copyrightNotice(const QString& title, const QStringList& composers, bool
     if (!others.isEmpty()) {
         owners << "Starsign";
     }
-    return QString("© %1 %2 All rights reserved. No part of this music may be copied, arranged, recorded or distributed "
+    return QString("© %1 %2 All rights reserved. No part of this music may be copied, arranged, recorded, or distributed "
                    "without permission.").arg(year).arg(sentenceEnd(joinNames(owners)));
 }
 
