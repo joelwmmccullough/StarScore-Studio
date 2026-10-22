@@ -144,6 +144,13 @@ LayoutCopyResult copyLayout(const Score* source, const std::vector<Score*>& targ
             if (options.keepTogether) {
                 applyBreak(m, sm->noBreak() && !inLock, m->noBreak(), LayoutBreakType::NOBREAK);
             }
+            // the bar's "Break multimeasure rests" (Format › Measure properties), in this score only (Joel, 22 Oct 2026:
+            // a 3H Flexible arrangement made from the 3H Standard lost them)
+            if (options.mmRestBreaks && m->breakMultiMeasureRest() != sm->breakMultiMeasureRest()
+                && (sm->breakMultiMeasureRest() || options.replaceExisting)) {
+                target->undo(new ChangeProperty(m, Pid::BREAK_MMR, sm->breakMultiMeasureRest()));
+                changed = true;
+            }
         }
 
         if (options.systemLocks) {

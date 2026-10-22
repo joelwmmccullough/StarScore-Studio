@@ -41,6 +41,7 @@
 #include "starscoreservice.h"
 #include "starscorelayoutcheck.h"
 #include "starscorehouse.h"
+#include "engraving/editing/editproperty.h"
 #include "starscorehornkeys.h"
 #include "starscoreautoarchive.h"
 #include "engraving/dom/layoutbreak.h"
@@ -497,6 +498,31 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             } else {
                 autotestLog("    " + describe(item) + " (no copies)");
             }
+        }
+    } else if (step.startsWith("barmmr:")) {
+        // barmmr:<part score>|<bar>|<0/1>: that bar's "Break multimeasure rests" in the part score (only there);
+        // barmmr:<part score>: lists the bars that break them
+        const QStringList a = step.mid(7).split('|');
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            if (e->name() != a.value(0)) {
+                continue;
+            }
+            engraving::Score* es = e->notation()->elements()->msScore();
+            if (a.size() >= 3) {
+                if (engraving::Measure* m = es->crMeasure(a.value(1).toInt() - 1)) {
+                    e->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("barmmr"));
+                    es->undo(new engraving::ChangeProperty(m, engraving::Pid::BREAK_MMR, a.value(2) == "1"));
+                    e->notation()->undoStack()->commitChanges();
+                }
+            }
+            QStringList bars;
+            int i = 1;
+            for (engraving::Measure* m = es->firstMeasure(); m; m = m->nextMeasure(), ++i) {
+                if (m->breakMultiMeasureRest()) {
+                    bars << QString::number(i);
+                }
+            }
+            autotestLog(QString("  %1: breaks multimeasure rests at bars %2").arg(e->name(), bars.join(", ")));
         }
     } else if (step == "stylecheck") {
         // stylecheck: whether opening the song would offer the default style, and the settings that differ

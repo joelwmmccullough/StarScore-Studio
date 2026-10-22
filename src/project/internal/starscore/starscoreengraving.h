@@ -24,6 +24,7 @@ struct LayoutCopyOptions {
     bool pageBreaks = true;
     bool keepTogether = true;   // "no break" markers
     bool systemLocks = true;    // "lock measures into system" (MuseScore 4.4+)
+    bool mmRestBreaks = true;   // each bar's "Break multimeasure rests" (Joel, 22 Oct 2026)
     bool replaceExisting = true;
 };
 
@@ -34,7 +35,7 @@ struct LayoutCopyResult {
     int locksCopied = 0;
 };
 
-//! Copy line/page breaks, "keep together" markers and system locks from one score
+//! Copy line/page breaks, "keep together" markers, system locks and bars' "break multimeasure rests" from one score
 //! (main score or a part book) to others, matching bars by position in the song.
 //! Must be called inside a command (startCmd/endCmd).
 LayoutCopyResult copyLayout(const mu::engraving::Score* source, const std::vector<mu::engraving::Score*>& targets,

@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.87
+
+- **Bars' "Break multimeasure rests" setting is copied with the layout.** Wherever StarScore copies a part score's layout to another (a Flexible arrangement made from the Standard one, copied horn parts, stand-in versions, + Voice sheets, combined sheets, standardizing), each bar's "Break multimeasure rests" setting (Measure properties) now comes along with the line breaks and system locks.
+
 ## 1.18.86
 
 - **Newer default style offered.** When you open a song whose main score doesn't match the default style yet (a new built-in Starsign style, or a new default style you picked), StarScore asks once whether to apply it to the main score and every part score. Yes restyles the song (one undo step per score). No isn't asked again for that song until there's an even newer style. StarScore's own per-score settings (staff size, footers, title offsets, multimeasure rests) don't count as differences.
