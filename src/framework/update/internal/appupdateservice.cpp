@@ -523,7 +523,9 @@ RetVal<ReleaseInfo> AppUpdateService::parseStarScoreRelease(const QByteArray& js
     result.val.fileName = QString("StarScore Studio %1.dmg").arg(release.version).toStdString();
     result.val.fileUrl = release.assetUrl.toStdString();
     // GitHub may hand the body back with Windows line endings; the dialog renders it as markdown.
-    result.val.notes = QString(release.notes).replace("\r\n", "\n").toStdString();
+    // StarScore (Joel, 22 Oct 2026: 1.18.83's notes stopped at "© <year>"): the markdown renderer takes "<year>" for an
+    // HTML tag and drops the rest, so angle brackets are shown as themselves
+    result.val.notes = QString(release.notes).replace("\r\n", "\n").replace("<", "&lt;").replace(">", "&gt;").toStdString();
     result.val.additionInfo["fileSize"] = Val(static_cast<int64_t>(release.assetSize));
     result.val.additionInfo["tagName"] = Val(release.tagName.toStdString());
 
