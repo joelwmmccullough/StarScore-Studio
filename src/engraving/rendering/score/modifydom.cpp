@@ -22,6 +22,7 @@
 #include "modifydom.h"
 
 #include <map>
+#include <string>
 #include "dom/key.h"
 
 #include "dom/measure.h"
@@ -81,6 +82,48 @@ void ModifyDom::connectTremolo(Measure* m)
     m->connectTremolo();
 }
 
+//! StarScore: a beat of the bar (a dotted quarter in 6/8, 9/8, 12/8)
+static mu::engraving::Fraction starscoreBeat(const mu::engraving::Measure* m)
+{
+    using namespace mu::engraving;
+    const Fraction ts = m->timesig();
+    return (ts.denominator() == 8 && ts.numerator() % 3 == 0 && ts.numerator() > 3) ? Fraction(3, 8) : Fraction(1, ts.denominator());
+}
+
+//! StarScore: the music either side of the bar's start on a staff: the key, the notes still sounding in the bar before's
+//! last beat and the notes starting in this bar's first beat (their places, lengths and spellings)
+static std::string starscoreBarlineFigure(const mu::engraving::Measure* m, const mu::engraving::Staff* staff,
+                                          mu::engraving::staff_idx_t staffIdx)
+{
+    using namespace mu::engraving;
+    const Measure* prev = m->prevMeasure();
+    if (!prev) {
+        return {};
+    }
+    const Fraction from = prev->endTick() - starscoreBeat(prev);
+    const Fraction until = m->tick() + starscoreBeat(m);
+    std::string figure = "k" + std::to_string(int(staff->key(prev->tick()))) + ">" + std::to_string(int(staff->key(m->tick())));
+    for (const Segment* seg = prev->first(SegmentType::ChordRest); seg; seg = seg->next1(SegmentType::ChordRest)) {
+        if (seg->tick() >= until) {
+            break;
+        }
+        for (track_idx_t t = staffIdx * VOICES; t < (staffIdx + 1) * VOICES; ++t) {
+            const EngravingItem* e = seg->element(t);
+            if (!e || !e->isChord() || seg->tick() + toChord(e)->actualTicks() <= from) {
+                continue;
+            }
+            const Chord* c = toChord(e);
+            figure += " " + std::to_string((seg->tick() - m->tick()).ticks()) + "/" + std::to_string(c->actualTicks().ticks()) + ":";
+            for (const Note* n : c->notes()) {
+                if (n->visible() && !n->fixed()) {
+                    figure += std::to_string(n->epitch()) + "." + std::to_string(n->tpc()) + ",";
+                }
+            }
+        }
+    }
+    return figure;
+}
+
 void ModifyDom::cmdUpdateNotes(const Measure* measure, const DomAccessor& dom)
 {
     for (staff_idx_t staffIdx = 0; staffIdx < dom.nstaves(); ++staffIdx) {
@@ -115,18 +158,15 @@ void ModifyDom::cmdUpdateNotes(const Measure* measure, const DomAccessor& dom)
         // StarScore (Joel, 22 Oct 2026): courtesy accidentals across the barline. A line (a step in an octave) whose
         // note still sounding in the bar before's last beat was altered otherwise than both bars' key signatures have it
         // (D# there, in C; E natural there, in E flat): its note starting in this bar's first beat gets its accidental in
-        // parentheses ("(♮)D", "(♭)E"). Only notes that show count (not hidden ones, not rhythm slashes).
+        // parentheses ("(♮)D", "(♭)E"). Only notes that show count (not hidden ones, not rhythm slashes). A figure that
+        // repeats gets them only the first time.
         static const bool noCourtesy = qEnvironmentVariableIsSet("STARSCORE_TEST_NO_COURTESY");   // (to compare)
         std::vector<int> courtesyLines;
         if (const Measure* prev = measure->prevMeasure(); prev && !noCourtesy && staff->isPitchedStaff(measure->tick())
             && !staff->isTabStaff(measure->tick())) {
             // (STARSCORE_COURTESY_MODE=all, to compare: any note altered in the bar before, for a note anywhere in this one)
             static const bool nearOnly = qEnvironmentVariable("STARSCORE_COURTESY_MODE") != "all";
-            auto beat = [](const Measure* m) {
-                const Fraction ts = m->timesig();
-                return (ts.denominator() == 8 && ts.numerator() % 3 == 0 && ts.numerator() > 3) ? Fraction(3, 8)
-                       : Fraction(1, ts.denominator());
-            };
+            auto beat = [](const Measure* m) { return starscoreBeat(m); };
             const Fraction prevFrom = nearOnly ? prev->endTick() - beat(prev) : prev->tick();
             if (nearOnly) {
                 as.setCourtesyUntil((measure->tick() + beat(measure)).ticks());
@@ -176,6 +216,17 @@ void ModifyDom::cmdUpdateNotes(const Measure* measure, const DomAccessor& dom)
                         LOGI() << "[starscore] courtesy bar " << measure->no() + 1 << " staff " << staffIdx << " line " << line << " alter "
                                << int(alter) << " in " << measure->score()->name();
                     }
+                }
+            }
+        }
+        // (a figure at the barline that came in the 16 bars before has had its courtesy accidentals: not again)
+        if (!courtesyLines.empty() && qEnvironmentVariable("STARSCORE_COURTESY_MODE") != "all") {
+            const std::string figure = starscoreBarlineFigure(measure, staff, staffIdx);
+            const Measure* earlier = measure->prevMeasure();
+            for (int k = 0; k < 16 && earlier; ++k, earlier = earlier->prevMeasure()) {
+                if (starscoreBarlineFigure(earlier, staff, staffIdx) == figure) {
+                    courtesyLines.clear();
+                    break;
                 }
             }
         }
