@@ -4,6 +4,9 @@
  * StarScore Studio — a MuseScore Studio fork
  */
 #include <QSettings>
+#include "engraving/style/style.h"
+#include "global/io/buffer.h"
+#include <QXmlStreamReader>
 #include "starscoreservice.h"
 #include "engraving/dom/bracketItem.h"
 #include "engraving/editing/editbrackets.h"
@@ -465,6 +468,7 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
     data.version = root.value("scoreVersion").toString();
     data.fileId = root.value("fileId").toString();
     data.copyrightYear = root.value("copyrightYear").toInt();
+    data.styleFingerprint = root.value("styleFingerprint").toString();
     const QJsonObject deco = root.value("decoRestore").toObject();
     for (auto it = deco.begin(); it != deco.end(); ++it) {
         QStringList fonts;
@@ -622,6 +626,9 @@ QString StarScoreService::toJson(const Data& data)
     }
     if (data.copyrightYear > 0) {
         root["copyrightYear"] = data.copyrightYear;
+    }
+    if (!data.styleFingerprint.isEmpty()) {
+        root["styleFingerprint"] = data.styleFingerprint;
     }
     if (!solos.isEmpty()) {
         root["solos"] = solos;
@@ -3799,10 +3806,129 @@ void StarScoreService::setStyleRules(const std::vector<StarScoreStyleRule>& rule
     saveStyleSettings(settings);
 }
 
+QString StarScoreService::defaultStyleFingerprint() const
+{
+    QFile f(loadStyleSettings().defaultStyle);
+    if (!f.open(QIODevice::ReadOnly)) {
+        return QString();
+    }
+    return QCryptographicHash::hash(f.readAll(), QCryptographicHash::Md5).toHex();
+}
+
+QStringList StarScoreService::styleDifferences() const
+{
+    engraving::MasterScore* ms = const_cast<StarScoreService*>(this)->masterScore();
+    const QString path = loadStyleSettings().defaultStyle;
+    QFile f(path);
+    if (!ms || !f.open(QIODevice::ReadOnly)) {
+        return {};
+    }
+    const QByteArray bytes = f.readAll();
+    // the settings the file names
+    QStringList names;
+    {
+        QXmlStreamReader x(bytes);
+        int depth = 0;
+        bool inStyle = false;
+        while (!x.atEnd()) {
+            x.readNext();
+            if (x.isStartElement()) {
+                ++depth;
+                if (x.name() == u"Style") {
+                    inStyle = true;
+                } else if (inStyle && depth == 3) {
+                    names << x.name().toString();
+                }
+            } else if (x.isEndElement()) {
+                --depth;
+                if (x.name() == u"Style") {
+                    inStyle = false;
+                }
+            }
+        }
+    }
+    // the file's values, read over a copy of the score's style
+    engraving::MStyle fileStyle = ms->style();
+    muse::ByteArray data(reinterpret_cast<const uint8_t*>(bytes.constData()), bytes.size());
+    muse::io::Buffer buf(&data);
+    buf.open(muse::io::IODevice::ReadOnly);
+    fileStyle.read(&buf);
+    static const std::set<engraving::Sid> OWN {
+        engraving::Sid::spatium, engraving::Sid::oddFooterL, engraving::Sid::oddFooterC, engraving::Sid::oddFooterR,
+        engraving::Sid::evenFooterL, engraving::Sid::evenFooterC, engraving::Sid::evenFooterR, engraving::Sid::showFooter,
+        engraving::Sid::footerFirstPage, engraving::Sid::footerOddEven, engraving::Sid::composerOffset,
+        engraving::Sid::composerOffsetType, engraving::Sid::subTitleOffset, engraving::Sid::subTitleOffsetType,
+        engraving::Sid::createMultiMeasureRests, engraving::Sid::mmRestHBarThickness, engraving::Sid::measureNumberPosAbove,
+        engraving::Sid::lyricsMinDistance,
+    };
+    QStringList differ;
+    for (const QString& name : names) {
+        const engraving::Sid sid = engraving::MStyle::styleIdx(muse::String::fromQString(name));
+        if (sid == engraving::Sid::NOSTYLE || OWN.count(sid)) {
+            continue;
+        }
+        const engraving::PropertyValue a = fileStyle.value(sid);
+        const engraving::PropertyValue b = ms->style().value(sid);
+        if (a.type() == engraving::P_TYPE::REAL && b.type() == engraving::P_TYPE::REAL) {
+            if (std::abs(a.toReal() - b.toReal()) < 1e-4) {
+                continue;
+            }
+        } else if (a == b) {
+            continue;
+        }
+        differ << name;
+    }
+    return differ;
+}
+
+void StarScoreService::offerNewerStyle()
+{
+    const Data d = load();
+    const QString fp = defaultStyleFingerprint();
+    if (fp.isEmpty() || d.sections.empty() || d.styleFingerprint == fp) {
+        return;
+    }
+    const QString declinedKey = "StarScore/styleDeclined/" + (d.fileId.isEmpty() ? QString("unknown") : d.fileId);
+    if (QSettings().value(declinedKey).toString() == fp) {
+        return;   // (No for this style, on this song)
+    }
+    const QStringList differ = styleDifferences();
+    if (differ.isEmpty()) {
+        return;   // already looks like it
+    }
+    LOGI() << "[starscore] the main score differs from the default style in: " << differ.join(", ").toStdString();
+    const QString styleName = QFileInfo(loadStyleSettings().defaultStyle).completeBaseName();
+    const IInteractive::Result answer = interactive()->questionSync(
+        muse::trc("starscore", "A newer style is available"),
+        muse::qtrc("starscore", "This song was styled with an older version of the default style. “%1” has %n setting(s) "
+                                "it doesn't have yet.\n\nApply the new style to the main score and every part score now? "
+                                "You can undo it. If you choose No, you won't be asked again for this song until there's "
+                                "an even newer style.", "", int(differ.size())).arg(styleName).toStdString(),
+        { IInteractive::Button::No, IInteractive::Button::Yes }, IInteractive::Button::Yes);
+    if (answer.standardButton() == IInteractive::Button::Yes) {
+        applyStyles({});
+        if (INotationProjectPtr project = globalContext()->currentProject()) {
+            project->markAsUnsaved();
+        }
+        scheduleChanged();
+    } else {
+        QSettings().setValue(declinedKey, fp);
+    }
+}
+
 int StarScoreService::applyStyles(const QStringList& partIds)
 {
     const Data data = load();
     const int restyled = applyStylesOnly(partIds, data);
+    if (partIds.isEmpty()) {
+        // the whole song in the default style as it is now (not asked about it again)
+        Data d = load();
+        const QString fp = defaultStyleFingerprint();
+        if (!fp.isEmpty() && d.styleFingerprint != fp) {
+            d.styleFingerprint = fp;
+            store(d);
+        }
+    }
     applyMixerDefaults(partIds);
     // horn part scores show their exported title (after the style: the composer credit moves clear of the label)
     labelPartBooks();

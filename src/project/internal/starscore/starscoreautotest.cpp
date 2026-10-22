@@ -498,6 +498,12 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
                 autotestLog("    " + describe(item) + " (no copies)");
             }
         }
+    } else if (step == "stylecheck") {
+        // stylecheck: whether opening the song would offer the default style, and the settings that differ
+        const Data d = load();
+        autotestLog(QString("  default %1 (%2); song restyled with %3; differs in %4: %5").arg(loadStyleSettings().defaultStyle)
+                    .arg(defaultStyleFingerprint()).arg(d.styleFingerprint.isEmpty() ? QString("(no record)") : d.styleFingerprint)
+                    .arg(styleDifferences().size()).arg(styleDifferences().mid(0, 12).join(", ")));
     } else if (step.startsWith("copyrightyear:")) {
         // copyrightyear:<year>: as the "…" menu's Copyright year
         setCopyrightYear(step.mid(14).toInt());

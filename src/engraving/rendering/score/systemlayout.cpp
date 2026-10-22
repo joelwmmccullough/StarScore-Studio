@@ -1399,6 +1399,11 @@ void SystemLayout::layoutSystemElements(System* system, LayoutContext& ctx)
         layoutHarmonies(elementsToLayout.harmonies, system, ctx);
     }
 
+    // StarScore: the rehearsal marks' places first, so a text at a mark's beat can go beside it (placed further down)
+    for (RehearsalMark* rm : elementsToLayout.rehMarks) {
+        TLayout::layoutItem(rm, ctx);
+    }
+
     for (StaffText* st : elementsToLayout.staffText) {
         TLayout::layoutItem(st, ctx);
     }
@@ -1450,6 +1455,34 @@ void SystemLayout::layoutSystemElements(System* system, LayoutContext& ctx)
     for (RehearsalMark* rehearsMark : elementsToLayout.rehMarks) {
         starscoreClearRehearsalMarkFromChords(rehearsMark, system);
         Autoplace::autoplaceSegmentElement(rehearsMark, rehearsMark->mutldata());
+        // StarScore (Joel, 22 Oct 2026): a text placed beside the mark (see TLayout) that sits higher, above the chord
+        // symbols, takes the mark up with it, so they read as one line: "F  Soloist plays over backgrounds…"
+        if (rehearsMark->autoplace() && rehearsMark->placeAbove() && rehearsMark->explicitParent()) {
+            const Segment* seg = toSegment(rehearsMark->explicitParent());
+            RehearsalMark::LayoutData* rl = rehearsMark->mutldata();
+            const RectF mark = rl->bbox().translated(rehearsMark->pos());   // (drawn place: the offset included)
+            // (the text may hang on another segment at the same beat: a time tick one)
+            std::vector<std::pair<const EngravingItem*, double> > texts;
+            for (const Segment* s2 = seg->measure()->first(); s2; s2 = s2->next()) {
+                if (s2->tick() != seg->tick()) {
+                    continue;
+                }
+                for (const EngravingItem* a : s2->annotations()) {
+                    texts.push_back({ a, s2->x() - seg->x() });
+                }
+            }
+            for (const auto& [a, dx] : texts) {
+                if (!a || !(a->isStaffText() || a->isSystemText()) || a->staffIdx() != rehearsMark->staffIdx() || !a->visible()
+                    || !a->placeAbove() || !a->ldata()->isSetPos()) {
+                    continue;
+                }
+                const RectF text = a->ldata()->bbox().translated(a->pos() + PointF(dx, 0.0));
+                const bool beside = text.left() >= mark.right() - 0.1 * rehearsMark->spatium();   // (right of it, same beat)
+                if (beside && text.center().y() < mark.center().y()) {
+                    rl->moveY(text.center().y() - mark.center().y());
+                }
+            }
+        }
     }
 
     for (EngravingItem* item : elementsToLayout.markersAndJumps) {

@@ -5130,6 +5130,42 @@ void TLayout::layoutStaffState(const StaffState* item, StaffState::LayoutData* l
     ldata->setPos(0.0, _spatium * -6.0);
 }
 
+//! StarScore (Joel, 22 Oct 2026: G.I. Jorge's "Soloist plays over backgrounds throughout solo" was stacked under the F
+//! rehearsal mark): a text above the staff at a rehearsal mark's beat goes beside the mark, its left edge just past
+//! the mark's right edge, instead of under it. Only texts placed automatically; called before they're placed.
+static void starscoreBesideRehearsalMark(const TextBase* item, TextBase::LayoutData* ldata)
+{
+    if (!item->autoplace() || !item->placeAbove() || !item->explicitParent() || !item->explicitParent()->isSegment()) {
+        return;
+    }
+    const Segment* s = toSegment(item->explicitParent());
+    if (!s->measure()) {
+        return;
+    }
+    // the marks at this beat (on this segment, or another at the same beat: a text can hang on a time tick segment)
+    for (const Segment* s2 = s->measure()->first(); s2; s2 = s2->next()) {
+        if (s2->tick() != s->tick()) {
+            continue;
+        }
+        for (const EngravingItem* a : s2->annotations()) {
+            if (!a || !a->isRehearsalMark() || !a->visible() || !a->placeAbove() || !a->ldata()->isSetPos()) {
+                continue;
+            }
+            if (a->staffIdx() != item->staffIdx()) {
+                continue;
+            }
+            // (where they're drawn: their offsets included)
+            const RectF mark = a->ldata()->bbox().translated(a->pos() + PointF(s2->x() - s->x(), 0.0));
+            const RectF text = ldata->bbox().translated(ldata->pos() + item->offset());
+            const double gap = 0.75 * item->spatium();
+            if (mark.isNull() || text.left() >= mark.right() + gap || text.right() <= mark.left()) {
+                continue;
+            }
+            ldata->moveX(mark.right() + gap - text.left());
+        }
+    }
+}
+
 void TLayout::layoutStaffText(const StaffText* item, StaffText::LayoutData* ldata)
 {
     LAYOUT_CALL_ITEM(item);
@@ -5143,6 +5179,7 @@ void TLayout::layoutStaffText(const StaffText* item, StaffText::LayoutData* ldat
         LD_CONDITION(s->ldata()->isSetPos());
     }
 
+    starscoreBesideRehearsalMark(item, ldata);
     Autoplace::autoplaceSegmentElement(item, ldata);
 
     if (SoundFlag* flag = item->soundFlag()) {
@@ -5518,6 +5555,7 @@ void TLayout::layoutSystemText(const SystemText* item, SystemText::LayoutData* l
         LD_CONDITION(s->ldata()->isSetPos());
     }
 
+    starscoreBesideRehearsalMark(item, ldata);
     Autoplace::autoplaceSegmentElement(item, ldata);
 }
 

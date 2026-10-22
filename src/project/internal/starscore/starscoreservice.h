@@ -346,6 +346,9 @@ public:
         // The year in an original's copyright line (Joel, 21 Oct 2026): its first performance or release, else the
         // year it was first exported; kept once a sheet has been exported with it (0 = not yet)
         int copyrightYear = 0;
+        // The default style file (md5) the whole song was last restyled with; a newer default style is offered once
+        // per file when the song is opened (Joel, 22 Oct 2026)
+        QString styleFingerprint;
         // StarScore Deco switched on: score ("" = main score, else the part book's name) -> its fonts before
         // (music symbols, music text, dynamics)
         std::map<QString, QStringList> decoRestore;
@@ -486,6 +489,13 @@ public:
     //! page), made from its composer text; the year kept in the song once fixYear (exporting)
     void syncCopyrightNow(bool fixYear);
     int copyrightYear() const override;
+    QString defaultStyleFingerprint() const;
+    //! The settings in the default style file that the main score has otherwise (StarScore's own per-score settings,
+    //! staff size, footers, title offsets, multimeasure rests, left out)
+    QStringList styleDifferences() const;
+    //! On opening: a song restyled with an older default style, or never, whose main score differs from the
+    //! default style is asked about once per style file ("Apply it?"); No is remembered for this file and this style
+    void offerNewerStyle();
     void setCopyrightYear(int year) override;
     bool songIsCover() const;
     int firstPublicYear() const;

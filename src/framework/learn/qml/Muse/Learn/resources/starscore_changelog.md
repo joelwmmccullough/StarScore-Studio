@@ -4,6 +4,11 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.86
+
+- **Newer default style offered.** When you open a song whose main score doesn't match the default style yet (a new built-in Starsign style, or a new default style you picked), StarScore asks once whether to apply it to the main score and every part score. Yes restyles the song (one undo step per score). No isn't asked again for that song until there's an even newer style. StarScore's own per-score settings (staff size, footers, title offsets, multimeasure rests) don't count as differences.
+- **Texts beside rehearsal marks.** A staff or system text at a rehearsal mark's beat is placed beside the mark, on the same line, instead of being stacked under it (G.I. Jorge's "Soloist plays over backgrounds throughout solo" at F). Texts you've moved by hand keep their place.
+
 ## 1.18.85
 
 - **Copyright year.** The StarScore bar's "…" menu has "Copyright year (2022)…" to set the year in an original's copyright line by hand. It's kept in the song and every score's line changes with it. Covers have no year, so the item is greyed out for them.
