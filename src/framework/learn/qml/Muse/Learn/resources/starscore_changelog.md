@@ -4,6 +4,11 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.88
+
+- **Courtesy accidentals at the barline.** When a note altered at the end of a bar (still sounding in its last beat) comes back in the first beat of the next bar as the key signature has it, that note gets its accidental in parentheses: D♯ then D in C gets (♮), E♮ then E♭ in E♭ gets (♭). Same octave only. A figure that repeats gets them only the first time (within 16 bars). Hidden notes and rhythm slashes don't count. It works in the app as well as on exported sheets, and each song gets them the next time it's opened. To hide one, make it invisible.
+- **Flexible sheets spelled like your hand-written parts.** When a Flexible version sheet is exported for a transposing instrument, each bar is looked up in the song's part scores in the same transposition (the Standard arrangements' parts). Where the same music is found (same rhythm, same notes in any octave, same key), its spellings and its hand-placed accidentals and parentheses are used: Little Louie's 3H and 2H Flexible Horn 1 B♭ sheets now match the Standard Trumpet, (♭)s in section L included. A match at the same place in the song is used first. A match elsewhere in the song counts only when a bar next to it matches too (or the bar is long). Pitches never change, only how they're spelled.
+
 ## 1.18.87
 
 - **Bars' "Break multimeasure rests" setting is copied with the layout.** Wherever StarScore copies a part score's layout to another (a Flexible arrangement made from the Standard one, copied horn parts, stand-in versions, + Voice sheets, combined sheets, standardizing), each bar's "Break multimeasure rests" setting (Measure properties) now comes along with the line breaks and system locks.
