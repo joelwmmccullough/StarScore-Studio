@@ -2241,6 +2241,11 @@ void Note::updateAccidental(AccidentalState* as)
             return;
         }
         // StarScore: a courtesy accidental (the bar before altered this line): this note as the key signature has it
+        // (a courtesy accidental only near the barline, when that's the setting: later on, none)
+        if (as->courtesy(eAbsLine) && !fixed() && tick().ticks() >= as->courtesyUntil()) {
+            as->setCourtesy(eAbsLine, false);
+            as->setForceRestateAccidental(eAbsLine, false);
+        }
         // (a rhythm slash on the line neither shows it nor uses it up)
         const bool slashOnCourtesy = as->courtesy(eAbsLine) && fixed();
         const bool courtesy = as->courtesy(eAbsLine) && !fixed() && accVal == absLineAccVal && !tieBackNonPartial();

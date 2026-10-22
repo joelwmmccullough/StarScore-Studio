@@ -120,7 +120,19 @@ void ModifyDom::cmdUpdateNotes(const Measure* measure, const DomAccessor& dom)
         std::vector<int> courtesyLines;
         if (const Measure* prev = measure->prevMeasure(); prev && !noCourtesy && staff->isPitchedStaff(measure->tick())
             && !staff->isTabStaff(measure->tick())) {
+            // (STARSCORE_COURTESY_MODE=near: only an alteration in the bar before's last beat, for a note in this bar's first)
+            static const bool nearOnly = qEnvironmentVariable("STARSCORE_COURTESY_MODE") == "near";
+            auto beat = [](const Measure* m) {
+                const Fraction ts = m->timesig();
+                return (ts.denominator() == 8 && ts.numerator() % 3 == 0 && ts.numerator() > 3) ? Fraction(3, 8)
+                       : Fraction(1, ts.denominator());
+            };
+            const Fraction prevFrom = nearOnly ? prev->endTick() - beat(prev) : prev->tick();
+            if (nearOnly) {
+                as.setCourtesyUntil((measure->tick() + beat(measure)).ticks());
+            }
             std::map<int, AccidentalVal> last;   // line -> its last note's alteration in the bar before
+            std::map<int, Fraction> lastTick;
             for (const Segment* seg = prev->first(SegmentType::ChordRest); seg; seg = seg->next(SegmentType::ChordRest)) {
                 for (track_idx_t t = staffIdx * VOICES; t < (staffIdx + 1) * VOICES; ++t) {
                     const EngravingItem* e = seg->element(t);
@@ -135,6 +147,7 @@ void ModifyDom::cmdUpdateNotes(const Measure* measure, const DomAccessor& dom)
                         for (const Note* n : ch->notes()) {
                             if (n->visible() && !n->fixed() && !n->hidden()) {
                                 last[absStep(n->tpc(), n->epitch())] = tpc2alter(n->tpc());
+                                lastTick[absStep(n->tpc(), n->epitch())] = seg->tick();
                             }
                         }
                     };
@@ -152,9 +165,17 @@ void ModifyDom::cmdUpdateNotes(const Measure* measure, const DomAccessor& dom)
             AccidentalState keyBefore;
             keyBefore.init(staff->keySigEvent(prev->tick()));
             for (const auto& [line, alter] : last) {
+                if (lastTick[line] < prevFrom) {
+                    continue;
+                }
                 bool error = false;
                 if (alter != keyHere.accidentalVal(line, error) && !error && alter != keyBefore.accidentalVal(line, error) && !error) {
                     courtesyLines.push_back(line);
+                    static const int debugBar = qEnvironmentVariableIntValue("STARSCORE_DEBUG_COURTESY");
+                    if (debugBar && std::abs(measure->no() + 1 - debugBar) <= 3) {
+                        LOGI() << "[starscore] courtesy bar " << measure->no() + 1 << " staff " << staffIdx << " line " << line << " alter "
+                               << int(alter) << " in " << measure->score()->name();
+                    }
                 }
             }
         }

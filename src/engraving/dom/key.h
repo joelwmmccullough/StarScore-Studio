@@ -22,6 +22,8 @@
 
 #pragma once
 
+#include <limits>
+
 #include <vector>
 #include <array>
 
@@ -129,12 +131,16 @@ public:
             m_courtesy[line] = on;
         }
     }
+    //! a courtesy accidental only on a note before this tick (the bar's first beat, when they're for nearby notes only)
+    int courtesyUntil() const { return m_courtesyUntil; }
+    void setCourtesyUntil(int tick) { m_courtesyUntil = tick; }
 
 private:
 
     uint8_t m_state[MAX_ACC_STATE] = {};      // (0 -- 4) | TIE_CONTEXT
     std::array<bool, MAX_ACC_STATE> m_forceRestateAccidental {};
     std::array<bool, MAX_ACC_STATE> m_courtesy {};
+    int m_courtesyUntil = std::numeric_limits<int>::max();
 };
 
 struct Interval;
