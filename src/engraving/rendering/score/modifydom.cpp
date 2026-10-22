@@ -21,6 +21,9 @@
  */
 #include "modifydom.h"
 
+#include <map>
+#include "dom/key.h"
+
 #include "dom/measure.h"
 #include "dom/staff.h"
 #include "dom/spannermap.h"
@@ -109,6 +112,60 @@ void ModifyDom::cmdUpdateNotes(const Measure* measure, const DomAccessor& dom)
             }
         }
 
+        // StarScore (Joel, 22 Oct 2026): courtesy accidentals across the barline. A line (a step in an octave) whose
+        // last note in the bar before was altered otherwise than both bars' key signatures have it (D# there, in C;
+        // E natural there, in E flat): its first note here gets its accidental in parentheses ("(♮)D", "(♭)E").
+        // Only notes that show count (not hidden ones, not rhythm slashes).
+        static const bool noCourtesy = qEnvironmentVariableIsSet("STARSCORE_TEST_NO_COURTESY");   // (to compare)
+        std::vector<int> courtesyLines;
+        if (const Measure* prev = measure->prevMeasure(); prev && !noCourtesy && staff->isPitchedStaff(measure->tick())
+            && !staff->isTabStaff(measure->tick())) {
+            std::map<int, AccidentalVal> last;   // line -> its last note's alteration in the bar before
+            for (const Segment* seg = prev->first(SegmentType::ChordRest); seg; seg = seg->next(SegmentType::ChordRest)) {
+                for (track_idx_t t = staffIdx * VOICES; t < (staffIdx + 1) * VOICES; ++t) {
+                    const EngravingItem* e = seg->element(t);
+                    if (!e || !e->isChord()) {
+                        continue;
+                    }
+                    const Chord* c = toChord(e);
+                    auto take = [&](const Chord* ch) {
+                        if (ch->vStaffIdx() != staffIdx || !ch->visible()) {
+                            return;
+                        }
+                        for (const Note* n : ch->notes()) {
+                            if (n->visible() && !n->fixed() && !n->hidden()) {
+                                last[absStep(n->tpc(), n->epitch())] = tpc2alter(n->tpc());
+                            }
+                        }
+                    };
+                    for (const Chord* g : c->graceNotesBefore()) {
+                        take(g);
+                    }
+                    take(c);
+                    for (const Chord* g : c->graceNotesAfter()) {
+                        take(g);
+                    }
+                }
+            }
+            AccidentalState keyHere;
+            keyHere.init(staff->keySigEvent(measure->tick()));
+            AccidentalState keyBefore;
+            keyBefore.init(staff->keySigEvent(prev->tick()));
+            for (const auto& [line, alter] : last) {
+                bool error = false;
+                if (alter != keyHere.accidentalVal(line, error) && !error && alter != keyBefore.accidentalVal(line, error) && !error) {
+                    courtesyLines.push_back(line);
+                }
+            }
+        }
+        auto markCourtesy = [&]() {
+            for (int line : courtesyLines) {
+                as.setForceRestateAccidental(line, true);
+                as.setCourtesy(line, true);
+            }
+        };
+        markCourtesy();
+
         track_idx_t startTrack = staff->part()->startTrack();
         track_idx_t mainTrack = staffIdx * VOICES;
         track_idx_t endTrack = staff->part()->endTrack();
@@ -119,6 +176,9 @@ void ModifyDom::cmdUpdateNotes(const Measure* measure, const DomAccessor& dom)
                 if (ks) {
                     Fraction tick = segment.tick();
                     as.init(staff->keySigEvent(tick));
+                    if (tick == measure->tick()) {
+                        markCourtesy();   // (the key signature at a system's start: the courtesy accidentals still)
+                    }
                 }
             } else if (segment.isJustType(SegmentType::ChordRest)) {
                 for (track_idx_t t = startTrack; t < endTrack; ++t) {

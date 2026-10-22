@@ -371,6 +371,7 @@ void AccidentalState::init(const KeySigEvent& keySig)
         }
     }
     m_forceRestateAccidental.fill(false);
+    m_courtesy.fill(false);
 }
 
 //---------------------------------------------------------

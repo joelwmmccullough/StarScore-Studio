@@ -120,11 +120,21 @@ public:
     bool tieContext(int line) const;
     void setAccidentalVal(int line, AccidentalVal val, bool tieContext = false);
     void setForceRestateAccidental(int line, bool forceRestate);
+    //! StarScore (Joel, 22 Oct 2026): the line was altered otherwise in the bar before (D# there, D here): its first
+    //! note here that the key signature would leave bare gets its accidental in parentheses
+    bool courtesy(int line) const { return line >= 0 && line < MAX_ACC_STATE && m_courtesy[line]; }
+    void setCourtesy(int line, bool on)
+    {
+        if (line >= 0 && line < MAX_ACC_STATE) {
+            m_courtesy[line] = on;
+        }
+    }
 
 private:
 
     uint8_t m_state[MAX_ACC_STATE] = {};      // (0 -- 4) | TIE_CONTEXT
-    std::array<bool, MAX_ACC_STATE> m_forceRestateAccidental;
+    std::array<bool, MAX_ACC_STATE> m_forceRestateAccidental {};
+    std::array<bool, MAX_ACC_STATE> m_courtesy {};
 };
 
 struct Interval;

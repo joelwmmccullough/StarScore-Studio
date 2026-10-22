@@ -73,6 +73,7 @@
 #include "starscoreengraving.h"
 #include "starscoreannotations.h"
 #include "starscorecombined.h"
+#include "starscoreenharmonics.h"
 #include "engraving/editing/editpart.h"
 #include "starscorehouse.h"
 #include "starscorechordchart.h"
@@ -3577,6 +3578,39 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     };
 
     // A Flexible chair re-written for one transposition and clef, as a part book of its own
+    // The song's part scores written in a version sheet's transposition (the Standard arrangements' trumpets for a
+    // B♭ version…): the version takes their spelling where a bar holds the same music (Joel, 22 Oct 2026)
+    auto spellingRefs = [&](const StarScoreBandFile& file) {
+        std::vector<const engraving::Score*> refs;
+        auto mod = [](int v, int m) { return ((v % m) + m) % m; };
+        for (const IExcerptNotationPtr& e : excerpts) {
+            INotationPtr en = e ? e->notation() : nullptr;
+            const engraving::Score* es = en && en->elements() ? en->elements()->msScore() : nullptr;
+            if (!es || es->parts().size() != 1 || !es->parts().front()->instrument()) {
+                continue;
+            }
+            const engraving::Interval v = es->parts().front()->instrument()->transpose();
+            if (mod(v.chromatic, 12) == mod(file.transposeChromatic, 12) && mod(v.diatonic, 7) == mod(file.transposeDiatonic, 7)) {
+                refs.push_back(es);
+            }
+        }
+        return refs;
+    };
+    auto respell = [&](const StarScoreBandFile& file, const INotationPtr& n) {
+        engraving::Score* sc = n && n->elements() ? n->elements()->msScore() : nullptr;
+        const std::vector<const engraving::Score*> refs = spellingRefs(file);
+        static const bool noRespell = qEnvironmentVariableIsSet("STARSCORE_TEST_NO_RESPELL");   // (to compare)
+        if (!sc || refs.empty() || noRespell) {
+            return;
+        }
+        n->undoStack()->prepareChanges(TranslatableString::untranslatable("Spelling from the hand-written parts"));
+        const starscore::SpellingResult r = starscore::copyReferenceSpellings(sc, refs);
+        n->undoStack()->commitChanges();
+        LOGI() << "[starscore] spelling " << file.relativePath << ": " << r.matched << "/" << r.bars << " bars matched ("
+               << r.sameBeat << " at their place), " << r.respelled << " notes respelled, " << r.accidentalsCopied
+               << " accidentals copied, " << r.tiesFixed << " ties evened, from " << refs.size() << " part scores";
+    };
+
     auto writeVersion = [&](const StarScoreBandFile& file, QByteArray& pdf) -> Ret {
         const bool brass = starscore::isBrassSheet(file.sheetLeft);
         // From the chair's own part book: everything set in it carries over. (Making the copies loaded the stripped
@@ -3613,6 +3647,8 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
                 bookScore->setLayoutAll();
                 bookScore->doLayout();
                 lapTime(file.relativePath, "rewrite the instrument");
+                respell(file, n);
+                lapTime(file.relativePath, "spelling");
                 n->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
                 if (!brass) {
                     starscore::hideMuteMarkings(n->elements()->msScore());
@@ -3644,6 +3680,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         if (!n) {
             return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "couldn't make the part"));
         }
+        respell(file, n);
         // a copy of the song, so nothing of this is kept
         n->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
         if (!brass) {

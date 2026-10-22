@@ -40,6 +40,7 @@
 #include "rendering/score/horizontalspacing.h"
 
 #include "accidental.h"
+#include "../editing/editproperty.h"
 #include "actionicon.h"
 #include "articulation.h"
 #include "bagpembell.h"
@@ -2239,7 +2240,15 @@ void Note::updateAccidental(AccidentalState* as)
             LOGD("error accidentalVal()");
             return;
         }
-        if ((accVal != absLineAccVal) || hidden() || as->tieContext(eAbsLine) || as->forceRestateAccidental(eAbsLine)) {
+        // StarScore: a courtesy accidental (the bar before altered this line): this note as the key signature has it
+        // (a rhythm slash on the line neither shows it nor uses it up)
+        const bool slashOnCourtesy = as->courtesy(eAbsLine) && fixed();
+        const bool courtesy = as->courtesy(eAbsLine) && !fixed() && accVal == absLineAccVal && !tieBackNonPartial();
+        if (!slashOnCourtesy) {
+            as->setCourtesy(eAbsLine, false);
+        }
+        const bool forceRestate = as->forceRestateAccidental(eAbsLine) && !slashOnCourtesy;
+        if ((accVal != absLineAccVal) || hidden() || as->tieContext(eAbsLine) || forceRestate) {
             as->setAccidentalVal(eAbsLine, accVal, m_tieBack != 0 && m_accidental == 0);
             acci = Accidental::value2subtype(accVal);
             // if previous tied note has same tpc, don't show accidental
@@ -2259,12 +2268,22 @@ void Note::updateAccidental(AccidentalState* as)
                 a->setParent(this);
                 a->setAccidentalType(acci);
                 a->setVisible(visible());
+                if (courtesy) {
+                    a->setBracket(AccidentalBracket::PARENTHESIS);
+                }
                 score()->undoAddElement(a);
             } else if (m_accidental->accidentalType() != acci) {
                 Accidental* a = m_accidental->clone();
                 a->setParent(this);
                 a->setAccidentalType(acci);
+                // (a generated accidental's parentheses were for what it was: a courtesy one keeps them)
+                if (m_accidental->role() == AccidentalRole::AUTO) {
+                    a->setBracket(courtesy ? AccidentalBracket::PARENTHESIS : AccidentalBracket::NONE);
+                }
                 score()->undoChangeElement(m_accidental, a);
+            } else if (courtesy && m_accidental->role() == AccidentalRole::AUTO
+                       && m_accidental->bracket() == AccidentalBracket::NONE) {
+                score()->undo(new ChangeProperty(m_accidental, Pid::ACCIDENTAL_BRACKET, int(AccidentalBracket::PARENTHESIS)));
             }
         } else {
             if (m_accidental) {
@@ -2296,7 +2315,9 @@ void Note::updateAccidental(AccidentalState* as)
         as->setAccidentalVal(absLine, accVal, m_tieBack != 0 && m_accidental == 0);
     }
 
-    as->setForceRestateAccidental(absLine, false);
+    if (!(fixed() && as->courtesy(absLine))) {   // (StarScore: kept past a rhythm slash for the courtesy accidental)
+        as->setForceRestateAccidental(absLine, false);
+    }
     updateRelLine(absLine, true);
 }
 
