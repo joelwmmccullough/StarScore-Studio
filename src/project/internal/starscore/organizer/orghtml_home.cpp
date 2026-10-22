@@ -146,7 +146,7 @@ QString bandGuideHtml(const Library& lib, const QDate& today)
          "&nbsp;&nbsp;&nbsp;&nbsp;<b>1 Rhythm</b><br>"
          "&nbsp;&nbsp;&nbsp;&nbsp;<b>1H</b> &nbsp;<span class=\"c\">the whole tune on one horn</span><br>"
          "&nbsp;&nbsp;&nbsp;&nbsp;<b>3H Tpt Alt Ten</b> &nbsp;<span class=\"c\">&larr; a horn arrangement</span><br>"
-         "&nbsp;&nbsp;&nbsp;&nbsp;<b>Extras</b> &nbsp;<span class=\"c\">strings, guests, odds and ends</span><br>"
+         "&nbsp;&nbsp;&nbsp;&nbsp;<b>Extras</b> &nbsp;<span class=\"c\">strings, guests, and odds and ends</span><br>"
          "&nbsp;&nbsp;<b>Chord Charts</b> &nbsp;<span class=\"c\">the chords alone, on some tunes</span><br>"
          "&nbsp;&nbsp;<b>Demos</b> &nbsp;<span class=\"c\">audio</span><br>"
          "&nbsp;&nbsp;<b>Horn Part Guides</b> &nbsp;<span class=\"c\">what differs between your parts</span><br>"
@@ -261,7 +261,7 @@ QString bandGuideHtml(const Library& lib, const QDate& today)
     foot("Song index");
 
     b += "<h1>The rest of it</h1>"
-         "<h2>Extras</h2><p>Anything that is neither a horn nor a rhythm part: violin, cello and combined <b>Strings</b> scores, parts "
+         "<h2>Extras</h2><p>Anything that is neither a horn nor a rhythm part: violin, cello, and combined <b>Strings</b> scores, parts "
          "written for guest players who sat in, alternate takes on a part, and the occasional full score. Worth a look if you cannot find "
          "yourself in Rhythm or a horn folder. It is in <b>Sheet Music</b> with them.</p>"
          "<h2>Version History</h2><p>Every song folder has one, and there is a big <b>5 Archive</b> at the top level too. Old sheets are "
@@ -342,7 +342,7 @@ static const std::vector<std::array<QString, 3> > TIERS {
     { "2h", "2-horn arrangements", "Trumpet / tenor." },
     { "4h", "4-horn arrangements", "Trumpet / alto / tenor / trombone." },
     { "1h", "1-horn versions", "Whole tune on a single horn, one sheet per instrument." },
-    { "rest", "Everything else", "5-, 6- and 7-horn arrangements plus keys, drums and percussion. Priority between these is nebulous "
+    { "rest", "Everything else", "5-, 6-, and 7-horn arrangements plus keys, drums, and percussion. Priority between these is nebulous "
       "&mdash; they are ordered by how often the tune gets played, so work top-down or follow your nose." },
 };
 
@@ -859,7 +859,7 @@ QString progressHtml(const Library& lib, const PlayCounts& plays, const std::vec
          "<span class=\"mono\">Full Orchestra</span>.</li><li><b>String quartet and quintet</b> &mdash; folder names like "
          "<span class=\"mono\">4S 2Vln Vla Vc</span>.</li><li><b>Marching band arrangements</b> &mdash; folder name: "
          "<span class=\"mono\">Marching Band</span>.</li><li><b>Sellable versions of the sheets</b> &mdash; a project in its own right. "
-         "Every chart would need a fine-toothed pass for engraving, consistency and correctness before it could go out under your name.</li></ul>";
+         "Every chart would need a fine-toothed pass for engraving, consistency, and correctness before it could go out under your name.</li></ul>";
     if (!plays.notInLibrary.isEmpty()) {
         QStringList names;
         for (const QString& n : plays.notInLibrary) {

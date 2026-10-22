@@ -56,8 +56,8 @@ StyledDialogView {
             horizontalAlignment: Text.AlignLeft
             text: mutesModel.problem !== "" ? mutesModel.problem
                   : mutesModel.flexible
-                    ? qsTrc("starscore", "%1 is a Flexible chair: its trumpet, trombone, tuba and other brass sheets show the mutes "
-                            + "that instrument has; its sax, flute, clarinet and string sheets show none.").arg(mutesModel.partName)
+                    ? qsTrc("starscore", "%1 is a Flexible chair: its trumpet, trombone, tuba, and other brass sheets show the mutes "
+                            + "that instrument has; its sax, flute, clarinet, and string sheets show none.").arg(mutesModel.partName)
                     : qsTrc("starscore", "The mutes %1 plays with, printed under the instrument name on its sheets in the "
                             + "order you tick them. Copying this part to the same instrument in another arrangement copies "
                             + "them too.").arg(mutesModel.partName)

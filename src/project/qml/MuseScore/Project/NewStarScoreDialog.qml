@@ -119,7 +119,7 @@ StyledDialogView {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 text: qsTrc("starscore", "Starsign Score")
-                toolTipTitle: qsTrc("starscore", "A .starscore with a Starsign horn arrangement, lead sheet and rhythm section")
+                toolTipTitle: qsTrc("starscore", "A .starscore with a Starsign horn arrangement, lead sheet, and rhythm section")
                 accentButton: true
                 navigation.panel: choicePanel
                 navigation.order: 1

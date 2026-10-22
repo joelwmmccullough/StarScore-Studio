@@ -226,7 +226,7 @@ QString recordingsBlock(const RecordingsData& rec, const QString& name, const QS
     const QString aid = anchor.isEmpty() ? QString() : " id=\"" + anchor + "\"";
     b += QString("<div class=\"hero%1\"%2><div><h1>%3</h1><div class=\"sub\">%4</div></div>%5</div>")
          .arg(swOnly ? " sw" : "", aid, esc(name),
-              swOnly ? "Sweater Weather &middot; recordings" : "Recordings &middot; albums, sessions and live shows",
+              swOnly ? "Sweater Weather &middot; recordings" : "Recordings &middot; albums, sessions, and live shows",
               code.isEmpty() ? QString() : "<div class=\"code\">" + esc(code) + "</div>");
 
     const QString key = swOnly ? "sw:" + swName : code;
@@ -246,11 +246,12 @@ QString recordingsBlock(const RecordingsData& rec, const QString& name, const QS
     }
     const auto groups = groupedTakes(rec, swOnly ? swPerfs : starsignPerfs);
     const std::vector<std::vector<Take> > swGroups = groupedTakes(rec, swPerfs);
-    std::vector<QJsonObject> album, wip, sessions, sources, swRel;
+    std::vector<QJsonObject> album, wip, sessions, live, sources, swRel;
     for (const QJsonValue& v : rec.releasesOf(key)) {
         const QJsonObject r = v.toObject();
         const QString kind = r.value("kind").toString();
-        (kind == "album" ? album : kind == "wip" ? wip : kind == "session" ? sessions : kind == "original" ? sources : swRel).push_back(r);
+        (kind == "album" ? album : kind == "wip" ? wip : kind == "session" ? sessions : kind == "live" ? live
+         : kind == "original" ? sources : swRel).push_back(r);
     }
     auto newestFirst = [](std::vector<QJsonObject>& v) {
         std::stable_sort(v.begin(), v.end(), [](const QJsonObject& a, const QJsonObject& b) {
@@ -259,6 +260,7 @@ QString recordingsBlock(const RecordingsData& rec, const QString& name, const QS
     };
     newestFirst(album);
     newestFirst(sessions);
+    newestFirst(live);
     newestFirst(swRel);
     if (!album.empty()) {
         wip.clear();      // unreleased mixes only for songs with nothing released
@@ -266,7 +268,8 @@ QString recordingsBlock(const RecordingsData& rec, const QString& name, const QS
     const auto& liveGroups = swOnly ? std::vector<std::vector<Take> >() : groups;
     const int nSet = rec.filmedStarsignShows();
 
-    if (album.empty() && wip.empty() && sessions.empty() && liveGroups.empty() && swGroups.empty() && swRel.empty() && sources.empty()) {
+    if (album.empty() && wip.empty() && sessions.empty() && live.empty() && liveGroups.empty() && swGroups.empty() && swRel.empty()
+        && sources.empty()) {
         b += QString("<div class=\"none\"><b>Nothing recorded yet.</b><br>No album take, no live session, and none of the "
                      "%1 filmed shows list it in their setlist.</div>").arg(nSet);
     } else {
@@ -282,6 +285,9 @@ QString recordingsBlock(const RecordingsData& rec, const QString& name, const QS
         }
         if (!sessions.empty()) {
             bits << QString("<b>%1</b> live session%2").arg(sessions.size()).arg(sessions.size() > 1 ? "s" : "");
+        }
+        if (!live.empty()) {
+            bits << QString("<b>%1</b> live performance video%2").arg(live.size()).arg(live.size() > 1 ? "s" : "");
         }
         if (!liveGroups.empty()) {
             bits << QString("<b>%1</b> filmed Starsign show%2").arg(liveGroups.size()).arg(liveGroups.size() > 1 ? "s" : "");
@@ -315,7 +321,8 @@ QString recordingsBlock(const RecordingsData& rec, const QString& name, const QS
         for (const Kind& k : { Kind { &album, "Album recording", "newest first", true },
                                Kind { &wip, "Studio recording", "album 2 &mdash; not released yet", true },
                                Kind { &swRel, "Sweater Weather release", "", true },
-                               Kind { &sessions, "Live session", "", false } }) {
+                               Kind { &sessions, "Live session", "", false },
+                               Kind { &live, "Live performance", "", false } }) {
             if (k.rows->empty()) {
                 continue;
             }
@@ -326,7 +333,9 @@ QString recordingsBlock(const RecordingsData& rec, const QString& name, const QS
                 const QString label = esc(r.value("label").toString());
                 const QString what = k.title.startsWith("Album") ? "<b>" + label + "</b> &mdash; album"
                                      : k.title.startsWith("Studio") ? QString("Work in progress")
-                                     : k.title.startsWith("Sweater") ? "<b>" + label + "</b>" : QString("Live session");
+                                     : k.title.startsWith("Sweater") ? "<b>" + label + "</b>"
+                                     : k.title == "Live performance" ? (label.isEmpty() ? QString("Live performance") : "<b>" + label + "</b>")
+                                     : QString("Live session");
                 b += QString("<tr><td class=\"dt%1\">%2</td><td class=\"vn wide%1\" colspan=\"3\">%3%4</td><td class=\"go%1\">%5</td></tr>")
                      .arg(cls, prettyDate(r.value("date").toString()), what,
                           note.isEmpty() ? QString() : " <span class=\"var\">" + esc(note) + "</span>",
@@ -461,7 +470,9 @@ h2.idx{font-size:11pt;color:#16213e;border-bottom:1.5px solid #16213e;padding-bo
     int nPerf = rec.root.value("performances").toArray().size();
     int nStudio = 0, rated = 0;
     for (const QJsonValue& v : rec.root.value("releases").toArray()) {
-        nStudio += v.toObject().value("kind").toString() != "original";
+        const QString kind = v.toObject().value("kind").toString();
+        nStudio += kind != "original" && kind != "live";
+        nPerf += kind == "live";   // (a live performance's video counts with the filmed shows)
     }
     for (const QJsonValue& v : rec.root.value("performances").toArray()) {
         rated += v.toObject().value("rating").toInt() > 0;
@@ -469,7 +480,7 @@ h2.idx{font-size:11pt;color:#16213e;border-bottom:1.5px solid #16213e;padding-bo
 
     QString b;
     b += QString("<div class=\"pg\"><div class=\"cover\"><h1>Every recording</h1><div class=\"sub\">Starsign and Sweater Weather "
-                 "&middot; albums, sessions, live shows &middot; %1</div><div class=\"tiles\">"
+                 "&middot; albums, sessions, and live shows &middot; %1</div><div class=\"tiles\">"
                  "<div class=\"tile\"><div class=\"big\">%2</div><div class=\"lab\">Tunes</div></div>"
                  "<div class=\"tile\"><div class=\"big\">%3</div><div class=\"lab\">Studio &amp; session takes</div></div>"
                  "<div class=\"tile\"><div class=\"big\">%4</div><div class=\"lab\">Filmed performances</div></div>"

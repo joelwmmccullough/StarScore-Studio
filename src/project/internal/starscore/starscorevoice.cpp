@@ -544,7 +544,7 @@ void StarScoreService::resetPartScore(const engraving::Score* score)
         muse::qtrc("starscore", "The part score is made again from the main score, as the Parts dialog's Reset does: its "
                                 "title frame comes back, and everything set in this part score only is lost (line and page "
                                 "breaks, moved or hidden items, its own style changes). StarScore then gives it the "
-                                "Starsign style, its sheet title and mutes again. You can undo it.").toStdString(),
+                                "Starsign style, its sheet title, and mutes again. You can undo it.").toStdString(),
         { muse::IInteractive::ButtonData(Cancel, muse::trc("starscore", "Cancel")),
           muse::IInteractive::ButtonData(Reset, muse::trc("starscore", "Reset"), true) }, Cancel);
     if (answer.button() != Reset) {

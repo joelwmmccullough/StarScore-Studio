@@ -925,7 +925,7 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
     } else if (action == "sec-delete-all") {
         IInteractive::Result res = interactive()->warningSync(
             muse::trc("starscore", "Delete this section and its instruments?"),
-            muse::trc("starscore", "The instruments, their music and their part books are deleted. You can undo this."),
+            muse::trc("starscore", "The instruments, their music, and their part books are deleted. You can undo this."),
             { IInteractive::Button::Cancel, IInteractive::Button::Ok }, IInteractive::Button::Cancel);
         if (res.standardButton() == IInteractive::Button::Ok) {
             starScore()->removeSection(arg, true);

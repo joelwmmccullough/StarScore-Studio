@@ -2788,7 +2788,7 @@ StarScoreMuteTarget StarScoreService::muteTarget() const
         }
     }
     if (!part) {
-        t.problem = muse::qtrc("starscore", "Open the part score of a trumpet, trombone or tuba part (or select one of its notes "
+        t.problem = muse::qtrc("starscore", "Open the part score of a trumpet, trombone, or tuba part (or select one of its notes "
                                             "in the full score), then come back here.");
         return t;
     }

@@ -4,6 +4,11 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.89
+
+- **Live performance recordings.** In Recordings › Albums, sessions, and originals, the kind dropdown has "Live performance" for a video of a live show that isn't in the filmed-shows list. The Recordings pages list them under "Live performance" (named by the album / who field, or the video's title from a pasted link) and count them with the filmed performances.
+- **Oxford commas** in the app's text that was missing them (Recordings, the export dialog, the mutes dialog, New Score, Half-Time, the generated Starsign pages, and a few messages).
+
 ## 1.18.88
 
 - **Courtesy accidentals at the barline.** When a note altered at the end of a bar (still sounding in its last beat) comes back in the first beat of the next bar as the key signature has it, that note gets its accidental in parentheses: D♯ then D in C gets (♮), E♮ then E♭ in E♭ gets (♭). Same octave only. A figure that repeats gets them only the first time (within 16 bars). Hidden notes and rhythm slashes don't count. It works in the app as well as on exported sheets, and each song gets them the next time it's opened. To hide one, make it invisible.
@@ -225,7 +230,7 @@ Version numbers: the first number changes when files stop being compatible, the 
 ## 1.18.50
 
 - **G.I. Jorge's export no longer crashes.** A laissez vibrer ("let ring") tie on a staff that the export shows while setting up a Score, in a bar that was part of a multi-bar rest, crashed StarScore at the 7-Horn Section Score.
-- **Recordings: album / who and date fill in from the YouTube link.** In Recordings › Albums, sessions and originals, pasting a YouTube link reads the video and fills in the album / who and the date, unless you typed them yourself. For a song from a YouTube "Topic" channel (the ones that say "Provided to YouTube by…"), it uses the artist, the album and the release date: an original is named "The Meters" or "Herbie Hancock — Head Hunters", an album by the album's name. Other videos give the channel's name for an original and the video's title for an album or a session, with the date it was posted. Changing the kind afterwards names it again.
+- **Recordings: album / who and date fill in from the YouTube link.** In Recordings › Albums, sessions, and originals, pasting a YouTube link reads the video and fills in the album / who and the date, unless you typed them yourself. For a song from a YouTube "Topic" channel (the ones that say "Provided to YouTube by…"), it uses the artist, the album and the release date: an original is named "The Meters" or "Herbie Hancock — Head Hunters", an album by the album's name. Other videos give the channel's name for an original and the video's title for an album or a session, with the date it was posted. Changing the kind afterwards names it again.
 - **Double-Time and Half-Time sheets use their standard sheet's multi-bar rest setting.** Each part score's Double-Time and Half-Time sheets have multi-bar rests if its standard sheet does (nearly always). G.I. Jorge's Double-Time sheets from 13 October have none because they were made before 1.18.47; exporting them again makes them with multi-bar rests.
 
 ## 1.18.49

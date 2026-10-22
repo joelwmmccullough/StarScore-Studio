@@ -1,7 +1,7 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
  *
- * StarScore Studio — Recordings: this song's live takes (with your stars), album tracks, sessions and originals.
+ * StarScore Studio — Recordings: this song's live takes (with your stars), album tracks, sessions, live performances, and originals.
  */
 import QtQuick
 import QtQuick.Controls
@@ -35,6 +35,7 @@ StyledDialogView {
         { "text": qsTrc("starscore", "Album"), "value": "album" },
         { "text": qsTrc("starscore", "Unreleased studio mix"), "value": "wip" },
         { "text": qsTrc("starscore", "Live session"), "value": "session" },
+        { "text": qsTrc("starscore", "Live performance"), "value": "live" },
         { "text": qsTrc("starscore", "The original (covers)"), "value": "original" }
     ]
 
@@ -149,7 +150,7 @@ StyledDialogView {
             text: root.addError
         }
 
-        StyledTextLabel { text: qsTrc("starscore", "Albums, sessions and originals"); font: ui.theme.bodyBoldFont; horizontalAlignment: Text.AlignLeft }
+        StyledTextLabel { text: qsTrc("starscore", "Albums, sessions, and originals"); font: ui.theme.bodyBoldFont; horizontalAlignment: Text.AlignLeft }
 
         StyledListView {
             id: relList

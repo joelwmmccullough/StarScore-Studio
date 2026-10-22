@@ -1225,7 +1225,7 @@ void StarScoreService::offerLowAlternates(const QStringList& partIds, bool asked
                 return;
             }
             interactive()->info(muse::trc("starscore", "1-Horn sheets made"),
-                                muse::qtrc("starscore", "%1 now have the Trumpet's music, formatting and text positions, "
+                                muse::qtrc("starscore", "%1 now have the Trumpet's music, formatting, and text positions, "
                                                         "marked Needs review. The Trombone is an octave "
                                                         "lower. Notes outside an instrument's range "
                                                         "are colored.").arg(list).toStdString());
@@ -1268,12 +1268,12 @@ void StarScoreService::offerLowAlternates(const QStringList& partIds, bool asked
                              ? muse::qtrc("starscore", "The %1 now has the %2's music, below it in the same section, and its status "
                                                        "is Needs review. It shows and hides with the section and is in the "
                                                        "arrangement's score. Its part score is open, with the %2 part's page "
-                                                       "breaks, system breaks and system locks. Notes outside the instrument's "
+                                                       "breaks, system breaks, and system locks. Notes outside the instrument's "
                                                        "range are colored.")
                              : muse::qtrc("starscore", "%1 now have the %2's music, below it in the same section, and their status "
                                                        "is Needs review. They show and hide with the section and are in the "
                                                        "arrangement's score. Their part scores are open, with the %2 part's "
-                                                       "page breaks, system breaks and system locks. Notes outside an instrument's "
+                                                       "page breaks, system breaks, and system locks. Notes outside an instrument's "
                                                        "range are colored.")).arg(list, mainName).toStdString());
     });
 }

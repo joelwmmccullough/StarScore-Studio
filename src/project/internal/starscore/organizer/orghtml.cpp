@@ -106,9 +106,9 @@ QString htmlPage(const QString& title, const QString& body, const QString& extra
 
 // ------------------------------------------------------------------ What's Here
 static const QMap<QString, QString> FOLDER_BLURB {
-    { "1 Lead Sheet", "The tune itself &mdash; melody, chords and form. If you only grab one sheet, grab this." },
-    { "1 Rhythm", "Bass, drums, percussion, keys and guitar parts." },
-    { "Extras", "Strings, guest parts, alternate versions and anything that is not a horn or rhythm part." },
+    { "1 Lead Sheet", "The tune itself &mdash; melody, chords, and form. If you only grab one sheet, grab this." },
+    { "1 Rhythm", "Bass, drums, percussion, keys, and guitar parts." },
+    { "Extras", "Strings, guest parts, alternate versions, and anything that is not a horn or rhythm part." },
     { "Demos", "Audio for the tune &mdash; reference recordings and rehearsal tracks." },
     { "Reference PDFs", "Reference material Joel keeps with the tune: transcriptions, original charts, notes." },
     { "Version History", "Every past version of this song, kept forever. Nothing here is current &mdash; do not play from it." },
@@ -191,7 +191,7 @@ QString whatsHereHtml(const SongInfo& d, const Roster& roster, const QDate& toda
     };
     if (!d.lead.isEmpty()) {
         rows.push_back({ d.leadFolder, d.leadFolder == LEAD_SHEET_VOICE_FOLDER
-                         ? QString("The tune itself &mdash; melody, chords and form &mdash; and the Voice, the singer&rsquo;s line.")
+                         ? QString("The tune itself &mdash; melody, chords, and form &mdash; and the Voice, the singer&rsquo;s line.")
                          : FOLDER_BLURB["1 Lead Sheet"], names(d.lead) });
     }
     if (!d.rhythm.isEmpty()) {

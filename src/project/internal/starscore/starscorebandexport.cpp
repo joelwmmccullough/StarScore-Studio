@@ -5129,7 +5129,7 @@ StarScoreVersionSuggestion StarScoreService::suggestVersionBump(const StarScoreB
                                                                                              + (gone.size() > 3 ? "…" : ""));
     }
     if (!changedSheets.isEmpty()) {
-        minorWhy << muse::qtrc("starscore", "notes, chords, dynamics or slurs changed in %n sheet(s): %1", nullptr, changedSheets.size())
+        minorWhy << muse::qtrc("starscore", "notes, chords, dynamics, or slurs changed in %n sheet(s): %1", nullptr, changedSheets.size())
             .arg(changedSheets.mid(0, 4).join(", ") + (changedSheets.size() > 4 ? "…" : ""));
     }
     if (!newSheets.isEmpty()) {
@@ -5144,7 +5144,7 @@ StarScoreVersionSuggestion StarScoreService::suggestVersionBump(const StarScoreB
         out.reasons = minorWhy;
     } else {
         out.bump = 3;
-        out.reasons << muse::qtrc("starscore", "no change to the music since the last export: layout, text and style fixes only "
+        out.reasons << muse::qtrc("starscore", "no change to the music since the last export: layout, text, and style fixes only "
                                                "(untick to keep the version)");
     }
     return out;

@@ -117,7 +117,7 @@ void ProjectActionsController::init()
         constexpr int Convert = static_cast<int>(IInteractive::Button::CustomButton) + 1;
         const IInteractive::Result answer = interactive()->questionSync(
             muse::trc("starscore", "Convert from double time?"),
-            muse::trc("starscore", "Every note, rest and marking becomes half as long and the tempo is halved, so the song "
+            muse::trc("starscore", "Every note, rest, and marking becomes half as long and the tempo is halved, so the song "
                                    "sounds the same. In 4/4 and other quarter-note time signatures two bars become one "
                                    "(a bar left over keeps its length); in 7/8 and other eighth-note time signatures each bar "
                                    "becomes a bar of sixteenths (7/16). Bar repeat signs are written out, and hand-placed "

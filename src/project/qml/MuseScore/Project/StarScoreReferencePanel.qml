@@ -81,7 +81,7 @@ Item {
             FlatButton {
                 icon: IconCode.SETTINGS_COG
                 toolTipTitle: qsTrc("starscore", "Manage reference PDFs")
-                toolTipDescription: qsTrc("starscore", "Rename, mark the instrument, reorder or delete")
+                toolTipDescription: qsTrc("starscore", "Rename, mark the instrument, reorder, or delete")
                 accentButton: root.managing
                 onClicked: root.managing = !root.managing
             }
