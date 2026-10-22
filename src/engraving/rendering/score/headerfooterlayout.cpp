@@ -161,7 +161,8 @@ void HeaderFooterLayout::layoutHeaderFooter(LayoutContext& ctx, Page* page)
         const String centre = footer ? ctx.conf().styleSt(odd ? Sid::oddFooterC : Sid::evenFooterC) : String();
         const String copyright = page->score()->metaTag(u"copyright");
         const bool copyrightHere = !copyright.empty()
-                                   && (centre.contains(u"$c") || (centre.contains(u"$C") && page->pageNumber() == 0));
+                                   && (centre.contains(u"$c") || centre.contains(u"$:copyright:")
+                                       || (centre.contains(u"$C") && page->pageNumber() == 0));
         if (!copyrightHere) {
             createUpdateFooterText(ctx, page, 1, centre);
         } else {
@@ -534,7 +535,7 @@ TextBlock HeaderFooterLayout::replaceTextMacros(LayoutContext& ctx, const Page* 
                     }
                     if (k != n) {      // found ':' ?
                         if (tag == u"copyright") {
-                            const String copyrightString = page->score()->metaTag(tag);
+                            const String copyrightString = s_copyrightOverride ? *s_copyrightOverride : page->score()->metaTag(tag);
                             const CharFormat copyrightFormat = formatForMacro(ctx, String(u"$:" + tag + u":"));
                             appendFormattedString(newFragments, copyrightString, defaultFormat, copyrightFormat);
                         } else {
