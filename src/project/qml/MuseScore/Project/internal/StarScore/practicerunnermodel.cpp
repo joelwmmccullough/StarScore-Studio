@@ -17,7 +17,6 @@
 #include "log.h"
 
 using namespace mu::project;
-using namespace mu::project::practice;
 
 static QString runnerImageDir()
 {
@@ -53,7 +52,7 @@ QString PracticeRunnerModel::dayTitle() const
     if (m_dayIndex < 0 || m_dayIndex >= int(m_plan.days.size())) {
         return QString();
     }
-    const Day& d = m_plan.days[m_dayIndex];
+    const practice::Day& d = m_plan.days[m_dayIndex];
     QString t = d.date.isValid() ? d.date.toString("dddd d MMMM") : QString("Session");
     if (m_plan.kind == "plan") {
         t = QString("Day %1 · %2").arg(m_dayIndex + 1).arg(t);
@@ -78,7 +77,7 @@ int PracticeRunnerModel::doneCount() const
 {
     int n = 0;
     if (m_dayIndex >= 0 && m_dayIndex < int(m_plan.days.size())) {
-        for (const Block& b : m_plan.days[m_dayIndex].blocks) {
+        for (const practice::Block& b : m_plan.days[m_dayIndex].blocks) {
             n += b.done ? 1 : 0;
         }
     }
@@ -90,7 +89,7 @@ QString PracticeRunnerModel::message() const
     return m_message;
 }
 
-const Library* PracticeRunnerModel::currentLibrary() const
+const practice::Library* PracticeRunnerModel::currentLibrary() const
 {
     if (m_dayIndex < 0 || m_dayIndex >= int(m_plan.days.size())) {
         return nullptr;
@@ -103,9 +102,9 @@ const Library* PracticeRunnerModel::currentLibrary() const
     return it == m_libs.end() ? nullptr : &it->second;
 }
 
-const Item* PracticeRunnerModel::currentItem() const
+const practice::Item* PracticeRunnerModel::currentItem() const
 {
-    const Library* lib = currentLibrary();
+    const practice::Library* lib = currentLibrary();
     if (!lib) {
         return nullptr;
     }
@@ -120,9 +119,9 @@ QVariantList PracticeRunnerModel::blocks() const
     }
     const auto& blocks = m_plan.days[m_dayIndex].blocks;
     for (int i = 0; i < int(blocks.size()); ++i) {
-        const Block& b = blocks[i];
+        const practice::Block& b = blocks[i];
         auto lib = m_libs.find(b.code);
-        const Item* it = lib == m_libs.end() ? nullptr : lib->second.item(b.itemId);
+        const practice::Item* it = lib == m_libs.end() ? nullptr : lib->second.item(b.itemId);
         out << QVariantMap { { "index", i }, { "song", lib == m_libs.end() ? b.code : lib->second.title },
                              { "title", it ? it->title : b.itemId }, { "minutes", b.minutes }, { "done", b.done } };
     }
@@ -131,18 +130,18 @@ QVariantList PracticeRunnerModel::blocks() const
 
 QVariantMap PracticeRunnerModel::block() const
 {
-    const Library* lib = currentLibrary();
+    const practice::Library* lib = currentLibrary();
     if (!lib && blockCount() == 0) {
         return {};
     }
-    const Block& b = m_plan.days[m_dayIndex].blocks[m_blockIndex];
-    const Item* it = lib ? lib->item(b.itemId) : nullptr;
-    Progress progress;
+    const practice::Block& b = m_plan.days[m_dayIndex].blocks[m_blockIndex];
+    const practice::Item* it = lib ? lib->item(b.itemId) : nullptr;
+    practice::Progress progress;
     progress.load();
-    const ItemProgress p = progress.get(b.code, b.itemId);
+    const practice::ItemProgress p = progress.get(b.code, b.itemId);
     QVariantMap m { { "code", b.code }, { "song", lib ? lib->title : b.code }, { "minutes", b.minutes }, { "tempo", b.tempo },
                     { "done", b.done }, { "kind", b.kind }, { "tempoReached", b.tempoReached }, { "stage", p.stage },
-                    { "stageName", stageName(p.stage) }, { "sessions", p.sessions }, { "bestTempo", p.bestTempo },
+                    { "stageName", practice::stageName(p.stage) }, { "sessions", p.sessions }, { "bestTempo", p.bestTempo },
                     { "lastNote", p.note }, { "missing", it == nullptr } };
     if (!it) {
         m["title"] = b.itemId;
@@ -150,8 +149,8 @@ QVariantMap PracticeRunnerModel::block() const
     }
     m["title"] = it->title;
     m["category"] = it->category;
-    m["categoryName"] = categoryName(it->category);
-    const Solo* solo = lib->solo(it->solo);
+    m["categoryName"] = practice::categoryName(it->category);
+    const practice::Solo* solo = lib->solo(it->solo);
     m["solo"] = solo ? solo->name : QString();
     m["soloInfo"] = solo ? QStringList { solo->bars.isEmpty() ? QString() : "Bars " + solo->bars, solo->form, solo->changes }
                     .filter(QRegularExpression(".")).join(" · ") : QString();
@@ -204,13 +203,13 @@ void PracticeRunnerModel::load(const QString& planId, int dayIndex, int blockInd
         return;
     }
     const QString root = starScore()->auditLibraryFolder();
-    for (const SongEntry& e : scanLibraries(root, practiceFolder() + "/libraries.json")) {
+    for (const practice::SongEntry& e : practice::scanLibraries(root, practice::practiceFolder() + "/libraries.json")) {
         m_paths[e.code] = e.path;
     }
-    for (const PlanSong& ps : m_plan.songs) {
+    for (const practice::PlanSong& ps : m_plan.songs) {
         auto p = m_paths.find(ps.code);
         if (p != m_paths.end()) {
-            m_libs[ps.code] = cachedLibrary(p->second);
+            m_libs[ps.code] = practice::cachedLibrary(p->second);
         }
     }
     m_dayIndex = std::clamp(dayIndex, 0, std::max(0, int(m_plan.days.size()) - 1));
@@ -250,7 +249,7 @@ void PracticeRunnerModel::renderImages()
         QFile::remove(QUrl(f).toLocalFile());
     }
     m_images.clear();
-    const Item* it = currentItem();
+    const practice::Item* it = currentItem();
     if (!it || it->xml.isEmpty()) {
         m_rendering = false;
         emit imagesChanged();
@@ -304,8 +303,8 @@ void PracticeRunnerModel::resetTimer()
 // ---------------------------------------------------------------- StarScore and iReal
 void PracticeRunnerModel::openExercise(int tempo, bool play)
 {
-    const Item* it = currentItem();
-    const Library* lib = currentLibrary();
+    const practice::Item* it = currentItem();
+    const practice::Library* lib = currentLibrary();
     if (!it || it->xml.isEmpty() || !lib) {
         return;
     }
@@ -315,7 +314,7 @@ void PracticeRunnerModel::openExercise(int tempo, bool play)
 
 void PracticeRunnerModel::openSong()
 {
-    const Library* lib = currentLibrary();
+    const practice::Library* lib = currentLibrary();
     if (!lib) {
         return;
     }
@@ -339,17 +338,17 @@ void PracticeRunnerModel::toggleMetronome()
 
 void PracticeRunnerModel::openIreal()
 {
-    const Item* it = currentItem();
-    const Library* lib = currentLibrary();
+    const practice::Item* it = currentItem();
+    const practice::Library* lib = currentLibrary();
     if (!it || !lib || it->irealProg.isEmpty()) {
         return;
     }
-    Plan one = m_plan;
+    practice::Plan one = m_plan;
     // a one-day, one-block plan: the same link the iReal page would have
-    Day d = m_plan.days[m_dayIndex];
+    practice::Day d = m_plan.days[m_dayIndex];
     d.blocks = { m_plan.days[m_dayIndex].blocks[m_blockIndex] };
     one.days = { d };
-    const QString html = irealHtml(one, m_libs, 0);
+    const QString html = practice::irealHtml(one, m_libs, 0);
     const QString file = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + "/StarScore Practice/ireal.html";
     QFile f(file);
     if (f.open(QIODevice::WriteOnly)) {
@@ -363,15 +362,15 @@ void PracticeRunnerModel::openIreal()
 void PracticeRunnerModel::savePlan()
 {
     // the plan may have been planned again from the Practice page meanwhile: merge this day's done marks into it
-    Plan latest = practice::loadPlan(m_plan.id);
+    practice::Plan latest = practice::loadPlan(m_plan.id);
     if (!latest.id.isEmpty() && m_dayIndex < int(m_plan.days.size())) {
-        for (Day& d : latest.days) {
+        for (practice::Day& d : latest.days) {
             if (d.date != m_plan.days[m_dayIndex].date) {
                 continue;
             }
-            for (const Block& mine : m_plan.days[m_dayIndex].blocks) {
+            for (const practice::Block& mine : m_plan.days[m_dayIndex].blocks) {
                 bool found = false;
-                for (Block& b : d.blocks) {
+                for (practice::Block& b : d.blocks) {
                     if (b.code == mine.code && b.itemId == mine.itemId) {
                         b.done = mine.done;
                         b.tempoReached = mine.tempoReached;
@@ -398,14 +397,14 @@ void PracticeRunnerModel::markDone(int tempoReached, int stage, const QString& n
     if (blockCount() == 0) {
         return;
     }
-    Block& b = m_plan.days[m_dayIndex].blocks[m_blockIndex];
+    practice::Block& b = m_plan.days[m_dayIndex].blocks[m_blockIndex];
     const QString code = b.code;
     const QString itemId = b.itemId;
     const int practised = std::max(1, (b.minutes * 60 - m_secondsLeft + 30) / 60);
     b.done = true;
     b.tempoReached = tempoReached;
     b.stage = std::clamp(stage, 0, 4);
-    Progress progress;
+    practice::Progress progress;
     progress.load();
     progress.record(code, itemId, m_timer.isActive() || m_secondsLeft < b.minutes * 60 ? practised : b.minutes, tempoReached,
                     b.stage, note);
@@ -437,7 +436,7 @@ void PracticeRunnerModel::markNotDone()
     if (blockCount() == 0) {
         return;
     }
-    Block& b = m_plan.days[m_dayIndex].blocks[m_blockIndex];
+    practice::Block& b = m_plan.days[m_dayIndex].blocks[m_blockIndex];
     b.done = false;
     b.stage = -1;
     b.tempoReached = 0;

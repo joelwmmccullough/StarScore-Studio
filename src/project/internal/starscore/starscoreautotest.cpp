@@ -187,6 +187,14 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         std::_Exit(0);   // no "save changes?" question, no shutdown work
     }
     const QString step = steps.takeFirst().trimmed();
+    // wait:<ms>: nothing for that long (for a page that loads in the background before a screenshot)
+    if (step.startsWith("wait:")) {
+        autotestLog("step: " + step);
+        QTimer::singleShot(std::max(0, step.mid(5).toInt()), &m_timerGuard, [this, steps, reportNumber]() {
+            runAutotestSteps(steps, reportNumber);
+        });
+        return;
+    }
     // waitupdate: until "Update all sheets" has finished (it opens and closes songs, so no score check here)
     if (step == "waitupdate") {
         const StarScoreUpdateAllStatus st = updateAllStatus();

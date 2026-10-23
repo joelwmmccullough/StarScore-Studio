@@ -138,7 +138,7 @@ static QByteArray mainMscx(const QString& path)
     for (const muse::ZipReader::FileInfo& fi : zip.fileInfoList()) {
         const QString name = fi.filePath.toQString();
         if (fi.isFile && !name.contains('/') && name.endsWith(".mscx")) {
-            return zip.fileData(name.toStdString()).toQByteArrayNoCopy();
+            return zip.fileData(name.toStdString()).toQByteArray();   // (a copy: the data is a temporary)
         }
     }
     return {};

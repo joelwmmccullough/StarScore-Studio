@@ -31,7 +31,6 @@
 #include "log.h"
 
 using namespace mu::project;
-using namespace mu::project::practice;
 
 static const char* PRACTICE_DEFAULT_SETLIST
     = "Set 1\nHit List\nFeed Your Kids Bugs\nDouble Entendre\nDream of Mushroom\nFish Oil\nUpdog\n\n"
@@ -57,9 +56,9 @@ PracticeModel::PracticeModel(QObject* parent)
 QVariantList PracticeModel::songs() const
 {
     QVariantList out;
-    for (const SongEntry& s : m_songs) {
+    for (const practice::SongEntry& s : m_songs) {
         out << QVariantMap { { "code", s.code }, { "title", s.title }, { "path", s.path }, { "items", s.items },
-                             { "solos", s.solos }, { "minutes", s.minutes }, { "time", formatMinutes(s.minutes) } };
+                             { "solos", s.solos }, { "minutes", s.minutes }, { "time", practice::formatMinutes(s.minutes) } };
     }
     return out;
 }
@@ -80,7 +79,7 @@ QVariantList PracticeModel::setlist() const
             for (const auto& [k, v] : needsFor(s.code)) {
                 needs[k] = v;
             }
-            for (const SongEntry& e : m_songs) {
+            for (const practice::SongEntry& e : m_songs) {
                 if (e.code == s.code) {
                     items = e.items;
                     solos = e.solos;
@@ -141,18 +140,18 @@ int PracticeModel::totalMinutes() const
 QVariantList PracticeModel::plans() const
 {
     QVariantList out;
-    for (const Plan& p : m_plans) {
+    for (const practice::Plan& p : m_plans) {
         int done = 0;
         int total = 0;
-        for (const Day& d : p.days) {
-            for (const Block& b : d.blocks) {
+        for (const practice::Day& d : p.days) {
+            for (const practice::Block& b : d.blocks) {
                 ++total;
                 done += b.done ? 1 : 0;
             }
         }
         QString sub;
         if (p.kind == "routine") {
-            sub = QString("Routine · %1").arg(formatMinutes(p.days.empty() ? 0 : p.days.front().minutes));
+            sub = QString("Routine · %1").arg(practice::formatMinutes(p.days.empty() ? 0 : p.days.front().minutes));
         } else {
             sub = QString("%1 days").arg(p.days.size());
             if (p.showDate.isValid()) {
@@ -172,8 +171,8 @@ QString PracticeModel::planId() const
 
 QVariantMap PracticeModel::plan() const
 {
-    const Plan* p = nullptr;
-    for (const Plan& x : m_plans) {
+    const practice::Plan* p = nullptr;
+    for (const practice::Plan& x : m_plans) {
         if (x.id == m_planId) {
             p = &x;
         }
@@ -181,35 +180,35 @@ QVariantMap PracticeModel::plan() const
     if (!p) {
         return {};
     }
-    const std::map<QString, Library> libs = librariesFor(p->songs);
+    const std::map<QString, practice::Library> libs = librariesFor(p->songs);
     const QDate today = QDate::currentDate();
     QVariantList days;
     int todayIndex = -1;
     int doneAll = 0;
     int totalAll = 0;
     for (int di = 0; di < int(p->days.size()); ++di) {
-        const Day& d = p->days[di];
+        const practice::Day& d = p->days[di];
         QVariantList blocks;
         int done = 0;
         int planned = 0;
         for (int bi = 0; bi < int(d.blocks.size()); ++bi) {
-            const Block& b = d.blocks[bi];
+            const practice::Block& b = d.blocks[bi];
             auto lib = libs.find(b.code);
-            const Item* it = lib == libs.end() ? nullptr : lib->second.item(b.itemId);
+            const practice::Item* it = lib == libs.end() ? nullptr : lib->second.item(b.itemId);
             done += b.done ? 1 : 0;
             planned += b.minutes;
             QString song = b.code;
-            for (const PlanSong& ps : p->songs) {
+            for (const practice::PlanSong& ps : p->songs) {
                 if (ps.code == b.code) {
                     song = ps.title;
                 }
             }
             blocks << QVariantMap {
                 { "index", bi }, { "code", b.code }, { "song", song }, { "title", it ? it->title : b.itemId },
-                { "category", it ? it->category : QString() }, { "categoryName", it ? categoryName(it->category) : QString() },
+                { "category", it ? it->category : QString() }, { "categoryName", it ? practice::categoryName(it->category) : QString() },
                 { "solo", it && lib != libs.end() && lib->second.solo(it->solo) ? lib->second.solo(it->solo)->name : QString() },
                 { "minutes", b.minutes }, { "tempo", b.tempo }, { "done", b.done }, { "kind", b.kind },
-                { "tempoReached", b.tempoReached }, { "stage", b.stage }, { "stageName", b.stage >= 0 ? stageName(b.stage) : QString() },
+                { "tempoReached", b.tempoReached }, { "stage", b.stage }, { "stageName", b.stage >= 0 ? practice::stageName(b.stage) : QString() },
                 { "missing", it == nullptr }
             };
         }
@@ -223,7 +222,7 @@ QVariantMap PracticeModel::plan() const
             title = QString("Day %1 · %2").arg(di + 1).arg(title);
         }
         days << QVariantMap { { "index", di }, { "date", d.date.toString(Qt::ISODate) }, { "title", title }, { "label", d.label },
-                              { "minutes", d.minutes }, { "planned", planned }, { "plannedText", formatMinutes(planned) },
+                              { "minutes", d.minutes }, { "planned", planned }, { "plannedText", practice::formatMinutes(planned) },
                               { "done", done }, { "total", int(d.blocks.size()) }, { "isToday", d.date == today },
                               { "isPast", d.date.isValid() && d.date < today }, { "blocks", blocks } };
     }
@@ -260,7 +259,7 @@ void PracticeModel::load()
     m_busy = true;
     setStatus(QStringLiteral("Reading the song libraries…"));
     QTimer::singleShot(30, this, [this]() {
-        m_songs = scanLibraries(m_root, practiceFolder() + "/libraries.json");
+        m_songs = practice::scanLibraries(m_root, practice::practiceFolder() + "/libraries.json");
         m_busy = false;
         parseSetlist();
         int withLib = 0;
@@ -289,11 +288,11 @@ void PracticeModel::watchPlans()
         connect(m_watcher, &QFileSystemWatcher::directoryChanged, this, [this]() { reloadPlans(); });
         connect(m_watcher, &QFileSystemWatcher::fileChanged, this, [this]() { reloadPlans(); });
     }
-    const QString dir = practiceFolder() + "/plans";
+    const QString dir = practice::practiceFolder() + "/plans";
     if (!m_watcher->directories().contains(dir)) {
         m_watcher->addPath(dir);
     }
-    for (const Plan& p : m_plans) {
+    for (const practice::Plan& p : m_plans) {
         const QString f = dir + "/" + p.id + ".json";
         if (!m_watcher->files().contains(f) && QFileInfo::exists(f)) {
             m_watcher->addPath(f);
@@ -303,9 +302,9 @@ void PracticeModel::watchPlans()
 
 void PracticeModel::reloadPlans()
 {
-    m_plans = loadPlans();
+    m_plans = practice::loadPlans();
     bool found = false;
-    for (const Plan& p : m_plans) {
+    for (const practice::Plan& p : m_plans) {
         found = found || p.id == m_planId;
     }
     if (!found) {
@@ -319,7 +318,7 @@ void PracticeModel::reloadPlans()
 
 void PracticeModel::loadSettings()
 {
-    QFile f(practiceFolder() + "/setlist.json");
+    QFile f(practice::practiceFolder() + "/setlist.json");
     QJsonObject o;
     if (f.open(QIODevice::ReadOnly)) {
         o = QJsonDocument::fromJson(f.readAll()).object();
@@ -369,7 +368,7 @@ void PracticeModel::saveSettings() const
     const QJsonObject o { { "setlist", m_setlistText }, { "showDate", m_showDate.toString(Qt::ISODate) },
                           { "defaultMinutes", m_defaultMinutes }, { "routineMinutes", m_routineMinutes }, { "dayMinutes", dm },
                           { "needs", needs } };
-    QSaveFile f(practiceFolder() + "/setlist.json");
+    QSaveFile f(practice::practiceFolder() + "/setlist.json");
     if (f.open(QIODevice::WriteOnly)) {
         f.write(QJsonDocument(o).toJson());
         f.commit();
@@ -396,15 +395,15 @@ void PracticeModel::parseSetlist()
         s.line = line;
         s.set = set;
         const QString n = practiceNormalized(line);
-        const SongEntry* best = nullptr;
-        for (const SongEntry& e : m_songs) {
+        const practice::SongEntry* best = nullptr;
+        for (const practice::SongEntry& e : m_songs) {
             if (practiceNormalized(e.title) == n || e.code.compare(line, Qt::CaseInsensitive) == 0) {
                 best = &e;
                 break;
             }
         }
         if (!best && n.size() >= 4) {
-            for (const SongEntry& e : m_songs) {
+            for (const practice::SongEntry& e : m_songs) {
                 const QString t = practiceNormalized(e.title);
                 if (t.startsWith(n) || n.startsWith(t)) {
                     best = &e;
@@ -425,9 +424,9 @@ void PracticeModel::parseSetlist()
 std::map<QString, int> PracticeModel::needsFor(const QString& code) const
 {
     std::map<QString, int> out;
-    for (const SongEntry& e : m_songs) {
+    for (const practice::SongEntry& e : m_songs) {
         if (e.code == code) {
-            const Library& lib = cachedLibrary(e.path);
+            const practice::Library& lib = practice::cachedLibrary(e.path);
             for (const QString& a : PRACTICE_AREAS) {
                 auto it = lib.needs.find(a);
                 out[a] = it == lib.needs.end() ? 1 : std::clamp(it->second, 0, 3);
@@ -444,16 +443,16 @@ std::map<QString, int> PracticeModel::needsFor(const QString& code) const
     return out;
 }
 
-std::vector<PlanSong> PracticeModel::planSongs() const
+std::vector<practice::PlanSong> PracticeModel::planSongs() const
 {
-    std::vector<PlanSong> out;
+    std::vector<practice::PlanSong> out;
     std::set<QString> seen;
     for (const SetSong& s : m_setlist) {
         if (s.code.isEmpty() || seen.count(s.code)) {
             continue;
         }
         seen.insert(s.code);
-        PlanSong ps;
+        practice::PlanSong ps;
         ps.code = s.code;
         ps.title = s.title;
         ps.set = s.set;
@@ -463,13 +462,13 @@ std::vector<PlanSong> PracticeModel::planSongs() const
     return out;
 }
 
-std::map<QString, Library> PracticeModel::librariesFor(const std::vector<PlanSong>& songs) const
+std::map<QString, practice::Library> PracticeModel::librariesFor(const std::vector<practice::PlanSong>& songs) const
 {
-    std::map<QString, Library> out;
-    for (const PlanSong& ps : songs) {
-        for (const SongEntry& e : m_songs) {
+    std::map<QString, practice::Library> out;
+    for (const practice::PlanSong& ps : songs) {
+        for (const practice::SongEntry& e : m_songs) {
             if (e.code == ps.code) {
-                out[ps.code] = cachedLibrary(e.path);
+                out[ps.code] = practice::cachedLibrary(e.path);
                 break;
             }
         }
@@ -559,20 +558,20 @@ void PracticeModel::setDayMinutes(const QString& isoDate, int minutes)
 // ---------------------------------------------------------------- plans
 void PracticeModel::makeRoutine()
 {
-    const std::vector<PlanSong> songs = planSongs();
+    const std::vector<practice::PlanSong> songs = planSongs();
     if (songs.empty()) {
         setStatus(QStringLiteral("None of the setlist songs have practice items yet."));
         return;
     }
-    Progress progress;
+    practice::Progress progress;
     progress.load();
-    PlanRequest req;
+    practice::PlanRequest req;
     req.kind = "routine";
-    req.name = QString("Routine · %1 · %2").arg(QDate::currentDate().toString("ddd d MMM"), formatMinutes(m_routineMinutes));
+    req.name = QString("Routine · %1 · %2").arg(QDate::currentDate().toString("ddd d MMM"), practice::formatMinutes(m_routineMinutes));
     req.songs = songs;
     req.days = { { QDate::currentDate(), m_routineMinutes } };
-    Plan p = practice::makePlan(req, librariesFor(songs), progress);
-    savePlan(p);
+    practice::Plan p = practice::makePlan(req, librariesFor(songs), progress);
+    practice::savePlan(p);
     m_planId = p.id;
     reloadPlans();
     setStatus(QStringLiteral("Made “%1”.").arg(p.name));
@@ -580,12 +579,12 @@ void PracticeModel::makeRoutine()
 
 void PracticeModel::makePlan()
 {
-    const std::vector<PlanSong> songs = planSongs();
+    const std::vector<practice::PlanSong> songs = planSongs();
     if (songs.empty()) {
         setStatus(QStringLiteral("None of the setlist songs have practice items yet."));
         return;
     }
-    PlanRequest req;
+    practice::PlanRequest req;
     req.kind = "plan";
     req.showDate = m_showDate;
     req.name = QString("Show %1").arg(m_showDate.toString("ddd d MMM yyyy"));
@@ -598,10 +597,10 @@ void PracticeModel::makePlan()
         setStatus(QStringLiteral("The show date is before the first day."));
         return;
     }
-    Progress progress;
+    practice::Progress progress;
     progress.load();
-    Plan p = practice::makePlan(req, librariesFor(songs), progress);
-    savePlan(p);
+    practice::Plan p = practice::makePlan(req, librariesFor(songs), progress);
+    practice::savePlan(p);
     m_planId = p.id;
     reloadPlans();
     setStatus(QStringLiteral("Made “%1”: %2 days.").arg(p.name).arg(p.days.size()));
@@ -624,18 +623,18 @@ void PracticeModel::deletePlan(const QString& id)
 
 void PracticeModel::rebuildPlan()
 {
-    Plan old = practice::loadPlan(m_planId);
+    practice::Plan old = practice::loadPlan(m_planId);
     if (old.id.isEmpty()) {
         return;
     }
-    PlanRequest req;
+    practice::PlanRequest req;
     req.kind = old.kind;
     req.name = old.name;
     req.showDate = old.showDate;
     // the plan's songs, with today's needs (the user may have changed them since)
-    for (PlanSong ps : old.songs) {
+    for (practice::PlanSong ps : old.songs) {
         bool known = false;
-        for (const SongEntry& e : m_songs) {
+        for (const practice::SongEntry& e : m_songs) {
             known = known || e.code == ps.code;
         }
         if (known) {
@@ -643,40 +642,40 @@ void PracticeModel::rebuildPlan()
         }
         req.songs.push_back(ps);
     }
-    for (const Day& d : old.days) {
+    for (const practice::Day& d : old.days) {
         req.days.push_back({ d.date, d.minutes });
     }
-    Progress progress;
+    practice::Progress progress;
     progress.load();
     const QDate today = QDate::currentDate();
     // a routine is rebuilt whole; a plan keeps its days before today, and today's done blocks
-    Plan p;
+    practice::Plan p;
     if (old.kind == "routine") {
         p = practice::makePlan(req, librariesFor(req.songs), progress, &old);
     } else {
         p = practice::makePlan(req, librariesFor(req.songs), progress, &old, today);
         // today's blocks that are done stay at the top of today
-        for (const Day& od : old.days) {
+        for (const practice::Day& od : old.days) {
             if (od.date != today) {
                 continue;
             }
-            for (Day& nd : p.days) {
+            for (practice::Day& nd : p.days) {
                 if (nd.date != today) {
                     continue;
                 }
-                std::vector<Block> kept;
+                std::vector<practice::Block> kept;
                 int doneMinutes = 0;
-                for (const Block& b : od.blocks) {
+                for (const practice::Block& b : od.blocks) {
                     if (b.done) {
                         kept.push_back(b);
                         doneMinutes += b.minutes;
                     }
                 }
-                std::vector<Block> rest;
+                std::vector<practice::Block> rest;
                 int left = nd.minutes - doneMinutes;
-                for (const Block& b : nd.blocks) {
+                for (const practice::Block& b : nd.blocks) {
                     bool dup = false;
-                    for (const Block& k : kept) {
+                    for (const practice::Block& k : kept) {
                         dup = dup || (k.code == b.code && k.itemId == b.itemId);
                     }
                     if (!dup && left - b.minutes >= 0) {
@@ -689,7 +688,7 @@ void PracticeModel::rebuildPlan()
             }
         }
     }
-    savePlan(p);
+    practice::savePlan(p);
     reloadPlans();
     setStatus(QStringLiteral("Planned again from today, from your progress so far."));
 }
@@ -710,11 +709,11 @@ static QString practiceFileSafe(QString s)
 
 void PracticeModel::makeBook(int dayIndex)
 {
-    const Plan p = practice::loadPlan(m_planId);
+    const practice::Plan p = practice::loadPlan(m_planId);
     if (p.id.isEmpty() || m_busy) {
         return;
     }
-    const std::map<QString, Library> libs = librariesFor(p.songs);
+    const std::map<QString, practice::Library> libs = librariesFor(p.songs);
     QString name = p.name;
     if (dayIndex >= 0 && dayIndex < int(p.days.size())) {
         name += " · " + (p.days[dayIndex].date.isValid() ? p.days[dayIndex].date.toString("ddd d MMM") : QString("Day %1").arg(dayIndex + 1));
@@ -726,7 +725,7 @@ void PracticeModel::makeBook(int dayIndex)
 
     std::map<QString, QList<QImage> > cache;
     IStarScoreService* ss = starScore().get();
-    NotationRenderer renderer = [&cache, ss](const Item& item, int) -> QList<QImage> {
+    practice::NotationRenderer renderer = [&cache, ss](const practice::Item& item, int) -> QList<QImage> {
         if (item.xml.isEmpty() || !ss) {
             return {};
         }
@@ -738,7 +737,7 @@ void PracticeModel::makeBook(int dayIndex)
         cache[item.id + "|" + QString::number(qHash(item.xml))] = images;
         return images;
     };
-    const bool ok = writePracticeBook(p, libs, pdf, renderer, dayIndex, [this](int done, int total) {
+    const bool ok = practice::writePracticeBook(p, libs, pdf, renderer, dayIndex, [this](int done, int total) {
         m_status = QStringLiteral("Making the practice book… %1 of %2").arg(done).arg(total);
         emit changed();
         QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
@@ -755,11 +754,11 @@ void PracticeModel::makeBook(int dayIndex)
 
 void PracticeModel::exportIreal(int dayIndex)
 {
-    const Plan p = practice::loadPlan(m_planId);
+    const practice::Plan p = practice::loadPlan(m_planId);
     if (p.id.isEmpty()) {
         return;
     }
-    const QString html = irealHtml(p, librariesFor(p.songs), dayIndex);
+    const QString html = practice::irealHtml(p, librariesFor(p.songs), dayIndex);
     QString name = p.name + " · iReal Pro";
     if (dayIndex >= 0 && dayIndex < int(p.days.size()) && p.days[dayIndex].date.isValid()) {
         name = p.name + " · " + p.days[dayIndex].date.toString("ddd d MMM") + " · iReal Pro";
