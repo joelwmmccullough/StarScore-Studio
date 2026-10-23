@@ -423,10 +423,9 @@ std::map<QString, int> PracticeModel::needsFor(const QString& code) const
     std::map<QString, int> out;
     for (const practice::SongEntry& e : m_songs) {
         if (e.code == code) {
-            const practice::Library& lib = practice::cachedLibrary(e.path);
             for (const QString& a : PRACTICE_AREAS) {
-                auto it = lib.needs.find(a);
-                out[a] = it == lib.needs.end() ? 1 : std::clamp(it->second, 0, 3);
+                auto it = e.needs.find(a);
+                out[a] = it == e.needs.end() ? 1 : std::clamp(it->second, 0, 3);
             }
             break;
         }
@@ -736,15 +735,16 @@ void PracticeModel::makeBook(int dayIndex)
     std::map<QString, QList<QImage> > cache;
     IStarScoreService* ss = starScore().get();
     practice::NotationRenderer renderer = [&cache, ss](const practice::Item& item, int) -> QList<QImage> {
-        if (item.xml.isEmpty() || !ss) {
+        if (!item.hasXml() || !ss) {
             return {};
         }
-        auto it = cache.find(item.id + "|" + QString::number(qHash(item.xml)));
+        const QString key = item.id + "|" + QString::number(qHash(item.xmlPacked));
+        auto it = cache.find(key);
         if (it != cache.end()) {
             return it->second;
         }
-        QList<QImage> images = ss->renderPracticeExercise(item.xml, 160);
-        cache[item.id + "|" + QString::number(qHash(item.xml))] = images;
+        QList<QImage> images = ss->renderPracticeExercise(item.xml(), 160);
+        cache[key] = images;
         return images;
     };
     const bool ok = practice::writePracticeBook(p, libs, pdf, renderer, dayIndex, [this](int done, int total) {

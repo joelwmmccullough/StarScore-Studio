@@ -114,6 +114,14 @@ QList<QImage> StarScoreService::renderPracticeExercise(const QString& musicXml, 
     ms->style().set(engraving::Sid::minSystemDistance, engraving::Spatium(7.0));
     ms->style().set(engraving::Sid::maxSystemDistance, engraving::Spatium(9.0));
     ms->style().set(engraving::Sid::minStaffSpread, engraving::Spatium(5.0));
+    // no page numbers: an exercise's pages are cut into the book or the runner, where they'd be stray numbers
+    ms->style().set(engraving::Sid::showPageNumber, false);
+    ms->style().set(engraving::Sid::showHeader, false);
+    ms->style().set(engraving::Sid::showFooter, false);
+    // an excerpt of a song's own bars asks for no bar numbers (they'd count the excerpt, not the song)
+    if (musicXml.contains("<measure-numbering>none</measure-numbering>")) {
+        ms->style().set(engraving::Sid::showMeasureNumber, false);
+    }
     // chord symbols in gold
     for (engraving::Segment* s = ms->firstSegment(engraving::SegmentType::ChordRest); s; s = s->next1(engraving::SegmentType::ChordRest)) {
         for (engraving::EngravingItem* e : s->annotations()) {

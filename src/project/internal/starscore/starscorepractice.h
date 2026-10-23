@@ -21,11 +21,12 @@
 #include <QDate>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QByteArray>
 #include <QString>
 #include <QStringList>
 
 namespace mu::project::practice {
-static const char* PRACTICE_META_TAG = "starscorePractice";
+inline constexpr const char PRACTICE_META_TAG[] = "starscorePractice";
 
 struct Item {
     QString id;
@@ -43,7 +44,9 @@ struct Item {
     QString moveOnWhen;
     QString listen;
     QStringList refs;      // "Keys part, bars 17-24"
-    QString xml;           // MusicXML with backing, empty for text-only items
+    QByteArray xmlPacked;  // MusicXML with backing (qCompress'd UTF-8: it is most of a library's size), empty for text-only items
+    bool hasXml() const { return !xmlPacked.isEmpty(); }
+    QString xml() const;
     QString irealStyle, irealKey, irealProg;
     QString groove;
 };
@@ -72,21 +75,23 @@ struct Library {
     const Solo* solo(const QString& id) const;
 };
 
-//! The library stored in a .starscore (an empty one when it has none or can't be read)
-Library readLibrary(const QString& starscorePath);
+//! The library stored in a .starscore (an empty one when it has none or can't be read). Without `withXml` the items
+//! have no notation (for indexing).
+Library readLibrary(const QString& starscorePath, bool withXml = true);
 //! From the metaTag's value
-Library decodeLibrary(const QByteArray& blob);
-Library parseLibrary(const QJsonObject& root);
+Library decodeLibrary(const QByteArray& blob, bool withXml = true);
+Library parseLibrary(const QJsonObject& root, bool withXml = true);
 
 //! The library of a .starscore, read once and kept while the file is unchanged
 const Library& cachedLibrary(const QString& starscorePath);
 
-//! The library index of a folder of songs: code, title, path, item count (cached by file date and size)
+//! The library index of a folder of songs: code, title, path, item count, needs (cached by file date and size)
 struct SongEntry {
     QString code, title, path;
     int items = 0;
     int solos = 0;
     int minutes = 0;
+    std::map<QString, int> needs;
 };
 std::vector<SongEntry> scanLibraries(const QString& rootFolder, const QString& cacheFile);
 

@@ -365,7 +365,7 @@ bool mu::project::practice::writePracticeBook(const Plan& plan, const std::map<Q
             if (!it->moveOnWhen.isEmpty()) {
                 bh += QString("<p><span class='label'>MOVE ON WHEN</span>&nbsp;&nbsp;<span class='move'>%1</span></p>").arg(esc(pretty(it->moveOnWhen)));
             }
-            const bool hasImage = renderer && !it->xml.isEmpty();
+            const bool hasImage = renderer && it->hasXml();
             html(bh, 12, hasImage);
             if (hasImage) {
                 const QList<QImage> images = renderer(*it, b.tempo);

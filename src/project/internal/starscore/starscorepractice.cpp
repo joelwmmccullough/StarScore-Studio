@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
 #include <set>
 
 #include <QDateTime>
@@ -21,6 +22,11 @@
 #include <QUrl>
 
 #include "global/serialization/zipreader.h"
+
+#if __has_include(<zlib.h>)
+#include <zlib.h>
+#define STARSCORE_PRACTICE_ZLIB 1
+#endif
 
 #include "log.h"
 
@@ -62,7 +68,7 @@ static QStringList strings(const QJsonValue& v)
     return out;
 }
 
-Library mu::project::practice::parseLibrary(const QJsonObject& root)
+Library mu::project::practice::parseLibrary(const QJsonObject& root, bool withXml)
 {
     Library lib;
     lib.code = root.value("song").toString();
@@ -104,7 +110,12 @@ Library mu::project::practice::parseLibrary(const QJsonObject& root)
         it.moveOnWhen = o.value("moveOnWhen").toString();
         it.listen = o.value("listen").toString();
         it.refs = strings(o.value("refs"));
-        it.xml = o.value("xml").toString();
+        if (withXml) {
+            const QString xml = o.value("xml").toString();
+            if (!xml.isEmpty()) {
+                it.xmlPacked = qCompress(xml.toUtf8(), 1);
+            }
+        }
         const QJsonObject ir = o.value("ireal").toObject();
         it.irealStyle = ir.value("style").toString();
         it.irealKey = ir.value("key").toString();
@@ -117,7 +128,12 @@ Library mu::project::practice::parseLibrary(const QJsonObject& root)
     return lib;
 }
 
-Library mu::project::practice::decodeLibrary(const QByteArray& blob)
+QString Item::xml() const
+{
+    return xmlPacked.isEmpty() ? QString() : QString::fromUtf8(qUncompress(xmlPacked));
+}
+
+Library mu::project::practice::decodeLibrary(const QByteArray& blob, bool withXml)
 {
     const QByteArray packed = QByteArray::fromBase64(blob.trimmed());
     const QByteArray json = qUncompress(packed);
@@ -125,7 +141,7 @@ Library mu::project::practice::decodeLibrary(const QByteArray& blob)
         return {};
     }
     const QJsonDocument doc = QJsonDocument::fromJson(json);
-    return doc.isObject() ? parseLibrary(doc.object()) : Library();
+    return doc.isObject() ? parseLibrary(doc.object(), withXml) : Library();
 }
 
 //! The main score's mscx inside a .starscore
@@ -156,14 +172,146 @@ static QByteArray metaTagValue(const QByteArray& mscx, const char* name)
     return e < 0 ? QByteArray() : mscx.mid(s, e - s);
 }
 
-Library mu::project::practice::readLibrary(const QString& starscorePath)
+#ifdef STARSCORE_PRACTICE_ZLIB
+static quint16 le16(const char* p)
 {
-    const QByteArray mscx = mainMscx(starscorePath);
-    const QByteArray blob = metaTagValue(mscx, PRACTICE_META_TAG);
+    return quint16(uchar(p[0])) | quint16(uchar(p[1])) << 8;
+}
+
+static quint32 le32(const char* p)
+{
+    return quint32(le16(p)) | quint32(le16(p + 2)) << 16;
+}
+
+//! The practice metaTag's value, read by decompressing only the start of the main score: the metaTags come before the
+//! first <Part>, so a 25 MB score needs only its first few KB. Returns nullopt when it can't tell (zip64, an unusual
+//! entry, damage), and the caller reads the whole score instead. An empty value means the song has no library.
+static std::optional<QByteArray> practiceBlobFromHead(const QString& path)
+{
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly) || f.size() < 22) {
+        return std::nullopt;
+    }
+    // end of central directory: the last 22 bytes plus up to 64 KB of comment
+    const qint64 tail = std::min<qint64>(f.size(), 22 + 65535);
+    f.seek(f.size() - tail);
+    const QByteArray end = f.read(tail);
+    const int eocd = end.lastIndexOf(QByteArray("PK\x05\x06", 4));
+    if (eocd < 0 || eocd + 22 > end.size()) {
+        return std::nullopt;
+    }
+    const quint32 cdSize = le32(end.constData() + eocd + 12);
+    const quint32 cdOffset = le32(end.constData() + eocd + 16);
+    if (cdOffset == 0xFFFFFFFF || cdSize == 0xFFFFFFFF || qint64(cdOffset) + cdSize > f.size()) {
+        return std::nullopt;
+    }
+    f.seek(cdOffset);
+    const QByteArray cd = f.read(cdSize);
+    if (cd.size() != int(cdSize)) {
+        return std::nullopt;
+    }
+    // the one top-level .mscx (as mainMscx picks it)
+    int method = -1;
+    quint32 compSize = 0, localOffset = 0;
+    for (int p = 0; p + 46 <= cd.size();) {
+        const char* e = cd.constData() + p;
+        if (le32(e) != 0x02014b50) {
+            return std::nullopt;
+        }
+        const int nameLen = le16(e + 28), extraLen = le16(e + 30), commentLen = le16(e + 32);
+        if (p + 46 + nameLen > cd.size()) {
+            return std::nullopt;
+        }
+        const QByteArray name(e + 46, nameLen);
+        if (!name.contains('/') && name.endsWith(".mscx")) {
+            method = le16(e + 10);
+            compSize = le32(e + 20);
+            localOffset = le32(e + 42);
+            break;
+        }
+        p += 46 + nameLen + extraLen + commentLen;
+    }
+    if ((method != 0 && method != 8) || compSize == 0xFFFFFFFF || localOffset == 0xFFFFFFFF) {
+        return std::nullopt;
+    }
+    f.seek(localOffset);
+    const QByteArray local = f.read(30);
+    if (local.size() != 30 || le32(local.constData()) != 0x04034b50) {
+        return std::nullopt;
+    }
+    f.seek(qint64(localOffset) + 30 + le16(local.constData() + 26) + le16(local.constData() + 28));
+
+    const QByteArray open = QByteArray("<metaTag name=\"") + PRACTICE_META_TAG + "\">";
+    QByteArray text;
+    z_stream zs {};
+    if (method == 8 && inflateInit2(&zs, -MAX_WBITS) != Z_OK) {
+        return std::nullopt;
+    }
+    std::optional<QByteArray> result;
+    QByteArray out(256 * 1024, Qt::Uninitialized);
+    bool decided = false;
+    qint64 left = compSize;
+    int status = Z_OK;
+    while (!decided && left > 0 && text.size() < 8 * 1024 * 1024) {
+        QByteArray in = f.read(std::min<qint64>(left, 64 * 1024));
+        if (in.isEmpty()) {
+            break;
+        }
+        left -= in.size();
+        if (method == 0) {
+            text += in;
+        } else {
+            zs.next_in = reinterpret_cast<Bytef*>(in.data());
+            zs.avail_in = uInt(in.size());
+            do {
+                zs.next_out = reinterpret_cast<Bytef*>(out.data());
+                zs.avail_out = uInt(out.size());
+                status = inflate(&zs, Z_NO_FLUSH);
+                if (status != Z_OK && status != Z_STREAM_END) {
+                    break;
+                }
+                text.append(out.constData(), out.size() - int(zs.avail_out));
+            } while (zs.avail_in > 0 && status == Z_OK);
+            if (status != Z_OK && status != Z_STREAM_END) {
+                break;
+            }
+        }
+        const int a = text.indexOf(open);
+        if (a >= 0) {
+            const int e = text.indexOf("</metaTag>", a + open.size());
+            if (e >= 0) {
+                result = text.mid(a + open.size(), e - a - open.size());
+                decided = true;
+            }
+        } else if (text.contains("<Part ") || text.contains("<Part>")) {
+            result = QByteArray();   // past the metaTags: no library
+            decided = true;
+        }
+        if (status == Z_STREAM_END) {
+            break;
+        }
+    }
+    if (method == 8) {
+        inflateEnd(&zs);
+    }
+    return decided ? result : std::nullopt;
+}
+
+#endif
+
+Library mu::project::practice::readLibrary(const QString& starscorePath, bool withXml)
+{
+    QByteArray blob;
+#ifdef STARSCORE_PRACTICE_ZLIB
+    if (const std::optional<QByteArray> head = practiceBlobFromHead(starscorePath)) {
+        blob = *head;
+    } else
+#endif
+    blob = metaTagValue(mainMscx(starscorePath), PRACTICE_META_TAG);
     if (blob.isEmpty()) {
         return {};
     }
-    Library lib = decodeLibrary(blob);
+    Library lib = decodeLibrary(blob, withXml);
     lib.path = starscorePath;
     return lib;
 }
@@ -211,19 +359,29 @@ std::vector<SongEntry> mu::project::practice::scanLibraries(const QString& rootF
         const QFileInfo fi(path);
         const QString stamp = QString("%1|%2").arg(fi.lastModified().toMSecsSinceEpoch()).arg(fi.size());
         QJsonObject entry = cache.value(path).toObject();
-        if (entry.value("stamp").toString() != stamp) {
-            const Library lib = readLibrary(path);
+        if (entry.value("stamp").toString() != stamp || !entry.contains("needs")) {
+            const Library lib = readLibrary(path, false);
             int minutes = 0;
             for (const Item& item : lib.items) {
                 minutes += item.minutes;
             }
+            QJsonObject needs;
+            for (const auto& [area, n] : lib.needs) {
+                needs[area] = n;
+            }
             entry = QJsonObject { { "stamp", stamp }, { "code", lib.code }, { "title", lib.title },
-                                  { "items", int(lib.items.size()) }, { "solos", int(lib.solos.size()) }, { "minutes", minutes } };
+                                  { "items", int(lib.items.size()) }, { "solos", int(lib.solos.size()) }, { "minutes", minutes },
+                                  { "needs", needs } };
         }
         newCache[path] = entry;
         if (entry.value("items").toInt() > 0) {
-            out.push_back({ entry.value("code").toString(), entry.value("title").toString(), path, entry.value("items").toInt(),
-                            entry.value("solos").toInt(), entry.value("minutes").toInt() });
+            SongEntry e { entry.value("code").toString(), entry.value("title").toString(), path, entry.value("items").toInt(),
+                          entry.value("solos").toInt(), entry.value("minutes").toInt(), {} };
+            const QJsonObject needs = entry.value("needs").toObject();
+            for (const QString& area : needs.keys()) {
+                e.needs[area] = needs.value(area).toInt();
+            }
+            out.push_back(e);
         }
     }
     // one entry per song code: the newest file (a stray copy outside the skipped folders loses)
@@ -478,7 +636,8 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
         }
     }
 
-    // song weights: the needs, at least 1
+    // song weights: 1, plus the needs, plus twice the biggest need (so a song with one big need, such as a solo and
+    // nothing else, still gets real time)
     std::map<QString, double> weight;
     double totalWeight = 0;
     for (const PlanSong& ps : req.songs) {
@@ -486,9 +645,12 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
             continue;
         }
         double w = 1.0;
+        int most = 0;
         for (const auto& [k, v] : ps.needs) {
             w += v;
+            most = std::max(most, v);
         }
+        w += 2 * most;
         weight[ps.code] = w;
         totalWeight += w;
     }
@@ -578,9 +740,9 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
             day.blocks.push_back(b);
             s.scheduled += 1;
             // an idea to understand (no exercise, no tempo) is usually solid after one session; a skill takes three
-            const bool concept = it.xml.isEmpty() && it.tempoStart <= 0 && it.category != "ear" && it.category != "performance"
+            const bool isConcept = !it.hasXml() && it.tempoStart <= 0 && it.category != "ear" && it.category != "performance"
                                  && it.category != "technique";
-            s.stage = std::min(3, s.stage + (concept ? 2 : 1));
+            s.stage = std::min(3, s.stage + (isConcept ? 2 : 1));
             s.lastDay = date;
             today.insert(key(code, it.id));
             left -= minutes;
@@ -618,7 +780,7 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
                 int bestKey = 1 << 30;
                 for (const Item& it : lib->second.items) {
                     if (!(it.category == "harmony" || it.category == "technique" || it.category == "voicings") || it.level > 2
-                        || it.xml.isEmpty() || !prereqsMet(ps.code, it) || today.count(key(ps.code, it.id))) {
+                        || !it.hasXml() || !prereqsMet(ps.code, it) || today.count(key(ps.code, it.id))) {
                         continue;
                     }
                     const Sim& s = sim[key(ps.code, it.id)];
@@ -665,7 +827,8 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
 
         if (!isShow && left >= 5) {
             // each song is owed minutes every day by its weight; a day works on the songs owed most (a handful, about
-            // 20 minutes each, so the day isn't 15 songs of 6 minutes), and what a song gets comes off what it's owed
+            // 25 minutes each, so a song gets a real session and the day isn't 12 songs of a few items), and what a song
+            // gets comes off what it's owed
             for (const auto& [code, w] : weight) {
                 debt[code] += std::max(0, left) * w / totalWeight;
             }
@@ -724,10 +887,9 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
                 }
             }
             std::stable_sort(codes.begin(), codes.end(), [&](const QString& x, const QString& y) { return debt[x] > debt[y] + 1e-9; });
-            const int maxSongs = std::clamp(int(std::lround(left / 20.0)), 1, std::max(1, int(codes.size())));
+            const int maxSongs = std::clamp(int(std::lround(left / 25.0)), 1, std::max(1, int(codes.size())));
             std::vector<QString> chosen(codes.begin(), codes.begin() + std::min<size_t>(maxSongs, codes.size()));
             size_t nextCandidate = chosen.size();
-            std::map<QString, int> spentToday;
             while (left >= 5) {
                 // the chosen song owed most after what it already got today
                 QString pick;
@@ -759,12 +921,19 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
                 schedule(pick, *it, m, "item");
                 areaUsed[pick][areaOf(it->category)] += 1;
                 debt[pick] -= m;
-                spentToday[pick] += m;
             }
         }
-        // the day in set order, warm-up first
-        std::stable_sort(day.blocks.begin(), day.blocks.end(), [&](const Block& a, const Block& b) {
-            auto rank = [&](const Block& x) {
+        // the day in set order, warm-up first; within a song, in learning order (the form, then the harmony and
+        // voicings, then comping and parts, then the solo, then run-throughs), each item after its prerequisites
+        {
+            std::map<QString, const Item*> itemOf;
+            for (const Block& b : day.blocks) {
+                auto lib = libs.find(b.code);
+                if (lib != libs.end()) {
+                    itemOf[key(b.code, b.itemId)] = lib->second.item(b.itemId);
+                }
+            }
+            auto songRank = [&](const Block& x) {
                 if (x.kind == "warmup") {
                     return -1;
                 }
@@ -775,8 +944,42 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
                 }
                 return 999;
             };
-            return rank(a) < rank(b);
-        });
+            auto stepRank = [&](const Block& x) {
+                static const QStringList ORDER { "form", "harmony", "technique", "ear", "voicings", "parts", "comping",
+                                                 "solo", "vocabulary", "performance" };
+                const Item* it = itemOf[key(x.code, x.itemId)];
+                if (x.kind == "runthrough" || !it) {
+                    return 100;
+                }
+                const QString c = it->category == "vocabulary" ? QString("solo") : it->category;   // (licks and solo items interleave)
+                const int r = int(ORDER.indexOf(c));
+                return r < 0 ? 50 : r;
+            };
+            std::stable_sort(day.blocks.begin(), day.blocks.end(), [&](const Block& a, const Block& b) {
+                const int sa = songRank(a), sb = songRank(b);
+                return sa != sb ? sa < sb : stepRank(a) < stepRank(b);
+            });
+            // a prerequisite scheduled the same day goes before the item that needs it (with a limit on moves, in
+            // case a library's prerequisites go round in a circle)
+            size_t moves = 0;
+            const size_t maxMoves = day.blocks.size() * day.blocks.size();
+            for (size_t i = 0; i < day.blocks.size() && moves <= maxMoves; ++i) {
+                const Item* it = itemOf[key(day.blocks[i].code, day.blocks[i].itemId)];
+                if (!it) {
+                    continue;
+                }
+                for (size_t j = i + 1; j < day.blocks.size(); ++j) {
+                    if (day.blocks[j].code == day.blocks[i].code && it->prereq.contains(day.blocks[j].itemId)) {
+                        const Block pre = day.blocks[j];
+                        day.blocks.erase(day.blocks.begin() + j);
+                        day.blocks.insert(day.blocks.begin() + i, pre);
+                        ++moves;
+                        i = size_t(-1);   // (start over: the move can expose another)
+                        break;
+                    }
+                }
+            }
+        }
         plan.days.push_back(day);
     }
     return plan;

@@ -3636,6 +3636,14 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         }
         practice::Progress progress(autotestDir() + "/progress.json");
         practice::Plan plan = practice::makePlan(req, libs, progress);
+        // (STARSCORE_AUTOTEST_PLAN: a plan's .json to write as the book instead, for a hand-made plan)
+        if (const QString planFile = qEnvironmentVariable("STARSCORE_AUTOTEST_PLAN"); !planFile.isEmpty()) {
+            QFile pf(planFile);
+            if (pf.open(QIODevice::ReadOnly)) {
+                plan = practice::Plan::fromJson(QJsonDocument::fromJson(pf.readAll()).object());
+                autotestLog(QString("  plan from %1: %2 days").arg(planFile).arg(plan.days.size()));
+            }
+        }
         plan.id = "autotest";   // saved as a plan too, so "uri:musescore://starscore/practicerunner?planId=autotest" opens it
         practice::savePlan(plan);
         {
@@ -3651,7 +3659,7 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         int rendered = 0;
         int images = 0;
         const bool ok = practice::writePracticeBook(plan, libs, autotestDir() + "/book.pdf", [&](const practice::Item& item, int) {
-            const QList<QImage> pages = renderPracticeExercise(item.xml, 160);
+            const QList<QImage> pages = renderPracticeExercise(item.xml(), 160);
             ++rendered;
             images += int(pages.size());
             if (rendered <= 3 && !pages.isEmpty()) {

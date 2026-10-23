@@ -176,8 +176,8 @@ QVariantMap PracticeRunnerModel::block() const
     m["moveOnWhenHtml"] = practice::prettyText(it->moveOnWhen).toHtmlEscaped();
     m["listen"] = practice::prettyText(it->listen);
     m["refs"] = practice::prettyText(it->refs.join("; "));
-    m["hasExercise"] = !it->xml.isEmpty();
-    m["hasBacking"] = it->xml.contains("<part id=\"P2\"");
+    m["hasExercise"] = it->hasXml();
+    m["hasBacking"] = it->hasXml() && it->xml().contains("<part id=\"P2\"");
     m["hasIreal"] = !it->irealProg.isEmpty();
     m["groove"] = it->groove;
     m["kindName"] = b.kind == "warmup" ? QString("Warm-up") : b.kind == "runthrough" ? QString("Run-through") : QString();
@@ -263,7 +263,7 @@ void PracticeRunnerModel::renderImages()
     }
     m_images.clear();
     const practice::Item* it = currentItem();
-    if (!it || it->xml.isEmpty()) {
+    if (!it || !it->hasXml()) {
         m_rendering = false;
         emit imagesChanged();
         return;
@@ -271,7 +271,7 @@ void PracticeRunnerModel::renderImages()
     m_rendering = true;
     emit imagesChanged();
     const int serial = ++m_renderSerial;
-    const QString xml = it->xml;
+    const QString xml = it->xml();
     QTimer::singleShot(20, this, [this, serial, xml]() {
         if (serial != m_renderSerial) {
             return;   // moved on meanwhile
@@ -318,11 +318,11 @@ void PracticeRunnerModel::openExercise(int tempo, bool play)
 {
     const practice::Item* it = currentItem();
     const practice::Library* lib = currentLibrary();
-    if (!it || it->xml.isEmpty() || !lib) {
+    if (!it || !it->hasXml() || !lib) {
         return;
     }
     const QString title = QString("%1 - %2").arg(lib->title, it->title);
-    starScore()->openPracticeExercise(it->xml, title, tempo, play);
+    starScore()->openPracticeExercise(it->xml(), title, tempo, play);
 }
 
 void PracticeRunnerModel::openSong()
