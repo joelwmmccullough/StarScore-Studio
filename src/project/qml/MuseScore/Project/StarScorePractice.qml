@@ -325,6 +325,13 @@ Rectangle {
                 }
                 Item { Layout.fillWidth: true }
                 FlatButton {
+                    text: qsTrc("starscore", "Song folder…")
+                    toolTipTitle: qsTrc("starscore", "The folder with your Starsign songs")
+                    toolTipDescription: pm.libraryFolder
+                    enabled: !pm.busy
+                    onClicked: pm.chooseLibraryFolder()
+                }
+                FlatButton {
                     text: qsTrc("starscore", "Read songs again")
                     enabled: !pm.busy
                     onClicked: pm.rescan()

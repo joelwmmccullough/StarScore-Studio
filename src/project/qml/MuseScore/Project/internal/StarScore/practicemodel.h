@@ -88,6 +88,7 @@ public:
     Q_INVOKABLE void exportIreal(int dayIndex);
     Q_INVOKABLE void openRunner(int dayIndex, int blockIndex);
     Q_INVOKABLE void openOutputFolder();
+    Q_INVOKABLE void chooseLibraryFolder();
 
 signals:
     void changed();
