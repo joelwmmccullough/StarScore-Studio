@@ -576,7 +576,7 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
 
         if (runThrough || isShow) {
             // performance and form items for every song, in set order; then the rest of the time on the weakest items
-            const int per = std::max(5, (isShow ? std::min(left, 45) : left) / std::max(1, int(ordered.size())));
+            const int per = std::max(5, left / std::max(1, int(ordered.size())));   // (the show day: the minutes chosen for it)
             for (const PlanSong& ps : ordered) {
                 auto lib = libs.find(ps.code);
                 if (lib == libs.end() || left < 5) {
