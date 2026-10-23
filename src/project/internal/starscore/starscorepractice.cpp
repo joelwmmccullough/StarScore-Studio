@@ -271,7 +271,7 @@ static std::optional<QByteArray> practiceBlobFromHead(const QString& path)
                     break;
                 }
                 text.append(out.constData(), out.size() - int(zs.avail_out));
-            } while (zs.avail_in > 0 && status == Z_OK);
+            } while (zs.avail_in > 0 && status == Z_OK && text.size() < 8 * 1024 * 1024);
             if (status != Z_OK && status != Z_STREAM_END) {
                 break;
             }
@@ -284,7 +284,8 @@ static std::optional<QByteArray> practiceBlobFromHead(const QString& path)
                 decided = true;
             }
         } else if (text.contains("<Part ") || text.contains("<Part>")) {
-            result = QByteArray();   // past the metaTags: no library
+            // past the metaTags: no library (StarScore and MuseScore write every metaTag before the first <Part>)
+            result = QByteArray();
             decided = true;
         }
         if (status == Z_STREAM_END) {
@@ -965,8 +966,8 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
             const size_t maxMoves = day.blocks.size() * day.blocks.size();
             for (size_t i = 0; i < day.blocks.size() && moves <= maxMoves; ++i) {
                 const Item* it = itemOf[key(day.blocks[i].code, day.blocks[i].itemId)];
-                if (!it) {
-                    continue;
+                if (!it || day.blocks[i].kind == "warmup") {
+                    continue;   // (a warm-up's prerequisites were already started when it was chosen; it stays first)
                 }
                 for (size_t j = i + 1; j < day.blocks.size(); ++j) {
                     if (day.blocks[j].code == day.blocks[i].code && it->prereq.contains(day.blocks[j].itemId)) {
