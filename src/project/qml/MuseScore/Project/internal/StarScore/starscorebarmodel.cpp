@@ -603,6 +603,7 @@ QVariantList StarScoreBarModel::moreMenu() const
         QVariantMap { { "id", "color-notes" }, { "title", muse::qtrc("starscore", "Color notes by pitch") }, { "enabled", true } },
         QVariantMap { { "id", "uncolor-notes" }, { "title", muse::qtrc("starscore", "Remove note colors") }, { "enabled", true } },
         QVariantMap {},
+        QVariantMap { { "id", "practice-flags" }, { "title", muse::qtrc("starscore", "Flag bars for practice…") }, { "enabled", true } },
         QVariantMap { { "id", "compare-parts" }, { "title", muse::qtrc("starscore", "Compare parts…") }, { "enabled", true } },
         QVariantMap { { "id", "toggle-minmaj" },
                       { "title", starScore()->minMajSymbolInCurrentScore()
@@ -1067,6 +1068,8 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
         if (res.standardButton() == IInteractive::Button::Ok) {
             starScore()->removeSolo(arg);
         }
+    } else if (action == "practice-flags") {
+        interactive()->open(UriQuery("musescore://starscore/practiceflags?modal=false&floating=true"));
     } else if (action == "solo-add") {
         interactive()->open(UriQuery("musescore://starscore/addsolo"));
     } else if (action == "part-styles") {

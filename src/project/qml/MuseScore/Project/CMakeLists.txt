@@ -119,6 +119,8 @@ qt_add_qml_module(project_qml
         internal/StarScore/practicemodel.h
         internal/StarScore/practicerunnermodel.cpp
         internal/StarScore/practicerunnermodel.h
+        internal/StarScore/practiceflagmodel.cpp
+        internal/StarScore/practiceflagmodel.h
     QML_FILES
         AlsoShareAudioComDialog.qml
         AskSaveLocationTypeDialog.qml
@@ -200,6 +202,7 @@ qt_add_qml_module(project_qml
         StarScoreSongbooks.qml
         StarScorePractice.qml
         PracticeRunnerDialog.qml
+        PracticeFlagDialog.qml
         StarScoreEditDialog.qml
         CopyLayoutDialog.qml
         NewStarScoreDialog.qml

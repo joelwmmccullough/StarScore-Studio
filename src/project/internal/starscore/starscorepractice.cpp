@@ -202,7 +202,7 @@ static quint32 le32(const char* p)
 //! The practice metaTag's value, read by decompressing only the start of the main score: the metaTags come before the
 //! first <Part>, so a 25 MB score needs only its first few KB. Returns nullopt when it can't tell (zip64, an unusual
 //! entry, damage), and the caller reads the whole score instead. An empty value means the song has no library.
-static std::optional<QByteArray> practiceBlobFromHead(const QString& path)
+static std::optional<QByteArray> practiceBlobFromHead(const QString& path, const char* tag = PRACTICE_META_TAG)
 {
     QFile f(path);
     if (!f.open(QIODevice::ReadOnly) || f.size() < 22) {
@@ -257,7 +257,7 @@ static std::optional<QByteArray> practiceBlobFromHead(const QString& path)
     }
     f.seek(qint64(localOffset) + 30 + le16(local.constData() + 26) + le16(local.constData() + 28));
 
-    const QByteArray open = QByteArray("<metaTag name=\"") + PRACTICE_META_TAG + "\">";
+    const QByteArray open = QByteArray("<metaTag name=\"") + tag + "\">";
     QByteArray text;
     z_stream zs {};
     if (method == 8 && inflateInit2(&zs, -MAX_WBITS) != Z_OK) {
@@ -316,19 +316,82 @@ static std::optional<QByteArray> practiceBlobFromHead(const QString& path)
 
 #endif
 
+//! The song's practice flags (metaTag "starscoreFlags", set on the Keys sheet: practiceflagmodel.h) as practice items:
+//! the bars he flagged as a solo, comping, or a written part, at his difficulty, with his notes as the steps
+static void addFlagItems(Library& lib, const QByteArray& escaped)
+{
+    if (escaped.isEmpty()) {
+        return;
+    }
+    QByteArray raw = escaped;
+    raw.replace("&quot;", "\"").replace("&apos;", "'").replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&");
+    const QJsonArray flags = QJsonDocument::fromJson(raw).object().value("flags").toArray();
+    static const QStringList DIFF { "", "easy", "medium", "hard", "virtuosic" };
+    for (const QJsonValue& v : flags) {
+        const QJsonObject f = v.toObject();
+        const int from = f.value("from").toInt(), to = std::max(from, f.value("to").toInt());
+        if (from < 1) {
+            continue;
+        }
+        const QString kind = f.value("kind").toString();
+        const int d = std::clamp(f.value("difficulty").toInt(2), 1, 4);
+        const QString bars = from == to ? QString("bar %1").arg(from) : QString("bars %1-%2").arg(from).arg(to);
+        Item it;
+        it.id = "FLAG-" + f.value("id").toString();
+        it.category = kind == "comping" ? "comping" : kind == "parts" ? "parts" : "solo";
+        const QString what = kind == "comping" ? "Comping" : kind == "parts" ? "Written part" : "Solo";
+        it.title = QString("%1, %2 (your flag, %3)").arg(what, bars, DIFF[d]);
+        it.level = d;
+        it.minutes = 4 + 2 * d;
+        const QString part = f.value("part").toString();
+        it.refs = { QString("%1, %2").arg(part.isEmpty() ? QString("Keys") : part, bars) };
+        const QStringList lines = f.value("text").toString().split('\n', Qt::SkipEmptyParts);
+        it.goal = lines.isEmpty() ? QString("%1 %2 solid at tempo.").arg(what, bars) : lines.first().trimmed();
+        for (int i = 1; i < lines.size() && it.steps.size() < 4; ++i) {
+            it.steps << lines[i].trimmed();
+        }
+        if (it.steps.isEmpty()) {
+            it.steps << (kind == "solo" ? QString("Open the song at %1 and play over it.").arg(bars)
+                         : QString("Open the song at %1: slowly, then at tempo with the band.").arg(bars));
+        }
+        it.moveOnWhen = QString("%1 at tempo, twice in a row, no stops.").arg(bars.left(1).toUpper() + bars.mid(1));
+        it.skills = { kind == "comping" ? QString("comp.swing") : kind == "parts" ? QString("parts.reading") : QString("solo.form") };
+        lib.items.push_back(it);
+    }
+}
+
 Library mu::project::practice::readLibrary(const QString& starscorePath, bool withXml)
 {
     QByteArray blob;
+    QByteArray flags;
+    bool whole = true;
 #ifdef STARSCORE_PRACTICE_ZLIB
     if (const std::optional<QByteArray> head = practiceBlobFromHead(starscorePath)) {
         blob = *head;
-    } else
+        whole = false;
+        if (const std::optional<QByteArray> f = practiceBlobFromHead(starscorePath, "starscoreFlags")) {
+            flags = *f;
+        } else {
+            whole = true;
+        }
+    }
 #endif
-    blob = metaTagValue(mainMscx(starscorePath), PRACTICE_META_TAG);
-    if (blob.isEmpty()) {
+    if (whole) {
+        const QByteArray mscx = mainMscx(starscorePath);
+        blob = metaTagValue(mscx, PRACTICE_META_TAG);
+        flags = metaTagValue(mscx, "starscoreFlags");
+    }
+    if (blob.isEmpty() && flags.isEmpty()) {
         return {};
     }
-    Library lib = decodeLibrary(blob, withXml);
+    Library lib = blob.isEmpty() ? Library() : decodeLibrary(blob, withXml);
+    if (lib.code.isEmpty()) {
+        // a song with flags and no library yet: "CODE - Title.starscore"
+        const QString base = QFileInfo(starscorePath).completeBaseName();
+        lib.code = base.section(" - ", 0, 0).trimmed();
+        lib.title = base.section(" - ", 1).trimmed();
+    }
+    addFlagItems(lib, flags);
     lib.path = starscorePath;
     return lib;
 }

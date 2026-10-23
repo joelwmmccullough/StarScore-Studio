@@ -130,6 +130,7 @@ void ProjectModule::resolveImports()
         ir->registerQmlUri(Uri("musescore://starscore/copylayout"), "MuseScore.Project", "CopyLayoutDialog");
         ir->registerQmlUri(Uri("musescore://starscore/styles"), "MuseScore.Project", "StarScoreStylesDialog");
         ir->registerQmlUri(Uri("musescore://starscore/addsolo"), "MuseScore.Project", "AddSoloDialog");
+        ir->registerQmlUri(Uri("musescore://starscore/practiceflags"), "MuseScore.Project", "PracticeFlagDialog");
         ir->registerQmlUri(Uri("musescore://starscore/additivetimesig"), "MuseScore.Project", "AdditiveTimeSigDialog");
         ir->registerQmlUri(Uri("musescore://starscore/annotation"), "MuseScore.Project", "PlayerAnnotationDialog");
         ir->registerQmlUri(Uri("musescore://starscore/mutes"), "MuseScore.Project", "PartMutesDialog");
