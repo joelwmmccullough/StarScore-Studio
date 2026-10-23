@@ -41,6 +41,13 @@ PracticeRunnerModel::PracticeRunnerModel(QObject* parent)
     });
 }
 
+PracticeRunnerModel::~PracticeRunnerModel()
+{
+    for (const QString& f : m_images) {
+        QFile::remove(QUrl(f).toLocalFile());
+    }
+}
+
 // ---------------------------------------------------------------- properties
 QString PracticeRunnerModel::planName() const
 {
@@ -166,6 +173,7 @@ QVariantMap PracticeRunnerModel::block() const
     m["tempoStart"] = it->tempoStart;
     m["tempoGoal"] = it->tempoGoal;
     m["moveOnWhen"] = practice::prettyText(it->moveOnWhen);
+    m["moveOnWhenHtml"] = practice::prettyText(it->moveOnWhen).toHtmlEscaped();
     m["listen"] = practice::prettyText(it->listen);
     m["refs"] = practice::prettyText(it->refs.join("; "));
     m["hasExercise"] = !it->xml.isEmpty();
@@ -271,7 +279,7 @@ void PracticeRunnerModel::renderImages()
         const QList<QImage> pages = starScore()->renderPracticeExercise(xml, 160);
         QStringList files;
         for (int i = 0; i < pages.size(); ++i) {
-            const QString f = QString("%1/exercise-%2-%3.png").arg(runnerImageDir()).arg(serial).arg(i);
+            const QString f = QString("%1/exercise-%2-%3-%4.png").arg(runnerImageDir()).arg(quintptr(this), 0, 16).arg(serial).arg(i);
             if (pages[i].save(f, "PNG")) {
                 files << QUrl::fromLocalFile(f).toString();
             }
@@ -364,37 +372,50 @@ void PracticeRunnerModel::openIreal()
 }
 
 // ---------------------------------------------------------------- progress
-void PracticeRunnerModel::savePlan()
+void PracticeRunnerModel::savePlan(const practice::Block& changed)
 {
-    // the plan may have been planned again from the Practice page meanwhile: merge this day's done marks into it
+    // the plan may have been planned again (or marked in another window) meanwhile: put only this block's marks into
+    // the plan as it is on disk
     practice::Plan latest = practice::loadPlan(m_plan.id);
-    if (!latest.id.isEmpty() && m_dayIndex < int(m_plan.days.size())) {
-        for (practice::Day& d : latest.days) {
-            if (d.date != m_plan.days[m_dayIndex].date) {
-                continue;
-            }
-            for (const practice::Block& mine : m_plan.days[m_dayIndex].blocks) {
-                bool found = false;
-                for (practice::Block& b : d.blocks) {
-                    if (b.code == mine.code && b.itemId == mine.itemId) {
-                        b.done = mine.done;
-                        b.tempoReached = mine.tempoReached;
-                        b.stage = mine.stage;
-                        found = true;
-                    }
-                }
-                if (!found && mine.done) {
-                    d.blocks.push_back(mine);
-                }
-            }
-            m_plan.days[m_dayIndex].blocks = d.blocks;
-        }
-        // keep our index on the same block
-        practice::savePlan(latest);
-        m_plan = latest;
-        return;
+    if (latest.id.isEmpty()) {
+        return;   // deleted meanwhile: not brought back
     }
-    practice::savePlan(m_plan);
+    const QDate day = m_plan.days[m_dayIndex].date;
+    bool found = false;
+    for (practice::Day& d : latest.days) {
+        if (d.date != day) {
+            continue;
+        }
+        for (practice::Block& b : d.blocks) {
+            if (b.code == changed.code && b.itemId == changed.itemId) {
+                b.done = changed.done;
+                b.tempoReached = changed.tempoReached;
+                b.stage = changed.stage;
+                found = true;
+            }
+        }
+        if (!found && changed.done) {
+            d.blocks.push_back(changed);
+        }
+    }
+    practice::savePlan(latest);
+    // carry on with the plan as saved, on the same block
+    int dayIndex = m_dayIndex;
+    for (int i = 0; i < int(latest.days.size()); ++i) {
+        if (latest.days[i].date == day) {
+            dayIndex = i;
+        }
+    }
+    m_plan = latest;
+    m_dayIndex = std::clamp(dayIndex, 0, std::max(0, int(m_plan.days.size()) - 1));
+    const int n = blockCount();
+    for (int i = 0; i < n; ++i) {
+        const practice::Block& b = m_plan.days[m_dayIndex].blocks[i];
+        if (b.code == changed.code && b.itemId == changed.itemId) {
+            m_blockIndex = i;
+        }
+    }
+    m_blockIndex = std::clamp(m_blockIndex, 0, std::max(0, n - 1));
 }
 
 void PracticeRunnerModel::markDone(int tempoReached, int stage, const QString& note)
@@ -415,15 +436,10 @@ void PracticeRunnerModel::markDone(int tempoReached, int stage, const QString& n
                     b.stage, note);
     progress.save();
     m_timer.stop();
-    savePlan();
-    // find our block again (the plan may have changed), then go to the next one not done
-    int at = m_blockIndex;
+    savePlan(practice::Block(b));
+    // (savePlan found our block again), then the next one not done
+    const int at = m_blockIndex;
     const auto& blocks = m_plan.days[m_dayIndex].blocks;
-    for (int i = 0; i < int(blocks.size()); ++i) {
-        if (blocks[i].code == code && blocks[i].itemId == itemId) {
-            at = i;
-        }
-    }
     for (int i = at + 1; i < int(blocks.size()); ++i) {
         if (!blocks[i].done) {
             go(i);
@@ -445,6 +461,6 @@ void PracticeRunnerModel::markNotDone()
     b.done = false;
     b.stage = -1;
     b.tempoReached = 0;
-    savePlan();
+    savePlan(practice::Block(b));
     emit changed();
 }

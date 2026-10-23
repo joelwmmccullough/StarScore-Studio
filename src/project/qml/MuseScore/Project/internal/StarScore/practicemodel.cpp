@@ -611,6 +611,19 @@ void PracticeModel::selectPlan(const QString& id)
 
 void PracticeModel::deletePlan(const QString& id)
 {
+    QString name;
+    for (const practice::Plan& p : m_plans) {
+        if (p.id == id) {
+            name = p.name;
+        }
+    }
+    const muse::IInteractive::Result r = interactive()->questionSync(
+        muse::trc("starscore", "Delete this plan?"),
+        QString("\u201C%1\u201D and the days it has marked done. Your progress on each item is kept.").arg(name).toStdString(),
+        { muse::IInteractive::Button::Cancel, muse::IInteractive::Button::Yes }, muse::IInteractive::Button::Cancel);
+    if (r.standardButton() != muse::IInteractive::Button::Yes) {
+        return;
+    }
     practice::deletePlan(id);
     if (m_planId == id) {
         m_planId.clear();
@@ -718,7 +731,7 @@ void PracticeModel::makeBook(int dayIndex)
     const QString pdf = outputFolder() + "/" + practiceFileSafe(name) + ".pdf";
     m_busy = true;
     setStatus(QStringLiteral("Making the practice book…"));
-    QCoreApplication::processEvents();
+    QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
 
     std::map<QString, QList<QImage> > cache;
     IStarScoreService* ss = starScore().get();

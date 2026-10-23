@@ -44,6 +44,7 @@ class PracticeRunnerModel : public QObject, public muse::Contextable, public mus
 
 public:
     explicit PracticeRunnerModel(QObject* parent = nullptr);
+    ~PracticeRunnerModel() override;
 
     QString planName() const;
     QString dayTitle() const;
@@ -88,7 +89,7 @@ private:
     const practice::Item* currentItem() const;
     const practice::Library* currentLibrary() const;
     void renderImages();
-    void savePlan();
+    void savePlan(const practice::Block& changed);
 
     practice::Plan m_plan;
     int m_dayIndex = 0;

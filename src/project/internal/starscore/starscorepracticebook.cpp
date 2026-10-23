@@ -114,6 +114,7 @@ public:
                                     "th{color:%4;font-size:8pt;text-align:left;padding:2px 6px 4px 0;} h3{color:%1;font-size:12pt;margin:0;}"
                                     "li{margin-bottom:2px;}")
                                 .arg(INK.name(), SOFT.name(), TEAL.name(), GREY.name(), GOLD.name()));
+        d->documentLayout()->setPaintDevice(&m_writer);   // sizes as the PDF has them, not the screen
         d->setTextWidth(width);
         d->setHtml("<body>" + html + "</body>");
         return d;
@@ -242,8 +243,8 @@ bool mu::project::practice::writePracticeBook(const Plan& plan, const std::map<Q
                       "aren't solid yet come back, and the run-through day before the show plays every song through.</p>"
                     : "<p>Mark each block in StarScore's practice runner as you finish it, with the tempo you reached and how solid it "
                       "is. The next routine you make starts from there.</p>";
-        h += "<br><p class='label'>THE SONGS</p>";
         html(h);
+        html("<br><p class='label'>THE SONGS</p>", 0, true);
         // the setlist, a row at a time (so a long setlist runs onto the next page)
         int curSet = -1;
         for (const PlanSong& s : plan.songs) {
@@ -411,7 +412,9 @@ bool mu::project::practice::writePracticeBook(const Plan& plan, const std::map<Q
             continue;
         }
         double need = f.space + f.height;
-        if (f.keepWithNext && i + 1 < flow.size() && flow[i + 1].kind == Flow::Image) {
+        if (f.keepWithNext && i + 1 < flow.size() && flow[i + 1].kind == Flow::Html) {
+            need += flow[i + 1].space + std::min(flow[i + 1].height, 120.0);
+        } else if (f.keepWithNext && i + 1 < flow.size() && flow[i + 1].kind == Flow::Image) {
             // the text and its notation on one page when they fit on one
             const double room = H - MBOT - MTOP - f.height - f.space;
             need += flow[i + 1].space + std::max(0.0, std::min(flow[i + 1].height, room));

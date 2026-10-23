@@ -22,7 +22,7 @@ StyledDialogView {
     title: qsTrc("starscore", "Practice")
 
     contentWidth: 820
-    contentHeight: 900
+    contentHeight: 780
     margins: 0
     resizable: true
     alwaysAboveApp: true
@@ -313,7 +313,7 @@ StyledDialogView {
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
                             anchors.margins: 10
-                            text: "<b>" + qsTrc("starscore", "MOVE ON WHEN") + "</b>&nbsp;&nbsp;" + (run.block.moveOnWhen || "")
+                            text: "<b>" + qsTrc("starscore", "MOVE ON WHEN") + "</b>&nbsp;&nbsp;" + (run.block.moveOnWhenHtml || "")
                             textFormat: Text.StyledText
                             color: root.gold
                             font.pixelSize: 14

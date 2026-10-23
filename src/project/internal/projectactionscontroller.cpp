@@ -312,7 +312,7 @@ void ProjectActionsController::init()
             return;
         }
         if (play) {
-            QTimer::singleShot(600, [this]() { dispatcher()->dispatch("play"); });
+            QTimer::singleShot(1500, [this]() { dispatcher()->dispatch("play"); });   // (once the playback has loaded)
         }
     });
 

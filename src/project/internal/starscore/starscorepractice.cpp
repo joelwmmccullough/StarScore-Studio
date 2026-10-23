@@ -226,6 +226,21 @@ std::vector<SongEntry> mu::project::practice::scanLibraries(const QString& rootF
                             entry.value("solos").toInt(), entry.value("minutes").toInt() });
         }
     }
+    // one entry per song code: the newest file (a stray copy outside the skipped folders loses)
+    {
+        std::map<QString, size_t> byCode;
+        std::vector<SongEntry> unique;
+        for (const SongEntry& e : out) {
+            auto it = byCode.find(e.code);
+            if (it == byCode.end()) {
+                byCode[e.code] = unique.size();
+                unique.push_back(e);
+            } else if (QFileInfo(e.path).lastModified() > QFileInfo(unique[it->second].path).lastModified()) {
+                unique[it->second] = e;
+            }
+        }
+        out = unique;
+    }
     std::sort(out.begin(), out.end(), [](const SongEntry& a, const SongEntry& b) {
         return a.title.compare(b.title, Qt::CaseInsensitive) < 0;
     });
@@ -481,6 +496,56 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
         return plan;
     }
     std::map<QString, double> debt;   // minutes owed to each song
+    // what each song has had lately (the progress log, and the kept days of a plan planned again), so a routine made
+    // today or a plan planned again doesn't start over with the same songs: owed more the longer since it was played,
+    // less the more it had in the last two weeks
+    {
+        const QDate start = req.days.empty() ? QDate::currentDate() : req.days.front().first;
+        std::map<QString, int> recent;
+        std::map<QString, QDate> lastPlayed;
+        for (const QJsonValue& v : progress.log()) {
+            const QJsonObject o = v.toObject();
+            const QDate d = QDate::fromString(o.value("date").toString(), Qt::ISODate);
+            const QString code = o.value("song").toString();
+            if (!d.isValid() || !weight.count(code)) {
+                continue;
+            }
+            if (d.daysTo(start) <= 14 && d <= start) {
+                recent[code] += o.value("minutes").toInt();
+            }
+            if (!lastPlayed[code].isValid() || d > lastPlayed[code]) {
+                lastPlayed[code] = d;
+            }
+        }
+        for (const Day& d : plan.days) {   // the kept days (before fromDate)
+            for (const Block& b : d.blocks) {
+                if (weight.count(b.code)) {
+                    if (!b.done) {
+                        continue;
+                    }
+                    if (!lastPlayed[b.code].isValid() || d.date > lastPlayed[b.code]) {
+                        lastPlayed[b.code] = d.date;
+                    }
+                }
+            }
+        }
+        double avgWeight = totalWeight / std::max<size_t>(1, weight.size());
+        for (const auto& [code, w] : weight) {
+            const int since = lastPlayed[code].isValid() ? std::clamp(int(lastPlayed[code].daysTo(start)), 0, 10) : 10;
+            debt[code] = since * 3.0 * w / avgWeight - recent[code] * 0.5;
+        }
+    }
+    // the run-through day: the last day before the show with time on it (a plan of three days or more)
+    QDate runThroughDate;
+    if (req.kind == "plan" && req.days.size() > 2) {
+        for (auto it = req.days.rbegin(); it != req.days.rend(); ++it) {
+            const bool show = req.showDate.isValid() && it->first == req.showDate;
+            if (!show && it->second >= 5 && (!req.showDate.isValid() || it->first < req.showDate)) {
+                runThroughDate = it->first;
+                break;
+            }
+        }
+    }
 
     // set order for the day's blocks
     std::vector<PlanSong> ordered = req.songs;
@@ -499,8 +564,7 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
         day.date = date;
         day.minutes = dayMinutes;
         const bool isShow = req.kind == "plan" && req.showDate.isValid() && date == req.showDate;
-        const bool runThrough = !isShow && req.kind == "plan" && nDays > 2 && (di == nDays - 1 || (req.showDate.isValid()
-                                                                                                  && date.daysTo(req.showDate) == 1));
+        const bool runThrough = !isShow && runThroughDate.isValid() && date == runThroughDate;
         int left = dayMinutes;
         std::set<QString> today;
         auto schedule = [&](const QString& code, const Item& it, int minutes, const QString& kind) {
@@ -545,7 +609,7 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
         if (left >= 45 && !isShow && !ordered.empty()) {
             const int n = int(ordered.size());
             for (int k = 0; k < n; ++k) {
-                const PlanSong& ps = ordered[(di + k) % n];
+                const PlanSong& ps = ordered[size_t((date.toJulianDay() + k) % n)];   // (by the date: a new song each day)
                 auto lib = libs.find(ps.code);
                 if (lib == libs.end()) {
                     continue;
@@ -659,7 +723,7 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
                     codes.push_back(ps.code);
                 }
             }
-            std::stable_sort(codes.begin(), codes.end(), [&](const QString& x, const QString& y) { return debt[x] > debt[y]; });
+            std::stable_sort(codes.begin(), codes.end(), [&](const QString& x, const QString& y) { return debt[x] > debt[y] + 1e-9; });
             const int maxSongs = std::clamp(int(std::lround(left / 20.0)), 1, std::max(1, int(codes.size())));
             std::vector<QString> chosen(codes.begin(), codes.begin() + std::min<size_t>(maxSongs, codes.size()));
             size_t nextCandidate = chosen.size();
@@ -688,8 +752,9 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
                     continue;
                 }
                 const int m = std::min(it->minutes, left);
-                if (m < 5) {
-                    break;
+                if (m < 3) {
+                    today.insert(key(pick, it->id));   // too long for what's left: another item, or another song
+                    continue;
                 }
                 schedule(pick, *it, m, "item");
                 areaUsed[pick][areaOf(it->category)] += 1;
@@ -789,7 +854,7 @@ bool mu::project::practice::deletePlan(const QString& id)
 // ---------------------------------------------------------------- iReal
 static QString urlQuote(const QString& s)
 {
-    return QString::fromLatin1(QUrl::toPercentEncoding(s, "/:=*[]|,^#+-.()"));
+    return QString::fromLatin1(QUrl::toPercentEncoding(s, "/:=*[]|,^+-.()"));   // ("#" encoded: a sharp isn't a fragment)
 }
 
 static QString esc(const QString& s)

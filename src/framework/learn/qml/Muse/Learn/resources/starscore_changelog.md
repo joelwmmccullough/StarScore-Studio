@@ -4,7 +4,18 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
-## 1.18.91
+## 1.19.0
+
+- **Practice (Home › Practice, below Dashboard).** Practice routines and plans for the songs on a setlist, from practice libraries stored in each song's .starscore:
+  - **The setlist.** The Oct 31 setlist is already filled in; Edit to change it (a line like "Set 2" starts a set). Each song shows how much it needs in four areas (parts, comping, harmony, and solos) from 0 to 3; click a number to change it. A song in red has no practice items yet.
+  - **One session.** "Make a routine" plans one session of the minutes you choose, starting with a short warm-up, then working through the songs in set order.
+  - **Up to a show.** Choose the show date and the minutes for each day (0 for a day off), then "Make a plan". Days give more time to the songs and areas that need more, rotate the songs so each comes back every few days, bring an item back until it's solid, and work up its tempo. The last day before the show is a run-through day, and the show day is a light run of each song. "Plan again from today" plans the days still to come from what you've actually done.
+  - **The runner.** Practice (or click any block) opens the runner beside the score. It shows what to play and how, the tempo for today, the exercise's notation, a timer, and the "move on when" test. "Play with backing" opens the exercise in StarScore at today's tempo, with bass and drums where it has them, and plays it; the metronome button turns the click on and off. "Done" records the tempo you reached and how solid it is, which later plans use.
+  - **The practice book.** "Practice book (PDF)" writes the whole plan, or one day (PDF beside a day), as a dark book like the course books, with every exercise engraved. It's saved in a Practice folder in your song folder.
+  - **iReal Pro.** "iReal Pro charts" writes a page of links, one per exercise with chords, plus a playlist of the day.
+  - The practice libraries live in each song's .starscore and are kept when you save the song in any StarScore version.
+
+### Also in 1.19.0
 
 - **Faster Scores on export.** Each Score folder's first Score no longer lays out the whole song (every part, in the song's continuous view) when it loads its copy of the song, since nothing reads that layout: it was about 20 s and 1.5 GB of memory per Score folder on G.I. Jorge on the build machine (a few seconds on a Mac). The sheets come out the same.
 - **Flexible chairs shown in one step.** When a song opens with its Flexible chairs shown differently from the "Show Flexible horns as" setting, or when you change that setting, every Flexible section is changed in one step, so the song is laid out once, not once per section (G.I. Jorge, three Flexible sections: one layout instead of three when opening in the automatic tests). One undo step too.

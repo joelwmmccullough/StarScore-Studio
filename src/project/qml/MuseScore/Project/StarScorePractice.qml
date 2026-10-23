@@ -220,7 +220,7 @@ Rectangle {
                             Layout.preferredWidth: 100
                             currentValue: pm.routineMinutes
                             step: 15; decimals: 0; minValue: 15; maxValue: 600
-                            onValueEdited: function(v) { pm.setRoutineMinutes(v) }
+                            onValueEditingFinished: function(v) { pm.setRoutineMinutes(v) }
                         }
                     }
                     FlatButton {
@@ -254,7 +254,7 @@ Rectangle {
                             Layout.preferredWidth: 100
                             currentValue: pm.defaultMinutes
                             step: 15; decimals: 0; minValue: 15; maxValue: 600
-                            onValueEdited: function(v) { pm.setDefaultMinutes(v) }
+                            onValueEditingFinished: function(v) { pm.setDefaultMinutes(v) }
                         }
                     }
                     StyledTextLabel {
@@ -281,7 +281,7 @@ Rectangle {
                                 Layout.preferredWidth: 100
                                 currentValue: modelData.minutes
                                 step: 15; decimals: 0; minValue: 0; maxValue: 600
-                                onValueEdited: function(v) { pm.setDayMinutes(modelData.date, v) }
+                                onValueEditingFinished: function(v) { pm.setDayMinutes(modelData.date, v) }
                             }
                             StyledTextLabel {
                                 visible: modelData.isShow
