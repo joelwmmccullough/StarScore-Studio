@@ -70,6 +70,8 @@
 #include "organizer/organizer.h"
 #include "organizer/orghtml.h"
 #include "organizer/orglibrary.h"
+#include "starscorepractice.h"
+#include "starscorepracticebook.h"
 #include <QEventLoop>
 
 #include <QCoreApplication>
@@ -3567,6 +3569,71 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         autotestLog(QString("  newest version unpacked in %1 ms: %2").arg(et.elapsed()).arg(out2.isEmpty() ? "FAILED" : "ok"));
         (void)same;
         QFile::remove(root + "/SIMU - Simulated.starhistory");
+    } else if (step == "import") {
+        // import: the open MuseScore file made into a .starscore as the import dialog suggests (sections and
+        // arrangements as planned, standardized); "save" then writes it
+        const StarScoreImportPlan plan = planImport();
+        autotestLog("  plan: " + plan.summary);
+        std::map<QString, QString> sectionByPart;
+        for (const StarScoreImportPart& p : plan.parts) {
+            sectionByPart[p.partId] = p.suggestedSection;
+            autotestLog(QString("  part %1 (%2) -> %3").arg(p.name, p.instrumentId, p.suggestedSection.isEmpty() ? "-" : p.suggestedSection));
+        }
+        autotestLog("  arrangements: " + plan.suggestedArrangements.join(", "));
+        const Ret r = applyImport(sectionByPart, plan.suggestedArrangements, true);
+        autotestLog(QString("  import: %1").arg(r ? "ok" : QString::fromStdString(r.toString())));
+    } else if (step.startsWith("practicebook")) {
+        // practicebook[:<days>]: a plan over the songs with practice items in STARSCORE_AUTOTEST_PRACTICE (a folder of
+        // .starscore files), written as a book with the exercises engraved by this StarScore, plus plan.json and
+        // ireal.html, into the autotest folder
+        const QString root = qEnvironmentVariable("STARSCORE_AUTOTEST_PRACTICE");
+        const int nDays = step.contains(':') ? step.section(':', 1).toInt() : 1;
+        std::map<QString, practice::Library> libs;
+        practice::PlanRequest req;
+        req.kind = nDays > 1 ? "plan" : "routine";
+        req.name = nDays > 1 ? "Autotest plan" : "Autotest routine";
+        int n = 0;
+        for (const practice::SongEntry& e : practice::scanLibraries(root, autotestDir() + "/libraries.json")) {
+            libs[e.code] = practice::readLibrary(e.path);
+            practice::PlanSong ps;
+            ps.code = e.code;
+            ps.title = e.title;
+            ps.set = 1 + n++ / 6;
+            ps.needs = libs[e.code].needs;
+            req.songs.push_back(ps);
+            autotestLog(QString("  library %1: %2 items").arg(e.title).arg(libs[e.code].items.size()));
+        }
+        const QDate start = QDate::currentDate();
+        for (int i = 0; i < nDays; ++i) {
+            req.days.push_back({ start.addDays(i), 90 });
+        }
+        if (nDays > 1) {
+            req.showDate = start.addDays(nDays - 1);
+        }
+        practice::Progress progress(autotestDir() + "/progress.json");
+        const practice::Plan plan = practice::makePlan(req, libs, progress);
+        {
+            QFile f(autotestDir() + "/plan.json");
+            if (f.open(QIODevice::WriteOnly)) {
+                f.write(QJsonDocument(plan.toJson()).toJson());
+            }
+            QFile h(autotestDir() + "/ireal.html");
+            if (h.open(QIODevice::WriteOnly)) {
+                h.write(practice::irealHtml(plan, libs).toUtf8());
+            }
+        }
+        int rendered = 0;
+        int images = 0;
+        const bool ok = practice::writePracticeBook(plan, libs, autotestDir() + "/book.pdf", [&](const practice::Item& item, int) {
+            const QList<QImage> pages = renderPracticeExercise(item.xml, 160);
+            ++rendered;
+            images += int(pages.size());
+            if (rendered <= 3 && !pages.isEmpty()) {
+                pages.front().save(autotestDir() + QString("/exercise-%1.png").arg(rendered));
+            }
+            return pages;
+        });
+        autotestLog(QString("  book: %1, %2 exercises engraved, %3 images").arg(ok ? "written" : "FAILED").arg(rendered).arg(images));
     } else if (step == "save") {
         INotationProjectPtr project = globalContext()->currentProject();
         const Ret r = project ? project->save(io::path_t(autotestDir() + "/saved.starscore"), SaveMode::SaveCopy, false)
