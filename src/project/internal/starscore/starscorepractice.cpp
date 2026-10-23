@@ -198,8 +198,14 @@ std::vector<SongEntry> mu::project::practice::scanLibraries(const QString& rootF
     QDirIterator it(rootFolder, { "*.starscore" }, QDir::Files, QDirIterator::Subdirectories);
     while (it.hasNext()) {
         const QString path = it.next();
-        if (path.contains("/Version History/") || path.contains("/MuseScore Files/") || path.contains("Autosave")
-            || path.contains("/5 Quarantine") || path.contains("/Z Empty")) {
+        // (the folders the library audit skips, and autosaves)
+        static const QStringList SKIP { "/Version History/", "/MuseScore Files/", "Quarantine", "/Templates/", "/Z Empty",
+                                        "Superseded", "Autosave" };
+        bool skip = false;
+        for (const QString& s : SKIP) {
+            skip = skip || path.contains(s);
+        }
+        if (skip) {
             continue;
         }
         const QFileInfo fi(path);
@@ -507,7 +513,10 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
             b.tempo = tempoFor(it, s);
             day.blocks.push_back(b);
             s.scheduled += 1;
-            s.stage = std::min(3, s.stage + 1);
+            // an idea to understand (no exercise, no tempo) is usually solid after one session; a skill takes three
+            const bool concept = it.xml.isEmpty() && it.tempoStart <= 0 && it.category != "ear" && it.category != "performance"
+                                 && it.category != "technique";
+            s.stage = std::min(3, s.stage + (concept ? 2 : 1));
             s.lastDay = date;
             today.insert(key(code, it.id));
             left -= minutes;
@@ -531,19 +540,31 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
             day.label = "Run-through day";
         }
 
-        // warm-up: a short harmony or technique item from the day's first song with harmony work left
-        if (left >= 45 && !isShow) {
-            for (const PlanSong& ps : ordered) {
+        // warm-up: a short played harmony, technique, or voicing item (scales, arpeggios, voicings in time), from the
+        // songs in turn, the least practised first
+        if (left >= 45 && !isShow && !ordered.empty()) {
+            const int n = int(ordered.size());
+            for (int k = 0; k < n; ++k) {
+                const PlanSong& ps = ordered[(di + k) % n];
                 auto lib = libs.find(ps.code);
                 if (lib == libs.end()) {
                     continue;
                 }
                 const Item* best = nullptr;
+                int bestKey = 1 << 30;
                 for (const Item& it : lib->second.items) {
-                    if ((it.category == "harmony" || it.category == "technique") && it.level == 1 && prereqsMet(ps.code, it)
-                        && sim[key(ps.code, it.id)].stage < 3 && !today.count(key(ps.code, it.id))) {
+                    if (!(it.category == "harmony" || it.category == "technique" || it.category == "voicings") || it.level > 2
+                        || it.xml.isEmpty() || !prereqsMet(ps.code, it) || today.count(key(ps.code, it.id))) {
+                        continue;
+                    }
+                    const Sim& s = sim[key(ps.code, it.id)];
+                    if (s.stage >= 3) {
+                        continue;
+                    }
+                    const int k2 = s.scheduled * 10 + it.level;
+                    if (k2 < bestKey) {
+                        bestKey = k2;
                         best = &it;
-                        break;
                     }
                 }
                 if (best) {
@@ -578,84 +599,102 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
             }
         }
 
-        if (!isShow) {
-            // owed minutes for the day
+        if (!isShow && left >= 5) {
+            // each song is owed minutes every day by its weight; a day works on the songs owed most (a handful, about
+            // 20 minutes each, so the day isn't 15 songs of 6 minutes), and what a song gets comes off what it's owed
             for (const auto& [code, w] : weight) {
                 debt[code] += std::max(0, left) * w / totalWeight;
             }
-            // songs in order of what they're owed; each gets its owed minutes now when that's at least a block
+            const PlanSong* psOf = nullptr;
+            auto planSong = [&](const QString& code) -> const PlanSong* {
+                psOf = nullptr;
+                for (const PlanSong& p : req.songs) {
+                    if (p.code == code) {
+                        psOf = &p;
+                    }
+                }
+                return psOf;
+            };
+            // the best item of a song for today (nullptr: nothing left to do)
+            std::map<QString, std::map<QString, int> > areaUsed;
+            auto bestItem = [&](const QString& code) -> const Item* {
+                const Library& lib = libs.at(code);
+                const PlanSong* ps = planSong(code);
+                const Item* best = nullptr;
+                double bestScore = -1e9;
+                for (const Item& it : lib.items) {
+                    const Sim& s = sim[key(code, it.id)];
+                    if (today.count(key(code, it.id)) || (it.category == "performance" && !runThrough && s.stage < 1
+                                                          && lib.items.size() > 20 && di < nDays - 2)) {
+                        continue;
+                    }
+                    if (!prereqsMet(code, it)) {
+                        continue;
+                    }
+                    const QString area = areaOf(it.category);
+                    const int need = ps && ps->needs.count(area) ? ps->needs.at(area) : 1;
+                    if (need <= 0 && it.category != "performance") {
+                        continue;
+                    }
+                    double score = need * 10.0 - it.level * 3.0 - areaUsed[code][area] * 6.0;
+                    const int since = s.lastDay.isValid() ? s.lastDay.daysTo(date) : 99;
+                    if (s.stage >= 4) {
+                        score -= 40;
+                    } else if (s.stage >= 3) {
+                        score -= since >= 4 ? 8 : 30;   // solid: a review now and then
+                    } else if (s.scheduled > 0) {
+                        score += since >= 2 ? 4 : -4;   // learning: back every other day or so
+                    }
+                    score -= s.scheduled * 1.5;
+                    if (score > bestScore) {
+                        bestScore = score;
+                        best = &it;
+                    }
+                }
+                return best;
+            };
             std::vector<QString> codes;
             for (const PlanSong& ps : ordered) {
                 if (weight.count(ps.code)) {
                     codes.push_back(ps.code);
                 }
             }
-            const int dayLeft = left;
-            for (const QString& code : codes) {
-                const auto& lib = libs.at(code);
-                const PlanSong* ps = nullptr;
-                for (const PlanSong& p : req.songs) {
-                    if (p.code == code) {
-                        ps = &p;
+            std::stable_sort(codes.begin(), codes.end(), [&](const QString& x, const QString& y) { return debt[x] > debt[y]; });
+            const int maxSongs = std::clamp(int(std::lround(left / 20.0)), 1, std::max(1, int(codes.size())));
+            std::vector<QString> chosen(codes.begin(), codes.begin() + std::min<size_t>(maxSongs, codes.size()));
+            size_t nextCandidate = chosen.size();
+            std::map<QString, int> spentToday;
+            while (left >= 5) {
+                // the chosen song owed most after what it already got today
+                QString pick;
+                double most = -1e18;
+                for (const QString& c : chosen) {
+                    const double owed = debt[c];
+                    if (owed > most) {
+                        most = owed;
+                        pick = c;
                     }
                 }
-                int budget = int(std::floor(debt[code] / 5.0)) * 5;
-                if (budget < 8 && dayLeft >= 60) {
-                    continue;   // its turn comes another day
+                if (pick.isEmpty()) {
+                    if (nextCandidate < codes.size()) {
+                        chosen.push_back(codes[nextCandidate++]);
+                        continue;
+                    }
+                    break;
                 }
-                budget = std::min(budget, left);
-                if (budget < 5) {
+                const Item* it = bestItem(pick);
+                if (!it) {
+                    chosen.erase(std::remove(chosen.begin(), chosen.end(), pick), chosen.end());
                     continue;
                 }
-                std::map<QString, int> areaUsed;
-                int spent = 0;
-                while (budget - spent >= 5) {
-                    const Item* best = nullptr;
-                    double bestScore = -1e9;
-                    for (const Item& it : lib.items) {
-                        const Sim& s = sim[key(code, it.id)];
-                        if (today.count(key(code, it.id)) || (it.category == "performance" && !runThrough && s.stage < 1
-                                                              && lib.items.size() > 20 && di < nDays - 2)) {
-                            continue;
-                        }
-                        if (!prereqsMet(code, it)) {
-                            continue;
-                        }
-                        const QString area = areaOf(it.category);
-                        const int need = ps && ps->needs.count(area) ? ps->needs.at(area) : 1;
-                        if (need <= 0 && it.category != "performance") {
-                            continue;
-                        }
-                        double score = need * 10.0 - it.level * 3.0 - areaUsed[area] * 6.0;
-                        if (s.stage >= 4) {
-                            score -= 40;
-                        } else if (s.stage >= 3) {
-                            // solid: a review now and then
-                            const int since = s.lastDay.isValid() ? s.lastDay.daysTo(date) : 99;
-                            score -= since >= 4 ? 8 : 30;
-                        } else if (s.scheduled > 0) {
-                            // learning: back every other day or so
-                            const int since = s.lastDay.isValid() ? s.lastDay.daysTo(date) : 99;
-                            score += since >= 2 ? 6 : (since == 1 ? 2 : -10);
-                        }
-                        score -= s.scheduled * 1.5;
-                        if (score > bestScore) {
-                            bestScore = score;
-                            best = &it;
-                        }
-                    }
-                    if (!best) {
-                        break;
-                    }
-                    const int m = std::min(best->minutes, budget - spent);
-                    if (m < 5) {
-                        break;
-                    }
-                    schedule(code, *best, m, "item");
-                    areaUsed[areaOf(best->category)] += 1;
-                    spent += m;
+                const int m = std::min(it->minutes, left);
+                if (m < 5) {
+                    break;
                 }
-                debt[code] -= spent;
+                schedule(pick, *it, m, "item");
+                areaUsed[pick][areaOf(it->category)] += 1;
+                debt[pick] -= m;
+                spentToday[pick] += m;
             }
         }
         // the day in set order, warm-up first
