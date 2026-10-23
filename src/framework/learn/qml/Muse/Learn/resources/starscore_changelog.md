@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.90
+
+- **Part scores lose MuseScore's duplicate numbers.** A part score MuseScore named "Piano 2" or "Electric Piano (1)" to keep it apart from another part score of the same name is renamed "Piano" or "Electric Piano" when you open the song, as long as no other part score has that name any more. The exported sheet's top-left label then reads the right name (The Trip's Keys sheet said "Piano 2").
+
 ## 1.18.89
 
 - **Live performance recordings.** In Recordings › Albums, sessions, and originals, the kind dropdown has "Live performance" for a video of a live show that isn't in the filmed-shows list. The Recordings pages list them under "Live performance" (named by the album / who field, or the video's title from a pasted link) and count them with the filmed performances.

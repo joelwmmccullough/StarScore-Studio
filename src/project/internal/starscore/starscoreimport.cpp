@@ -2530,6 +2530,18 @@ int StarScoreService::renameOffSchemePartScores()
                 want = partName;
             }
         }
+        // a number MuseScore added to keep two part scores' names apart ("Piano 2", "Electric Piano (1)": The Trip's
+        // Keys, when its lead sheet was a piano part too), when no other part score has the name any more
+        if (want.isEmpty() && ps.size() == 1) {
+            static const QRegularExpression numberedRe("^(.+?)\\s+(?:\\d+|\\(\\d+\\))$");
+            const QRegularExpressionMatch m = numberedRe.match(name);
+            QString partName = ps.front()->partName().toQString().trimmed();
+            partName = partName.mid(partName.lastIndexOf(": ") + (partName.contains(": ") ? 2 : 0));
+            if (m.hasMatch() && m.captured(1).compare(partName, Qt::CaseInsensitive) == 0
+                && !taken.contains(m.captured(1).toLower())) {
+                want = m.captured(1);
+            }
+        }
         if (want.isEmpty()) {
             // does the name say what's in it?
             QSet<QString> known { "keys", "drums", "percussion", "guitar", "bass", "lead", "sheet", "synth", "sax" };
