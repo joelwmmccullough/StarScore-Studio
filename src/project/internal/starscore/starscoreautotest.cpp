@@ -1393,6 +1393,10 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
                 }
             }
             store(d);
+            // as adding instruments in the app does: the arrangement scores take the new part, the house style the
+            // new part score (it came out A4)
+            syncArrangementScores();
+            applyStyles(sec.partIds);
             autotestLog(QString("  added %1 (%2) to %3").arg(a.value(1), sec.partIds.join(","), a.value(2)));
         }
     } else if (step.startsWith("restoresection:")) {
