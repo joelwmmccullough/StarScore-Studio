@@ -143,6 +143,7 @@ void ProjectModule::resolveImports()
         ir->registerQmlUri(Uri("musescore://starscore/roster"), "MuseScore.Project", "BandRosterDialog");
         ir->registerQmlUri(Uri("musescore://starscore/recordings"), "MuseScore.Project", "RecordingsDialog");
         ir->registerQmlUri(Uri("musescore://starscore/import"), "MuseScore.Project", "StarScoreImportDialog");
+        ir->registerQmlUri(Uri("musescore://starscore/practicerunner"), "MuseScore.Project", "PracticeRunnerDialog");
     }
 
     auto er = ioc()->resolve<muse::extensions::IExtensionsExecPointsRegister>(moduleName());

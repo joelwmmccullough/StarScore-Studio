@@ -76,6 +76,7 @@ DockPage {
 
         switch (name) {
         case "dashboard": root.central = dashboardComp; break
+        case "practice": root.central = practiceComp; break
         case "songbooks": root.central = songbooksComp; break
         case "plugins": root.central = extensionsComp; break // backward compatibility
         case "extensions": root.central = extensionsComp; break
@@ -135,6 +136,12 @@ DockPage {
         id: accountComp
 
         AccountPage {}
+    }
+
+    Component {
+        id: practiceComp
+
+        StarScorePractice {}
     }
 
     Component {

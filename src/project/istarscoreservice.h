@@ -9,6 +9,9 @@
  */
 #pragma once
 
+#include <QImage>
+#include <QList>
+
 #include <map>
 #include <optional>
 #include <utility>
@@ -922,5 +925,12 @@ public:
     virtual QStringList auditWalkPaths() const = 0;
     virtual void auditWalkStep(int delta) = 0;       // open the next (+1) or previous (-1) song
     virtual void stopAuditWalk() = 0;
+
+    // --- Practice (Joel, 22 Oct 2026): a practice item's exercise (MusicXML)
+    //! Its notation as images, one per page: transparent background, light notes, gold chord symbols; backing
+    //! staves (bass, drums) left out
+    virtual QList<QImage> renderPracticeExercise(const QString& musicXml, int dpi) = 0;
+    //! Opens it as a score (backing included) at the given tempo, to play along with
+    virtual muse::Ret openPracticeExercise(const QString& musicXml, const QString& title, int tempo, bool play) = 0;
 };
 }
