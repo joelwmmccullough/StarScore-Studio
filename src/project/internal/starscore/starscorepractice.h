@@ -170,6 +170,9 @@ struct PlanRequest {
 Plan makePlan(const PlanRequest& request, const std::map<QString, Library>& libraries, const Progress& progress,
               const Plan* existing = nullptr, const QDate& fromDate = QDate());
 
+//! The folder of songs to read libraries from: the library folder, or the automatic tests' folder
+QString libraryRoot(const QString& libraryFolder);
+
 //! Where practice data lives (progress.json, plans/, setlist.json)
 QString practiceFolder();
 std::vector<Plan> loadPlans();       // newest first
@@ -181,6 +184,8 @@ bool deletePlan(const QString& id);
 QString irealHtml(const Plan& plan, const std::map<QString, Library>& libraries, int dayIndex = -1);
 
 QString categoryName(const QString& category);
+//! Chord names in text with real accidentals and symbols: "Bb^7" -> "B♭Δ7", "F#m7b5" -> "F♯ø7", "C7b9" -> "C7♭9"
+QString prettyText(const QString& text);
 QString formatMinutes(int minutes);
 QString stageName(int stage);
 }

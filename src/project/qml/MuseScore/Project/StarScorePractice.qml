@@ -53,7 +53,8 @@ Rectangle {
 
         // ---------------- Setlist ----------------
         Rectangle {
-            Layout.preferredWidth: 360
+            Layout.preferredWidth: 340
+            Layout.minimumWidth: 300
             Layout.fillHeight: true
             radius: 6
             color: ui.theme.backgroundPrimaryColor
@@ -190,7 +191,8 @@ Rectangle {
 
         // ---------------- Make ----------------
         Rectangle {
-            Layout.preferredWidth: 300
+            Layout.preferredWidth: 270
+            Layout.minimumWidth: 240
             Layout.fillHeight: true
             radius: 6
             color: ui.theme.backgroundPrimaryColor
@@ -232,7 +234,7 @@ Rectangle {
                     SeparatorLine { Layout.topMargin: 8; Layout.bottomMargin: 8 }
 
                     StyledTextLabel {
-                        text: qsTrc("starscore", "Every day up to a show")
+                        text: qsTrc("starscore", "Up to a show")
                         font: ui.theme.headerBoldFont
                     }
                     RowLayout {
@@ -306,6 +308,7 @@ Rectangle {
         // ---------------- Plans ----------------
         ColumnLayout {
             Layout.fillWidth: true
+            Layout.minimumWidth: 420
             Layout.fillHeight: true
             spacing: 10
 

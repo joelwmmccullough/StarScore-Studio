@@ -123,7 +123,7 @@ QVariantList PracticeRunnerModel::blocks() const
         auto lib = m_libs.find(b.code);
         const practice::Item* it = lib == m_libs.end() ? nullptr : lib->second.item(b.itemId);
         out << QVariantMap { { "index", i }, { "song", lib == m_libs.end() ? b.code : lib->second.title },
-                             { "title", it ? it->title : b.itemId }, { "minutes", b.minutes }, { "done", b.done } };
+                             { "title", it ? practice::prettyText(it->title) : b.itemId }, { "minutes", b.minutes }, { "done", b.done } };
     }
     return out;
 }
@@ -147,22 +147,27 @@ QVariantMap PracticeRunnerModel::block() const
         m["title"] = b.itemId;
         return m;
     }
-    m["title"] = it->title;
+    m["title"] = practice::prettyText(it->title);
     m["category"] = it->category;
     m["categoryName"] = practice::categoryName(it->category);
     const practice::Solo* solo = lib->solo(it->solo);
-    m["solo"] = solo ? solo->name : QString();
+    m["solo"] = solo ? practice::prettyText(solo->name) : QString();
     m["soloInfo"] = solo ? QStringList { solo->bars.isEmpty() ? QString() : "Bars " + solo->bars, solo->form, solo->changes }
                     .filter(QRegularExpression(".")).join(" · ") : QString();
+    m["soloInfo"] = practice::prettyText(m["soloInfo"].toString());
     m["sections"] = it->sections.join(", ");
     m["level"] = it->level;
-    m["goal"] = it->goal;
-    m["steps"] = it->steps;
+    m["goal"] = practice::prettyText(it->goal);
+    QStringList steps;
+    for (const QString& st : it->steps) {
+        steps << practice::prettyText(st);
+    }
+    m["steps"] = steps;
     m["tempoStart"] = it->tempoStart;
     m["tempoGoal"] = it->tempoGoal;
-    m["moveOnWhen"] = it->moveOnWhen;
-    m["listen"] = it->listen;
-    m["refs"] = it->refs.join("; ");
+    m["moveOnWhen"] = practice::prettyText(it->moveOnWhen);
+    m["listen"] = practice::prettyText(it->listen);
+    m["refs"] = practice::prettyText(it->refs.join("; "));
     m["hasExercise"] = !it->xml.isEmpty();
     m["hasBacking"] = it->xml.contains("<part id=\"P2\"");
     m["hasIreal"] = !it->irealProg.isEmpty();
@@ -202,7 +207,7 @@ void PracticeRunnerModel::load(const QString& planId, int dayIndex, int blockInd
         emit changed();
         return;
     }
-    const QString root = starScore()->auditLibraryFolder();
+    const QString root = practice::libraryRoot(starScore()->auditLibraryFolder());
     for (const practice::SongEntry& e : practice::scanLibraries(root, practice::practiceFolder() + "/libraries.json")) {
         m_paths[e.code] = e.path;
     }

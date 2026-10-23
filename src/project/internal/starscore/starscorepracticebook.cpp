@@ -66,16 +66,10 @@ QString esc(const QString& s)
     return s.toHtmlEscaped();
 }
 
-//! chord-ish text: "b" and "#" after a letter as real accidentals
+//! chord-ish text with real accidentals and symbols
 QString pretty(const QString& s)
 {
-    QString out = s;
-    static const QRegularExpression flat("([A-G])b(?![a-z])");
-    static const QRegularExpression sharp("([A-G])#");
-    out.replace(flat, "\\1\u266D");
-    out.replace(sharp, "\\1\u266F");
-    out.replace("m7b5", "\u00F87");
-    return out;
+    return mu::project::practice::prettyText(s);
 }
 
 //! One thing on the page: a block of HTML text, an image, a rule, or a page break
@@ -248,14 +242,16 @@ bool mu::project::practice::writePracticeBook(const Plan& plan, const std::map<Q
                       "aren't solid yet come back, and the run-through day before the show plays every song through.</p>"
                     : "<p>Mark each block in StarScore's practice runner as you finish it, with the tempo you reached and how solid it "
                       "is. The next routine you make starts from there.</p>";
-        // the setlist
-        h += "<br><p class='label'>THE SONGS</p><table width='100%' cellspacing='0'>";
+        h += "<br><p class='label'>THE SONGS</p>";
+        html(h);
+        // the setlist, a row at a time (so a long setlist runs onto the next page)
         int curSet = -1;
         for (const PlanSong& s : plan.songs) {
+            QString row;
             if (s.set != curSet) {
                 curSet = s.set;
                 if (s.set > 0) {
-                    h += QString("<tr><td colspan='3' class='gold' style='padding-top:8px;'>SET %1</td></tr>").arg(s.set);
+                    row += QString("<p class='gold' style='margin-top:6px;'>SET %1</p>").arg(s.set);
                 }
             }
             auto lib = libs.find(s.code);
@@ -267,12 +263,12 @@ bool mu::project::practice::writePracticeBook(const Plan& plan, const std::map<Q
                     }
                 }
             }
-            h += QString("<tr><td>%1</td><td class='muted'>%2</td><td align='right' class='muted'>%3</td></tr>")
-                 .arg(esc(s.title), lib == libs.end() ? QString("no library yet") : esc(lib->second.style),
-                      songMin ? esc(formatMinutes(songMin)) : QString("&mdash;"));
+            row += QString("<table width='100%' cellspacing='0'><tr><td width='28%'>%1</td><td width='58%' class='muted'>%2</td>"
+                           "<td width='14%' align='right' class='muted'>%3</td></tr></table>")
+                   .arg(esc(s.title), lib == libs.end() ? QString("no library yet") : esc(lib->second.style),
+                        songMin ? esc(formatMinutes(songMin)) : QString("&mdash;"));
+            html(row);
         }
-        h += "</table>";
-        html(h);
     }
 
     // the days

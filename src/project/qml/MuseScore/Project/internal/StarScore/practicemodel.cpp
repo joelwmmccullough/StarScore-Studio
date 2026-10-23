@@ -204,7 +204,7 @@ QVariantMap PracticeModel::plan() const
                 }
             }
             blocks << QVariantMap {
-                { "index", bi }, { "code", b.code }, { "song", song }, { "title", it ? it->title : b.itemId },
+                { "index", bi }, { "code", b.code }, { "song", song }, { "title", it ? practice::prettyText(it->title) : b.itemId },
                 { "category", it ? it->category : QString() }, { "categoryName", it ? practice::categoryName(it->category) : QString() },
                 { "solo", it && lib != libs.end() && lib->second.solo(it->solo) ? lib->second.solo(it->solo)->name : QString() },
                 { "minutes", b.minutes }, { "tempo", b.tempo }, { "done", b.done }, { "kind", b.kind },
@@ -251,10 +251,7 @@ QString PracticeModel::libraryFolder() const
 // ---------------------------------------------------------------- loading
 void PracticeModel::load()
 {
-    m_root = starScore()->auditLibraryFolder();
-    if (const QString test = qEnvironmentVariable("STARSCORE_AUTOTEST_PRACTICE"); !test.isEmpty()) {
-        m_root = test;   // (the automatic tests' songs)
-    }
+    m_root = practice::libraryRoot(starScore()->auditLibraryFolder());
     loadSettings();
     m_busy = true;
     setStatus(QStringLiteral("Reading the song libraries…"));

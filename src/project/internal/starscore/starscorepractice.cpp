@@ -718,6 +718,12 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
 }
 
 // ---------------------------------------------------------------- saved plans
+QString mu::project::practice::libraryRoot(const QString& libraryFolder)
+{
+    const QString test = qEnvironmentVariable("STARSCORE_AUTOTEST_PRACTICE");
+    return test.isEmpty() ? libraryFolder : test;
+}
+
 QString mu::project::practice::practiceFolder()
 {
     const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/practice";
@@ -829,6 +835,30 @@ QString mu::project::practice::irealHtml(const Plan& plan, const std::map<QStrin
                    "background:#16130f;color:#ede6d6'><style>a{color:#d4a85a}</style><h2>%1</h2>"
                    "<p>Tap a link to open it in iReal Pro. Each chart is the chord progression of one practice item.</p>%2</body></html>")
            .arg(esc(plan.name), body);
+}
+
+QString mu::project::practice::prettyText(const QString& s)
+{
+    QString out = s;
+    static const QRegularExpression flat("(?<![A-Za-z])([A-G])b(?![a-ln-z])");
+    static const QRegularExpression sharp("(?<![A-Za-z])([A-G])#");
+    static const QRegularExpression halfDim("m7b5");
+    static const QRegularExpression major7(QString::fromUtf8("(?<=[A-G\u266D\u266F])\\^(?=\\d)"));
+    static const QRegularExpression ext("(?<=[0-9)])([b#])(?=\\d)");
+    out.replace(halfDim, "\u00F87");
+    out.replace(flat, "\\1\u266D");
+    out.replace(sharp, "\\1\u266F");
+    out.replace(major7, "\u0394");
+    QString r;
+    int last = 0;
+    for (auto it = ext.globalMatch(out); it.hasNext();) {
+        const QRegularExpressionMatch m = it.next();
+        r += out.mid(last, m.capturedStart(1) - last);
+        r += m.captured(1) == "b" ? QString(QChar(0x266D)) : QString(QChar(0x266F));
+        last = m.capturedEnd(1);
+    }
+    r += out.mid(last);
+    return r;
 }
 
 QString mu::project::practice::categoryName(const QString& c)
