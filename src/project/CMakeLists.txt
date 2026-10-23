@@ -135,6 +135,11 @@ target_sources(project PRIVATE
     internal/starscore/starscoreengraving.h
     internal/starscore/starscorechordchart.cpp
     internal/starscore/starscorechordchart.h
+    internal/starscore/starscorepractice.cpp
+    internal/starscore/starscorepractice.h
+    internal/starscore/starscorepracticebook.cpp
+    internal/starscore/starscorepracticebook.h
+    internal/starscore/starscorepracticeservice.cpp
 
     internal/starscore/organizer/orgcore.cpp
     internal/starscore/organizer/orgcore.h
@@ -190,6 +195,9 @@ set_source_files_properties(internal/starscore/starscoretodo.cpp PROPERTIES SKIP
 set_source_files_properties(internal/starscore/starscoreautotest.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 # StarScore chord charts: its own translation unit (file-local helper types named like the audit's)
 set_source_files_properties(internal/starscore/starscorechordchart.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+# StarScore practice: their own translation units (file-local helpers)
+set_source_files_properties(internal/starscore/starscorepractice.cpp internal/starscore/starscorepracticebook.cpp
+    internal/starscore/starscorepracticeservice.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 # zstd (BSD, facebook/zstd 1.5.7, single-file build) for the autosave archive's packed song histories
 target_sources(project PRIVATE thirdparty/zstd/zstd.c thirdparty/zstd/zstd.h thirdparty/zstd/zstd_errors.h)
 set_source_files_properties(thirdparty/zstd/zstd.c PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON SKIP_PRECOMPILE_HEADERS ON COMPILE_OPTIONS "-w")

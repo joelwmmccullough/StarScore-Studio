@@ -286,6 +286,36 @@ void ProjectActionsController::init()
         }
     });
 
+    // StarScore practice: open an exercise (or a song) in this window in place of the open score, then optionally play
+    dispatcher()->reg(this, "starscore-practice-open", [this](const ActionData& args) {
+        const QUrl url = !args.empty() ? args.arg<QUrl>(0) : QUrl();
+        const bool play = args.count() > 1 ? args.arg<bool>(1) : false;
+        if (!url.isLocalFile()) {
+            return;
+        }
+        const muse::io::path_t path = fileSystem()->absoluteFilePath(muse::io::path_t(url.toLocalFile()));
+        if (multiwindowsProvider()->isProjectAlreadyOpened(path) && !isProjectOpened(path)) {
+            multiwindowsProvider()->activateWindowWithProject(path);
+            return;
+        }
+        if (isProjectOpened(path)) {
+            // the same exercise again (at a new tempo): read it again
+            if (!closeOpenedProject(false)) {
+                return;
+            }
+        } else if (currentNotationProject() && !closeOpenedProject(false)) {
+            return;   // save prompt cancelled: stay on this score
+        }
+        Ret ret = openProject(path);
+        if (!ret) {
+            LOGE() << ret.toString();
+            return;
+        }
+        if (play) {
+            QTimer::singleShot(600, [this]() { dispatcher()->dispatch("play"); });
+        }
+    });
+
     dispatcher()->reg(this, "file-close", [this]() {
         auto anyInstanceWithoutProject = multiwindowsProvider()->isHasWindowWithoutProject();
         bool ok = closeOpenedProject();
@@ -357,6 +387,7 @@ bool ProjectActionsController::canReceiveAction(const ActionCode& code) const
             "starscore-autosave-archive",
             "starscore-audit-library",
             "starscore-audit-open",
+            "starscore-practice-open",
             "starscore-organize",
             "starscore-rebuild-all",
             "starscore-band-roster",
@@ -583,7 +614,9 @@ Ret ProjectActionsController::doOpenProject(const muse::io::path_t& filePath)
     INotationProjectPtr project = rv.val;
 
     bool isNewlyCreated = projectAutoSaver()->isAutosaveOfNewlyCreatedProject(filePath);
-    if (!isNewlyCreated) {
+    // StarScore practice: an exercise is opened as it is (not imported, not saved as a .starscore, not in recent files)
+    const bool isPracticeExercise = filePath.toQString().contains("/StarScore Practice/");
+    if (!isNewlyCreated && !isPracticeExercise) {
         recentFilesController()->prependRecentFile(makeRecentFile(project));
     }
 
@@ -593,7 +626,7 @@ Ret ProjectActionsController::doOpenProject(const muse::io::path_t& filePath)
 
     // StarScore Studio: a MuseScore file is imported (sections and arrangements chosen) rather than opened as it is,
     // and saving it makes a new .starscore
-    if (ret && !isNewlyCreated && io::suffix(filePath) != "starscore") {
+    if (ret && !isNewlyCreated && !isPracticeExercise && io::suffix(filePath) != "starscore") {
         if (starScoreService()->needsImport()) {
             QTimer::singleShot(0, [this]() {
                 interactive()->open(Uri("musescore://starscore/import"));

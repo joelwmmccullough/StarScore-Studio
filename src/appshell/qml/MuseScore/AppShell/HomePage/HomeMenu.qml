@@ -90,7 +90,8 @@ Item {
             spacing: 0
 
             model: {
-                var pages = [ { "name": "dashboard", "title": qsTrc("starscore", "Dashboard"), "iconCode": IconCode.STAR } ]
+                var pages = [ { "name": "dashboard", "title": qsTrc("starscore", "Dashboard"), "iconCode": IconCode.STAR },
+                              { "name": "practice", "title": qsTrc("starscore", "Practice"), "iconCode": IconCode.METRONOME } ]
                 // (the Scores page is the left half of the Dashboard since 1.18.3)
                 if (root.songbooksShown) {
                     pages.push({ "name": "songbooks", "title": qsTrc("starscore", "Songbooks"), "iconCode": IconCode.SCORE })

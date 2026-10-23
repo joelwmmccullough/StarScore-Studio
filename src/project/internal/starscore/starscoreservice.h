@@ -319,6 +319,9 @@ public:
     QStringList auditWalkPaths() const override;
     void auditWalkStep(int delta) override;
     void stopAuditWalk() override;
+
+    QList<QImage> renderPracticeExercise(const QString& musicXml, int dpi) override;
+    muse::Ret openPracticeExercise(const QString& musicXml, const QString& title, int tempo, bool play) override;
     void openAuditWalkSong();
 
     struct Data {
