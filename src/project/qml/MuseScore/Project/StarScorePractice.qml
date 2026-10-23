@@ -67,8 +67,10 @@ Rectangle {
 
                 RowLayout {
                     Layout.fillWidth: true
+                    Layout.preferredWidth: 60
                     StyledTextLabel {
                         Layout.fillWidth: true
+                        Layout.preferredWidth: 60
                         horizontalAlignment: Text.AlignLeft
                         text: qsTrc("starscore", "Setlist")
                         font: ui.theme.headerBoldFont
@@ -86,6 +88,7 @@ Rectangle {
 
                 StyledTextLabel {
                     Layout.fillWidth: true
+                    Layout.preferredWidth: 60
                     visible: !root.editingSetlist
                     wrapMode: Text.WordWrap
                     horizontalAlignment: Text.AlignLeft
@@ -95,6 +98,7 @@ Rectangle {
 
                 Rectangle {
                     Layout.fillWidth: true
+                    Layout.preferredWidth: 60
                     Layout.fillHeight: true
                     visible: root.editingSetlist
                     color: ui.theme.textFieldColor
@@ -116,6 +120,7 @@ Rectangle {
 
                 StyledFlickable {
                     Layout.fillWidth: true
+                    Layout.preferredWidth: 60
                     Layout.fillHeight: true
                     visible: !root.editingSetlist
                     contentHeight: setColumn.implicitHeight
@@ -133,6 +138,7 @@ Rectangle {
                                 required property var modelData
                                 required property int index
                                 Layout.fillWidth: true
+                                Layout.preferredWidth: 60
                                 spacing: 2
 
                                 StyledTextLabel {
@@ -145,10 +151,12 @@ Rectangle {
 
                                 RowLayout {
                                     Layout.fillWidth: true
+                                    Layout.preferredWidth: 60
                                     spacing: 4
 
                                     StyledTextLabel {
                                         Layout.fillWidth: true
+                                        Layout.preferredWidth: 60
                                         horizontalAlignment: Text.AlignLeft
                                         elide: Text.ElideRight
                                         text: modelData.title
@@ -181,6 +189,7 @@ Rectangle {
 
                 StyledTextLabel {
                     Layout.fillWidth: true
+                    Layout.preferredWidth: 60
                     visible: !root.editingSetlist
                     horizontalAlignment: Text.AlignLeft
                     opacity: 0.6
@@ -225,6 +234,7 @@ Rectangle {
                     }
                     FlatButton {
                         Layout.fillWidth: true
+                        Layout.preferredWidth: 60
                         text: qsTrc("starscore", "Make a routine")
                         accentButton: true
                         enabled: !pm.busy
@@ -259,6 +269,7 @@ Rectangle {
                     }
                     StyledTextLabel {
                         Layout.fillWidth: true
+                        Layout.preferredWidth: 60
                         wrapMode: Text.WordWrap
                         horizontalAlignment: Text.AlignLeft
                         opacity: 0.7
@@ -269,6 +280,7 @@ Rectangle {
                         delegate: RowLayout {
                             required property var modelData
                             Layout.fillWidth: true
+                            Layout.preferredWidth: 60
                             spacing: 8
                             StyledTextLabel {
                                 Layout.preferredWidth: 110
@@ -296,6 +308,7 @@ Rectangle {
                     }
                     FlatButton {
                         Layout.fillWidth: true
+                        Layout.preferredWidth: 60
                         text: qsTrc("starscore", "Make a plan")
                         accentButton: true
                         enabled: !pm.busy && pm.days.length > 0
@@ -308,12 +321,14 @@ Rectangle {
         // ---------------- Plans ----------------
         ColumnLayout {
             Layout.fillWidth: true
+            Layout.preferredWidth: 400   // (wider when there's room: the long titles elide instead of widening it)
             Layout.minimumWidth: 420
             Layout.fillHeight: true
             spacing: 10
 
             RowLayout {
                 Layout.fillWidth: true
+                Layout.preferredWidth: 60
                 spacing: 8
                 StyledTextLabel {
                     text: qsTrc("starscore", "Practice")
@@ -328,6 +343,7 @@ Rectangle {
                 }
                 Item { Layout.fillWidth: true }
                 FlatButton {
+                    minWidth: 60
                     text: qsTrc("starscore", "Song folder…")
                     toolTipTitle: qsTrc("starscore", "The folder with your Starsign songs")
                     toolTipDescription: pm.libraryFolder
@@ -335,6 +351,7 @@ Rectangle {
                     onClicked: pm.chooseLibraryFolder()
                 }
                 FlatButton {
+                    minWidth: 60
                     text: qsTrc("starscore", "Read songs again")
                     enabled: !pm.busy
                     onClicked: pm.rescan()
@@ -343,6 +360,7 @@ Rectangle {
 
             StyledTextLabel {
                 Layout.fillWidth: true
+                Layout.preferredWidth: 60
                 horizontalAlignment: Text.AlignLeft
                 wrapMode: Text.WordWrap
                 text: pm.status
@@ -351,24 +369,29 @@ Rectangle {
 
             RowLayout {
                 Layout.fillWidth: true
+                Layout.preferredWidth: 60
                 spacing: 8
                 visible: pm.plan.id !== undefined
                 FlatButton {
+                    minWidth: 60
                     text: qsTrc("starscore", "Practice today")
                     accentButton: true
                     enabled: pm.plan.todayIndex !== undefined && pm.plan.todayIndex >= 0
                     onClicked: pm.openRunner(pm.plan.todayIndex, 0)
                 }
                 FlatButton {
+                    minWidth: 60
                     text: qsTrc("starscore", "Practice book (PDF)")
                     enabled: !pm.busy
                     onClicked: pm.makeBook(-1)
                 }
                 FlatButton {
+                    minWidth: 60
                     text: qsTrc("starscore", "iReal Pro charts")
                     onClicked: pm.exportIreal(-1)
                 }
                 FlatButton {
+                    minWidth: 60
                     text: qsTrc("starscore", "Plan again from today")
                     toolTipTitle: qsTrc("starscore", "Plan again from today")
                     toolTipDescription: qsTrc("starscore", "Plans the days from today on again, from what you've done so far and how solid it is.")
@@ -377,10 +400,12 @@ Rectangle {
                 }
                 Item { Layout.fillWidth: true }
                 FlatButton {
+                    minWidth: 60
                     text: qsTrc("starscore", "Folder")
                     onClicked: pm.openOutputFolder()
                 }
                 FlatButton {
+                    minWidth: 60
                     text: qsTrc("starscore", "Delete")
                     onClicked: pm.deletePlan(pm.planId)
                 }
@@ -388,6 +413,7 @@ Rectangle {
 
             StyledTextLabel {
                 Layout.fillWidth: true
+                Layout.preferredWidth: 60
                 visible: pm.plan.id !== undefined
                 horizontalAlignment: Text.AlignLeft
                 text: qsTrc("starscore", "%1 of %2 done").arg(pm.plan.done || 0).arg(pm.plan.total || 0)
@@ -396,6 +422,7 @@ Rectangle {
 
             Rectangle {
                 Layout.fillWidth: true
+                Layout.preferredWidth: 60
                 Layout.fillHeight: true
                 radius: 6
                 color: ui.theme.backgroundPrimaryColor
@@ -428,11 +455,13 @@ Rectangle {
                                 id: dayDelegate
                                 required property var modelData
                                 Layout.fillWidth: true
+                                Layout.preferredWidth: 60
                                 spacing: 2
                                 readonly property bool expanded: root.openDay === modelData.index
 
                                 RowLayout {
                                     Layout.fillWidth: true
+                                    Layout.preferredWidth: 60
                                     spacing: 8
 
                                     FlatButton {
@@ -443,6 +472,7 @@ Rectangle {
                                     }
                                     StyledTextLabel {
                                         Layout.fillWidth: true
+                                        Layout.preferredWidth: 60
                                         horizontalAlignment: Text.AlignLeft
                                         text: dayDelegate.modelData.title + (dayDelegate.modelData.label ? " · " + dayDelegate.modelData.label : "")
                                         font: ui.theme.bodyBoldFont
@@ -482,6 +512,7 @@ Rectangle {
                                         id: blockDelegate
                                         required property var modelData
                                         Layout.fillWidth: true
+                                        Layout.preferredWidth: 60
                                         Layout.leftMargin: 36
                                         implicitHeight: blockRow.implicitHeight + 10
                                         radius: 3
@@ -518,6 +549,7 @@ Rectangle {
                                             }
                                             StyledTextLabel {
                                                 Layout.fillWidth: true
+                                                Layout.preferredWidth: 60
                                                 horizontalAlignment: Text.AlignLeft
                                                 elide: Text.ElideRight
                                                 text: (blockDelegate.modelData.kind === "warmup" ? qsTrc("starscore", "Warm-up: ")
