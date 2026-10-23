@@ -513,7 +513,9 @@ private:
     //! A Flexible section's chairs written in the clefs that keep their range on the staff: Horn 1 treble, the
     //! 3-Horn's Horn 2 soprano clef, the bottom chair alto clef. Only a chair still in its old clef (treble, the
     //! bottom chair bass) changes. Returns how many chairs changed. The exported sheets have their own clefs.
-    int applyFlexibleView(const StarScoreSection& section);
+    //! ownCommand false: inside a command the caller opened (and closes), so several sections cost one layout
+    int applyFlexibleView(const StarScoreSection& section, bool ownCommand = true);
+    void applyFlexibleViews();
     void syncSectionTabs(const QStringList& turnedOnSectionIds);
     void removeEmptyVersions(const QStringList& partIds);
     //! A part with stand-in versions (a 7-Horn section's main low horn, a Piccolo) marked Finished: offer the versions

@@ -26,7 +26,8 @@
  *   sectionbreaks the bars with a section break, score by score; addsectionbreak:<part score>:<bar> and
  *                 removesectionbreak:<part score>:<bar> add or take away one first
  *   version:X     sets the version number (version:1.2.3) in the song and every part score's footer
- *   export        Export to Sheets and Demos into STARSCORE_AUTOTEST_BAND (a copy, never the real folder)
+ *   export        Export to Sheets and Demos into STARSCORE_AUTOTEST_BAND (a copy, never the real folder);
+ *                 export:<text>[|<text>…] only the sheets whose path holds one of the texts
  *   chords        the chord charts' three outputs: chords.json (the lead sheet's form and chords, extract.py's
  *                 JSON), chart.html (the PDF page, without the version footer, as pdfchart.py writes it),
  *                 ireal.html (the iReal Pro page); plus CODE - Chord Chart.html with the footer. The page's font
@@ -55,6 +56,7 @@
 #include "global/serialization/zipreader.h"
 #include "global/serialization/zipwriter.h"
 #include <QElapsedTimer>
+#include <algorithm>
 #include "engraving/dom/starscoreprogress.h"
 #include "engraving/dom/starscoreannotations.h"
 #include "starscoreannotations.h"
@@ -2784,13 +2786,27 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         // version:1.2.3: the version number set in the song and every part score's footer (as an export does first)
         setScoreVersion(step.mid(8));
         autotestLog(QString("  version %1").arg(scoreVersion()));
-    } else if (step == "export") {
+    } else if (step == "export" || step.startsWith("export:")) {
+        // export:<text>[|<text>…]: only the sheets whose path holds one of the texts (export:Section Score), to time or
+        // check a few
         const QString band = qEnvironmentVariable("STARSCORE_AUTOTEST_BAND");
         if (band.isEmpty() || !QDir(band).exists()) {
             autotestLog("  STARSCORE_AUTOTEST_BAND missing");
         } else {
             setBandFolder(band);
-            const RetVal<QString> r = exportToBandFolder({});
+            QStringList only;
+            if (step.startsWith("export:")) {
+                const QString text = step.mid(7);
+                const QStringList texts = text.split('|', Qt::SkipEmptyParts);
+                const RetVal<StarScoreBandExportPlan> plan = planBandExport();
+                for (const StarScoreBandFile& f : plan.ret ? plan.val.files : std::vector<StarScoreBandFile>()) {
+                    if (std::any_of(texts.begin(), texts.end(), [&](const QString& t) { return f.relativePath.contains(t); })) {
+                        only << f.relativePath;
+                    }
+                }
+                autotestLog(QString("  %1 sheet(s) match \"%2\"").arg(only.size()).arg(text));
+            }
+            const RetVal<QString> r = exportToBandFolder(only);
             QString text = r.ret ? r.val : QString::fromStdString(r.ret.toString());
             text.replace("\n", "\n  ");
             autotestLog("  " + text);

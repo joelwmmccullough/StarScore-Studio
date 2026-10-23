@@ -818,10 +818,32 @@ void StarScoreService::setFlexibleViewMode(int mode)
     if (!masterScore()) {
         return;
     }
-    for (const StarScoreSection& s : load().sections) {
-        applyFlexibleView(s);
-    }
+    applyFlexibleViews();
     m_changed.notify();
+}
+
+//! Every Flexible section as the "Show Flexible horns as" setting says, in one command: each section's own command
+//! laid the song out again (G.I. Jorge, three Flexible sections: three layouts of the whole song on opening)
+void StarScoreService::applyFlexibleViews()
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    if (!master || !masterScore()) {
+        return;
+    }
+    const std::vector<StarScoreSection> sections = load().sections;
+    if (std::none_of(sections.begin(), sections.end(),
+                     [](const StarScoreSection& s) { return s.templateKey.endsWith("-horn-any"); })) {
+        return;
+    }
+    master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Show the Flexible chairs"));
+    int changed = 0;
+    for (const StarScoreSection& s : sections) {
+        changed += applyFlexibleView(s, false);
+    }
+    master->notation()->undoStack()->commitChanges();
+    if (changed) {
+        master->notation()->notationChanged().notify();
+    }
 }
 
 bool StarScoreService::hasFlexibleSections() const
@@ -834,7 +856,7 @@ bool StarScoreService::hasFlexibleSections() const
                        [](const StarScoreSection& s) { return s.templateKey.endsWith("-horn-any"); });
 }
 
-int StarScoreService::applyFlexibleView(const StarScoreSection& section)
+int StarScoreService::applyFlexibleView(const StarScoreSection& section, bool ownCommand)
 {
     IMasterNotationPtr master = globalContext()->currentMasterNotation();
     engraving::MasterScore* ms = masterScore();
@@ -848,7 +870,9 @@ int StarScoreService::applyFlexibleView(const StarScoreSection& section)
         return 0;
     }
     int changed = 0;
-    master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Show the Flexible chairs"));
+    if (ownCommand) {
+        master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Show the Flexible chairs"));
+    }
     for (int i = 0; i < n; ++i) {
         engraving::Part* part = chairs[size_t(i)];
         const engraving::Staff* staff = part->staves().empty() ? nullptr : part->staves().front();
@@ -862,9 +886,11 @@ int StarScoreService::applyFlexibleView(const StarScoreSection& section)
         starscoreSetChairDisplay(ms, part, view.transpose, view.clef);
         ++changed;
     }
-    master->notation()->undoStack()->commitChanges();
-    if (changed) {
-        master->notation()->notationChanged().notify();
+    if (ownCommand) {
+        master->notation()->undoStack()->commitChanges();
+        if (changed) {
+            master->notation()->notationChanged().notify();
+        }
     }
     return changed;
 }
@@ -2090,7 +2116,17 @@ void StarScoreService::tidyOpenedScore()
     }
     QElapsedTimer clock;   // how long the tidying takes, in the log
     clock.start();
+    QElapsedTimer stepClock;   // and where it goes: each step over a tenth of a second
+    stepClock.start();
+    QStringList slowSteps;
+    auto lap = [&](const char* what) {
+        const qint64 ms = stepClock.restart();
+        if (ms >= 100) {
+            slowSteps << QString("%1 %2 ms").arg(what).arg(ms);
+        }
+    };
     showOldAlternates();   // may store, so the data is read after it
+    lap("old alternates");
 
     // A damaged score (opened with "Open anyway"): rests on top of notes, as The Courier's bar 60 had, are taken out
     if (!ms->sanityCheck()) {
@@ -2117,6 +2153,7 @@ void StarScoreService::tidyOpenedScore()
         }
     }
 
+    lap("sanity check");
     // Stand-in versions made before 1.15.3 lost the double barlines of the line they stand in for: matched once per
     // file, then left alone (Joel adjusts stand-in parts by hand after they're made)
     Data d = load();
@@ -2144,16 +2181,19 @@ void StarScoreService::tidyOpenedScore()
         }
     }
 
+    lap("alternate barlines");
     // The Flexible chairs as the status bar's "Show Flexible horns as" says (every score, 1.18.16)
-    for (const StarScoreSection& s : d.sections) {
-        applyFlexibleView(s);
-    }
+    applyFlexibleViews();
+    lap("flexible view");
     // the arrangements' own score tabs as the "Section scores visible" switch says
     syncSectionTabs({});
+    lap("section tabs");
 
     // the part scores' composer and lyricist as the main score's (Joel, 19 Oct 2026)
     syncCreditsNow("opened");
+    lap("credits");
     syncCopyrightNow(false);
+    lap("copyright");
     // a newer default style: asked once per style per song (not in the automatic tests, which have nobody to answer)
     if (!autotestRequested()) {
         offerNewerStyle();
@@ -2167,6 +2207,7 @@ void StarScoreService::tidyOpenedScore()
         master->notation()->notationChanged().notify();
     }
 
+    lap("tempo and frames");
     // Barlines the same on every staff (a staff added later starts with plain ones)
     if (starscore::syncEndBarlines(ms, false) > 0) {
         master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Barlines the same on every staff"));
@@ -2175,6 +2216,7 @@ void StarScoreService::tidyOpenedScore()
         master->notation()->notationChanged().notify();
     }
 
+    lap("barlines");
     // Rhythm markings pinned to their space above or below the staff, so a paste or a new instrument doesn't move them
     // (Joel, 14 Oct 2026)
     if (starscore::pinRhythmMarkings(ms, false) > 0) {
@@ -2193,6 +2235,7 @@ void StarScoreService::tidyOpenedScore()
         LOGI() << "[starscore] " << cleared << " rest(s) beside rhythm markings no longer moved by hand";
     }
 
+    lap("rhythm markings");
     // One bass guitar part (Joel, 14 Oct 2026): a song with a 4-string and a 5-string bass part keeps the 4-string
     // part's notes as "Bass Guitar"; the file as it was is first copied to Version History
     if (!mergeBassParts(false).isEmpty()) {
@@ -2220,13 +2263,21 @@ void StarScoreService::tidyOpenedScore()
         }
     }
 
+    lap("one bass part");
     standardizeHornNames();
+    lap("horn names");
     renamePersonNamedPartScores();
+    lap("person-named part scores");
     addMissingPartScores();
+    lap("missing part scores");
     renameOffSchemePartScores();
+    lap("off-scheme part scores");
     bracketTwoTrumpetSections();
+    lap("two-trumpet brackets");
     makeLeadSheetVoiceWhenReady();
+    lap("lead sheet + voice");
     labelPartBooks();
+    lap("part book labels");
     // the Keys player's bass staff: always in the full score, only where it has music in the part scores
     if (starscore::applyKeysStaffRules(ms, leadSheetPartsOf(ms)) > 0) {
         if (INotationProjectPtr project = globalContext()->currentProject()) {
@@ -2234,12 +2285,15 @@ void StarScoreService::tidyOpenedScore()
         }
         master->notation()->notationChanged().notify();
     }
+    lap("keys staff rules");
     if (tidyKeysBrackets() > 0) {
         if (INotationProjectPtr project = globalContext()->currentProject()) {
             project->markAsUnsaved();
         }
     }
-    LOGI() << "[starscore] tidied the opened score in " << clock.elapsed() << " ms";
+    lap("keys brackets");
+    LOGI() << "[starscore] tidied the opened score in " << clock.elapsed() << " ms"
+           << (slowSteps.isEmpty() ? std::string() : (" (" + slowSteps.join(", ") + ")").toStdString());
 }
 
 //! An instrument in the band's words: "Violoncello" -> "Cello", "Tenor Saxophone 1" -> "Tenor Sax 1",

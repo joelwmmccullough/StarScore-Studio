@@ -2412,7 +2412,16 @@ static int starscoreTightenWrappedSystems(const INotationPtr& n)
     if (n->painting()->viewMode() != ViewMode::PAGE) {
         n->painting()->setViewMode(ViewMode::PAGE);
     }
+    static const bool printTimes = qEnvironmentVariableIsSet("STARSCORE_PRINT_TIMES");
+    QElapsedTimer clock;
+    clock.start();
+    auto lap = [&](const QString& what) {
+        if (printTimes) {
+            LOGI() << "[starscore] tighten time " << what << " " << clock.restart() << " ms";
+        }
+    };
     sc->doLayout();   // (the systems were just set; the Score's copy isn't laid out after each edit)
+    lap("first layout");
     auto systemsOf = [](const std::vector<Measure*>& run) {
         std::set<const System*> systems;
         for (const Measure* m : run) {
@@ -2473,11 +2482,17 @@ static int starscoreTightenWrappedSystems(const INotationPtr& n)
         // from the system before it until the systems after its break line up again with the layout before
         // (MuseScore's layout after an edit), not the whole Score for every step (140 s of The Courier's export,
         // 44 Scores). The decisions are the same; the Score is laid out whole once at the end.
+        // (Laying the whole Score out once per step instead, when many runs are left, was tried on 22 Oct 2026: with
+        // 14 runs it was faster, 1.2 s against 2.9 s a step, but G.I. Jorge's 7-Horn B♭ and E♭ Scores came out with
+        // other page breaks, so each run keeps its own layout.)
+        int laidOut = 0;
         for (Run& r : runs) {
             if (!r.kept) {
                 sc->doLayoutRange(r.bars.front()->tick(), r.bars.back()->endTick());
+                ++laidOut;
             }
         }
+        lap(QString("step %1: %2 run(s) of %3 laid out").arg(step).arg(laidOut).arg(runs.size()));
         for (Run& r : runs) {
             if (!r.kept && systemsOf(r.bars) < r.before) {
                 r.kept = true;   // the loosest spacing that saves a system
@@ -2497,6 +2512,7 @@ static int starscoreTightenWrappedSystems(const INotationPtr& n)
     }
     n->undoStack()->commitChanges();
     sc->doLayout();   // (the steps above laid out only the runs; what follows measures the whole page)
+    lap("last layout");
     return tightened;
 }
 
@@ -2816,6 +2832,15 @@ static Ret starscorePrintSheetAsIs(const INotationWriterPtr& writer, const INota
     if (!score) {
         return make_ret(Ret::Code::InternalError);
     }
+    // where a sheet's printing time goes, in the log (STARSCORE_PRINT_TIMES=1)
+    static const bool printTimes = qEnvironmentVariableIsSet("STARSCORE_PRINT_TIMES");
+    QElapsedTimer printClock;
+    printClock.start();
+    auto lap = [&](const char* what) {
+        if (printTimes) {
+            LOGI() << "[starscore] print time " << QString(left).replace('\n', ' ') << " " << what << " " << printClock.restart() << " ms";
+        }
+    };
     // laid out as a sheet: a rest in a beam on the note beside it isn't moved sideways or given the extra room it gets
     // on screen (Score::starscoreRestRoom), for spaceOutBeamedRests to deal with as before; laid out again before and
     // after when the screen's layout had any extra room
@@ -2837,6 +2862,7 @@ static Ret starscorePrintSheetAsIs(const INotationWriterPtr& writer, const INota
         score->setLayoutAll();
         score->doLayout();
     }
+    lap("screen room layout");
     if (partSheet) {
         starscoreRetitleTexts(score, left, right);
     }
@@ -2847,6 +2873,7 @@ static Ret starscorePrintSheetAsIs(const INotationWriterPtr& writer, const INota
     } else {
         score->doLayout();
     }
+    lap("sheet layout");
     if (partSheet) {
         starscore::levelArrangementLabel(score);
         // a long instrument name running into the title is shortened ("Soprano Saxophone" -> "Soprano Sax" -> "Sop Sax"…)
@@ -2855,12 +2882,15 @@ static Ret starscorePrintSheetAsIs(const INotationWriterPtr& writer, const INota
         starscore::fitArrangementLabel(score);
     }
     starscore::clearComposerCredit(score);
+    lap("titles and credit");
     // texts over chord symbols or each other moved clear, texts running off the page moved in; what still looks wrong
     // in the log (Joel, 16 Oct 2026)
     // (on the page first: a text moved in can land on a chord symbol)
     const int onPage = starscore::keepTextsOnPage(score);
     const int separated = starscore::separateOverlappingTexts(score);
+    lap("texts");
     starscore::spaceOutBeamedRests(score);
+    lap("beamed rests");
     const int movedIn = onPage + separated;
     const std::vector<starscore::LayoutIssue> issues = starscore::layoutIssues(score);
     if (movedIn > 0 || !issues.empty()) {
@@ -2868,8 +2898,11 @@ static Ret starscorePrintSheetAsIs(const INotationWriterPtr& writer, const INota
                << QString(right).replace('\n', ' ').toStdString() << "\": " << movedIn << " text(s) moved (" << separated << " clear of others); "
                << starscore::describeIssues(issues).join(" ; ").toStdString();
     }
+    lap("layout issues");
     const bool minMajNote = starscoreSetMinMajNote(score);
+    lap("footnote");
     const Ret ret = starscorePdfBytes(writer, notation, pdf);
+    lap("pdf");
     if (minMajNote) {
         starscoreClearMinMajNote(score);
         score->setLayoutAll();
@@ -2878,6 +2911,7 @@ static Ret starscorePrintSheetAsIs(const INotationWriterPtr& writer, const INota
     if (restoreView && oldMode != ViewMode::PAGE) {
         notation->painting()->setViewMode(oldMode);
     }
+    lap("after");
     return ret;
 }
 
@@ -3455,9 +3489,10 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     auto lapTime = [&](const QString& rel, const char* what) {
         LOGI() << "[starscore] sheet time " << rel << " " << what << " " << stepClock.restart() << " ms";
     };
-    // skipLayout: the copy's main score isn't laid out on loading (for a copy whose main score is never printed or
-    // measured; the Scores' copies are judged on the layout from loading on, so theirs is)
-    auto loadProject = [&](const QString& path, bool skipLayout = false) -> INotationProjectPtr {
+    // skipLayout: the copy's main score isn't laid out on loading. Every copy is laid out by hand where it is measured
+    // or printed (each Score's steps lay it out first), so the layout on loading was never read: with every part
+    // showing, in the song's continuous view, it was 20 s of each Score folder's first Score on G.I. Jorge.
+    auto loadProject = [&](const QString& path, bool skipLayout = true) -> INotationProjectPtr {
         INotationProjectPtr p = projectCreator()->newProject(iocContext());
         OpenParams params;
         params.skipLayout = skipLayout;
@@ -3497,7 +3532,12 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
             return nullptr;
         }
         stepClock.restart();
-        INotationProjectPtr p = loadProject(strippedPath);
+        INotationProjectPtr p = loadProject(strippedPath, true);
+        if (p && p->masterNotation() && p->masterNotation()->masterScore()->style().styleB(engraving::Sid::createMultiMeasureRests)) {
+            // (a main score with multimeasure rests: showing a part drops the system locks that hold one, judged on
+            // the layout so far, so the copy is laid out as loading did; no Starsign song has them in its main score)
+            p->masterNotation()->masterScore()->doLayout();
+        }
         lapTime("copies", "load the stripped copy");
         if (!p) {
             strippedFailed = true;
@@ -3703,6 +3743,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         double spatium = 0.0;
     };
     ScoreCopy scoreCopy;
+    static const bool printTimesLog = qEnvironmentVariableIsSet("STARSCORE_PRINT_TIMES");
     auto writeScore = [&](const StarScoreBandFile& file, QByteArray& pdf) -> Ret {
         QElapsedTimer scoreClock;   // where a Score's time goes, in the log
         scoreClock.start();
@@ -3722,6 +3763,9 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         }
         lap("copy");
         engraving::MasterScore* cs = p->masterNotation()->masterScore();
+        if (printTimesLog) {
+            LOGI() << "[starscore] copy rest room entries: " << cs->starscoreRestRoom().size();
+        }
         // (Joel, 6 Oct 2026: exports took long) MuseScore lays the copy out again after every edit, and most steps
         // below then lay it out themselves to measure it: while a Score is made, the copy is laid out only where
         // something is measured (each step lays out first), about half the layouts

@@ -55,6 +55,7 @@
 #include "engraving/dom/systemlock.h"
 #include "engraving/editing/editsystemlocks.h"
 #include "engraving/style/style.h"
+#include "log.h"
 
 using namespace mu::engraving;
 
@@ -1912,6 +1913,7 @@ int mu::project::starscore::bracketPartsTogether(MasterScore* master, const std:
         }
         if (apply) {
             score->undoAddBracket(score->staff(idx.front()), 0, BracketType::NORMAL, idx.size());
+            LOGI() << "[starscore] bracket added in " << (score->isMaster() ? String(u"the main score") : score->name());
         }
         ++added;
     }

@@ -4,6 +4,13 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.18.91
+
+- **Faster Scores on export.** Each Score folder's first Score no longer lays out the whole song (every part, in the song's continuous view) when it loads its copy of the song, since nothing reads that layout: it was about 20 s and 1.5 GB of memory per Score folder on G.I. Jorge on the build machine (a few seconds on a Mac). The sheets come out the same.
+- **Flexible chairs shown in one step.** When a song opens with its Flexible chairs shown differently from the "Show Flexible horns as" setting, or when you change that setting, every Flexible section is changed in one step, so the song is laid out once, not once per section (G.I. Jorge, three Flexible sections: one layout instead of three when opening in the automatic tests). One undo step too.
+- **Timing in the log.** "tidied the opened score" now names the steps that took a tenth of a second or more. With STARSCORE_PRINT_TIMES=1 in the environment, the log also shows where each printed sheet's time goes (layouts, texts, beamed rests, footnote, PDF) and each step of the tighter spacing. The export log says which scores got a 4-Horn 2-Trumpet bracket.
+- **Automatic tests:** the export step takes a filter (export:Section Score, or several texts with |) to export only the sheets whose path holds it.
+
 ## 1.18.90
 
 - **Part scores lose MuseScore's duplicate numbers.** A part score MuseScore named "Piano 2" or "Electric Piano (1)" to keep it apart from another part score of the same name is renamed "Piano" or "Electric Piano" when you open the song, as long as no other part score has that name any more. The exported sheet's top-left label then reads the right name (The Trip's Keys sheet said "Piano 2").
