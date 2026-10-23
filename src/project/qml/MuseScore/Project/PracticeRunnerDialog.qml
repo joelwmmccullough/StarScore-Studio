@@ -229,8 +229,10 @@ StyledDialogView {
                     spacing: 0
                     Text {
                         Layout.fillWidth: true
+                        visible: run.handsFree !== "break" && run.handsFree !== "done"
                         text: (run.block.song || "") + (run.parts.length > 1
                               ? "  ·  " + qsTrc("starscore", "part %1 of %2").arg(run.partIndex + 1).arg(run.parts.length) : "")
+                              + (root.passText() !== "" && run.handsFree === "practice" ? "  ·  " + root.passText() : "")
                         color: root.gold
                         font.pixelSize: root.px(13)
                         font.capitalization: Font.AllUppercase
@@ -247,12 +249,6 @@ StyledDialogView {
                         font.bold: true
                         elide: Text.ElideRight
                     }
-                }
-                Text {
-                    text: root.passText()
-                    visible: text !== "" && run.handsFree === "practice"
-                    color: root.teal
-                    font.pixelSize: root.px(18)
                 }
                 Text {
                     text: root.clock(run.handsFree === "break" ? run.breakSecondsLeft : run.partSecondsLeft)
@@ -337,7 +333,7 @@ StyledDialogView {
                 spacing: 14
                 Text {
                     visible: run.handsFree === "break"
-                    text: qsTrc("starscore", "Next: %1").arg(run.nextUp || (run.block.song + " · " + run.block.title))
+                    text: qsTrc("starscore", "Next: %1").arg((run.block.song || "") + " · " + (run.block.title || ""))
                     color: root.teal
                     font.pixelSize: root.px(16)
                 }

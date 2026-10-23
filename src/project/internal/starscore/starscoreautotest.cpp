@@ -3680,6 +3680,10 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             return pages;
         });
         autotestLog(QString("  book: %1, %2 exercises engraved, %3 images").arg(ok ? "written" : "FAILED").arg(rendered).arg(images));
+    } else if (step == "filesave") {
+        // filesave: File › Save, in place (a .starscore keeps its solos and reference PDFs)
+        dispatcher()->dispatch("file-save");
+        autotestLog("  file-save dispatched");
     } else if (step == "save") {
         INotationProjectPtr project = globalContext()->currentProject();
         const Ret r = project ? project->save(io::path_t(autotestDir() + "/saved.starscore"), SaveMode::SaveCopy, false)

@@ -310,9 +310,12 @@ void PracticeRunnerModel::setupParts()
             const practice::Part& p = it->parts[i];
             RunPart rp;
             rp.label = practice::prettyText(p.label);
+            const double exact = double(total) * p.minutes / std::max(1, sum);
+            const bool roomy = total >= 30 * int(it->parts.size());
             rp.seconds = i + 1 == it->parts.size() ? total - given
-                         : int(std::lround(double(total) * p.minutes / std::max(1, sum) / 15.0)) * 15;   // (to 15 seconds)
-            rp.seconds = std::max(15, rp.seconds);
+                         : roomy ? int(std::lround(exact / 15.0)) * 15   // (to 15 seconds)
+                         : int(std::lround(exact));
+            rp.seconds = std::max(roomy ? 15 : 5, rp.seconds);
             given += rp.seconds;
             rp.from = p.barFrom;
             rp.to = p.barTo;
@@ -504,7 +507,17 @@ void PracticeRunnerModel::playAlong(int index)
     m_partSecondsLeft = m_parts[index].seconds;
     m_playingAlong = true;
     emit partChanged();
-    starScore()->openPracticeExercise(pa.xml, QString("%1 - %2 - play along").arg(lib->title, p.label), 0, true);
+    // (the automatic tests can leave the score open: the tests' steps run on the open song)
+    static const bool noPlayback = qEnvironmentVariableIsSet("STARSCORE_AUTOTEST_NO_PLAYBACK");
+    if (!noPlayback) {
+        starScore()->openPracticeExercise(pa.xml, QString("%1 - %2 - play along").arg(lib->title, p.label), 0, true);
+    } else {
+        LOGI() << "[starscore] play along: " << p.label << ", " << pa.seconds << " s, passes " << pa.passTempos.size();
+        QFile dump(QStandardPaths::writableLocation(QStandardPaths::TempLocation) + "/StarScore Practice/playalong-test.musicxml");
+        if (dump.open(QIODevice::WriteOnly)) {
+            dump.write(pa.xml.toUtf8());
+        }
+    }
     if (!m_timer.isActive()) {
         m_timer.start();
     }

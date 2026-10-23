@@ -1082,7 +1082,10 @@ bool ProjectActionsController::closeOpenedProject(bool goToHome)
 
     bool result = true;
 
-    if (project->needSave().val || starScoreService()->hasUnsavedSolos()) {
+    // StarScore: a practice exercise or play-along (a temporary file the practice runner opened) closes without asking
+    // (hands free opens one after another)
+    const bool practiceTemp = project->path().toQString().contains("/StarScore Practice/");
+    if (!practiceTemp && (project->needSave().val || starScoreService()->hasUnsavedSolos())) {
         IInteractive::Button btn = askAboutSavingScore(project);
 
         if (btn == IInteractive::Button::Cancel) {

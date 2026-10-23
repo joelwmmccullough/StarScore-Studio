@@ -103,7 +103,8 @@ void cleanMeasure(QDomElement& m, bool dropTempo)
 {
     QList<QDomElement> remove;
     for (const QDomElement& c : childElements(m)) {
-        if (c.tagName() == "barline" && (!c.firstChildElement("repeat").isNull() || !c.firstChildElement("ending").isNull())) {
+        if (c.tagName() == "barline" && (!c.firstChildElement("repeat").isNull() || !c.firstChildElement("ending").isNull()
+                                          || (dropTempo && c.firstChildElement("bar-style").text() == "light-heavy"))) {
             remove << c;
         } else if (c.tagName() == "direction") {
             const QDomElement dt = c.firstChildElement("direction-type");

@@ -29,7 +29,7 @@ Rectangle {
     readonly property var areas: ["parts", "comping", "solos"]
     readonly property var areaNames: ({ "parts": qsTrc("starscore", "Parts"), "comping": qsTrc("starscore", "Comping"),
                                         "solos": qsTrc("starscore", "Solos") })
-    readonly property int needWidth: 58
+    readonly property int needWidth: 72
 
     PracticeModel {
         id: pm
@@ -58,8 +58,8 @@ Rectangle {
 
         // ---------------- Setlist ----------------
         Rectangle {
-            Layout.preferredWidth: 380
-            Layout.minimumWidth: 340
+            Layout.preferredWidth: 400
+            Layout.minimumWidth: 360
             Layout.fillHeight: true
             radius: 6
             color: ui.theme.backgroundPrimaryColor
@@ -288,8 +288,8 @@ Rectangle {
 
         // ---------------- Make ----------------
         Rectangle {
-            Layout.preferredWidth: 270
-            Layout.minimumWidth: 240
+            Layout.preferredWidth: 290
+            Layout.minimumWidth: 270
             Layout.fillHeight: true
             radius: 6
             color: ui.theme.backgroundPrimaryColor
@@ -314,14 +314,14 @@ Rectangle {
                         spacing: 8
                         StyledTextLabel { text: qsTrc("starscore", "Every") }
                         IncrementalPropertyControl {
-                            Layout.preferredWidth: 90
+                            Layout.preferredWidth: 80
                             currentValue: pm.breakEvery
                             step: 5; decimals: 0; minValue: 0; maxValue: 180
                             onValueEditingFinished: function(v) { pm.setBreakEvery(v) }
                         }
                         StyledTextLabel { text: qsTrc("starscore", "min, for") }
                         IncrementalPropertyControl {
-                            Layout.preferredWidth: 80
+                            Layout.preferredWidth: 70
                             currentValue: pm.breakMinutes
                             step: 1; decimals: 0; minValue: 1; maxValue: 30
                             onValueEditingFinished: function(v) { pm.setBreakMinutes(v) }

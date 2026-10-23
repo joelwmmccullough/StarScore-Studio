@@ -664,6 +664,9 @@ Color EngravingItem::curColor(bool isVisible, Color normalColor, const rendering
 {
     // the default element color is always interpreted as black in printing
     if (opt.isPrinting) {
+        if (opt.invertColors && opt.inversionColor.isValid()) {   // (StarScore: a dark-mode sheet)
+            return (normalColor == configuration()->defaultColor()) ? opt.inversionColor : normalColor;
+        }
         return (normalColor == configuration()->defaultColor()) ? Color::BLACK : normalColor;
     }
 
