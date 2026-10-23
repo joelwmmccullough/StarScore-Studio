@@ -2061,7 +2061,8 @@ void StarScoreService::syncCopyrightNow(bool fixYear)
 }
 
 //! Joel, 21 Oct 2026 (Little Louie's Keys sheet: the names far left of the staves): in a part score of several
-//! keyboards, each keyboard keeps its own grand staff brace and nothing groups the instruments. Adding a part to a
+//! keyboards, each keyboard keeps its own grand staff brace and nothing groups the instruments (23 Oct: unless he
+//! braced staves himself, across keyboards: his first-column braces stay). Adding a part to a
 //! part score in score order adds a brace round every keyboard as well, and each brace column takes room left of the
 //! staves even where it isn't drawn. Returns how many part scores were changed.
 int StarScoreService::tidyKeysBrackets()
@@ -2081,13 +2082,10 @@ int StarScoreService::tidyKeysBrackets()
         })) {
             continue;
         }
-        // what it should be: (first staff, span) of each keyboard of two staves or more
-        std::set<std::pair<engraving::staff_idx_t, size_t> > want;
-        for (const engraving::Part* p : sc->parts()) {
-            if (p->nstaves() > 1) {
-                want.insert({ p->staff(0)->idx(), p->nstaves() });
-            }
-        }
+        // what it should be: the braces in the first column as they are (Joel, 23 Oct 2026: on Little Louie's Keys sheet
+        // he braces the Rhodes bass staff with the Hammond treble staff, and tidying them back to one brace per keyboard
+        // kept undoing it), plus one brace per keyboard of two staves or more where none of its staves has one; any other
+        // bracket (a second column, a square bracket) is what pushed the names left, and goes
         std::set<std::pair<engraving::staff_idx_t, size_t> > have;
         bool other = false;
         for (const engraving::Staff* st : sc->staves()) {
@@ -2095,11 +2093,32 @@ int StarScoreService::tidyKeysBrackets()
                 if (!b || b->bracketType() == engraving::BracketType::NO_BRACKET) {
                     continue;
                 }
-                if (b->bracketType() == engraving::BracketType::BRACE && b->column() == 0) {
+                if (b->bracketType() == engraving::BracketType::BRACE && b->column() == 0 && b->bracketSpan() > 0) {
                     have.insert({ st->idx(), b->bracketSpan() });
                 } else {
                     other = true;
                 }
+            }
+        }
+        auto covered = [&](engraving::staff_idx_t s) {
+            for (const auto& [first, span] : have) {
+                if (s >= first && s < first + span) {
+                    return true;
+                }
+            }
+            return false;
+        };
+        std::set<std::pair<engraving::staff_idx_t, size_t> > want = have;
+        for (const engraving::Part* p : sc->parts()) {
+            if (p->nstaves() < 2) {
+                continue;
+            }
+            bool any = false;
+            for (const engraving::Staff* st : p->staves()) {
+                any = any || covered(st->idx());
+            }
+            if (!any) {
+                want.insert({ p->staff(0)->idx(), p->nstaves() });
             }
         }
         if (!other && have == want) {

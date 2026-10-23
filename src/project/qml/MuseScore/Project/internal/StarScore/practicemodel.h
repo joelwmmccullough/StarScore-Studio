@@ -6,6 +6,7 @@
  */
 #pragma once
 
+#include <QJsonObject>
 #include <QObject>
 #include <QStringList>
 #include <QVariantList>
@@ -40,6 +41,15 @@ class PracticeModel : public QObject, public muse::Contextable, public muse::asy
     Q_PROPERTY(bool busy READ busy NOTIFY changed)
     Q_PROPERTY(QString status READ status NOTIFY changed)
     Q_PROPERTY(QString libraryFolder READ libraryFolder NOTIFY changed)
+    //! Saved setlists (each with its show date, its needs and minutes, and its plans)
+    Q_PROPERTY(QVariantList setlists READ setlists NOTIFY changed)
+    Q_PROPERTY(QString setlistId READ setlistId NOTIFY changed)
+    Q_PROPERTY(QString setlistName READ setlistName NOTIFY changed)
+    //! Breaks in a routine or plan: every N minutes of practice (0: none), for M minutes
+    Q_PROPERTY(int breakEvery READ breakEvery NOTIFY changed)
+    Q_PROPERTY(int breakMinutes READ breakMinutes NOTIFY changed)
+    //! How good he is at each skill: id, name, group, rating (0-5), level text, items, last, trend (since 2 weeks ago)
+    Q_PROPERTY(QVariantList skills READ skills NOTIFY skillsChanged)
 
     QML_ELEMENT
 
@@ -64,6 +74,12 @@ public:
     bool busy() const;
     QString status() const;
     QString libraryFolder() const;
+    QVariantList setlists() const;
+    QString setlistId() const;
+    QString setlistName() const;
+    int breakEvery() const;
+    int breakMinutes() const;
+    QVariantList skills() const;
 
     Q_INVOKABLE void load();
     //! Reads the song libraries again (after new practice items were added to songs)
@@ -76,6 +92,17 @@ public:
     Q_INVOKABLE void setDefaultMinutes(int minutes);
     Q_INVOKABLE void setRoutineMinutes(int minutes);
     Q_INVOKABLE void setDayMinutes(const QString& isoDate, int minutes);
+    Q_INVOKABLE void setBreakEvery(int minutes);
+    Q_INVOKABLE void setBreakMinutes(int minutes);
+
+    Q_INVOKABLE void selectSetlist(const QString& id);
+    //! A new setlist: a copy of the current one (setlist, needs, minutes) under a new name and date
+    Q_INVOKABLE void newSetlist(const QString& name, const QString& isoDate);
+    Q_INVOKABLE void renameSetlist(const QString& name);
+    Q_INVOKABLE void deleteSetlist();
+
+    //! Ratings of every skill, from the progress so far
+    Q_INVOKABLE void refreshSkills();
 
     Q_INVOKABLE void makeRoutine();
     Q_INVOKABLE void makePlan();
@@ -83,18 +110,31 @@ public:
     Q_INVOKABLE void deletePlan(const QString& id);
     //! Plans the days from today on again, from the progress so far
     Q_INVOKABLE void rebuildPlan();
+    //! More practice for a day already planned: N minutes of new items at its end, from what it already has
+    Q_INVOKABLE void addMinutes(int dayIndex, int minutes);
     //! The practice book: the whole plan (dayIndex -1) or one day
     Q_INVOKABLE void makeBook(int dayIndex);
     Q_INVOKABLE void exportIreal(int dayIndex);
-    Q_INVOKABLE void openRunner(int dayIndex, int blockIndex);
+    Q_INVOKABLE void openRunner(int dayIndex, int blockIndex, bool handsFree = false);
     Q_INVOKABLE void openOutputFolder();
     Q_INVOKABLE void chooseLibraryFolder();
 
 signals:
     void changed();
     void plansChanged();
+    void skillsChanged();
 
 private:
+    struct SavedSetlist {
+        QString id;
+        QString name;
+        QJsonObject data;   // setlist, showDate, defaultMinutes, routineMinutes, dayMinutes, needs, breakEvery, breakMinutes
+        bool legacy = false;   // made from the one setlist of 1.19 (plans without a setlist belong to it)
+    };
+    QJsonObject currentData() const;
+    void applyData(const QJsonObject& o);
+    void saveSetlists() const;
+
     struct SetSong {
         QString line;     // as typed
         QString code;     // empty when no song with a library matches
@@ -130,5 +170,10 @@ private:
     QString m_status;
     QString m_lastOutput;
     QFileSystemWatcher* m_watcher = nullptr;
+    std::vector<SavedSetlist> m_setlists;
+    QString m_setlistId;
+    int m_breakEvery = 0;
+    int m_breakMinutes = 5;
+    QVariantList m_skills;
 };
 }

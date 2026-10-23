@@ -5,6 +5,7 @@
  */
 #include "starscoreservice.h"
 
+#include <algorithm>
 #include <cmath>
 
 #include <QDir>
@@ -32,8 +33,8 @@ namespace {
 QString printableXml(const QString& xml)
 {
     QString x = xml;
-    static const QRegularExpression backingPart("<score-part id=\"P[23]\">.*?</score-part>", QRegularExpression::DotMatchesEverythingOption);
-    static const QRegularExpression backing("<part id=\"P[23]\">.*?</part>", QRegularExpression::DotMatchesEverythingOption);
+    static const QRegularExpression backingPart("<score-part id=\"(P[23]|B\\d+)\">.*?</score-part>", QRegularExpression::DotMatchesEverythingOption);
+    static const QRegularExpression backing("<part id=\"(P[23]|B\\d+)\">.*?</part>", QRegularExpression::DotMatchesEverythingOption);
     static const QRegularExpression work("<work>.*?</work>|<movement-title>.*?</movement-title>|<identification>.*?</identification>",
                                          QRegularExpression::DotMatchesEverythingOption);
     x.remove(backingPart);
@@ -87,7 +88,7 @@ QString practiceTempDir()
 }
 }
 
-QList<QImage> StarScoreService::renderPracticeExercise(const QString& musicXml, int dpi)
+QList<QImage> StarScoreService::renderPracticeExercise(const QString& musicXml, int dpi, double scale, int* printableWidthPx)
 {
     QList<QImage> out;
     if (musicXml.isEmpty()) {
@@ -121,6 +122,19 @@ QList<QImage> StarScoreService::renderPracticeExercise(const QString& musicXml, 
     // an excerpt of a song's own bars asks for no bar numbers (they'd count the excerpt, not the song)
     if (musicXml.contains("<measure-numbering>none</measure-numbering>")) {
         ms->style().set(engraving::Sid::showMeasureNumber, false);
+    }
+    // bigger or smaller notation: a page narrower (or wider) by the scale, drawn at a dpi higher (or lower) by it, so a
+    // full system is the same number of pixels wide and the bars reflow to fit
+    scale = std::clamp(scale, 0.5, 2.5);
+    const double printable = ms->style().styleD(engraving::Sid::pagePrintableWidth);
+    if (printableWidthPx) {
+        *printableWidthPx = int(std::lrint(printable * dpi));
+    }
+    if (std::abs(scale - 1.0) > 0.01) {
+        const double margins = ms->style().styleD(engraving::Sid::pageWidth) - printable;
+        ms->style().set(engraving::Sid::pagePrintableWidth, printable / scale);
+        ms->style().set(engraving::Sid::pageWidth, printable / scale + margins);
+        dpi = std::max(20, int(std::lrint(dpi * scale)));
     }
     // chord symbols in gold
     for (engraving::Segment* s = ms->firstSegment(engraving::SegmentType::ChordRest); s; s = s->next1(engraving::SegmentType::ChordRest)) {

@@ -140,6 +140,8 @@ target_sources(project PRIVATE
     internal/starscore/starscorepracticebook.cpp
     internal/starscore/starscorepracticebook.h
     internal/starscore/starscorepracticeservice.cpp
+    internal/starscore/starscorepracticexml.cpp
+    internal/starscore/starscorepracticexml.h
 
     internal/starscore/organizer/orgcore.cpp
     internal/starscore/organizer/orgcore.h
@@ -197,7 +199,7 @@ set_source_files_properties(internal/starscore/starscoreautotest.cpp PROPERTIES 
 set_source_files_properties(internal/starscore/starscorechordchart.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 # StarScore practice: their own translation units (file-local helpers)
 set_source_files_properties(internal/starscore/starscorepractice.cpp internal/starscore/starscorepracticebook.cpp
-    internal/starscore/starscorepracticeservice.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+    internal/starscore/starscorepracticeservice.cpp internal/starscore/starscorepracticexml.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 # zstd (BSD, facebook/zstd 1.5.7, single-file build) for the autosave archive's packed song histories
 target_sources(project PRIVATE thirdparty/zstd/zstd.c thirdparty/zstd/zstd.h thirdparty/zstd/zstd_errors.h)
 set_source_files_properties(thirdparty/zstd/zstd.c PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON SKIP_PRECOMPILE_HEADERS ON COMPILE_OPTIONS "-w")
@@ -234,7 +236,7 @@ if (NOT OS_IS_MAC)
     target_sources(project PRIVATE internal/starscore/organizer/orgplatform_other.cpp)
 endif()
 
-target_link_libraries(project PRIVATE notation)
+target_link_libraries(project PRIVATE notation Qt::Xml)
 
 if (QT_ADD_CONCURRENT)
     target_link_libraries(project PRIVATE Qt::Concurrent)

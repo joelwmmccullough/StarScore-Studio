@@ -25,6 +25,9 @@
 #include <tuple>
 #include <vector>
 
+#include <functional>
+
+#include <QBuffer>
 #include <QDate>
 #include <QDir>
 #include <QFile>
@@ -35,6 +38,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QRegularExpression>
+#include <QPdfWriter>
 #include <QSaveFile>
 #include <QSettings>
 #include <QUuid>
@@ -111,6 +115,8 @@ static const QString STARSCORE_BASS_HORNS_FOLDER = QStringLiteral("Bass Horns (H
 static const QString STARSCORE_ANNOTATED_FOLDER = QStringLiteral("Annotated Sheets");
 //! each horn chair's lines from every arrangement on one sheet (see starscorecombined.h)
 static const QString STARSCORE_COMBINED_FOLDER = QStringLiteral("Combined Parts");
+//! Dark-mode copies of the Keys sheets (Joel, 23 Oct 2026), in the colours of his course books: "Dark Mode/1 Rhythm/…"
+static const QString STARSCORE_DARK_FOLDER = QStringLiteral("Dark Mode");
 
 //! A Flexible chair as one instrument can play it (Starsign Band Guide, page 3)
 struct StarScoreSeat {
@@ -2004,8 +2010,42 @@ static mu::notation::IExcerptNotationPtr starscorePotentialBook(const mu::notati
 //! The PDF of the score as it is laid out now, as bytes: nothing is laid out here, so the caller decides when the one
 //! layout a sheet needs happens (and the bytes are at hand for comparing with the file already exported, for the
 //! sheet record's md5 and for writing the file, without a temporary file read back from disk)
+//! While set, sheets print in dark mode: the course books' colours (Body and Soul's desktop book: page #15120E, music
+//! and text #EDE4D3)
+static bool s_starscoreDarkPdf = false;
+
+static Ret starscoreDarkPdfBytes(const INotationPtr& notation, QByteArray& pdf)
+{
+    QBuffer buf(&pdf);
+    buf.open(QIODevice::WriteOnly);
+    QPdfWriter pdfWriter(&buf);
+    pdfWriter.setResolution(300);
+    pdfWriter.setCreator(QString("StarScore Studio"));
+    pdfWriter.setTitle(notation->projectWorkTitleAndPartName() + " (Dark Mode)");
+    pdfWriter.setPageMargins(QMarginsF());
+    pdfWriter.setPageLayout(QPageLayout(QPageSize(notation->painting()->pageSizeInch().toQSizeF(), QPageSize::Inch),
+                                        QPageLayout::Orientation::Portrait, QMarginsF()));
+    muse::draw::Painter painter(&pdfWriter, "starscoredark");
+    if (!painter.isActive()) {
+        return make_ret(Ret::Code::UnknownError);
+    }
+    INotationPainting::Options opt;
+    opt.deviceDpi = pdfWriter.logicalDpiX();
+    opt.onNewPage = [&pdfWriter]() { pdfWriter.newPage(); };
+    opt.printPageBackground = true;
+    opt.invertColors = true;
+    opt.inversionColor = muse::draw::Color(0xED, 0xE4, 0xD3);
+    opt.pageColor = muse::draw::Color(0x15, 0x12, 0x0E);
+    notation->painting()->paintPdf(&painter, opt);
+    painter.endDraw();
+    return make_ok();
+}
+
 static Ret starscorePdfBytes(const INotationWriterPtr& writer, const INotationPtr& notation, QByteArray& pdf)
 {
+    if (s_starscoreDarkPdf && notation) {
+        return starscoreDarkPdfBytes(notation, pdf);
+    }
     if (!writer || !notation) {
         return make_ret(Ret::Code::InternalError);
     }
@@ -2926,6 +2966,9 @@ static Ret starscorePrintSheet(const INotationWriterPtr& writer, const INotation
                                StarScoreAnnotatedPdfs* annotated = nullptr)
 {
     mu::engraving::Score* score = notation && notation->elements() ? notation->elements()->msScore() : nullptr;
+    if (s_starscoreDarkPdf) {
+        annotated = nullptr;   // (the dark-mode copy: the clean sheet only)
+    }
     const std::vector<starscore::AnnotationItem> notes = starscore::annotationItems(score);
     if (!notes.empty()) {
         LOGI() << "[starscore] sheet with " << notes.size() << " player annotation(s): " << left.toStdString() << " "
@@ -4214,14 +4257,70 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         }
     };
 
-    int fileNumber = 0;
-    for (const StarScoreBandFile& file : plan.files) {
-        QByteArray pdf;
-        Ret ret;
-        annotatedPdfs.clear();
-        // where the export is: in the log (a crash can be traced to the sheet being made) and in the export window
-        reportExportProgress(muse::qtrc("starscore", "Sheets"), fileNumber++, int(plan.files.size()), file.relativePath);
+    // The Keys sheets in dark mode too (Joel, 23 Oct 2026): "Sheet Music/Dark Mode/1 Rhythm/CODE - Keys (Dark Mode).pdf",
+    // written like the annotated copies (an unchanged one left as it is, a replaced one to Version History); not in the
+    // sheet record or the changelogs
+    int darkWritten = 0;
+    int darkSame = 0;
+    std::function<Ret(const StarScoreBandFile&, QByteArray&)> makeSheetAgain;
+    auto writeDark = [&](const StarScoreBandFile& file) {
+        static const QRegularExpression keysSheet(" - Keys\\.pdf$");
+        if (!variant.isEmpty() || !file.sourceFile.isEmpty() || file.isScore || !keysSheet.match(file.relativePath).hasMatch()
+            || !makeSheetAgain) {
+            return;
+        }
+        QByteArray dark;
+        s_starscoreDarkPdf = true;
+        const StarScoreAnnotatedPdfs keepAnnotated = annotatedPdfs;
+        const Ret ret = makeSheetAgain(file, dark);
+        annotatedPdfs = keepAnnotated;
+        s_starscoreDarkPdf = false;
+        if (!ret || dark.isEmpty()) {
+            problems << muse::qtrc("starscore", "%1 (dark mode): %2").arg(file.relativePath).arg(QString::fromStdString(ret.toString()));
+            return;
+        }
+        const QString inner = starscore::org::withoutSheetMusic(QFileInfo(file.relativePath).path());
+        const QString rel = starscore::org::songFolderPath(STARSCORE_DARK_FOLDER)
+                            + (inner == "." || inner.isEmpty() || inner == starscore::org::SHEET_MUSIC ? QString() : "/" + inner)
+                            + "/" + QFileInfo(file.relativePath).completeBaseName() + " (Dark Mode).pdf";
+        const QString target = songDir + "/" + rel;
+        if (QFileInfo::exists(target) && starscoreSamePdf(dark, target)) {
+            ++darkSame;
+            return;
+        }
+        if (m_exportDryRun) {
+            if (!m_dryRunAnnotated.contains(file.relativePath)) {
+                m_dryRunAnnotated << file.relativePath;
+            }
+            return;
+        }
+        QDir().mkpath(QFileInfo(target).absolutePath());
+        QSaveFile out(target);
+        if (!out.open(QIODevice::WriteOnly) || out.write(dark) != dark.size()) {
+            out.cancelWriting();
+            problems << muse::qtrc("starscore", "%1: couldn't write the file.").arg(rel);
+            return;
+        }
+        QString archivedTo;
+        const bool moved = supersede(rel, &archivedTo);
+        archivedPaths.removeAll(rel);
+        if (!moved) {
+            out.cancelWriting();
+            return;
+        }
+        if (!out.commit()) {
+            if (!archivedTo.isEmpty()) {
+                QFile::rename(archivedTo, target);
+            }
+            problems << muse::qtrc("starscore", "%1: couldn't write the file.").arg(rel);
+            return;
+        }
+        ++darkWritten;
+    };
 
+    // one sheet's PDF, as its kind of sheet is made
+    auto makeSheet = [&](const StarScoreBandFile& file, QByteArray& pdf) -> Ret {
+        Ret ret;
         if (!file.sourceFile.isEmpty()) {
             QFile source(file.sourceFile);
             ret = source.open(QIODevice::ReadOnly) ? make_ok()
@@ -4259,12 +4358,26 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         } else {
             ret = writeScore(file, pdf);
         }
+        return ret;
+    };
+
+    makeSheetAgain = makeSheet;
+    int fileNumber = 0;
+    for (const StarScoreBandFile& file : plan.files) {
+        QByteArray pdf;
+        Ret ret;
+        annotatedPdfs.clear();
+        // where the export is: in the log (a crash can be traced to the sheet being made) and in the export window
+        reportExportProgress(muse::qtrc("starscore", "Sheets"), fileNumber++, int(plan.files.size()), file.relativePath);
+
+        ret = makeSheet(file, pdf);
 
         if (!ret) {
             problems << muse::qtrc("starscore", "%1: %2").arg(file.relativePath).arg(QString::fromStdString(ret.toString()));
             continue;
         }
         writeAnnotated(file);
+        writeDark(file);
 
         const QString target = songDir + "/" + starscoreVariantPath(file.relativePath, variant);
         // the same pages as the file already there (a re-export with nothing changed in this sheet):
@@ -4883,6 +4996,10 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     if (combinedWritten + combinedSame > 0) {
         summary += " " + muse::qtrc("starscore", "Combined parts (in %1): %2 written, %3 the same as before.")
                    .arg(starscore::org::songFolderPath(STARSCORE_COMBINED_FOLDER)).arg(combinedWritten).arg(combinedSame);
+    }
+    if (darkWritten + darkSame > 0) {
+        summary += " " + muse::qtrc("starscore", "Dark-mode Keys sheets (in %1): %2 written, %3 the same as before.")
+                   .arg(starscore::org::songFolderPath(STARSCORE_DARK_FOLDER)).arg(darkWritten).arg(darkSame);
     }
     if (annotatedWritten + annotatedSame + annotatedArchived > 0) {
         summary += " " + muse::qtrc("starscore", "Sheets with players' annotations (in %1): %2 written, %3 the same as before.")

@@ -6,9 +6,11 @@
 #include "practicemodel.h"
 
 #include <algorithm>
+#include <cmath>
 #include <set>
 
 #include <QCoreApplication>
+#include <QDateTime>
 #include <QDesktopServices>
 #include <QDir>
 #include <QFile>
@@ -37,7 +39,7 @@ static const char* PRACTICE_DEFAULT_SETLIST
       "Set 2\nBet\nThe Courier\nIndustrial Park Driveway\nAmplitudes\nG.I. Jorge\nCiao Ferrari\n\n"
       "Set 3\nGhostbusters\nThe Trip\nSeagrass\nLive Strong / Strasbourg / St. Denis\nLittle Louie\nOkane\n";
 
-static const QStringList PRACTICE_AREAS { "parts", "comping", "harmony", "solos" };
+static const QStringList PRACTICE_AREAS { "parts", "comping", "solos" };
 
 static QString practiceNormalized(const QString& s)
 {
@@ -140,7 +142,7 @@ int PracticeModel::totalMinutes() const
 QVariantList PracticeModel::plans() const
 {
     QVariantList out;
-    for (const practice::Plan& p : m_plans) {
+    for (const practice::Plan& p : m_plans) {   // (only the current setlist's: see reloadPlans)
         int done = 0;
         int total = 0;
         for (const practice::Day& d : p.days) {
@@ -299,7 +301,17 @@ void PracticeModel::watchPlans()
 
 void PracticeModel::reloadPlans()
 {
-    m_plans = practice::loadPlans();
+    // the current setlist's plans (plans from before saved setlists belong to the first one)
+    bool legacy = false;
+    for (const SavedSetlist& sl : m_setlists) {
+        legacy = legacy || (sl.id == m_setlistId && sl.legacy);
+    }
+    m_plans.clear();
+    for (const practice::Plan& p : practice::loadPlans()) {
+        if (m_setlistId.isEmpty() || p.setlistId == m_setlistId || (legacy && p.setlistId.isEmpty())) {
+            m_plans.push_back(p);
+        }
+    }
     bool found = false;
     for (const practice::Plan& p : m_plans) {
         found = found || p.id == m_planId;
@@ -313,42 +325,15 @@ void PracticeModel::reloadPlans()
     emit plansChanged();
 }
 
-void PracticeModel::loadSettings()
+// ---------------------------------------------------------------- saved setlists
+// setlists.json: { "current": id, "setlists": [ { "id", "name", "legacy", "data": { setlist, showDate, ... } } ] }.
+// 1.19 kept one setlist in setlist.json; it becomes the first saved setlist.
+static QString setlistsFile()
 {
-    QFile f(practice::practiceFolder() + "/setlist.json");
-    QJsonObject o;
-    if (f.open(QIODevice::ReadOnly)) {
-        o = QJsonDocument::fromJson(f.readAll()).object();
-    }
-    m_setlistText = o.value("setlist").toString(QString::fromUtf8(PRACTICE_DEFAULT_SETLIST));
-    m_showDate = QDate::fromString(o.value("showDate").toString(), Qt::ISODate);
-    const QDate today = QDate::currentDate();
-    if (!m_showDate.isValid() || m_showDate < today) {
-        const QDate oct31(2026, 10, 31);
-        m_showDate = oct31 >= today ? oct31 : today.addDays(14);
-    }
-    m_startDate = today;
-    m_defaultMinutes = std::clamp(o.value("defaultMinutes").toInt(120), 15, 600);
-    m_routineMinutes = std::clamp(o.value("routineMinutes").toInt(120), 15, 600);
-    m_dayMinutes.clear();
-    const QJsonObject dm = o.value("dayMinutes").toObject();
-    for (const QString& k : dm.keys()) {
-        const QDate d = QDate::fromString(k, Qt::ISODate);
-        if (d.isValid() && d >= today) {
-            m_dayMinutes[d] = dm.value(k).toInt();
-        }
-    }
-    m_needs.clear();
-    const QJsonObject needs = o.value("needs").toObject();
-    for (const QString& code : needs.keys()) {
-        const QJsonObject n = needs.value(code).toObject();
-        for (const QString& a : n.keys()) {
-            m_needs[code][a] = std::clamp(n.value(a).toInt(), 0, 3);
-        }
-    }
+    return practice::practiceFolder() + "/setlists.json";
 }
 
-void PracticeModel::saveSettings() const
+QJsonObject PracticeModel::currentData() const
 {
     QJsonObject dm;
     for (const auto& [d, m] : m_dayMinutes) {
@@ -362,14 +347,311 @@ void PracticeModel::saveSettings() const
         }
         needs[code] = o;
     }
-    const QJsonObject o { { "setlist", m_setlistText }, { "showDate", m_showDate.toString(Qt::ISODate) },
-                          { "defaultMinutes", m_defaultMinutes }, { "routineMinutes", m_routineMinutes }, { "dayMinutes", dm },
-                          { "needs", needs } };
-    QSaveFile f(practice::practiceFolder() + "/setlist.json");
+    return QJsonObject { { "setlist", m_setlistText }, { "showDate", m_showDate.toString(Qt::ISODate) },
+                         { "defaultMinutes", m_defaultMinutes }, { "routineMinutes", m_routineMinutes }, { "dayMinutes", dm },
+                         { "needs", needs }, { "breakEvery", m_breakEvery }, { "breakMinutes", m_breakMinutes } };
+}
+
+void PracticeModel::applyData(const QJsonObject& o)
+{
+    m_setlistText = o.value("setlist").toString(QString::fromUtf8(PRACTICE_DEFAULT_SETLIST));
+    m_showDate = QDate::fromString(o.value("showDate").toString(), Qt::ISODate);
+    const QDate today = QDate::currentDate();
+    if (!m_showDate.isValid()) {
+        const QDate oct31(2026, 10, 31);
+        m_showDate = oct31 >= today ? oct31 : today.addDays(14);
+    }
+    m_startDate = today;
+    m_defaultMinutes = std::clamp(o.value("defaultMinutes").toInt(120), 15, 600);
+    m_routineMinutes = std::clamp(o.value("routineMinutes").toInt(120), 15, 600);
+    m_breakEvery = std::clamp(o.value("breakEvery").toInt(0), 0, 180);
+    m_breakMinutes = std::clamp(o.value("breakMinutes").toInt(5), 1, 30);
+    m_dayMinutes.clear();
+    const QJsonObject dm = o.value("dayMinutes").toObject();
+    for (const QString& k : dm.keys()) {
+        const QDate d = QDate::fromString(k, Qt::ISODate);
+        if (d.isValid() && d >= today) {
+            m_dayMinutes[d] = dm.value(k).toInt();
+        }
+    }
+    m_needs.clear();
+    const QJsonObject needs = o.value("needs").toObject();
+    for (const QString& code : needs.keys()) {
+        const QJsonObject n = needs.value(code).toObject();
+        for (const QString& a : n.keys()) {
+            if (PRACTICE_AREAS.contains(a)) {   // (1.19's "harmony" is gone)
+                m_needs[code][a] = std::clamp(n.value(a).toInt(), 0, 3);
+            }
+        }
+    }
+}
+
+void PracticeModel::loadSettings()
+{
+    m_setlists.clear();
+    QFile f(setlistsFile());
+    QJsonObject root;
+    if (f.open(QIODevice::ReadOnly)) {
+        root = QJsonDocument::fromJson(f.readAll()).object();
+    }
+    for (const QJsonValue& v : root.value("setlists").toArray()) {
+        const QJsonObject o = v.toObject();
+        SavedSetlist sl;
+        sl.id = o.value("id").toString();
+        sl.name = o.value("name").toString();
+        sl.data = o.value("data").toObject();
+        sl.legacy = o.value("legacy").toBool();
+        if (!sl.id.isEmpty()) {
+            m_setlists.push_back(sl);
+        }
+    }
+    if (m_setlists.empty()) {
+        // the 1.19 setlist (or the default one)
+        QFile old(practice::practiceFolder() + "/setlist.json");
+        QJsonObject o;
+        if (old.open(QIODevice::ReadOnly)) {
+            o = QJsonDocument::fromJson(old.readAll()).object();
+        }
+        SavedSetlist sl;
+        sl.id = QString::number(QDateTime::currentMSecsSinceEpoch(), 36);
+        sl.data = o;
+        sl.legacy = true;
+        const QDate d = QDate::fromString(o.value("showDate").toString(), Qt::ISODate);
+        sl.name = QString("Show %1").arg((d.isValid() ? d : QDate(2026, 10, 31)).toString("ddd d MMM yyyy"));
+        m_setlists.push_back(sl);
+    }
+    m_setlistId = root.value("current").toString();
+    const SavedSetlist* cur = nullptr;
+    for (const SavedSetlist& sl : m_setlists) {
+        if (sl.id == m_setlistId) {
+            cur = &sl;
+        }
+    }
+    if (!cur) {
+        cur = &m_setlists.front();
+        m_setlistId = cur->id;
+    }
+    applyData(cur->data);
+    saveSetlists();
+}
+
+void PracticeModel::saveSetlists() const
+{
+    QJsonArray arr;
+    for (const SavedSetlist& sl : m_setlists) {
+        arr.append(QJsonObject { { "id", sl.id }, { "name", sl.name }, { "legacy", sl.legacy },
+                                 { "data", sl.id == m_setlistId ? currentData() : sl.data } });
+    }
+    QSaveFile f(setlistsFile());
     if (f.open(QIODevice::WriteOnly)) {
-        f.write(QJsonDocument(o).toJson());
+        f.write(QJsonDocument(QJsonObject { { "current", m_setlistId }, { "setlists", arr } }).toJson());
         f.commit();
     }
+}
+
+void PracticeModel::saveSettings() const
+{
+    saveSetlists();
+}
+
+QVariantList PracticeModel::setlists() const
+{
+    QVariantList out;
+    for (const SavedSetlist& sl : m_setlists) {
+        const QDate d = QDate::fromString((sl.id == m_setlistId ? currentData() : sl.data).value("showDate").toString(), Qt::ISODate);
+        out << QVariantMap { { "id", sl.id }, { "name", sl.name }, { "date", d.toString(Qt::ISODate) },
+                             { "dateText", d.isValid() ? d.toString("ddd d MMM yyyy") : QString() } };
+    }
+    return out;
+}
+
+QString PracticeModel::setlistId() const
+{
+    return m_setlistId;
+}
+
+QString PracticeModel::setlistName() const
+{
+    for (const SavedSetlist& sl : m_setlists) {
+        if (sl.id == m_setlistId) {
+            return sl.name;
+        }
+    }
+    return {};
+}
+
+int PracticeModel::breakEvery() const
+{
+    return m_breakEvery;
+}
+
+int PracticeModel::breakMinutes() const
+{
+    return m_breakMinutes;
+}
+
+void PracticeModel::selectSetlist(const QString& id)
+{
+    if (id == m_setlistId) {
+        return;
+    }
+    for (SavedSetlist& sl : m_setlists) {
+        if (sl.id == m_setlistId) {
+            sl.data = currentData();
+        }
+    }
+    for (const SavedSetlist& sl : m_setlists) {
+        if (sl.id == id) {
+            m_setlistId = id;
+            applyData(sl.data);
+            break;
+        }
+    }
+    saveSetlists();
+    parseSetlist();
+    m_planId.clear();
+    reloadPlans();
+    emit changed();
+}
+
+void PracticeModel::newSetlist(const QString& name, const QString& isoDate)
+{
+    for (SavedSetlist& sl : m_setlists) {
+        if (sl.id == m_setlistId) {
+            sl.data = currentData();
+        }
+    }
+    SavedSetlist sl;
+    sl.id = QString::number(QDateTime::currentMSecsSinceEpoch(), 36);
+    sl.data = currentData();
+    const QDate d = QDate::fromString(isoDate, Qt::ISODate);
+    if (d.isValid()) {
+        sl.data["showDate"] = d.toString(Qt::ISODate);
+        sl.data["dayMinutes"] = QJsonObject();
+    }
+    sl.name = name.trimmed().isEmpty() ? QString("Show %1").arg((d.isValid() ? d : m_showDate).toString("ddd d MMM yyyy")) : name.trimmed();
+    m_setlists.push_back(sl);
+    m_setlistId = sl.id;
+    applyData(sl.data);
+    saveSetlists();
+    parseSetlist();
+    m_planId.clear();
+    reloadPlans();
+    setStatus(QStringLiteral("Made the setlist “%1”.").arg(sl.name));
+}
+
+void PracticeModel::renameSetlist(const QString& name)
+{
+    if (name.trimmed().isEmpty()) {
+        return;
+    }
+    for (SavedSetlist& sl : m_setlists) {
+        if (sl.id == m_setlistId) {
+            sl.name = name.trimmed();
+        }
+    }
+    saveSetlists();
+    emit changed();
+}
+
+void PracticeModel::deleteSetlist()
+{
+    if (m_setlists.size() < 2) {
+        setStatus(QStringLiteral("This is the only setlist, so it stays."));
+        return;
+    }
+    const muse::IInteractive::Result r = interactive()->questionSync(
+        muse::trc("starscore", "Delete this setlist?"),
+        QString("“%1” and its plans. Your progress on each item is kept.").arg(setlistName()).toStdString(),
+        { muse::IInteractive::Button::Cancel, muse::IInteractive::Button::Yes }, muse::IInteractive::Button::Cancel);
+    if (r.standardButton() != muse::IInteractive::Button::Yes) {
+        return;
+    }
+    const bool legacy = std::any_of(m_setlists.begin(), m_setlists.end(), [this](const SavedSetlist& sl) {
+        return sl.id == m_setlistId && sl.legacy;
+    });
+    for (const practice::Plan& p : practice::loadPlans()) {
+        if (p.setlistId == m_setlistId || (legacy && p.setlistId.isEmpty())) {
+            practice::deletePlan(p.id);
+        }
+    }
+    m_setlists.erase(std::remove_if(m_setlists.begin(), m_setlists.end(), [this](const SavedSetlist& sl) {
+        return sl.id == m_setlistId;
+    }), m_setlists.end());
+    m_setlistId = m_setlists.front().id;
+    applyData(m_setlists.front().data);
+    saveSetlists();
+    parseSetlist();
+    m_planId.clear();
+    reloadPlans();
+}
+
+void PracticeModel::setBreakEvery(int minutes)
+{
+    m_breakEvery = std::clamp(minutes, 0, 180);
+    saveSettings();
+    emit changed();
+}
+
+void PracticeModel::setBreakMinutes(int minutes)
+{
+    m_breakMinutes = std::clamp(minutes, 1, 30);
+    saveSettings();
+    emit changed();
+}
+
+// ---------------------------------------------------------------- skills
+QVariantList PracticeModel::skills() const
+{
+    return m_skills;
+}
+
+void PracticeModel::refreshSkills()
+{
+    practice::Progress progress;
+    progress.load();
+    // the skills of items done before 1.20 (the log didn't keep them): from the songs' libraries
+    std::set<QString> codes;
+    for (const QJsonValue& v : progress.log()) {
+        codes.insert(v.toObject().value("song").toString());
+    }
+    std::map<QString, practice::Library> libs;
+    for (const practice::SongEntry& e : m_songs) {
+        if (codes.count(e.code)) {
+            libs[e.code] = practice::cachedLibrary(e.path);
+        }
+    }
+    const practice::SkillLookup lookup = practice::skillLookup(libs);
+    const auto now = practice::skillRatings(progress, lookup);
+    const auto before = practice::skillRatings(progress, lookup, QDate::currentDate().addDays(-14));
+    QVariantList out;
+    for (const QString& group : practice::skillGroups()) {
+        std::vector<const practice::SkillRating*> rs;
+        for (const auto& [id, r] : now) {
+            if (practice::skillGroup(id) == group) {
+                rs.push_back(&r);
+            }
+        }
+        std::sort(rs.begin(), rs.end(), [](const practice::SkillRating* a, const practice::SkillRating* b) {
+            return a->rating > b->rating;
+        });
+        for (const practice::SkillRating* r : rs) {
+            auto b = before.find(r->id);
+            const double was = b == before.end() ? 0.0 : b->second.rating;
+            // "Level 2, solid": the level of his best item, and how far along it he is
+            const int level = std::max(1, int(std::ceil(r->rating - 0.001)));
+            const double frac = r->rating - (level - 1);
+            const QString how = frac >= 0.99 ? QStringLiteral("mastered") : frac >= 0.8 ? QStringLiteral("solid")
+                                : frac >= 0.45 ? QStringLiteral("getting there") : QStringLiteral("started");
+            out << QVariantMap { { "id", r->id }, { "name", practice::skillName(r->id) }, { "group", group },
+                                 { "rating", r->rating }, { "levelText", QString("Level %1, %2").arg(level).arg(how) },
+                                 { "items", r->items }, { "solidItems", r->solidItems }, { "minutes", r->minutes },
+                                 { "last", r->last.isValid() ? r->last.toString("d MMM") : QString() },
+                                 { "trend", r->rating - was } };
+        }
+    }
+    m_skills = out;
+    emit skillsChanged();
 }
 
 void PracticeModel::parseSetlist()
@@ -567,6 +849,9 @@ void PracticeModel::makeRoutine()
     req.songs = songs;
     req.days = { { QDate::currentDate(), m_routineMinutes } };
     practice::Plan p = practice::makePlan(req, librariesFor(songs), progress);
+    p.setlistId = m_setlistId;
+    p.breakEvery = m_breakEvery;
+    p.breakMinutes = m_breakMinutes;
     practice::savePlan(p);
     m_planId = p.id;
     reloadPlans();
@@ -596,6 +881,9 @@ void PracticeModel::makePlan()
     practice::Progress progress;
     progress.load();
     practice::Plan p = practice::makePlan(req, librariesFor(songs), progress);
+    p.setlistId = m_setlistId;
+    p.breakEvery = m_breakEvery;
+    p.breakMinutes = m_breakMinutes;
     practice::savePlan(p);
     m_planId = p.id;
     reloadPlans();
@@ -697,9 +985,39 @@ void PracticeModel::rebuildPlan()
             }
         }
     }
+    p.setlistId = old.setlistId;
+    p.breakEvery = old.breakEvery;
+    p.breakMinutes = old.breakMinutes;
     practice::savePlan(p);
     reloadPlans();
     setStatus(QStringLiteral("Planned again from today, from your progress so far."));
+}
+
+void PracticeModel::addMinutes(int dayIndex, int minutes)
+{
+    practice::Plan p = practice::loadPlan(m_planId);
+    if (p.id.isEmpty()) {
+        return;
+    }
+    for (practice::PlanSong& ps : p.songs) {   // (today's needs: they may have changed since the plan was made)
+        for (const practice::SongEntry& e : m_songs) {
+            if (e.code == ps.code) {
+                ps.needs = needsFor(ps.code);
+            }
+        }
+    }
+    practice::Progress progress;
+    progress.load();
+    const int before = dayIndex >= 0 && dayIndex < int(p.days.size()) ? int(p.days[dayIndex].blocks.size()) : 0;
+    const int added = practice::addToDay(p, dayIndex, minutes, librariesFor(p.songs), progress);
+    if (added == 0) {
+        setStatus(QStringLiteral("Nothing more to add for these songs today."));
+        return;
+    }
+    practice::savePlan(p);
+    reloadPlans();
+    setStatus(QStringLiteral("Added %1 items (%2) to the end of the day.").arg(int(p.days[dayIndex].blocks.size()) - before)
+              .arg(practice::formatMinutes(added)));
 }
 
 QString PracticeModel::outputFolder() const
@@ -786,13 +1104,13 @@ void PracticeModel::exportIreal(int dayIndex)
     QDesktopServices::openUrl(QUrl::fromLocalFile(file));
 }
 
-void PracticeModel::openRunner(int dayIndex, int blockIndex)
+void PracticeModel::openRunner(int dayIndex, int blockIndex, bool handsFree)
 {
     if (m_planId.isEmpty()) {
         return;
     }
-    const QString uri = QString("musescore://starscore/practicerunner?planId=%1&dayIndex=%2&blockIndex=%3&modal=false&floating=true")
-                        .arg(m_planId).arg(dayIndex).arg(std::max(0, blockIndex));
+    const QString uri = QString("musescore://starscore/practicerunner?planId=%1&dayIndex=%2&blockIndex=%3&handsFree=%4&modal=false&floating=true")
+                        .arg(m_planId).arg(dayIndex).arg(std::max(0, blockIndex)).arg(handsFree ? 1 : 0);
     interactive()->open(muse::UriQuery(uri.toStdString()));
 }
 

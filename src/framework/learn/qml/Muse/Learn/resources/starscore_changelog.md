@@ -4,6 +4,30 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.20.0
+
+- **Practice, hands free.** "Hands free" (on the Practice page, beside each day, and in the runner) plays a whole day without stopping, so the laptop can sit on a stand behind the keyboards. Each part of each item opens, its play-along backing starts by itself, its timer runs, and the runner moves on when the time is up. The notation is fitted to the window with no scrolling ("Full screen" fills the screen). Pause, Skip, and Stop are at the top.
+- **Breaks.** On the Practice page, set "Breaks: every N min, for M min" before making a routine or plan (0 for no breaks). Hands free stops for the break after about that much practice and starts again by itself; "End the break" starts sooner. In each break (and at the end of the day) it asks how the items since the last break went, one tap each (Started, Getting there, Solid, Mastered), so your progress still counts. "Skip ratings" marks them done and keeps how solid they were.
+- **An item's parts each have their own timer.** An item with several exercises (the six scales of Okane's "Lydian lens") lists them as parts, each with its own minutes. The clock counts down the current part and moves to the next one by itself.
+- **Play example and Play along.** Each part has "Play example" (its bars as written, at today's tempo, once) and "Play along" (a backing track of bass, drums, and a soft pad, without your notes, looped for the part's minutes). When an item has a tempo range, the play-along starts at today's tempo and steps up toward the goal pass by pass; the runner shows the pass and its tempo. iReal Pro is now a small button: there's no way for another app to start iReal or set its tempo.
+- **Bigger or smaller text and notation in the runner.** "Text − 100% +" and "Score − 100% +" at the top, from 70% to 200% (text) and 60% to 200% (score). A bigger score reflows to fewer bars a line, so it still fits the width. Both are remembered.
+- **Parts, Comping, and Solos.** The setlist has three areas now, with proper column headers. What 1.19 called harmony (scales per chord, voicings, and the like) is under Solos or Comping, wherever it's used.
+- **Saved setlists.** The dropdown at the top of the setlist holds every setlist you've made, each with its own show date, needs, minutes, breaks, and plans. "New" makes one (a copy of the current one, with a name and a date), "Rename" and "Delete" do what they say. The Oct 31 setlist and its plans are the first one.
+- **Want more? Add minutes.** Under an open day ("Want more? Add 30 minutes"), and in the runner when a day is done (15, 30, 45, or 60 min), adds new items to the end of the day. They're chosen from what the songs still need after what the day already has, with no second warm-up.
+- **Skills.** Every item now names the skills it works on (the altered scale, broken 3rds, rootless voicings, Latin comping, odd meters, and about 50 more), and marking items done rates each skill across every song. The Skills button on the Practice page shows how good you are at each (for example "Level 2, solid"), how many items it's from, and an arrow when it went up in the last two weeks. Plans use it: an item that's basic for you (you're solid at a higher level of all its skills) comes up much less and needs one session, an item one level above your best gets priority, a skill you have counts as a prerequisite met in any song, and tempos start higher where you have the skill.
+- **Scale shapes.** Scale work now goes on to shapes once the plain scale is solid: 1-2-3-5 cells, broken tetrads (1-3-5-7), broken 3rds and alternating broken 3rds, broken 4ths, 1-4-7, enclosures, and 1-5-1-3, in continuous scales over the changes, hands together and with left-hand chords under a right-hand scale, and superimposed scales for an "out" sound. A shape item needs its plain scale solid first.
+- **7/8 scales.** Heptatonic scale runs that aren't over the song's changes are written in 7/8 (one octave a bar, beamed 2+2+3).
+- **Fingerings** on pure scale runs, from Joel's fingering chart (the course books' rules).
+- **Shorter text.** Every practice item's goal, steps, and "move on when" were rewritten to the point.
+- **The Trip and Live Strong:** the free playing reworked: lines that ignore the chords on purpose (a cell moved by a fixed interval, symmetric shapes, a second key, planing, clusters), landing on the harmony at phrase ends.
+- **Everpresent's piano solo** (Solo #1) is in the song as a solo transcription, and its vocabulary (quartal side-slips, triad chains, diminished triads, upper-structure planing, the climax's planed stabs, and more) is in the song's practice items: learn the licks from the transcription, then the same devices on other chords.
+
+### Also in 1.20.0
+
+- **Dark-mode Keys sheets.** Export to Sheets and Demos also writes each Keys sheet in dark mode, in the course books' colours (light music on a dark page), to "Sheet Music/Dark Mode/1 Rhythm/CODE - Keys (Dark Mode).pdf". They don't affect folder colours.
+- **Keys braces you set stay.** A Keys sheet of several keyboards kept losing a brace you set across them (Little Louie's Rhodes bass staff with the Hammond treble staff): opening the song put back one brace per keyboard. Braces you set are kept now; a keyboard gets its own brace only when none of its staves has one.
+- **Automatic tests:** addsolo:<file>|<first bar>|<last bar>|<name> adds a solo transcription.
+
 ## 1.19.0
 
 - **Practice (Home › Practice, below Dashboard).** Practice routines and plans for the songs on a setlist, from practice libraries stored in each song's .starscore:

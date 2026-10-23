@@ -542,6 +542,18 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         autotestLog(QString("  default %1 (%2); song restyled with %3; differs in %4: %5").arg(loadStyleSettings().defaultStyle)
                     .arg(defaultStyleFingerprint()).arg(d.styleFingerprint.isEmpty() ? QString("(no record)") : d.styleFingerprint)
                     .arg(styleDifferences().size()).arg(styleDifferences().mid(0, 12).join(", ")));
+    } else if (step.startsWith("addsolo:")) {
+        // addsolo:<solo .mscz>|<first bar>|<last bar>|<name>: as the bar menu's "Add solo transcription"
+        const QStringList a = step.mid(8).split('|');
+        if (a.size() < 4) {
+            autotestLog("  addsolo needs <file>|<first bar>|<last bar>|<name>");
+        } else {
+            const RetVal<StarScoreSoloPlan> plan = planSolo(io::path_t(a[0]), a[1].toInt(), a[2].toInt());
+            autotestLog(QString("  plan: %1 bars, %2-%3, %4 passes; %5 %6").arg(plan.val.soloBars).arg(plan.val.startBar)
+                        .arg(plan.val.endBar).arg(plan.val.passes).arg(plan.val.summary, plan.val.warning));
+            const RetVal<QString> r = addSolo(io::path_t(a[0]), a[3], a[1].toInt(), a[2].toInt());
+            autotestLog(QString("  addsolo: %1 %2").arg(r.ret ? "ok" : "failed", r.ret ? r.val : QString::fromStdString(r.ret.toString())));
+        }
     } else if (step.startsWith("copyrightyear:")) {
         // copyrightyear:<year>: as the "…" menu's Copyright year
         setCopyrightYear(step.mid(14).toInt());

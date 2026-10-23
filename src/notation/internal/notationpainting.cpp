@@ -119,7 +119,12 @@ void NotationPainting::doPaint(Painter* painter, const Options& opt)
 
     Options myopt = opt;
     bool printPageBackground = myopt.printPageBackground;
-    myopt.onPaintPageSheet = [this, printPageBackground](Painter* painter, const Page* page, const RectF& pageRect) {
+    const Color pageColor = myopt.pageColor;
+    myopt.onPaintPageSheet = [this, printPageBackground, pageColor](Painter* painter, const Page* page, const RectF& pageRect) {
+        if (score()->printing() && printPageBackground && pageColor.isValid()) {
+            painter->fillRect(pageRect, pageColor);   // (StarScore: a dark-mode sheet)
+            return;
+        }
         paintPageSheet(painter, page, pageRect, printPageBackground);
     };
 

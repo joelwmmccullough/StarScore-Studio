@@ -113,6 +113,7 @@ static const QMap<QString, QString> FOLDER_BLURB {
     { "Reference PDFs", "Reference material Joel keeps with the tune: transcriptions, original charts, notes." },
     { "Version History", "Every past version of this song, kept forever. Nothing here is current &mdash; do not play from it." },
     { "Annotated Sheets", "Sheets with one player's own notes on them, kept through every update. The clean sheets are in the other folders." },
+    { "Dark Mode", "The Keys sheets in dark mode: light music on a dark page, for reading from a screen." },
     { "Combined Parts", "One sheet per horn player with their line from every arrangement (1-Horn to 7-Horn) on one staff, labelled by arrangement." },
     { "Sheet Music (Double-Time)", "Every sheet with the song written out in double time, in the same folders as Sheet Music." },
     { "Sheet Music (Half-Time)", "Every sheet with the song written out in half time, in the same folders as Sheet Music." },

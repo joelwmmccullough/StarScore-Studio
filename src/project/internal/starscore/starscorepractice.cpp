@@ -99,9 +99,25 @@ Library mu::project::practice::parseLibrary(const QJsonObject& root, bool withXm
         it.category = o.value("category").toString();
         it.solo = o.value("solo").toString();
         it.sections = strings(o.value("sections"));
-        it.level = std::clamp(o.value("level").toInt(1), 1, 3);
+        it.level = std::clamp(o.value("level").toInt(1), 1, 5);
         it.minutes = std::clamp(o.value("minutes").toInt(10), 3, 60);
         it.prereq = strings(o.value("prereq"));
+        it.prereqSolid = o.value("prereqSolid").toBool();
+        it.skills = strings(o.value("skills"));
+        for (const QJsonValue& pv : o.value("parts").toArray()) {
+            const QJsonObject po = pv.toObject();
+            Part part;
+            part.label = po.value("label").toString();
+            part.minutes = std::max(1, po.value("minutes").toInt(1));
+            const QStringList bars = po.value("bars").toString().split('-', Qt::SkipEmptyParts);
+            if (!bars.isEmpty()) {
+                part.barFrom = std::max(1, bars.first().trimmed().toInt());
+                part.barTo = std::max(part.barFrom, bars.last().trimmed().toInt());
+            }
+            if (!part.label.isEmpty()) {
+                it.parts.push_back(part);
+            }
+        }
         it.goal = o.value("goal").toString();
         it.steps = strings(o.value("steps"));
         const QJsonObject tempo = o.value("tempo").toObject();
@@ -440,6 +456,10 @@ void Progress::load()
         p.bestTempo = o.value("bestTempo").toInt();
         p.last = QDate::fromString(o.value("last").toString(), Qt::ISODate);
         p.note = o.value("note").toString();
+        p.level = o.value("level").toInt();
+        for (const QJsonValue& sv : o.value("skills").toArray()) {
+            p.skills << sv.toString();
+        }
         m_items[k] = p;
     }
     m_log = root.value("log").toArray();
@@ -450,7 +470,8 @@ bool Progress::save() const
     QJsonObject items;
     for (const auto& [k, p] : m_items) {
         items[k] = QJsonObject { { "stage", p.stage }, { "sessions", p.sessions }, { "minutes", p.minutes }, { "bestTempo", p.bestTempo },
-                                 { "last", p.last.toString(Qt::ISODate) }, { "note", p.note } };
+                                 { "last", p.last.toString(Qt::ISODate) }, { "note", p.note }, { "level", p.level },
+                                 { "skills", QJsonArray::fromStringList(p.skills) } };
     }
     QDir().mkpath(QFileInfo(m_file).absolutePath());
     QSaveFile f(m_file);
@@ -468,9 +489,13 @@ ItemProgress Progress::get(const QString& code, const QString& itemId) const
 }
 
 void Progress::record(const QString& code, const QString& itemId, int minutes, int tempo, int stage, const QString& note,
-                      const QDate& date)
+                      const QDate& date, int level, const QStringList& skills)
 {
     ItemProgress& p = m_items[code + "/" + itemId];
+    if (level > 0) {
+        p.level = level;
+        p.skills = skills;
+    }
     p.sessions += 1;
     p.minutes += minutes;
     p.bestTempo = std::max(p.bestTempo, tempo);
@@ -481,8 +506,13 @@ void Progress::record(const QString& code, const QString& itemId, int minutes, i
     if (!note.isEmpty()) {
         p.note = note;
     }
-    m_log.append(QJsonObject { { "date", date.toString(Qt::ISODate) }, { "song", code }, { "item", itemId }, { "minutes", minutes },
-                               { "tempo", tempo }, { "stage", stage }, { "note", note } });
+    QJsonObject entry { { "date", date.toString(Qt::ISODate) }, { "song", code }, { "item", itemId }, { "minutes", minutes },
+                        { "tempo", tempo }, { "stage", stage }, { "note", note } };
+    if (level > 0) {
+        entry["level"] = level;
+        entry["skills"] = QJsonArray::fromStringList(skills);
+    }
+    m_log.append(entry);
 }
 
 // ---------------------------------------------------------------- plans (JSON)
@@ -507,7 +537,8 @@ QJsonObject Plan::toJson() const
                                { "blocks", b } });
     }
     return QJsonObject { { "id", id }, { "name", name }, { "kind", kind }, { "created", created.toString(Qt::ISODate) },
-                         { "showDate", showDate.toString(Qt::ISODate) }, { "songs", s }, { "days", d } };
+                         { "showDate", showDate.toString(Qt::ISODate) }, { "songs", s }, { "days", d },
+                         { "setlist", setlistId }, { "breakEvery", breakEvery }, { "breakMinutes", breakMinutes } };
 }
 
 Plan Plan::fromJson(const QJsonObject& o)
@@ -518,6 +549,9 @@ Plan Plan::fromJson(const QJsonObject& o)
     p.kind = o.value("kind").toString("routine");
     p.created = QDate::fromString(o.value("created").toString(), Qt::ISODate);
     p.showDate = QDate::fromString(o.value("showDate").toString(), Qt::ISODate);
+    p.setlistId = o.value("setlist").toString();
+    p.breakEvery = std::max(0, o.value("breakEvery").toInt());
+    p.breakMinutes = std::clamp(o.value("breakMinutes").toInt(5), 1, 30);
     for (const QJsonValue& v : o.value("songs").toArray()) {
         const QJsonObject so = v.toObject();
         PlanSong ps;
@@ -554,19 +588,197 @@ Plan Plan::fromJson(const QJsonObject& o)
     return p;
 }
 
-// ---------------------------------------------------------------- the planner
-static QString areaOf(const QString& category)
+// ---------------------------------------------------------------- skills
+namespace {
+struct SkillDef {
+    const char* name;
+    const char* group;
+};
+// (made by the libraries' tools/skills.py --cpp: keep in step with it)
+const std::map<QString, SkillDef>& skillDefs()
 {
-    if (category == "solo" || category == "vocabulary") {
+    static const std::map<QString, SkillDef> defs {
+        { "scale.modes", { "Major-scale modes", "Scales" } },
+        { "scale.melodic-minor", { "Melodic minor and its modes", "Scales" } },
+        { "scale.altered", { "The altered scale", "Scales" } },
+        { "scale.diminished", { "Diminished scales", "Scales" } },
+        { "scale.whole-tone", { "Whole-tone scale", "Scales" } },
+        { "scale.pentatonic", { "Pentatonics", "Scales" } },
+        { "scale.blues", { "Blues scale and blue notes", "Scales" } },
+        { "scale.harmonic", { "Harmonic minor and its modes", "Scales" } },
+        { "scale.augmented", { "Augmented and hexatonic scales", "Scales" } },
+        { "scale.linear", { "Scales over changes", "Scales" } },
+        { "shape.thirds", { "Shapes: broken 3rds", "Scale shapes" } },
+        { "shape.fourths", { "Shapes: broken 4ths", "Scale shapes" } },
+        { "shape.cells", { "Shapes: 1-2-3-5 cells", "Scale shapes" } },
+        { "shape.tetrads", { "Shapes: broken tetrads (1-3-5-7)", "Scale shapes" } },
+        { "shape.triads", { "Shapes: scale triads", "Scale shapes" } },
+        { "shape.147", { "Shapes: 1-4-7 (stacked 4ths)", "Scale shapes" } },
+        { "shape.root-five", { "Shapes: 1-5-1-3", "Scale shapes" } },
+        { "shape.hands", { "Shapes with both hands and with left-hand chords", "Scale shapes" } },
+        { "shape.superimpose", { "Superimposed scales", "Scale shapes" } },
+        { "line.chord-tones", { "Arpeggios and chord tones", "Lines" } },
+        { "line.guide-tones", { "Guide tones", "Lines" } },
+        { "line.enclosures", { "Approach notes and enclosures", "Lines" } },
+        { "line.chromatic", { "Chromatic and bebop lines", "Lines" } },
+        { "line.triad-pairs", { "Triad pairs and upper-structure triads", "Lines" } },
+        { "line.outside", { "Playing outside: side-slips, superimposition, and free playing", "Lines" } },
+        { "line.motif", { "Motifs, development, and sequences", "Lines" } },
+        { "line.rhythm", { "Rhythmic phrasing: displacement and groupings", "Lines" } },
+        { "line.octaves", { "Octaves and two-hand lines", "Lines" } },
+        { "solo.form", { "Soloing through a tune's form", "Lines" } },
+        { "line.licks", { "Licks and transcribed solos", "Lines" } },
+        { "voicing.shells", { "Shell voicings", "Voicings" } },
+        { "voicing.rootless", { "Rootless voicings", "Voicings" } },
+        { "voicing.drop2", { "Drop 2 and block chords", "Voicings" } },
+        { "voicing.quartal", { "Quartal and So What voicings", "Voicings" } },
+        { "voicing.upper", { "Upper-structure and slash-chord voicings", "Voicings" } },
+        { "voicing.clusters", { "Clusters and seconds", "Voicings" } },
+        { "voicing.spread", { "Two-hand and spread voicings", "Voicings" } },
+        { "voicing.triads", { "Triads and inversions", "Voicings" } },
+        { "voicing.sus", { "Sus chords", "Voicings" } },
+        { "voicing.leading", { "Voice leading", "Voicings" } },
+        { "comp.swing", { "Swing comping rhythms", "Comping" } },
+        { "comp.funk", { "Funk and 16th-note comping", "Comping" } },
+        { "comp.latin", { "Latin patterns: montuno, clave, and bossa", "Comping" } },
+        { "comp.pads", { "Pads, swells, and textures", "Comping" } },
+        { "comp.bass", { "Left-hand bass and keys bass", "Comping" } },
+        { "comp.gospel", { "Gospel and passing chords", "Comping" } },
+        { "comp.free", { "Free and improvised comping", "Comping" } },
+        { "tech.independence", { "Hand independence", "Technique and time" } },
+        { "tech.speed", { "Speed and evenness", "Technique and time" } },
+        { "time.odd", { "Odd meters", "Technique and time" } },
+        { "time.feel", { "Time and feel", "Technique and time" } },
+        { "ear.sing", { "Ear: singing and hearing", "Ear" } },
+        { "ear.transcribe", { "Ear: transcribing", "Ear" } },
+        { "form.memory", { "Form and memory", "Form, parts, and performance" } },
+        { "parts.reading", { "Written parts", "Form, parts, and performance" } },
+        { "perf.run", { "Run-throughs and performing", "Form, parts, and performance" } },
+    };
+    return defs;
+}
+
+double skillCredit(int level, int stage)
+{
+    static const double STAGE[] = { 0.0, 0.25, 0.5, 0.85, 1.0 };
+    return stage <= 0 ? 0.0 : (std::max(1, level) - 1) + STAGE[std::clamp(stage, 0, 4)];
+}
+}
+
+QString mu::project::practice::skillName(const QString& id)
+{
+    auto it = skillDefs().find(id);
+    return it == skillDefs().end() ? id : QString::fromUtf8(it->second.name);
+}
+
+QString mu::project::practice::skillGroup(const QString& id)
+{
+    auto it = skillDefs().find(id);
+    return it == skillDefs().end() ? QStringLiteral("Other") : QString::fromUtf8(it->second.group);
+}
+
+QStringList mu::project::practice::skillGroups()
+{
+    return { "Scales", "Scale shapes", "Lines", "Voicings", "Comping", "Technique and time", "Ear",
+             "Form, parts, and performance", "Other" };
+}
+
+SkillLookup mu::project::practice::skillLookup(const std::map<QString, Library>& libraries)
+{
+    SkillLookup out;
+    for (const auto& [code, lib] : libraries) {
+        for (const Item& it : lib.items) {
+            if (!it.skills.isEmpty()) {
+                out[code + "/" + it.id] = { it.skills, it.level };
+            }
+        }
+    }
+    return out;
+}
+
+std::map<QString, SkillRating> mu::project::practice::skillRatings(const Progress& progress, const SkillLookup& lookup, const QDate& asOf)
+{
+    // each item's latest stage (up to asOf), its skills and level, sessions, minutes
+    struct Seen {
+        int stage = 0;
+        int level = 1;
+        QStringList skills;
+        int sessions = 0;
+        int minutes = 0;
+        QDate last;
+    };
+    std::map<QString, Seen> items;
+    for (const QJsonValue& v : progress.log()) {
+        const QJsonObject o = v.toObject();
+        const QDate d = QDate::fromString(o.value("date").toString(), Qt::ISODate);
+        if (asOf.isValid() && d.isValid() && d > asOf) {
+            continue;
+        }
+        const QString k = o.value("song").toString() + "/" + o.value("item").toString();
+        Seen& s = items[k];
+        if (o.value("stage").toInt(-1) >= 0) {
+            s.stage = o.value("stage").toInt();
+        }
+        s.sessions += 1;
+        s.minutes += o.value("minutes").toInt();
+        if (d.isValid() && (!s.last.isValid() || d > s.last)) {
+            s.last = d;
+        }
+        if (o.contains("skills")) {
+            s.skills.clear();
+            for (const QJsonValue& sv : o.value("skills").toArray()) {
+                s.skills << sv.toString();
+            }
+            s.level = std::max(1, o.value("level").toInt(1));
+        }
+    }
+    std::map<QString, SkillRating> out;
+    for (auto& [k, s] : items) {
+        if (s.skills.isEmpty()) {
+            auto f = lookup.find(k);
+            if (f == lookup.end()) {
+                continue;
+            }
+            s.skills = f->second.first;
+            s.level = f->second.second;
+        }
+        const double credit = skillCredit(s.level, s.stage);
+        for (const QString& id : s.skills) {
+            SkillRating& r = out[id];
+            r.id = id;
+            r.rating = std::max(r.rating, credit);
+            r.items += 1;
+            r.solidItems += s.stage >= 3 ? 1 : 0;
+            r.sessions += s.sessions;
+            r.minutes += s.minutes;
+            if (s.last.isValid() && (!r.last.isValid() || s.last > r.last)) {
+                r.last = s.last;
+            }
+        }
+    }
+    return out;
+}
+
+// ---------------------------------------------------------------- the planner
+//! The setlist area an item counts for: parts, comping, or solos
+static QString areaOf(const Item& it)
+{
+    const QString& c = it.category;
+    if (c == "solo" || c == "vocabulary") {
         return "solos";
     }
-    if (category == "comping") {
+    if (c == "comping" || c == "voicings") {
         return "comping";
     }
-    if (category == "parts" || category == "form" || category == "performance") {
+    if (c == "parts" || c == "form" || c == "performance") {
         return "parts";
     }
-    return "harmony";   // harmony, voicings, technique, ear
+    return it.solo.isEmpty() ? "comping" : "solos";   // (older libraries' harmony, and technique and ear)
+}
+
+static bool isPracticeArea(const QString& a)
+{
+    return a == "parts" || a == "comping" || a == "solos";
 }
 
 namespace {
@@ -575,6 +787,7 @@ struct Sim {
     int scheduled = 0;
     QDate lastDay;
     int bestTempo = 0;
+    double minFrac = 0;    // how far up the tempo range to start at the least (he has the skill already)
 };
 
 int tempoFor(const Item& it, const Sim& s)
@@ -584,7 +797,8 @@ int tempoFor(const Item& it, const Sim& s)
     }
     const int goal = std::max(it.tempoGoal, it.tempoStart);
     static const double FRAC[] = { 0.0, 0.4, 0.75, 1.0, 1.0 };
-    int t = int(std::lround(it.tempoStart + (goal - it.tempoStart) * FRAC[std::clamp(s.stage, 0, 4)]));
+    const double frac = std::max(s.minFrac, FRAC[std::clamp(s.stage, 0, 4)]);
+    int t = int(std::lround(it.tempoStart + (goal - it.tempoStart) * frac));
     if (s.bestTempo > 0) {
         t = std::max(t, std::min(goal, s.bestTempo + 4));
     }
@@ -603,6 +817,21 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
     plan.showDate = req.showDate;
     plan.songs = req.songs;
 
+    // how good he is at each skill (from all the songs he has practised), and where each item sits against that:
+    // its "edge" is its weakest skill's rating (-1: an item without skills)
+    const std::map<QString, SkillRating> ratings = skillRatings(progress, skillLookup(libs));
+    auto edgeOf = [&](const Item& it) {
+        double e = 1e9;
+        for (const QString& id : it.skills) {
+            auto r = ratings.find(id);
+            e = std::min(e, r == ratings.end() ? 0.0 : r->second.rating);
+        }
+        return it.skills.isEmpty() ? -1.0 : e;
+    };
+    // a basic item for him: he is solid at a higher level in all its skills; owned: solid at this level elsewhere
+    auto isBasic = [&](const Item& it) { const double e = edgeOf(it); return e >= 0 && e >= it.level + 0.85 - 0.001; };
+    auto isOwned = [&](const Item& it) { const double e = edgeOf(it); return e >= 0 && e >= it.level - 0.15 - 0.001; };
+
     // the simulated state of every item: real progress, then each scheduled session moves it on a stage
     std::map<QString, Sim> sim;
     auto key = [](const QString& code, const QString& id) { return code + "/" + id; };
@@ -617,7 +846,21 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
             s.stage = p.stage;
             s.lastDay = p.last;
             s.bestTempo = p.bestTempo;
+            if (isBasic(it)) {
+                s.stage = std::max(s.stage, 2);   // one session should do it
+                s.minFrac = 0.6;
+            } else if (isOwned(it)) {
+                s.minFrac = 0.3;
+            }
             sim[key(ps.code, it.id)] = s;
+        }
+    }
+    // more for a day already planned: its blocks count as today's
+    for (const Block& b : req.alreadyToday) {
+        Sim& s = sim[key(b.code, b.itemId)];
+        if (!b.done) {
+            s.scheduled += 1;
+            s.stage = std::min(3, s.stage + 1);
         }
     }
     // kept days (before fromDate) count as practised
@@ -648,6 +891,9 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
         double w = 1.0;
         int most = 0;
         for (const auto& [k, v] : ps.needs) {
+            if (!isPracticeArea(k)) {
+                continue;   // (an old setlist's "harmony")
+            }
             w += v;
             most = std::max(most, v);
         }
@@ -697,6 +943,11 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
             const int since = lastPlayed[code].isValid() ? std::clamp(int(lastPlayed[code].daysTo(start)), 0, 10) : 10;
             debt[code] = since * 3.0 * w / avgWeight - recent[code] * 0.5;
         }
+        for (const Block& b : req.alreadyToday) {   // (more for today: what today already gave each song)
+            if (debt.count(b.code)) {
+                debt[b.code] -= b.done ? b.minutes * 0.5 : b.minutes;   // (done blocks are in the log already)
+            }
+        }
     }
     // the run-through day: the last day before the show with time on it (a plan of three days or more)
     QDate runThroughDate;
@@ -730,6 +981,17 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
         const bool runThrough = !isShow && runThroughDate.isValid() && date == runThroughDate;
         int left = dayMinutes;
         std::set<QString> today;
+        std::map<QString, std::map<QString, int> > areaUsed;
+        if (di == 0) {
+            for (const Block& b : req.alreadyToday) {
+                today.insert(key(b.code, b.itemId));
+                auto lib = libs.find(b.code);
+                const Item* bi = lib == libs.end() ? nullptr : lib->second.item(b.itemId);
+                if (bi) {
+                    areaUsed[b.code][areaOf(*bi)] += 1;
+                }
+            }
+        }
         auto schedule = [&](const QString& code, const Item& it, int minutes, const QString& kind) {
             Sim& s = sim[key(code, it.id)];
             Block b;
@@ -749,12 +1011,22 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
             left -= minutes;
         };
         auto prereqsMet = [&](const QString& code, const Item& it) {
+            const Library* lib = libs.count(code) ? &libs.at(code) : nullptr;
             for (const QString& p : it.prereq) {
                 auto f = sim.find(key(code, p));
                 if (f == sim.end()) {
                     continue;
                 }
-                if (f->second.stage < 1 && !today.count(key(code, p))) {
+                const Item* pre = lib ? lib->item(p) : nullptr;
+                if (pre && isOwned(*pre)) {
+                    continue;   // he has that skill at that level already (from another song)
+                }
+                if (it.prereqSolid) {
+                    // solid first, and not just today (a shape comes after the plain scale is comfortable)
+                    if (f->second.stage < 3 || (today.count(key(code, p)) && progress.get(code, p).stage < 3)) {
+                        return false;
+                    }
+                } else if (f->second.stage < 1 && !today.count(key(code, p))) {
                     return false;
                 }
             }
@@ -769,7 +1041,7 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
 
         // warm-up: a short played harmony, technique, or voicing item (scales, arpeggios, voicings in time), from the
         // songs in turn, the least practised first
-        if (left >= 45 && !isShow && !ordered.empty()) {
+        if (left >= 45 && !isShow && !req.noWarmup && !ordered.empty()) {
             const int n = int(ordered.size());
             for (int k = 0; k < n; ++k) {
                 const PlanSong& ps = ordered[size_t((date.toJulianDay() + k) % n)];   // (by the date: a new song each day)
@@ -780,8 +1052,12 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
                 const Item* best = nullptr;
                 int bestKey = 1 << 30;
                 for (const Item& it : lib->second.items) {
-                    if (!(it.category == "harmony" || it.category == "technique" || it.category == "voicings") || it.level > 2
-                        || !it.hasXml() || !prereqsMet(ps.code, it) || today.count(key(ps.code, it.id))) {
+                    bool warm = it.category == "harmony" || it.category == "technique" || it.category == "voicings";
+                    for (const QString& sk : it.skills) {
+                        warm = warm || sk.startsWith("scale.") || sk.startsWith("shape.") || sk == "line.chord-tones";
+                    }
+                    if (!warm || it.level > 2 || !it.hasXml() || isBasic(it) || !prereqsMet(ps.code, it)
+                        || today.count(key(ps.code, it.id))) {
                         continue;
                     }
                     const Sim& s = sim[key(ps.code, it.id)];
@@ -844,7 +1120,6 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
                 return psOf;
             };
             // the best item of a song for today (nullptr: nothing left to do)
-            std::map<QString, std::map<QString, int> > areaUsed;
             auto bestItem = [&](const QString& code) -> const Item* {
                 const Library& lib = libs.at(code);
                 const PlanSong* ps = planSong(code);
@@ -859,7 +1134,7 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
                     if (!prereqsMet(code, it)) {
                         continue;
                     }
-                    const QString area = areaOf(it.category);
+                    const QString area = areaOf(it);
                     const int need = ps && ps->needs.count(area) ? ps->needs.at(area) : 1;
                     if (need <= 0 && it.category != "performance") {
                         continue;
@@ -874,6 +1149,19 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
                         score += since >= 2 ? 4 : -4;   // learning: back every other day or so
                     }
                     score -= s.scheduled * 1.5;
+                    // his skill: skip what's basic for him, prefer the next step up, hold back what's well beyond
+                    const double edge = edgeOf(it);
+                    if (edge >= 0) {
+                        if (isBasic(it)) {
+                            score -= 12;
+                        } else if (isOwned(it)) {
+                            score -= 6;
+                        } else if (edge >= it.level - 1.15) {
+                            score += 4;
+                        } else if (edge < it.level - 2.15) {
+                            score -= 5;
+                        }
+                    }
                     if (score > bestScore) {
                         bestScore = score;
                         best = &it;
@@ -920,7 +1208,7 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
                     continue;
                 }
                 schedule(pick, *it, m, "item");
-                areaUsed[pick][areaOf(it->category)] += 1;
+                areaUsed[pick][areaOf(*it)] += 1;
                 debt[pick] -= m;
             }
         }
@@ -984,6 +1272,32 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
         plan.days.push_back(day);
     }
     return plan;
+}
+
+int mu::project::practice::addToDay(Plan& plan, int dayIndex, int minutes, const std::map<QString, Library>& libs,
+                                    const Progress& progress)
+{
+    if (dayIndex < 0 || dayIndex >= int(plan.days.size()) || minutes < 5) {
+        return 0;
+    }
+    Day& day = plan.days[dayIndex];
+    PlanRequest req;
+    req.kind = "routine";   // (no run-through or show logic: just more items)
+    req.name = plan.name;
+    req.noWarmup = true;
+    req.alreadyToday = day.blocks;
+    req.songs = plan.songs;
+    req.days = { { day.date.isValid() ? day.date : QDate::currentDate(), std::clamp(minutes, 5, 300) } };
+    const Plan more = makePlan(req, libs, progress);
+    int added = 0;
+    if (!more.days.empty()) {
+        for (const Block& b : more.days.front().blocks) {
+            day.blocks.push_back(b);
+            added += b.minutes;
+        }
+    }
+    day.minutes += added;
+    return added;
 }
 
 // ---------------------------------------------------------------- saved plans

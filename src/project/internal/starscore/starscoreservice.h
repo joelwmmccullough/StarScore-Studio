@@ -320,7 +320,7 @@ public:
     void auditWalkStep(int delta) override;
     void stopAuditWalk() override;
 
-    QList<QImage> renderPracticeExercise(const QString& musicXml, int dpi) override;
+    QList<QImage> renderPracticeExercise(const QString& musicXml, int dpi, double scale = 1.0, int* printableWidthPx = nullptr) override;
     muse::Ret openPracticeExercise(const QString& musicXml, const QString& title, int tempo, bool play) override;
     void openAuditWalkSong();
 

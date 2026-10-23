@@ -28,15 +28,25 @@
 namespace mu::project::practice {
 inline constexpr const char PRACTICE_META_TAG[] = "starscorePractice";
 
+//! One of an item's separate exercises, with its own share of the minutes (and its own timer, example, and backing)
+struct Part {
+    QString label;
+    int minutes = 0;
+    int barFrom = 0;       // the exercise's bars (1-based) it covers; 0: the whole exercise, or none (text only)
+    int barTo = 0;
+};
+
 struct Item {
     QString id;
     QString title;
-    QString category;      // harmony, voicings, comping, parts, solo, vocabulary, form, technique, ear, performance
+    QString category;      // voicings, comping, parts, solo, vocabulary, form, technique, ear, performance (old: harmony)
     QString solo;          // the solo it belongs to, if any
     QStringList sections;
-    int level = 1;
+    int level = 1;         // 1-5
     int minutes = 10;
     QStringList prereq;
+    bool prereqSolid = false;   // the prerequisites must be solid (stage 3), not just started
+    QStringList skills;    // the skills it works on ("scale.altered", "shape.thirds", ...; see skillName)
     QString goal;
     QStringList steps;
     int tempoStart = 0;
@@ -49,6 +59,7 @@ struct Item {
     QString xml() const;
     QString irealStyle, irealKey, irealProg;
     QString groove;
+    std::vector<Part> parts;   // empty: one part, the whole item
 };
 
 struct Solo {
@@ -66,7 +77,7 @@ struct Library {
     QString summary;
     QString style;
     QStringList instruments;
-    std::map<QString, int> needs;   // parts, comping, harmony, solos: 0-3
+    std::map<QString, int> needs;   // parts, comping, solos: 0-3
     std::vector<Section> sections;
     std::vector<Solo> solos;
     std::vector<Item> items;
@@ -104,6 +115,8 @@ struct ItemProgress {
     int bestTempo = 0;
     QDate last;
     QString note;
+    int level = 0;         // the item's level and skills when it was last done (0, empty: not known)
+    QStringList skills;
 };
 
 class Progress
@@ -114,7 +127,7 @@ public:
     bool save() const;
     ItemProgress get(const QString& code, const QString& itemId) const;
     void record(const QString& code, const QString& itemId, int minutes, int tempo, int stage, const QString& note,
-                const QDate& date = QDate::currentDate());
+                const QDate& date = QDate::currentDate(), int level = 0, const QStringList& skills = {});
     QJsonArray log() const { return m_log; }
     QString file() const { return m_file; }
 
@@ -123,6 +136,27 @@ private:
     std::map<QString, ItemProgress> m_items;   // "CODE/ID"
     QJsonArray m_log;
 };
+
+// ---------------------------------------------------------------- skills
+//! How good he is at each skill, from the items done: an item of level L counts L-1, plus 0.25 started, 0.5 getting
+//! there, 0.85 solid, 1 mastered; a skill's rating is its best item (0: not started; 1.85: solid at level 2, ...)
+struct SkillRating {
+    QString id;
+    double rating = 0;
+    int items = 0;         // items of the skill done at least once
+    int solidItems = 0;    // ... and solid or mastered
+    int sessions = 0;
+    int minutes = 0;
+    QDate last;
+};
+//! "CODE/ITEM" → the item's skills and level, for progress kept before items had skills
+using SkillLookup = std::map<QString, std::pair<QStringList, int> >;
+SkillLookup skillLookup(const std::map<QString, Library>& libraries);
+//! The ratings from the progress log, as they were at the end of `asOf` (invalid: now)
+std::map<QString, SkillRating> skillRatings(const Progress& progress, const SkillLookup& lookup = {}, const QDate& asOf = QDate());
+QString skillName(const QString& id);
+QString skillGroup(const QString& id);
+QStringList skillGroups();   // in display order
 
 // ---------------------------------------------------------------- plans
 struct PlanSong {
@@ -159,6 +193,9 @@ struct Plan {
     QDate showDate;
     std::vector<PlanSong> songs;
     std::vector<Day> days;
+    QString setlistId;     // the saved setlist it was made from
+    int breakEvery = 0;    // minutes of practice between breaks (0: no breaks)
+    int breakMinutes = 5;
     QJsonObject toJson() const;
     static Plan fromJson(const QJsonObject& o);
 };
@@ -169,11 +206,19 @@ struct PlanRequest {
     QDate showDate;
     std::vector<PlanSong> songs;
     std::vector<std::pair<QDate, int> > days;   // date, minutes ("routine": one day)
+    //! More for a day already planned ("add N minutes"): its blocks so far (the new ones don't repeat them and count
+    //! what they did), and no warm-up
+    std::vector<Block> alreadyToday;
+    bool noWarmup = false;
 };
 
 //! Builds the plan's days from today's progress. Days before `fromDate` (when given) are kept as they are.
 Plan makePlan(const PlanRequest& request, const std::map<QString, Library>& libraries, const Progress& progress,
               const Plan* existing = nullptr, const QDate& fromDate = QDate());
+
+//! More for a day already planned: `minutes` of new items at its end, from what the songs need after what the day
+//! has (no warm-up). Returns the minutes added (0: nothing left to add).
+int addToDay(Plan& plan, int dayIndex, int minutes, const std::map<QString, Library>& libraries, const Progress& progress);
 
 //! The folder of songs to read libraries from: the library folder, or the automatic tests' folder
 QString libraryRoot(const QString& libraryFolder);

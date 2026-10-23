@@ -928,8 +928,9 @@ public:
 
     // --- Practice (Joel, 22 Oct 2026): a practice item's exercise (MusicXML)
     //! Its notation as images, one per page: transparent background, light notes, gold chord symbols; backing
-    //! staves (bass, drums) left out
-    virtual QList<QImage> renderPracticeExercise(const QString& musicXml, int dpi) = 0;
+    //! staves (bass, drums) left out. scale > 1 draws the notation bigger (the page is narrowed, so the systems reflow
+    //! and still fit the same width); printableWidthPx, when given, is the width a full system takes in the images
+    virtual QList<QImage> renderPracticeExercise(const QString& musicXml, int dpi, double scale = 1.0, int* printableWidthPx = nullptr) = 0;
     //! Opens it as a score (backing included) at the given tempo, to play along with
     virtual muse::Ret openPracticeExercise(const QString& musicXml, const QString& title, int tempo, bool play) = 0;
 };

@@ -19,12 +19,17 @@ Rectangle {
 
     property bool editingSetlist: false
     property int openDay: -1
+    property string setlistAction: ""   // "new" or "rename"
+    property bool showSkills: false
+    property int addMinutesValue: 30
 
     readonly property color goldColor: "#CFA85E"
     readonly property color doneColor: "#3FB05A"
     readonly property color missingColor: "#E0463A"
+    readonly property var areas: ["parts", "comping", "solos"]
     readonly property var areaNames: ({ "parts": qsTrc("starscore", "Parts"), "comping": qsTrc("starscore", "Comping"),
-                                        "harmony": qsTrc("starscore", "Harmony"), "solos": qsTrc("starscore", "Solos") })
+                                        "solos": qsTrc("starscore", "Solos") })
+    readonly property int needWidth: 58
 
     PracticeModel {
         id: pm
@@ -53,8 +58,8 @@ Rectangle {
 
         // ---------------- Setlist ----------------
         Rectangle {
-            Layout.preferredWidth: 340
-            Layout.minimumWidth: 300
+            Layout.preferredWidth: 380
+            Layout.minimumWidth: 340
             Layout.fillHeight: true
             radius: 6
             color: ui.theme.backgroundPrimaryColor
@@ -64,6 +69,70 @@ Rectangle {
                 anchors.fill: parent
                 anchors.margins: 12
                 spacing: 8
+
+                // the saved setlists
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 60
+                    spacing: 4
+                    StyledDropdown {
+                        Layout.fillWidth: true
+                        Layout.preferredWidth: 60
+                        model: pm.setlists.map(function(sl) { return { "text": sl.name, "value": sl.id } })
+                        currentIndex: pm.setlists.findIndex(function(sl) { return sl.id === pm.setlistId })
+                        onActivated: function(index, value) { root.openDay = -1; pm.selectSetlist(value) }
+                    }
+                    FlatButton {
+                        minWidth: 44
+                        text: qsTrc("starscore", "New")
+                        toolTipTitle: qsTrc("starscore", "A new setlist with its own date and plans")
+                        toolTipDescription: qsTrc("starscore", "It starts as a copy of this one.")
+                        onClicked: { root.setlistAction = root.setlistAction === "new" ? "" : "new"; newName.currentText = ""; newDate.currentText = "" }
+                    }
+                    FlatButton {
+                        minWidth: 56
+                        text: qsTrc("starscore", "Rename")
+                        onClicked: { root.setlistAction = root.setlistAction === "rename" ? "" : "rename"; newName.currentText = pm.setlistName }
+                    }
+                    FlatButton {
+                        minWidth: 50
+                        text: qsTrc("starscore", "Delete")
+                        enabled: pm.setlists.length > 1
+                        onClicked: pm.deleteSetlist()
+                    }
+                }
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 60
+                    spacing: 4
+                    visible: root.setlistAction !== ""
+                    TextInputField {
+                        id: newName
+                        Layout.fillWidth: true
+                        Layout.preferredWidth: 60
+                        hint: qsTrc("starscore", "Name, e.g. Show Sat 31 Oct")
+                    }
+                    TextInputField {
+                        id: newDate
+                        Layout.preferredWidth: 100
+                        visible: root.setlistAction === "new"
+                        hint: qsTrc("starscore", "Show date")
+                    }
+                    FlatButton {
+                        minWidth: 50
+                        accentButton: true
+                        text: root.setlistAction === "new" ? qsTrc("starscore", "Make") : qsTrc("starscore", "Save")
+                        onClicked: {
+                            if (root.setlistAction === "new") {
+                                root.openDay = -1
+                                pm.newSetlist(newName.currentText, newDate.currentText)
+                            } else {
+                                pm.renameSetlist(newName.currentText)
+                            }
+                            root.setlistAction = ""
+                        }
+                    }
+                }
 
                 RowLayout {
                     Layout.fillWidth: true
@@ -93,7 +162,34 @@ Rectangle {
                     wrapMode: Text.WordWrap
                     horizontalAlignment: Text.AlignLeft
                     opacity: 0.7
-                    text: qsTrc("starscore", "How much each song needs, from 0 (nothing) to 3 (a lot). Click a number to change it. Plans give more time to the songs and areas that need more.")
+                    text: qsTrc("starscore", "How much each song needs, from 0 (nothing) to 3 (a lot). Click a number to change it.")
+                }
+
+                // the column headers
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 60
+                    visible: !root.editingSetlist
+                    spacing: 4
+                    StyledTextLabel {
+                        Layout.fillWidth: true
+                        Layout.preferredWidth: 60
+                        horizontalAlignment: Text.AlignLeft
+                        text: qsTrc("starscore", "Song")
+                        font: ui.theme.bodyBoldFont
+                        opacity: 0.8
+                    }
+                    Repeater {
+                        model: root.areas
+                        delegate: StyledTextLabel {
+                            required property string modelData
+                            Layout.preferredWidth: root.needWidth
+                            horizontalAlignment: Text.AlignHCenter
+                            text: root.areaNames[modelData]
+                            font: ui.theme.bodyBoldFont
+                            opacity: 0.8
+                        }
+                    }
                 }
 
                 Rectangle {
@@ -163,12 +259,12 @@ Rectangle {
                                         color: modelData.found ? ui.theme.fontPrimaryColor : root.missingColor
                                     }
                                     Repeater {
-                                        model: modelData.found ? ["parts", "comping", "harmony", "solos"] : []
+                                        model: modelData.found ? root.areas : []
                                         delegate: FlatButton {
                                             required property string modelData
                                             readonly property var song: songDelegate.modelData
-                                            minWidth: 30
-                                            Layout.preferredWidth: 30
+                                            minWidth: root.needWidth
+                                            Layout.preferredWidth: root.needWidth
                                             Layout.preferredHeight: 24
                                             text: song && song.needs ? String(song.needs[modelData]) : ""
                                             toolTipTitle: root.areaNames[modelData]
@@ -187,14 +283,6 @@ Rectangle {
                     }
                 }
 
-                StyledTextLabel {
-                    Layout.fillWidth: true
-                    Layout.preferredWidth: 60
-                    visible: !root.editingSetlist
-                    horizontalAlignment: Text.AlignLeft
-                    opacity: 0.6
-                    text: qsTrc("starscore", "Columns: parts, comping, harmony, solos")
-                }
             }
         }
 
@@ -217,6 +305,39 @@ Rectangle {
                     id: makeColumn
                     width: parent.width
                     spacing: 8
+
+                    StyledTextLabel {
+                        text: qsTrc("starscore", "Breaks")
+                        font: ui.theme.headerBoldFont
+                    }
+                    RowLayout {
+                        spacing: 8
+                        StyledTextLabel { text: qsTrc("starscore", "Every") }
+                        IncrementalPropertyControl {
+                            Layout.preferredWidth: 90
+                            currentValue: pm.breakEvery
+                            step: 5; decimals: 0; minValue: 0; maxValue: 180
+                            onValueEditingFinished: function(v) { pm.setBreakEvery(v) }
+                        }
+                        StyledTextLabel { text: qsTrc("starscore", "min, for") }
+                        IncrementalPropertyControl {
+                            Layout.preferredWidth: 80
+                            currentValue: pm.breakMinutes
+                            step: 1; decimals: 0; minValue: 1; maxValue: 30
+                            onValueEditingFinished: function(v) { pm.setBreakMinutes(v) }
+                        }
+                    }
+                    StyledTextLabel {
+                        Layout.fillWidth: true
+                        Layout.preferredWidth: 60
+                        wrapMode: Text.WordWrap
+                        horizontalAlignment: Text.AlignLeft
+                        opacity: 0.7
+                        text: pm.breakEvery > 0 ? qsTrc("starscore", "Hands free stops for a break after about %1 minutes of practice. (0: no breaks.)").arg(pm.breakEvery)
+                                                : qsTrc("starscore", "No breaks. Set how often for hands free.")
+                    }
+
+                    SeparatorLine { Layout.topMargin: 8; Layout.bottomMargin: 8 }
 
                     StyledTextLabel {
                         text: qsTrc("starscore", "One session")
@@ -344,6 +465,17 @@ Rectangle {
                 Item { Layout.fillWidth: true }
                 FlatButton {
                     minWidth: 60
+                    text: root.showSkills ? qsTrc("starscore", "Plans") : qsTrc("starscore", "Skills")
+                    toolTipTitle: qsTrc("starscore", "How good you are at each skill, from what you've practised")
+                    onClicked: {
+                        root.showSkills = !root.showSkills
+                        if (root.showSkills) {
+                            pm.refreshSkills()
+                        }
+                    }
+                }
+                FlatButton {
+                    minWidth: 60
                     text: qsTrc("starscore", "Song folder…")
                     toolTipTitle: qsTrc("starscore", "The folder with your Starsign songs")
                     toolTipDescription: pm.libraryFolder
@@ -387,6 +519,14 @@ Rectangle {
                 }
                 FlatButton {
                     minWidth: 60
+                    text: qsTrc("starscore", "Hands free")
+                    toolTipTitle: qsTrc("starscore", "Plays today's practice without stopping")
+                    toolTipDescription: qsTrc("starscore", "Each part's backing and timer start by themselves, with breaks. Put the laptop on a stand and play.")
+                    enabled: pm.plan.todayIndex !== undefined && pm.plan.todayIndex >= 0
+                    onClicked: pm.openRunner(pm.plan.todayIndex, 0, true)
+                }
+                FlatButton {
+                    minWidth: 60
                     text: qsTrc("starscore", "Practice book (PDF)")
                     enabled: !pm.busy
                     onClicked: pm.makeBook(-1)
@@ -415,7 +555,7 @@ Rectangle {
             StyledTextLabel {
                 Layout.fillWidth: true
                 Layout.preferredWidth: 60
-                visible: pm.plan.id !== undefined
+                visible: pm.plan.id !== undefined && !root.showSkills
                 horizontalAlignment: Text.AlignLeft
                 text: qsTrc("starscore", "%1 of %2 done").arg(pm.plan.done || 0).arg(pm.plan.total || 0)
                 opacity: 0.7
@@ -432,16 +572,100 @@ Rectangle {
                 StyledTextLabel {
                     anchors.centerIn: parent
                     width: parent.width - 60
-                    visible: pm.plan.id === undefined
+                    visible: pm.plan.id === undefined && !root.showSkills
                     wrapMode: Text.WordWrap
                     text: pm.busy ? "" : qsTrc("starscore", "Make a routine for one session, or a plan for every day up to your show.")
                     opacity: 0.7
                 }
 
+                // ---------------- skills ----------------
                 StyledFlickable {
                     anchors.fill: parent
                     anchors.margins: 12
-                    visible: pm.plan.id !== undefined
+                    visible: root.showSkills
+                    contentHeight: skillColumn.implicitHeight
+                    clip: true
+                    ColumnLayout {
+                        id: skillColumn
+                        width: parent.width
+                        spacing: 4
+                        StyledTextLabel {
+                            Layout.fillWidth: true
+                            Layout.preferredWidth: 60
+                            horizontalAlignment: Text.AlignLeft
+                            wrapMode: Text.WordWrap
+                            opacity: 0.7
+                            text: pm.skills.length === 0
+                                  ? qsTrc("starscore", "No skills yet: they come from the items you mark done.")
+                                  : qsTrc("starscore", "From every item you've marked done, in every song. Plans skip what you've got and give you the next level up.")
+                        }
+                        Repeater {
+                            model: pm.skills
+                            delegate: ColumnLayout {
+                                id: skillDelegate
+                                required property var modelData
+                                required property int index
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: 60
+                                spacing: 2
+                                StyledTextLabel {
+                                    visible: skillDelegate.index === 0 || pm.skills[skillDelegate.index - 1].group !== skillDelegate.modelData.group
+                                    Layout.topMargin: skillDelegate.index === 0 ? 4 : 10
+                                    text: skillDelegate.modelData.group
+                                    font: ui.theme.bodyBoldFont
+                                    color: root.goldColor
+                                }
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    Layout.preferredWidth: 60
+                                    spacing: 10
+                                    StyledTextLabel {
+                                        Layout.fillWidth: true
+                                        Layout.preferredWidth: 60
+                                        horizontalAlignment: Text.AlignLeft
+                                        elide: Text.ElideRight
+                                        text: skillDelegate.modelData.name
+                                    }
+                                    Rectangle {
+                                        Layout.preferredWidth: 120
+                                        Layout.preferredHeight: 8
+                                        radius: 4
+                                        color: ui.theme.buttonColor
+                                        Rectangle {
+                                            width: parent.width * Math.min(1, skillDelegate.modelData.rating / 5)
+                                            height: parent.height
+                                            radius: 4
+                                            color: root.goldColor
+                                        }
+                                    }
+                                    StyledTextLabel {
+                                        Layout.preferredWidth: 150
+                                        horizontalAlignment: Text.AlignLeft
+                                        text: skillDelegate.modelData.levelText
+                                        opacity: 0.8
+                                    }
+                                    StyledTextLabel {
+                                        Layout.preferredWidth: 40
+                                        horizontalAlignment: Text.AlignRight
+                                        text: skillDelegate.modelData.trend > 0.05 ? "▲" : ""
+                                        color: root.doneColor
+                                    }
+                                    StyledTextLabel {
+                                        Layout.preferredWidth: 110
+                                        horizontalAlignment: Text.AlignRight
+                                        text: qsTrc("starscore", "%1 items · %2").arg(skillDelegate.modelData.items).arg(skillDelegate.modelData.last)
+                                        opacity: 0.6
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                StyledFlickable {
+                    anchors.fill: parent
+                    anchors.margins: 12
+                    visible: pm.plan.id !== undefined && !root.showSkills
                     contentHeight: dayColumn.implicitHeight
                     clip: true
 
@@ -492,6 +716,12 @@ Rectangle {
                                         text: qsTrc("starscore", "Practice")
                                         enabled: dayDelegate.modelData.total > 0
                                         onClicked: pm.openRunner(dayDelegate.modelData.index, 0)
+                                    }
+                                    FlatButton {
+                                        minWidth: 80
+                                        text: qsTrc("starscore", "Hands free")
+                                        enabled: dayDelegate.modelData.total > dayDelegate.modelData.done
+                                        onClicked: pm.openRunner(dayDelegate.modelData.index, 0, true)
                                     }
                                     FlatButton {
                                         minWidth: 50
@@ -576,6 +806,30 @@ Rectangle {
                                                 text: qsTrc("starscore", "%1 min").arg(blockDelegate.modelData.minutes)
                                             }
                                         }
+                                    }
+                                }
+
+                                // more for this day: N minutes of new items at the end
+                                RowLayout {
+                                    visible: dayDelegate.expanded
+                                    Layout.leftMargin: 36
+                                    Layout.topMargin: 4
+                                    spacing: 8
+                                    StyledTextLabel { text: qsTrc("starscore", "Want more? Add") }
+                                    IncrementalPropertyControl {
+                                        Layout.preferredWidth: 90
+                                        currentValue: root.addMinutesValue
+                                        step: 5; decimals: 0; minValue: 5; maxValue: 240
+                                        onValueEdited: function(v) { root.addMinutesValue = v }
+                                    }
+                                    StyledTextLabel { text: qsTrc("starscore", "minutes") }
+                                    FlatButton {
+                                        minWidth: 60
+                                        text: qsTrc("starscore", "Add")
+                                        toolTipTitle: qsTrc("starscore", "Adds new items to the end of this day")
+                                        toolTipDescription: qsTrc("starscore", "Chosen from what the songs still need, after what this day already has.")
+                                        enabled: !pm.busy
+                                        onClicked: pm.addMinutes(dayDelegate.modelData.index, root.addMinutesValue)
                                     }
                                 }
                             }

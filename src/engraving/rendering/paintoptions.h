@@ -21,10 +21,16 @@
  */
 #pragma once
 
+#include "draw/types/color.h"
+
 namespace mu::engraving::rendering {
 struct PaintOptions
 {
     bool isPrinting = false;
     bool invertColors = false;
+    // StarScore (Joel, 23 Oct 2026: dark-mode Keys sheets): with invertColors, the colour of the music (invalid: the
+    // configuration's), and the page's colour when printing (invalid: white)
+    muse::draw::Color inversionColor;
+    muse::draw::Color pageColor;
 };
 }

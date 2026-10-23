@@ -141,7 +141,7 @@ bool isSheetPath(const QString& rel)
         // (the Half-Time and Double-Time sheets, in their own folders beside Sheet Music since 1.18.47, inside each
         // sheet folder before: copies made from the song, replaced at each export, never filed)
         if (s == "Version History" || s == "Old Versions" || s.startsWith("Update Notes") || s == "Horn Part Guides"
-            || s == "Annotated Sheets" || s == "Combined Parts" || isTimeVariantFolder(s) || s == "Double-Time"
+            || s == "Annotated Sheets" || s == "Combined Parts" || s == "Dark Mode" || isTimeVariantFolder(s) || s == "Double-Time"
             || s == "Half-Time" || s.startsWith('.')) {
             return false;
         }
