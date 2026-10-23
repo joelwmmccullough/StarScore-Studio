@@ -365,6 +365,12 @@ Rectangle {
                 wrapMode: Text.WordWrap
                 text: pm.status
                 opacity: 0.8
+                MouseArea {
+                    anchors.fill: parent
+                    enabled: pm.status.indexOf("Saved ") === 0
+                    cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                    onClicked: pm.openOutputFolder()   // (the folder the book or the iReal page was saved in)
+                }
             }
 
             RowLayout {
@@ -399,11 +405,6 @@ Rectangle {
                     onClicked: pm.rebuildPlan()
                 }
                 Item { Layout.fillWidth: true }
-                FlatButton {
-                    minWidth: 60
-                    text: qsTrc("starscore", "Folder")
-                    onClicked: pm.openOutputFolder()
-                }
                 FlatButton {
                     minWidth: 60
                     text: qsTrc("starscore", "Delete")
