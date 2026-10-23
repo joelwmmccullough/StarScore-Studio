@@ -627,7 +627,9 @@ Ret ProjectActionsController::doOpenProject(const muse::io::path_t& filePath)
     // StarScore Studio: a MuseScore file is imported (sections and arrangements chosen) rather than opened as it is,
     // and saving it makes a new .starscore
     if (ret && !isNewlyCreated && !isPracticeExercise && io::suffix(filePath) != "starscore") {
-        if (starScoreService()->needsImport()) {
+        if (!qEnvironmentVariable("STARSCORE_AUTOTEST").isEmpty()) {
+            // (the automatic test run imports with its "import" step)
+        } else if (starScoreService()->needsImport()) {
             QTimer::singleShot(0, [this]() {
                 interactive()->open(Uri("musescore://starscore/import"));
             });
