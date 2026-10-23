@@ -3611,7 +3611,9 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             req.showDate = start.addDays(nDays - 1);
         }
         practice::Progress progress(autotestDir() + "/progress.json");
-        const practice::Plan plan = practice::makePlan(req, libs, progress);
+        practice::Plan plan = practice::makePlan(req, libs, progress);
+        plan.id = "autotest";   // saved as a plan too, so "uri:musescore://starscore/practicerunner?planId=autotest" opens it
+        practice::savePlan(plan);
         {
             QFile f(autotestDir() + "/plan.json");
             if (f.open(QIODevice::WriteOnly)) {

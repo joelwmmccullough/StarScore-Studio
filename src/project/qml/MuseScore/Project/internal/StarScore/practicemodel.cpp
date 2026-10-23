@@ -26,6 +26,8 @@
 #include "project/internal/starscore/starscorepracticebook.h"
 #include "types/uri.h"
 
+#include "translation.h"
+
 #include "log.h"
 
 using namespace mu::project;
@@ -251,6 +253,9 @@ QString PracticeModel::libraryFolder() const
 void PracticeModel::load()
 {
     m_root = starScore()->auditLibraryFolder();
+    if (const QString test = qEnvironmentVariable("STARSCORE_AUTOTEST_PRACTICE"); !test.isEmpty()) {
+        m_root = test;   // (the automatic tests' songs)
+    }
     loadSettings();
     m_busy = true;
     setStatus(QStringLiteral("Reading the song libraries…"));
@@ -780,6 +785,18 @@ void PracticeModel::openRunner(int dayIndex, int blockIndex)
     const QString uri = QString("musescore://starscore/practicerunner?planId=%1&dayIndex=%2&blockIndex=%3&modal=false&floating=true")
                         .arg(m_planId).arg(dayIndex).arg(std::max(0, blockIndex));
     interactive()->open(muse::UriQuery(uri.toStdString()));
+}
+
+void PracticeModel::chooseLibraryFolder()
+{
+    const muse::io::path_t dir = interactive()->selectDirectory(
+        muse::trc("starscore", "Choose the folder with your Starsign songs"),
+        muse::io::path_t(m_root.isEmpty() ? QDir::homePath() : m_root));
+    if (dir.empty()) {
+        return;
+    }
+    starScore()->setAuditLibraryFolder(dir.toQString());
+    load();
 }
 
 void PracticeModel::openOutputFolder()
