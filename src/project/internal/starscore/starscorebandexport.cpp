@@ -1482,8 +1482,10 @@ static bool starscoreNeedsRetitle(const mu::engraving::Score* score, const QStri
                 }
             }
         } else {
-            // (or a shorter form, to clear the title: fitInstrumentName; its mute lines in the smaller size)
-            leftOk |= starscore::instrumentNameShows(t, left);
+            // (or a shorter form, to clear the title: fitInstrumentName; its mute lines in the smaller size). A song
+            // with slashed headers on purpose: any name written with slashes, or a one-word name as it is
+            leftOk |= starscore::slashHeaders(score) ? starscore::hasSlashes(t) || (!left.contains(' ') && starscore::instrumentNameShows(t, left))
+                      : starscore::instrumentNameShows(t, left);
         }
     }
     return !(leftOk && rightOk);
@@ -1528,10 +1530,16 @@ static bool starscoreRetitleTexts(mu::engraving::Score* score, const QString& le
         }
     }
     bool changed = false;
+    // slashed headers on purpose (Live Strong / Strasbourg / St. Denis): one written with slashes is kept, a new one
+    // gets them
+    const bool slash = starscore::slashHeaders(score);
+    const QString leftName = slash ? starscore::slashedName(left) : left;
     if (!left.isEmpty()) {
         if (partText) {
-            if (!starscore::instrumentNameShows(partText, left)) {
-                partText->undoChangeProperty(mu::engraving::Pid::TEXT, starscore::instrumentNameXml(left, partText->size()));
+            const bool ok = slash ? starscore::hasSlashes(partText) || starscore::instrumentNameShows(partText, leftName)
+                                  : starscore::instrumentNameShows(partText, left);
+            if (!ok) {
+                partText->undoChangeProperty(mu::engraving::Pid::TEXT, starscore::instrumentNameXml(leftName, partText->size()));
                 changed = true;
             }
         } else {
@@ -1540,7 +1548,7 @@ static bool starscoreRetitleTexts(mu::engraving::Score* score, const QString& le
             t->setTrack(0);
             t->setPlacement(mu::engraving::PlacementV::ABOVE);
             t->setPropertyFlags(mu::engraving::Pid::PLACEMENT, mu::engraving::PropertyFlags::UNSTYLED);
-            t->setXmlText(starscore::instrumentNameXml(left, t->size()));
+            t->setXmlText(starscore::instrumentNameXml(leftName, t->size()));
             score->undoAddElement(t);
             partText = t;
             changed = true;
@@ -2920,6 +2928,9 @@ static Ret starscorePrintSheetAsIs(const INotationWriterPtr& writer, const INota
         starscore::fitInstrumentName(score, left);
         // a long label running into the title is shortened ("Flexible 2H Arrangement"), then broken over two lines
         starscore::fitArrangementLabel(score);
+    } else if (starscore::slashHeaders(score)) {
+        // (a song with slashed headers on purpose: every sheet's instrument name slashed, and clear of the title)
+        starscore::fitInstrumentName(score);
     }
     starscore::clearComposerCredit(score);
     lap("titles and credit");
@@ -2931,7 +2942,9 @@ static Ret starscorePrintSheetAsIs(const INotationWriterPtr& writer, const INota
     lap("texts");
     starscore::spaceOutBeamedRests(score);
     lap("beamed rests");
-    const int movedIn = onPage + separated;
+    // (again after the bars were widened: the systems can move)
+    const int lifted = starscore::liftTextsOffStaff(score);
+    const int movedIn = onPage + separated + lifted;
     const std::vector<starscore::LayoutIssue> issues = starscore::layoutIssues(score);
     if (movedIn > 0 || !issues.empty()) {
         LOGI() << "[starscore] layout check \"" << QString(left).replace('\n', ' ').toStdString() << " | "
@@ -2941,6 +2954,7 @@ static Ret starscorePrintSheetAsIs(const INotationWriterPtr& writer, const INota
     lap("layout issues");
     const bool minMajNote = starscoreSetMinMajNote(score);
     lap("footnote");
+
     const Ret ret = starscorePdfBytes(writer, notation, pdf);
     lap("pdf");
     if (minMajNote) {

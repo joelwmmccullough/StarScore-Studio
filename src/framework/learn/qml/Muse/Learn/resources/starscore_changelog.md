@@ -4,6 +4,13 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.22.1
+
+- **Slashed headers kept.** A song whose subtitle is written with slashes ("Starsign / Cover / Song", Live Strong / Strasbourg / St. Denis) keeps its slash-heavy headers on export: an instrument name written with slashes ("Trumpet / in / B♭") stays as it is, and one StarScore writes gets them too ("Drum / Kit", "Electric / Guitar").
+- **Instrument names clear of the title.** In those songs, an instrument name that runs into a long title moves down below it, whole, instead of overlapping it.
+- **Fewer texts on top of each other in exported sheets.** A text MuseScore placed that overlaps one placed by hand moves clear (a new part's "Swing" over the tempo marking), and a text above the staff that sits on the staff, over the music, moves up above it and clear of the rehearsal mark.
+- **The Practice page fits a laptop screen.** In a narrow window it has two columns (the making under the setlist), the button rows wrap onto a second line, each day's buttons sit on their own line, and the item rows drop the category column, so nothing goes off the right edge.
+
 ## 1.22.0
 
 - **Jams.** Every song's practice library now has jam tracks: its own chord progressions as written, each with a backing track (bass, drums, and comping) in some groove and tempo, from swing and bossa to songo, funk, dilla, and trap. Some are whole sections (a solo's changes, a vamp, the B section), and some loop just a few chords of a long progression (Dream of Mushroom's solo is covered in 26 short loops). The notation is slashes with the chord symbols, and each jam has one short idea to try, from the song's own solo vocabulary or a general improvising prompt. 573 jams in 31 songs (Updog has no chords written yet).

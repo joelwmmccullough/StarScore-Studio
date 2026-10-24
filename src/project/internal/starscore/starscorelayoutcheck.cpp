@@ -492,6 +492,83 @@ int alignCombinedLabels(Score* score)
     return moved;
 }
 
+int liftTextsOffStaff(Score* score)
+{
+    if (!score) {
+        return 0;
+    }
+    // a text above the staff that sits on the staff itself, over the music (a main score's offset in a part score
+    // laid out differently: Live Strong's "Drums and keys lightly vibe…" through the first bars): moved up, clear of
+    // the staff (Joel, 24 Oct 2026: "make sure things also don't intersect")
+    auto movable = [](const EngravingItem* e) {
+        return e->isStaffText() || e->isSystemText() || e->isExpression() || e->isPlayTechAnnotation() || e->isInstrumentChange()
+               || e->isTempoText();
+    };
+    int moved = 0;
+    std::set<EngravingItem*> liftedAll;
+    for (int round = 0; round < 2; ++round) {
+        std::map<EngravingItem*, double> lift;
+        const double clear = 0.3 * score->style().spatium();
+        for (const PlacedText& t : placedTexts(score)) {
+            EngravingItem* e = t.item;
+            if (!movable(e) || !e->placeAbove() || e->staffIdx() == muse::nidx || lift.count(e) || !e->staff()) {
+                continue;
+            }
+            const Measure* m = e->findMeasure();
+            const System* sys = m ? m->system() : nullptr;
+            if (!sys || e->staffIdx() >= sys->staves().size() || !sys->staff(e->staffIdx())->show()) {
+                continue;
+            }
+            const double top = sys->staffYpage(e->staffIdx());
+            const RectF staffRect(t.rect.left(), top, t.rect.width(), e->staff()->staffHeight(m->tick()));
+            const RectF in = t.rect.intersected(staffRect);
+            if (!in.isEmpty() && in.height() >= 0.3 * t.rect.height()) {
+                lift[e] = top - clear - t.rect.bottom();
+            }
+        }
+        if (lift.empty()) {
+            break;
+        }
+        for (const auto& [e, dy] : lift) {
+            changeHere(e, Pid::OFFSET, PropertyValue(e->offset() + PointF(0.0, dy)));
+            liftedAll.insert(e);
+            ++moved;
+        }
+        score->setLayoutAll();
+        score->doLayout();
+    }
+    // a text moved up: on up above any text it now runs into (the rehearsal mark over the first bar)
+    for (int round = 0; round < 3 && !liftedAll.empty(); ++round) {
+        const std::vector<PlacedText> texts = placedTexts(score);
+        const double clear = 0.3 * score->style().spatium();
+        std::map<EngravingItem*, double> lift;
+        for (const PlacedText& a : texts) {
+            if (!liftedAll.count(a.item)) {
+                continue;
+            }
+            for (const PlacedText& b : texts) {
+                if (b.item == a.item || b.page != a.page) {
+                    continue;
+                }
+                const RectF in = a.rect.intersected(b.rect);
+                if (!in.isEmpty() && in.width() >= clear && in.height() >= 0.2 * std::min(a.rect.height(), b.rect.height())) {
+                    const double dy = b.rect.top() - clear - a.rect.bottom();
+                    lift[a.item] = std::min(lift.count(a.item) ? lift[a.item] : 0.0, dy);
+                }
+            }
+        }
+        if (lift.empty()) {
+            break;
+        }
+        for (const auto& [e, dy] : lift) {
+            changeHere(e, Pid::OFFSET, PropertyValue(e->offset() + PointF(0.0, dy)));
+        }
+        score->setLayoutAll();
+        score->doLayout();
+    }
+    return moved;
+}
+
 int separateOverlappingTexts(Score* score)
 {
     if (!score) {
@@ -502,6 +579,8 @@ int separateOverlappingTexts(Score* score)
         return e->isStaffText() || e->isSystemText() || e->isExpression() || e->isPlayTechAnnotation() || e->isInstrumentChange()
                || e->isTempoText() || e->isRehearsalMark();
     };
+    // texts MuseScore had placed, held in place below to be moved clear (autoplace off from then on, but still moved)
+    std::set<EngravingItem*> wasAuto;
     auto overlapping = [&](std::vector<std::pair<PlacedText, PlacedText> >& pairs) {
         pairs.clear();
         const std::vector<PlacedText> texts = placedTexts(score);
@@ -527,9 +606,14 @@ int separateOverlappingTexts(Score* score)
                     // Two texts MuseScore placed itself (autoplace on) that still overlap (it doesn't keep texts on
                     // one beat apart: Fish Oil's "Repeat to cue" and "Note: rhythm here is 8+6, not 7+7!"): the
                     // later one moves; a rehearsal mark stays where it is
-                    const bool bothAuto = a.item->autoplace() && b.item->autoplace() && !a.item->isRehearsalMark()
+                    auto isAuto = [&](const EngravingItem* x) { return x->autoplace() || wasAuto.count(const_cast<EngravingItem*>(x)); };
+                    const bool bothAuto = isAuto(a.item) && isAuto(b.item) && !a.item->isRehearsalMark()
                                           && (b.item->isRehearsalMark() || j > i);
-                    if (!(overThing || (labelA && !labelB) || (labelA && labelB && j > i) || bothAuto)) {
+                    // A text MuseScore placed over one placed by hand: the one MuseScore placed moves (a new part score's
+                    // "Swing" over the tempo marking moved by hand in the main score; Joel, 24 Oct 2026: "make sure
+                    // things also don't intersect")
+                    const bool autoOverFixed = isAuto(a.item) && !isAuto(b.item) && !a.item->isRehearsalMark();
+                    if (!(overThing || (labelA && !labelB) || (labelA && labelB && j > i) || bothAuto || autoOverFixed)) {
                         continue;
                     }
                     if (sameText(a, b)) {
@@ -576,6 +660,7 @@ int separateOverlappingTexts(Score* score)
             score->doLayout();
         }
     }
+    moved += liftTextsOffStaff(score);
     // 1. a text placed by hand: back to the style's place, MuseScore's autoplace keeping it clear
     overlapping(pairs);
     std::set<EngravingItem*> reset;
@@ -615,6 +700,7 @@ int separateOverlappingTexts(Score* score)
         }
         for (EngravingItem* e : held) {
             changeHere(e, Pid::AUTOPLACE, PropertyValue(false));
+            wasAuto.insert(e);
         }
         score->setLayoutAll();
         score->doLayout();

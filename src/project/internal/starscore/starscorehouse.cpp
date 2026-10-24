@@ -581,6 +581,28 @@ String instrumentNameXml(const QString& plain, double size)
                                + mutes.toHtmlEscaped());
 }
 
+bool slashHeaders(const Score* score)
+{
+    const Score* ms = score ? score->masterScore() : nullptr;
+    const Text* sub = ms ? titleFrameText(ms, TextStyleType::SUBTITLE) : nullptr;
+    return sub && sub->plainText().toQString().contains(" / ");
+}
+
+QString slashedName(const QString& plain)
+{
+    const int nl = plain.indexOf('\n');
+    const QString first = nl < 0 ? plain : plain.left(nl);
+    if (first.contains(" / ")) {
+        return plain;
+    }
+    return first.simplified().split(' ', Qt::SkipEmptyParts).join(" / ") + (nl < 0 ? QString() : plain.mid(nl));
+}
+
+bool hasSlashes(const Text* name)
+{
+    return name && name->plainText().toQString().contains(" / ");
+}
+
 bool instrumentNameShows(const Text* name, const QString& plain)
 {
     if (!name) {
@@ -857,6 +879,60 @@ bool fitInstrumentName(Score* score, const QString& plain)
         return starscoreNameOverlaps(score, name, titles);
     };
     bool changed = false;
+    if (slashHeaders(score)) {
+        // slashes on purpose: a name written with them stays as it is; one without gets them. Shortened only when it
+        // runs into the title, to a shorter form of the name, slashed too
+        const QString want = slashedName(plain.isEmpty() ? name->plainText().toQString() : plain);
+        if (!hasSlashes(name) && want.contains(" / ")) {
+            name->undoChangeProperty(Pid::TEXT, instrumentNameXml(want, name->size()));
+            changed = true;
+            score->setLayoutAll();
+            score->doLayout();
+            levelArrangementLabel(score);
+        }
+        // into the title (a long title across the page, Joel 24 Oct 2026): the name goes down below what it runs into,
+        // in the space left of the subtitle, kept whole. ("Into": closer than a spatium, so it doesn't touch it either)
+        const double gap = 0.5 * score->style().spatium();
+        auto near = [&]() {
+            const RectF r = name->pageBoundingRect().adjusted(0.0, 0.0, 2.0 * gap, 0.0);
+            for (const Text* t : titles) {
+                if (t->ldata() && !t->plainText().isEmpty() && r.intersects(t->pageBoundingRect())) {
+                    return true;
+                }
+            }
+            return false;
+        };
+        for (int tries = 0; tries < 3 && near(); ++tries) {
+            const RectF r = name->pageBoundingRect().adjusted(0.0, 0.0, 2.0 * gap, 0.0);
+            double lowest = -1e9;
+            for (const Text* t : titles) {
+                if (t->ldata() && !t->plainText().isEmpty() && r.intersects(t->pageBoundingRect())) {
+                    lowest = std::max(lowest, t->pageBoundingRect().bottom());
+                }
+            }
+            const double dy = lowest + gap - name->pageBoundingRect().top();
+            if (dy <= 0.0 || dy > 20.0 * score->style().spatium()) {
+                break;
+            }
+            name->undoChangeProperty(Pid::OFFSET, name->offset() + PointF(0.0, dy), PropertyFlags::UNSTYLED);
+            changed = true;
+            score->setLayoutAll();
+            score->doLayout();
+            levelArrangementLabel(score);
+        }
+        const QString current = name->plainText().toQString();
+        const int nl = current.indexOf('\n');
+        const QString rest = nl < 0 ? QString() : current.mid(nl);
+        const QStringList variants = instrumentNameVariants(QString(nl < 0 ? current : current.left(nl)).replace(" / ", " ").simplified());
+        for (int i = 1; i < int(variants.size()) && overlaps(); ++i) {
+            name->undoChangeProperty(Pid::TEXT, instrumentNameXml(slashedName(variants[i]) + rest, name->size()));
+            changed = true;
+            score->setLayoutAll();
+            score->doLayout();
+            levelArrangementLabel(score);
+        }
+        return changed;
+    }
     if (!plain.isEmpty()) {
         // a shorter form shown that the name doesn't need (a title made shorter since, or a part's own name that
         // happens to be one, "Trumpet" for "Trumpet in B♭"): the full name first, then shortened only as needed

@@ -73,6 +73,16 @@ muse::String instrumentNameXml(const QString& plain, double size);
 //! Whether a sheet's instrument name shows these words, its mute lines in the smaller size
 bool instrumentNameShows(const mu::engraving::Text* name, const QString& plain);
 
+//! A song whose sheet headers are written with slashes on purpose (Live Strong / Strasbourg / St. Denis: "Starsign /
+//! Cover / Song", "Trumpet / in / B♭"; Joel, 24 Oct 2026: it's a joke, keep it on export): its main score's subtitle
+//! has " / " in it. Then an instrument name already written with slashes is kept as it is, and a name StarScore writes
+//! gets them too (slashedName).
+bool slashHeaders(const mu::engraving::Score* score);
+//! "Trumpet in B♭" -> "Trumpet / in / B♭" (the first line; mute lines under it as they are)
+QString slashedName(const QString& plain);
+//! the instrument name text is written with slashes
+bool hasSlashes(const mu::engraving::Text* name);
+
 //! The smaller second line of an arrangement label in a score ("" when it has none)
 QString arrangementLabelNote(const mu::engraving::Text* label);
 //! The arrangement label (top right) running into the title: replaced by its next shorter form until it clears the

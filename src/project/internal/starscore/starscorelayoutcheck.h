@@ -48,6 +48,8 @@ int alignCombinedLabels(mu::engraving::Score* score);
 //! autoplace on), so MuseScore keeps it clear; one still over a chord symbol after that is moved up (above the staff)
 //! or down (below) until it clears. Not chord symbols, rehearsal marks or tempo markings: they keep their places.
 //! Undoable; call inside a command. Lays the score out again when it moved anything. Returns how many it moved.
+//! Texts above a staff that sit on the staff (over the music) moved up clear of it. Returns how many moved.
+int liftTextsOffStaff(mu::engraving::Score* score);
 int separateOverlappingTexts(mu::engraving::Score* score);
 
 //! A rest inside a beam printed over the next or previous note's accidental or head (MuseScore moves such a rest clear

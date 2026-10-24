@@ -51,15 +51,23 @@ Rectangle {
         return r ? qsTrc("starscore", "%1 h %2 min").arg(h).arg(r) : qsTrc("starscore", "%1 h").arg(h)
     }
 
-    RowLayout {
+    // A narrow window (a laptop screen with the sidebar): two columns, the making under the setlist, so nothing goes
+    // off the right edge (Joel, 24 Oct 2026)
+    readonly property bool narrow: width < 1180
+
+    GridLayout {
         anchors.fill: parent
         anchors.margins: 24
-        spacing: 20
+        columnSpacing: 20
+        rowSpacing: 16
+        columns: root.narrow ? 2 : 3
 
         // ---------------- Setlist ----------------
         Rectangle {
+            Layout.row: 0
+            Layout.column: 0
             Layout.preferredWidth: 400
-            Layout.minimumWidth: 360
+            Layout.minimumWidth: root.narrow ? 330 : 360
             Layout.fillHeight: true
             radius: 6
             color: ui.theme.backgroundPrimaryColor
@@ -288,8 +296,11 @@ Rectangle {
 
         // ---------------- Make ----------------
         Rectangle {
-            Layout.preferredWidth: 290
-            Layout.minimumWidth: 270
+            Layout.row: root.narrow ? 1 : 0
+            Layout.column: root.narrow ? 0 : 1
+            Layout.preferredWidth: root.narrow ? 400 : 290
+            Layout.minimumWidth: root.narrow ? 330 : 270
+            Layout.fillWidth: root.narrow
             Layout.fillHeight: true
             radius: 6
             color: ui.theme.backgroundPrimaryColor
@@ -441,28 +452,35 @@ Rectangle {
 
         // ---------------- Plans ----------------
         ColumnLayout {
+            Layout.row: 0
+            Layout.column: root.narrow ? 1 : 2
+            Layout.rowSpan: root.narrow ? 2 : 1
             Layout.fillWidth: true
             Layout.preferredWidth: 400   // (wider when there's room: the long titles elide instead of widening it)
-            Layout.minimumWidth: 420
+            Layout.minimumWidth: root.narrow ? 340 : 420
             Layout.fillHeight: true
             spacing: 10
 
-            RowLayout {
+            // (the buttons go on to a second line when the column is narrow, instead of off the right edge; Joel, 24 Oct
+            // 2026)
+            Flow {
+                id: plansHeader
                 Layout.fillWidth: true
                 Layout.preferredWidth: 60
                 spacing: 8
                 StyledTextLabel {
+                    height: 30
+                    verticalAlignment: Text.AlignVCenter
                     text: qsTrc("starscore", "Practice")
                     font: ui.theme.headerBoldFont
                 }
                 StyledDropdown {
-                    Layout.preferredWidth: 320
+                    width: Math.min(320, plansHeader.width)
                     visible: pm.plans.length > 0
                     model: pm.plans.map(function(p) { return { "text": p.name + " — " + p.subtitle, "value": p.id } })
                     currentIndex: pm.plans.findIndex(function(p) { return p.id === pm.planId })
                     onActivated: function(index, value) { root.openDay = -1; pm.selectPlan(value) }
                 }
-                Item { Layout.fillWidth: true }
                 FlatButton {
                     minWidth: 60
                     text: root.showSkills ? qsTrc("starscore", "Plans") : qsTrc("starscore", "Skills")
@@ -505,7 +523,7 @@ Rectangle {
                 }
             }
 
-            RowLayout {
+            Flow {
                 Layout.fillWidth: true
                 Layout.preferredWidth: 60
                 spacing: 8
@@ -544,7 +562,6 @@ Rectangle {
                     enabled: !pm.busy
                     onClicked: pm.rebuildPlan()
                 }
-                Item { Layout.fillWidth: true }
                 FlatButton {
                     minWidth: 60
                     text: qsTrc("starscore", "Delete")
@@ -711,6 +728,13 @@ Rectangle {
                                         color: dayDelegate.modelData.total > 0 && dayDelegate.modelData.done === dayDelegate.modelData.total
                                                ? root.doneColor : ui.theme.fontPrimaryColor
                                     }
+                                }
+                                // the day's buttons on a line of their own (they went off the edge beside the title)
+                                Flow {
+                                    Layout.fillWidth: true
+                                    Layout.preferredWidth: 60
+                                    Layout.leftMargin: 36
+                                    spacing: 6
                                     FlatButton {
                                         minWidth: 70
                                         text: qsTrc("starscore", "Practice")
@@ -772,7 +796,7 @@ Rectangle {
                                                 opacity: blockDelegate.modelData.done ? 1 : 0.5
                                             }
                                             StyledTextLabel {
-                                                Layout.preferredWidth: 170
+                                                Layout.preferredWidth: root.narrow ? 100 : 170
                                                 horizontalAlignment: Text.AlignLeft
                                                 elide: Text.ElideRight
                                                 text: blockDelegate.modelData.song
@@ -789,19 +813,21 @@ Rectangle {
                                                       + (blockDelegate.modelData.solo ? "  ·  " + blockDelegate.modelData.solo : "")
                                             }
                                             StyledTextLabel {
+                                                visible: !root.narrow   // (narrow: the title gets the room)
                                                 Layout.preferredWidth: 110
                                                 horizontalAlignment: Text.AlignLeft
+                                                elide: Text.ElideRight
                                                 text: blockDelegate.modelData.categoryName
                                                 opacity: 0.7
                                             }
                                             StyledTextLabel {
-                                                Layout.preferredWidth: 60
+                                                Layout.preferredWidth: 58
                                                 horizontalAlignment: Text.AlignRight
                                                 text: blockDelegate.modelData.tempo > 0 ? "♩ = " + blockDelegate.modelData.tempo : ""
                                                 opacity: 0.7
                                             }
                                             StyledTextLabel {
-                                                Layout.preferredWidth: 56
+                                                Layout.preferredWidth: 52
                                                 horizontalAlignment: Text.AlignRight
                                                 text: qsTrc("starscore", "%1 min").arg(blockDelegate.modelData.minutes)
                                             }
@@ -810,19 +836,21 @@ Rectangle {
                                 }
 
                                 // more for this day: N minutes of new items at the end
-                                RowLayout {
+                                Flow {
                                     visible: dayDelegate.expanded
+                                    Layout.fillWidth: true
+                                    Layout.preferredWidth: 60
                                     Layout.leftMargin: 36
                                     Layout.topMargin: 4
                                     spacing: 8
-                                    StyledTextLabel { text: qsTrc("starscore", "Want more? Add") }
+                                    StyledTextLabel { height: 30; verticalAlignment: Text.AlignVCenter; text: qsTrc("starscore", "Want more? Add") }
                                     IncrementalPropertyControl {
-                                        Layout.preferredWidth: 90
+                                        width: 90
                                         currentValue: root.addMinutesValue
                                         step: 5; decimals: 0; minValue: 5; maxValue: 240
                                         onValueEdited: function(v) { root.addMinutesValue = v }
                                     }
-                                    StyledTextLabel { text: qsTrc("starscore", "minutes") }
+                                    StyledTextLabel { height: 30; verticalAlignment: Text.AlignVCenter; text: qsTrc("starscore", "minutes") }
                                     FlatButton {
                                         minWidth: 60
                                         text: qsTrc("starscore", "Add")
