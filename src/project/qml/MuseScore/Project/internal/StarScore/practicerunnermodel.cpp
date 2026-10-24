@@ -842,6 +842,16 @@ void PracticeRunnerModel::keepUnrated()
 
 void PracticeRunnerModel::addMinutes(int minutes)
 {
+    addToToday(false, minutes);
+}
+
+void PracticeRunnerModel::addJam(int minutes)
+{
+    addToToday(true, minutes);
+}
+
+void PracticeRunnerModel::addToToday(bool jam, int minutes)
+{
     practice::Plan latest = practice::loadPlan(m_plan.id);
     if (latest.id.isEmpty() || blockCount() == 0) {
         return;
@@ -856,8 +866,10 @@ void PracticeRunnerModel::addMinutes(int minutes)
     const int before = dayIndex < int(latest.days.size()) ? int(latest.days[dayIndex].blocks.size()) : 0;
     practice::Progress progress;
     progress.load();
-    if (practice::addToDay(latest, dayIndex, minutes, m_libs, progress) == 0) {
-        m_message = QStringLiteral("Nothing more to add for these songs today.");
+    const int added = jam ? practice::addJam(latest, dayIndex, minutes, m_libs, progress)
+                          : practice::addToDay(latest, dayIndex, minutes, m_libs, progress);
+    if (added == 0) {
+        m_message = jam ? QStringLiteral("These songs have no jams yet.") : QStringLiteral("Nothing more to add for these songs today.");
         emit changed();
         return;
     }

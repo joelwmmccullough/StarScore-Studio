@@ -418,6 +418,11 @@ StyledDialogView {
                             onClicked: run.addMinutes(modelData)
                         }
                     }
+                    FlatButton {
+                        text: qsTrc("starscore", "A jam (10 min)")
+                        minWidth: 110
+                        onClicked: run.addJam(10)
+                    }
                 }
                 Ratings { Layout.fillWidth: true }
                 Item { Layout.fillHeight: true }
@@ -483,6 +488,13 @@ StyledDialogView {
                     minWidth: 32
                     enabled: run.blockIndex < run.blockCount - 1
                     onClicked: run.next()
+                }
+                FlatButton {
+                    text: qsTrc("starscore", "+ Jam")
+                    minWidth: 70
+                    toolTipTitle: qsTrc("starscore", "Adds a jam to the end of the day")
+                    toolTipDescription: qsTrc("starscore", "10 minutes improvising over one of the songs' changes, with a backing track in some groove.")
+                    onClicked: run.addJam(10)
                 }
                 FlatButton {
                     text: qsTrc("starscore", "Hands free")
@@ -715,6 +727,11 @@ StyledDialogView {
                                 minWidth: 64
                                 onClicked: run.addMinutes(modelData)
                             }
+                        }
+                        FlatButton {
+                            text: qsTrc("starscore", "A jam (10 min)")
+                            minWidth: 110
+                            onClicked: run.addJam(10)
                         }
                     }
 

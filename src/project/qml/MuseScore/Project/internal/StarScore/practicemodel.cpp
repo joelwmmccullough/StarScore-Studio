@@ -995,6 +995,16 @@ void PracticeModel::rebuildPlan()
 
 void PracticeModel::addMinutes(int dayIndex, int minutes)
 {
+    addToDay(dayIndex, minutes, false);
+}
+
+void PracticeModel::addJam(int dayIndex, int minutes)
+{
+    addToDay(dayIndex, minutes, true);
+}
+
+void PracticeModel::addToDay(int dayIndex, int minutes, bool jam)
+{
     practice::Plan p = practice::loadPlan(m_planId);
     if (p.id.isEmpty()) {
         return;
@@ -1009,9 +1019,10 @@ void PracticeModel::addMinutes(int dayIndex, int minutes)
     practice::Progress progress;
     progress.load();
     const int before = dayIndex >= 0 && dayIndex < int(p.days.size()) ? int(p.days[dayIndex].blocks.size()) : 0;
-    const int added = practice::addToDay(p, dayIndex, minutes, librariesFor(p.songs), progress);
+    const int added = jam ? practice::addJam(p, dayIndex, minutes, librariesFor(p.songs), progress)
+                          : practice::addToDay(p, dayIndex, minutes, librariesFor(p.songs), progress);
     if (added == 0) {
-        setStatus(QStringLiteral("Nothing more to add for these songs today."));
+        setStatus(jam ? QStringLiteral("These songs have no jams yet.") : QStringLiteral("Nothing more to add for these songs today."));
         return;
     }
     practice::savePlan(p);

@@ -135,6 +135,8 @@ public:
     Q_INVOKABLE void keepUnrated();
     //! More practice: N minutes of new items at the end of the day (and on with them)
     Q_INVOKABLE void addMinutes(int minutes);
+    //! a jam (improvising over a song's changes, a backing track looping) at the end of the day
+    Q_INVOKABLE void addJam(int minutes);
 
     //! Marks the block done: the tempo reached (0: none), how solid it is now (0-4), a note
     Q_INVOKABLE void markDone(int tempoReached, int stage, const QString& note);
@@ -150,6 +152,7 @@ signals:
     void scaleChanged();
 
 private:
+    void addToToday(bool jam, int minutes);
     const practice::Item* currentItem() const;
     const practice::Library* currentLibrary() const;
     void renderImages();

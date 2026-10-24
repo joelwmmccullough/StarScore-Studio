@@ -831,6 +831,14 @@ Rectangle {
                                         enabled: !pm.busy
                                         onClicked: pm.addMinutes(dayDelegate.modelData.index, root.addMinutesValue)
                                     }
+                                    FlatButton {
+                                        minWidth: 90
+                                        text: qsTrc("starscore", "Add a jam")
+                                        toolTipTitle: qsTrc("starscore", "10 minutes of improvising over one of the songs' changes")
+                                        toolTipDescription: qsTrc("starscore", "A backing track in some groove and tempo, looping. Each jam is a different song and groove from the last one.")
+                                        enabled: !pm.busy
+                                        onClicked: pm.addJam(dayDelegate.modelData.index, 10)
+                                    }
                                 }
                             }
                         }

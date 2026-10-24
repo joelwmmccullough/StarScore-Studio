@@ -112,6 +112,7 @@ public:
     Q_INVOKABLE void rebuildPlan();
     //! More practice for a day already planned: N minutes of new items at its end, from what it already has
     Q_INVOKABLE void addMinutes(int dayIndex, int minutes);
+    Q_INVOKABLE void addJam(int dayIndex, int minutes);
     //! The practice book: the whole plan (dayIndex -1) or one day
     Q_INVOKABLE void makeBook(int dayIndex);
     Q_INVOKABLE void exportIreal(int dayIndex);
@@ -125,6 +126,7 @@ signals:
     void skillsChanged();
 
 private:
+    void addToDay(int dayIndex, int minutes, bool jam);
     struct SavedSetlist {
         QString id;
         QString name;

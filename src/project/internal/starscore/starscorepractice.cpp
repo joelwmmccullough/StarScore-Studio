@@ -137,6 +137,12 @@ Library mu::project::practice::parseLibrary(const QJsonObject& root, bool withXm
         it.irealKey = ir.value("key").toString();
         it.irealProg = ir.value("prog").toString();
         it.groove = o.value("backing").toObject().value("groove").toString();
+        if (it.groove.isEmpty()) {
+            it.groove = o.value("groove").toString();   // (a jam's)
+        }
+        if (it.groove.isEmpty()) {
+            it.groove = o.value("exercise").toObject().value("groove").toString();
+        }
         if (!it.id.isEmpty()) {
             lib.items.push_back(it);
         }
@@ -690,6 +696,7 @@ const std::map<QString, SkillDef>& skillDefs()
         { "line.rhythm", { "Rhythmic phrasing: displacement and groupings", "Lines" } },
         { "line.octaves", { "Octaves and two-hand lines", "Lines" } },
         { "solo.form", { "Soloing through a tune's form", "Lines" } },
+        { "solo.improv", { "Improvising over a groove", "Lines" } },
         { "line.licks", { "Licks and transcribed solos", "Lines" } },
         { "voicing.shells", { "Shell voicings", "Voicings" } },
         { "voicing.rootless", { "Rootless voicings", "Voicings" } },
@@ -827,6 +834,9 @@ std::map<QString, SkillRating> mu::project::practice::skillRatings(const Progres
 static QString areaOf(const Item& it)
 {
     const QString& c = it.category;
+    if (c == "jam") {
+        return "jam";   // (not a setlist area: a jam a day, and more on request)
+    }
     if (c == "solo" || c == "vocabulary") {
         return "solos";
     }
@@ -866,6 +876,46 @@ int tempoFor(const Item& it, const Sim& s)
         t = std::max(t, std::min(goal, s.bestTempo + 4));
     }
     return std::min(goal, t);
+}
+
+//! The jam to play next: of the songs' jam items, the least played and longest ago, not the last jam's groove or song,
+//! and from day to day a different one among equals (by the date)
+std::pair<QString, const Item*> pickJam(const std::map<QString, Library>& libs, const std::vector<PlanSong>& songs,
+                                        std::map<QString, Sim>& sim, const std::set<QString>& today, const QDate& date,
+                                        const QString& lastGroove, const QString& lastSong)
+{
+    QString bestCode;
+    const Item* best = nullptr;
+    double bestScore = -1e18;
+    for (const PlanSong& ps : songs) {
+        auto lib = libs.find(ps.code);
+        if (lib == libs.end()) {
+            continue;
+        }
+        for (const Item& it : lib->second.items) {
+            const QString k = ps.code + "/" + it.id;
+            if (it.category != "jam" || !it.hasXml() || today.count(k)) {
+                continue;
+            }
+            const Sim& s = sim[k];
+            const int since = s.lastDay.isValid() ? int(std::clamp<qint64>(s.lastDay.daysTo(date), 0, 60)) : 60;
+            double score = since * 0.5 - s.scheduled * 8.0;
+            if (!lastGroove.isEmpty() && it.groove == lastGroove) {
+                score -= 15;
+            }
+            if (ps.code == lastSong) {
+                score -= 8;
+            }
+            // among equals, a different one each day
+            score += double(qHash(k + date.toString(Qt::ISODate)) % 1000) / 1000.0 * 3.0;
+            if (score > bestScore) {
+                bestScore = score;
+                best = &it;
+                bestCode = ps.code;
+            }
+        }
+    }
+    return { bestCode, best };
 }
 }
 
@@ -1030,6 +1080,24 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
         return (a.set ? a.set : 99) < (b.set ? b.set : 99);
     });
 
+    // the last jam's groove and song (the kept days' last one, or the day being added to)
+    QString lastJamGroove, lastJamSong;
+    {
+        std::vector<Block> before;
+        for (const Day& d : plan.days) {
+            before.insert(before.end(), d.blocks.begin(), d.blocks.end());
+        }
+        before.insert(before.end(), req.alreadyToday.begin(), req.alreadyToday.end());
+        for (const Block& b : before) {
+            if (b.kind == "jam") {
+                auto lib = libs.find(b.code);
+                const Item* it = lib == libs.end() ? nullptr : lib->second.item(b.itemId);
+                lastJamGroove = it ? it->groove : QString();
+                lastJamSong = b.code;
+            }
+        }
+    }
+
     const int nDays = int(req.days.size());
     for (int di = 0; di < nDays; ++di) {
         const QDate date = req.days[di].first;
@@ -1140,6 +1208,16 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
             }
         }
 
+        // a jam: improvising over one of the songs' changes in some groove (Joel, 24 Oct 2026: "build up tons of
+        // vocabulary without getting bored"), a different song and groove from the last one, the least played first
+        if (!isShow && !runThrough && !req.noJam && left >= 30) {
+            if (const auto [code, jam] = pickJam(libs, req.songs, sim, today, date, lastJamGroove, lastJamSong); jam) {
+                schedule(code, *jam, left >= 90 ? 15 : 10, "jam");
+                lastJamGroove = jam->groove;
+                lastJamSong = code;
+            }
+        }
+
         if (runThrough || isShow) {
             // performance and form items for every song, in set order; then the rest of the time on the weakest items
             const int per = std::max(5, left / std::max(1, int(ordered.size())));   // (the show day: the minutes chosen for it)
@@ -1189,6 +1267,9 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
                 const Item* best = nullptr;
                 double bestScore = -1e9;
                 for (const Item& it : lib.items) {
+                    if (it.category == "jam") {
+                        continue;   // (the day's jam is chosen on its own)
+                    }
                     const Sim& s = sim[key(code, it.id)];
                     if (today.count(key(code, it.id)) || (it.category == "performance" && !runThrough && s.stage < 1
                                                           && lib.items.size() > 20 && di < nDays - 2)) {
@@ -1289,6 +1370,9 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
                 if (x.kind == "warmup") {
                     return -1;
                 }
+                if (x.kind == "jam") {
+                    return 100000;   // (the end of the day)
+                }
                 for (size_t i = 0; i < ordered.size(); ++i) {
                     if (ordered[i].code == x.code) {
                         return int(i);
@@ -1348,6 +1432,7 @@ int mu::project::practice::addToDay(Plan& plan, int dayIndex, int minutes, const
     req.kind = "routine";   // (no run-through or show logic: just more items)
     req.name = plan.name;
     req.noWarmup = true;
+    req.noJam = true;   // (more items; a jam is its own button)
     req.alreadyToday = day.blocks;
     req.songs = plan.songs;
     req.days = { { day.date.isValid() ? day.date : QDate::currentDate(), std::clamp(minutes, 5, 300) } };
@@ -1361,6 +1446,63 @@ int mu::project::practice::addToDay(Plan& plan, int dayIndex, int minutes, const
     }
     day.minutes += added;
     return added;
+}
+
+int mu::project::practice::addJam(Plan& plan, int dayIndex, int minutes, const std::map<QString, Library>& libs,
+                                  const Progress& progress)
+{
+    if (dayIndex < 0 || dayIndex >= int(plan.days.size())) {
+        return 0;
+    }
+    Day& day = plan.days[dayIndex];
+    const QDate date = day.date.isValid() ? day.date : QDate::currentDate();
+    std::map<QString, Sim> sim;
+    std::set<QString> today;
+    QString lastGroove, lastSong;
+    for (const PlanSong& ps : plan.songs) {
+        auto lib = libs.find(ps.code);
+        if (lib == libs.end()) {
+            continue;
+        }
+        for (const Item& it : lib->second.items) {
+            if (it.category == "jam") {
+                const ItemProgress p = progress.get(ps.code, it.id);
+                Sim s;
+                s.lastDay = p.last;
+                s.scheduled = p.sessions;
+                sim[ps.code + "/" + it.id] = s;
+            }
+        }
+    }
+    for (const Day& d : plan.days) {
+        for (const Block& b : d.blocks) {
+            const QString k = b.code + "/" + b.itemId;
+            if (&d == &day) {
+                today.insert(k);
+            } else if (sim.count(k) && !b.done) {
+                sim[k].scheduled += 1;   // (planned on another day)
+            }
+            if (b.kind == "jam" && d.date <= date) {
+                auto lib = libs.find(b.code);
+                const Item* it = lib == libs.end() ? nullptr : lib->second.item(b.itemId);
+                lastGroove = it ? it->groove : QString();
+                lastSong = b.code;
+            }
+        }
+    }
+    const auto [code, jam] = pickJam(libs, plan.songs, sim, today, date, lastGroove, lastSong);
+    if (!jam) {
+        return 0;
+    }
+    Block b;
+    b.code = code;
+    b.itemId = jam->id;
+    b.kind = "jam";
+    b.minutes = std::clamp(minutes, 5, 60);
+    b.tempo = jam->tempoStart;
+    day.blocks.push_back(b);
+    day.minutes += b.minutes;
+    return b.minutes;
 }
 
 // ---------------------------------------------------------------- saved plans
@@ -1512,7 +1654,7 @@ QString mu::project::practice::categoryName(const QString& c)
     static const std::map<QString, QString> NAMES {
         { "harmony", "Harmony" }, { "voicings", "Voicings" }, { "comping", "Comping" }, { "parts", "Written parts" },
         { "solo", "Solo" }, { "vocabulary", "Vocabulary" }, { "form", "Form and memory" }, { "technique", "Technique" },
-        { "ear", "Ear" }, { "performance", "Performance" }
+        { "ear", "Ear" }, { "performance", "Performance" }, { "jam", "Jam" }
     };
     auto it = NAMES.find(c);
     return it == NAMES.end() ? c : it->second;

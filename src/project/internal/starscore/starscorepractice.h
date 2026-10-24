@@ -210,6 +210,7 @@ struct PlanRequest {
     //! what they did), and no warm-up
     std::vector<Block> alreadyToday;
     bool noWarmup = false;
+    bool noJam = false;    // no jam in the day (a jam a day otherwise, when there's half an hour or more)
 };
 
 //! Builds the plan's days from today's progress. Days before `fromDate` (when given) are kept as they are.
@@ -219,6 +220,10 @@ Plan makePlan(const PlanRequest& request, const std::map<QString, Library>& libr
 //! More for a day already planned: `minutes` of new items at its end, from what the songs need after what the day
 //! has (no warm-up). Returns the minutes added (0: nothing left to add).
 int addToDay(Plan& plan, int dayIndex, int minutes, const std::map<QString, Library>& libraries, const Progress& progress);
+
+//! A jam (improvising over a song's changes with a backing track) at the end of the day: a different song and groove
+//! from the last jam, the least played first. Returns the minutes added (0: no jams in these songs).
+int addJam(Plan& plan, int dayIndex, int minutes, const std::map<QString, Library>& libraries, const Progress& progress);
 
 //! The folder of songs to read libraries from: the library folder, or the automatic tests' folder
 QString libraryRoot(const QString& libraryFolder);
