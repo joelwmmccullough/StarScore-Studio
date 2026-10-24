@@ -1,0 +1,158 @@
+run 136 commit df6d7925fc11eceb819f7940ddd2ee612b84b024
+33:D:\a\StarScore-Studio\StarScore-Studio>IF 261023232 == "" (ECHO "error: not set BUILD_NUMBER"   & EXIT /b 1 ) 
+36:ECHO "error: not set TARGET_PROCESSOR_BITS, must be 32 or 64, current TARGET_PROCESSOR_BITS: 64"  
+45:ECHO "error: unknown BUILD_MODE: stable"  
+1446:FAILED: [code=2] src/project/CMakeFiles/project.dir/internal/starscore/starscoreautotest.cpp.obj 
+1459:D:\a\StarScore-Studio\StarScore-Studio\src\project\internal\starscore\starscoreautotest.cpp(3305): fatal error C1061: compiler limit: blocks nested too deeply
+
+---- tail ----
+    Generated 20 translation(s) (20 finished and 0 unfinished)
+    Ignored 7238 untranslated source text(s)
+[2795/3041] Generating musescore_ja.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_ja.qm'...
+    Generated 7258 translation(s) (7258 finished and 0 unfinished)
+[2796/3041] Generating musescore_it.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_it.qm'...
+Removed plural forms as the target language has less forms.
+If this sounds wrong, possibly the target language is not set or recognized.
+    Generated 7030 translation(s) (7030 finished and 0 unfinished)
+    Ignored 228 untranslated source text(s)
+[2797/3041] Generating musescore_ka.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_ka.qm'...
+    Generated 5632 translation(s) (5632 finished and 0 unfinished)
+    Ignored 1626 untranslated source text(s)
+[2798/3041] Generating musescore_kab.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_kab.qm'...
+Removed plural forms as the target language has less forms.
+If this sounds wrong, possibly the target language is not set or recognized.
+    Generated 1 translation(s) (1 finished and 0 unfinished)
+    Ignored 7257 untranslated source text(s)
+[2799/3041] Generating musescore_lt.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_lt.qm'...
+Removed plural forms as the target language has less forms.
+If this sounds wrong, possibly the target language is not set or recognized.
+    Generated 3888 translation(s) (3888 finished and 0 unfinished)
+    Ignored 3370 untranslated source text(s)
+[2800/3041] Generating musescore_ko.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_ko.qm'...
+    Generated 7241 translation(s) (7241 finished and 0 unfinished)
+    Ignored 17 untranslated source text(s)
+[2801/3041] Generating musescore_lv.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_lv.qm'...
+    Generated 616 translation(s) (616 finished and 0 unfinished)
+    Ignored 6642 untranslated source text(s)
+[2802/3041] Generating musescore_ml.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_ml.qm'...
+    Generated 479 translation(s) (479 finished and 0 unfinished)
+    Ignored 6779 untranslated source text(s)
+[2803/3041] Generating musescore_mn_MN.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_mn_MN.qm'...
+    Generated 440 translation(s) (440 finished and 0 unfinished)
+    Ignored 6818 untranslated source text(s)
+[2804/3041] Generating musescore_mt.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_mt.qm'...
+    Generated 2552 translation(s) (2552 finished and 0 unfinished)
+    Ignored 4706 untranslated source text(s)
+[2805/3041] Generating musescore_nb.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_nb.qm'...
+    Generated 6250 translation(s) (6250 finished and 0 unfinished)
+    Ignored 1008 untranslated source text(s)
+[2806/3041] Generating musescore_nl.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_nl.qm'...
+    Generated 7258 translation(s) (7258 finished and 0 unfinished)
+[2807/3041] Generating musescore_nn.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_nn.qm'...
+    Generated 1478 translation(s) (1478 finished and 0 unfinished)
+    Ignored 5780 untranslated source text(s)
+[2808/3041] Generating musescore_pl.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_pl.qm'...
+Removed plural forms as the target language has less forms.
+If this sounds wrong, possibly the target language is not set or recognized.
+    Generated 7232 translation(s) (7232 finished and 0 unfinished)
+    Ignored 26 untranslated source text(s)
+[2809/3041] Generating musescore_pt.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_pt.qm'...
+Removed plural forms as the target language has less forms.
+If this sounds wrong, possibly the target language is not set or recognized.
+    Generated 5738 translation(s) (5738 finished and 0 unfinished)
+    Ignored 1520 untranslated source text(s)
+[2810/3041] Generating musescore_pt_BR.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_pt_BR.qm'...
+Removed plural forms as the target language has less forms.
+If this sounds wrong, possibly the target language is not set or recognized.
+    Generated 6844 translation(s) (6844 finished and 0 unfinished)
+    Ignored 414 untranslated source text(s)
+[2811/3041] Generating musescore_ro.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_ro.qm'...
+    Generated 7258 translation(s) (7258 finished and 0 unfinished)
+[2812/3041] Generating musescore_scn.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_scn.qm'...
+Removed plural forms as the target language has less forms.
+If this sounds wrong, possibly the target language is not set or recognized.
+    Generated 13 translation(s) (13 finished and 0 unfinished)
+    Ignored 7245 untranslated source text(s)
+[2813/3041] Generating musescore_ru.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_ru.qm'...
+Removed plural forms as the target language has less forms.
+If this sounds wrong, possibly the target language is not set or recognized.
+    Generated 7258 translation(s) (7258 finished and 0 unfinished)
+[2814/3041] Generating musescore_sk.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_sk.qm'...
+Removed plural forms as the target language has less forms.
+If this sounds wrong, possibly the target language is not set or recognized.
+    Generated 3716 translation(s) (3716 finished and 0 unfinished)
+    Ignored 3542 untranslated source text(s)
+[2815/3041] Generating musescore_sl.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_sl.qm'...
+    Generated 7100 translation(s) (7100 finished and 0 unfinished)
+    Ignored 158 untranslated source text(s)
+[2816/3041] Generating musescore_sr.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_sr.qm'...
+    Generated 917 translation(s) (917 finished and 0 unfinished)
+    Ignored 6341 untranslated source text(s)
+[2817/3041] Generating musescore_sr_RS.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_sr_RS.qm'...
+    Generated 1412 translation(s) (1412 finished and 0 unfinished)
+    Ignored 5846 untranslated source text(s)
+[2818/3041] Generating musescore_sv.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_sv.qm'...
+    Generated 7258 translation(s) (7258 finished and 0 unfinished)
+[2819/3041] Generating musescore_th.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_th.qm'...
+    Generated 817 translation(s) (817 finished and 0 unfinished)
+    Ignored 6441 untranslated source text(s)
+[2820/3041] Generating musescore_sv_SE.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_sv_SE.qm'...
+    Generated 7258 translation(s) (7258 finished and 0 unfinished)
+[2821/3041] Generating musescore_tr.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_tr.qm'...
+Removed plural forms as the target language has less forms.
+If this sounds wrong, possibly the target language is not set or recognized.
+    Generated 7258 translation(s) (7258 finished and 0 unfinished)
+[2822/3041] Generating musescore_uk.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_uk.qm'...
+Removed plural forms as the target language has less forms.
+If this sounds wrong, possibly the target language is not set or recognized.
+    Generated 2645 translation(s) (2645 finished and 0 unfinished)
+    Ignored 4613 untranslated source text(s)
+[2823/3041] Generating musescore_uz@Latn.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_uz@Latn.qm'...
+    Generated 108 translation(s) (108 finished and 0 unfinished)
+    Ignored 7150 untranslated source text(s)
+[2824/3041] Generating musescore_vi.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_vi.qm'...
+    Generated 2895 translation(s) (2895 finished and 0 unfinished)
+    Ignored 4363 untranslated source text(s)
+[2825/3041] Generating musescore_zh_CN.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_zh_CN.qm'...
+    Generated 7258 translation(s) (7258 finished and 0 unfinished)
+[2826/3041] Generating musescore_zh_HK.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_zh_HK.qm'...
+    Generated 5649 translation(s) (5649 finished and 0 unfinished)
+    Ignored 1609 untranslated source text(s)
+[2827/3041] Generating musescore_zh_TW.qm
+Updating 'D:/a/StarScore-Studio/StarScore-Studio/build.release/share/locale/musescore_zh_TW.qm'...
+    Generated 5636 translation(s) (5636 finished and 0 unfinished)
+    Ignored 1622 untranslated source text(s)
+ninja: build stopped: cannot make progress due to previous errors.
+Build failed
