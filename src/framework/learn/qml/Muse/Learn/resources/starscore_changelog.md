@@ -4,7 +4,12 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
-## 1.21.1
+## 1.22.0
+
+- **Jams.** Every song's practice library now has jam tracks: its own chord progressions as written, each with a backing track (bass, drums, and comping) in some groove and tempo, from swing and bossa to songo, funk, dilla, and trap. Some are whole sections (a solo's changes, a vamp, the B section), and some loop just a few chords of a long progression (Dream of Mushroom's solo is covered in 26 short loops). The notation is slashes with the chord symbols, and each jam has one short idea to try, from the song's own solo vocabulary or a general improvising prompt. 573 jams in 31 songs (Updog has no chords written yet).
+- **A jam a day.** A routine or plan day of 30 minutes or more ends with a 10-15 minute jam: a different song and groove from the last one, the least played first. For more, "Add a jam" on the Practice page (under each day) and "+ Jam" in the runner add one to the end of the day, and "A jam (10 min)" is offered when the day is done.
+- A new skill, "Improvising over a groove", is rated from the jams.
+- Chord symbols written "madd9" (Amadd9) were read as major sevenths in practice exercises; they're minor with an added 9th now.
 
 - **Hands free doesn't crash moving on.** When a part's or item's time ran out, opening the next play-along closed the practice window with the score, while it was still running, and StarScore crashed. Practice exercises now replace the score without closing the practice window.
 - **Drums in the backing tracks.** The drum part of every play-along loaded as an orchestral bass drum, so the groove didn't sound. It loads as a drum kit now, in every song's exercises.
