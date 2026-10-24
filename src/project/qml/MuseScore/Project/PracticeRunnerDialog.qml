@@ -67,8 +67,28 @@ StyledDialogView {
         run.stopHandsFree()
     }
 
-    //! a text size, at the size chosen in the runner (Text − / +)
-    function px(n) { return Math.round(n * run.textScale) }
+    //! the text grows with the window: 1 at the runner's opening size (hands free: at 1000 × 560), up to 3 times
+    readonly property real winScale: Math.max(1, Math.min(3, Math.min(page.width / (root.hf ? 1000 : 860),
+                                                                       page.height / (root.hf ? 560 : 800))))
+
+    //! a text size, at the size chosen in the runner (Text − / +) and the window's size
+    function px(n) { return Math.round(n * run.textScale * root.winScale) }
+
+    //! hands free: what to do, a line each, and when to move on (when there's no notation)
+    function stepsText() {
+        var lines = []
+        if (run.block.goal) {
+            lines.push(run.block.goal)
+        }
+        var steps = run.block.steps || []
+        for (var i = 0; i < steps.length; ++i) {
+            lines.push("•  " + steps[i])
+        }
+        if (run.images.length === 0 && !run.rendering && run.block.moveOnWhen) {
+            lines.push(qsTrc("starscore", "Move on when: %1").arg(run.block.moveOnWhen))
+        }
+        return lines.join("\n")
+    }
 
     function clock(sec) {
         var m = Math.floor(sec / 60)
@@ -137,11 +157,28 @@ StyledDialogView {
     //! The notation of the current part, every page fitted into the space it is given (no scrolling)
     component FittedNotation: Item {
         id: fit
+        //! the height the pages take at the full width (0 until they're loaded)
+        property int loads: 0
+        readonly property real naturalHeight: {
+            fit.loads
+            var h = 0
+            for (var i = 0; i < pages.count; ++i) {
+                var it = pages.itemAt(i)
+                if (!it || it.implicitWidth <= 0) {
+                    return 0
+                }
+                h += fit.width * it.implicitHeight / it.implicitWidth
+            }
+            return h + 4 * Math.max(0, pages.count - 1)
+        }
         Column {
             anchors.fill: parent
             spacing: 4
             Repeater {
+                id: pages
                 model: run.images
+                onItemAdded: fit.loads++
+                onItemRemoved: fit.loads++
                 delegate: Image {
                     required property string modelData
                     width: fit.width
@@ -153,6 +190,7 @@ StyledDialogView {
                     smooth: true
                     mipmap: true
                     cache: false
+                    onStatusChanged: fit.loads++
                 }
             }
         }
@@ -210,6 +248,7 @@ StyledDialogView {
     }
 
     Rectangle {
+        id: page
         anchors.fill: parent
         color: root.paper
 
@@ -234,7 +273,7 @@ StyledDialogView {
                               ? "  ·  " + qsTrc("starscore", "part %1 of %2").arg(run.partIndex + 1).arg(run.parts.length) : "")
                               + (root.passText() !== "" && run.handsFree === "practice" ? "  ·  " + root.passText() : "")
                         color: root.gold
-                        font.pixelSize: root.px(13)
+                        font.pixelSize: root.px(17)
                         font.capitalization: Font.AllUppercase
                         font.letterSpacing: 1.2
                         elide: Text.ElideRight
@@ -245,7 +284,7 @@ StyledDialogView {
                               : run.handsFree === "done" ? qsTrc("starscore", "That's the day done")
                               : (run.parts.length > 1 ? (run.parts[run.partIndex] ? run.parts[run.partIndex].label : "") : (run.block.title || ""))
                         color: root.ink
-                        font.pixelSize: root.px(24)
+                        font.pixelSize: root.px(32)
                         font.bold: true
                         elide: Text.ElideRight
                     }
@@ -254,7 +293,7 @@ StyledDialogView {
                     text: root.clock(run.handsFree === "break" ? run.breakSecondsLeft : run.partSecondsLeft)
                     visible: run.handsFree !== "done"
                     color: root.ink
-                    font.pixelSize: root.px(40)
+                    font.pixelSize: root.px(56)
                     font.family: "Menlo"
                 }
                 ColumnLayout {
@@ -287,42 +326,60 @@ StyledDialogView {
                             onClicked: root.toggleFullScreen()
                         }
                     }
-                    Text {
+                    RowLayout {
                         Layout.alignment: Qt.AlignRight
-                        text: qsTrc("starscore", "%1 left today").arg(run.dayMinutesLeft + " min")
-                        color: root.soft
-                        font.pixelSize: root.px(12)
+                        spacing: 10
+                        SizeControl {
+                            label: qsTrc("starscore", "Text")
+                            value: run.textScale
+                            minimum: 0.7; maximum: 2.0
+                            onStep: function(delta) { run.textScale = run.textScale + delta }
+                        }
+                        Text {
+                            text: qsTrc("starscore", "%1 left today").arg(run.dayMinutesLeft + " min")
+                            color: root.soft
+                            font.pixelSize: root.px(14)
+                        }
                     }
                 }
             }
-            Text {
-                Layout.fillWidth: true
-                visible: run.handsFree === "practice" || run.handsFree === "paused"
-                text: (run.block.goal || "") + ((run.block.steps || []).length > 0 ? "   ·   " + run.block.steps.join("   ·   ") : "")
-                color: root.soft
-                font.pixelSize: root.px(14)
-                wrapMode: Text.WordWrap
-                maximumLineCount: 2
-                elide: Text.ElideRight
-            }
             Rectangle { Layout.fillWidth: true; height: 1; color: root.gold; opacity: 0.5 }
 
-            // the notation, fitted
-            FittedNotation {
+            // what to do, as big as the space the notation leaves allows, then the notation, fitted
+            Item {
+                id: hfBody
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 visible: run.handsFree === "practice" || run.handsFree === "paused"
-            }
-            Text {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                visible: (run.handsFree === "practice" || run.handsFree === "paused") && run.images.length === 0 && !run.rendering
-                text: run.block.moveOnWhen ? qsTrc("starscore", "Move on when: %1").arg(run.block.moveOnWhen) : ""
-                color: root.ink
-                font.pixelSize: root.px(20)
-                wrapMode: Text.WordWrap
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
+                readonly property real gap: 12
+                readonly property bool hasNotation: run.images.length > 0 || run.rendering
+                // the notation at the full width, unless that leaves the text less than about three lines
+                readonly property real notationHeight: !hasNotation ? 0
+                    : hfNotation.naturalHeight > 0 ? Math.max(0, Math.min(hfNotation.naturalHeight, height - root.px(20) * 4 - gap))
+                    : height * 0.6
+
+                Text {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    height: Math.max(0, hfBody.height - hfBody.notationHeight - (hfBody.hasNotation ? hfBody.gap : 0))
+                    text: root.stepsText()
+                    color: root.ink
+                    wrapMode: Text.WordWrap
+                    fontSizeMode: Text.Fit
+                    font.pixelSize: root.px(36)
+                    minimumPixelSize: Math.max(10, root.px(12))
+                    lineHeight: 1.12
+                    verticalAlignment: Text.AlignVCenter
+                }
+                FittedNotation {
+                    id: hfNotation
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    height: hfBody.notationHeight
+                    visible: hfBody.hasNotation
+                }
             }
 
             // the break, and the end of the day
@@ -335,7 +392,7 @@ StyledDialogView {
                     visible: run.handsFree === "break"
                     text: qsTrc("starscore", "Next: %1").arg((run.block.song || "") + " · " + (run.block.title || ""))
                     color: root.teal
-                    font.pixelSize: root.px(16)
+                    font.pixelSize: root.px(22)
                 }
                 FlatButton {
                     visible: run.handsFree === "break"
@@ -350,7 +407,7 @@ StyledDialogView {
                     Text {
                         text: qsTrc("starscore", "Keep going? Add")
                         color: root.ink
-                        font.pixelSize: root.px(16)
+                        font.pixelSize: root.px(20)
                     }
                     Repeater {
                         model: [15, 30, 45, 60]

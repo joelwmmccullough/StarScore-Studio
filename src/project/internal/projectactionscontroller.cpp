@@ -294,6 +294,12 @@ void ProjectActionsController::init()
             return;
         }
         const muse::io::path_t path = fileSystem()->absoluteFilePath(muse::io::path_t(url.toLocalFile()));
+        // the practice runner opens these, and stays open: closing the score closed every dialog, the runner too,
+        // while it was still running (Joel, 24 Oct 2026: StarScore crashed when hands free moved on to the next item)
+        m_keepDialogsOnClose = true;
+        DEFER {
+            m_keepDialogsOnClose = false;
+        };
         if (multiwindowsProvider()->isProjectAlreadyOpened(path) && !isProjectOpened(path)) {
             multiwindowsProvider()->activateWindowWithProject(path);
             return;
@@ -1098,7 +1104,9 @@ bool ProjectActionsController::closeOpenedProject(bool goToHome)
     }
 
     if (result) {
-        interactive()->closeAllDialogsSync();
+        if (!m_keepDialogsOnClose) {
+            interactive()->closeAllDialogsSync();
+        }
         globalContext()->setCurrentProject(nullptr);
 
         if (goToHome) {

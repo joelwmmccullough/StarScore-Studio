@@ -229,6 +229,7 @@ private:
 
     bool m_isProjectSaving = false;
     bool m_isProjectClosing = false;
+    bool m_keepDialogsOnClose = false;   // StarScore: a practice exercise replacing the score keeps the practice runner open
     bool m_isProjectProcessing = false;
     bool m_isProjectPublishing = false;
     bool m_isProjectUploading = false;

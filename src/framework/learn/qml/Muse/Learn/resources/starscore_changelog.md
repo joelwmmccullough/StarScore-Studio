@@ -4,6 +4,12 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.21.1
+
+- **Hands free doesn't crash moving on.** When a part's or item's time ran out, opening the next play-along closed the practice window with the score, while it was still running, and StarScore crashed. Practice exercises now replace the score without closing the practice window.
+- **Drums in the backing tracks.** The drum part of every play-along loaded as an orchestral bass drum, so the groove didn't sound. It loads as a drum kit now, in every song's exercises.
+- **Bigger text in hands free.** The text grows with the window. The goal and steps are listed a line each, as big as the space above the notation allows, and "Text − / +" is on the hands-free screen too.
+
 ## 1.21.0
 
 - **Flag bars for practice.** On any part score (the Keys sheet, say), select bars and choose "…" › "Flag bars for practice…". Say what they are (Solo, Comping, or Written part), how hard (Easy, Medium, Hard, or Virtuosic), and anything about them in your own words. Nothing shows on the sheet. Each flag becomes a practice item of the song: its difficulty is the item's level, its minutes grow with the difficulty, your first line of notes is the goal and the rest are the steps, and plans pick it like any other item (a song with flags and no practice library yet gets one made of its flags). The same window lists the song's flags to edit or delete. Save the song to keep them. The flags and notes are also there to be read when the song's practice library is next written.

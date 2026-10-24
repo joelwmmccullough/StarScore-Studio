@@ -56,6 +56,32 @@ QString withTempo(const QString& xml, int tempo)
     return x;
 }
 
+//! A drum part named so MuseScore's MusicXML import makes it a drum kit. It takes the instrument from the first drum
+//! sound's name otherwise ("Bass Drum 1": an orchestral bass drum, which played nothing of the groove; Joel, 24 Oct
+//! 2026: "I need drums!"). The import makes a drum kit only of a part named "Drumset" or "Drumkit".
+QString drumsAsKit(const QString& xml)
+{
+    static const QRegularExpression scorePart("<score-part id=\"[^\"]+\">.*?</score-part>", QRegularExpression::DotMatchesEverythingOption);
+    static const QRegularExpression partName("<part-name>([^<]*)</part-name>");
+    QString out;
+    int last = 0;
+    QRegularExpressionMatchIterator it = scorePart.globalMatch(xml);
+    while (it.hasNext()) {
+        const QRegularExpressionMatch m = it.next();
+        QString sp = m.captured(0);
+        const QRegularExpressionMatch n = partName.match(sp);
+        const QString name = n.hasMatch() ? n.captured(1) : QString();
+        if (sp.count("<midi-unpitched>") >= 2 && n.hasMatch() && !name.contains("drumset", Qt::CaseInsensitive)
+            && !name.contains("drumkit", Qt::CaseInsensitive) && !name.contains("percussion", Qt::CaseInsensitive)) {
+            sp.replace(n.capturedStart(0), n.capturedLength(0), "<part-name>Drumset</part-name>");
+        }
+        out += xml.mid(last, m.capturedStart(0) - last) + sp;
+        last = m.capturedEnd(0);
+    }
+    out += xml.mid(last);
+    return out;
+}
+
 void recolor(QImage& img)
 {
     static const QColor CREAM("#EDE6D6");
@@ -190,7 +216,7 @@ Ret StarScoreService::openPracticeExercise(const QString& musicXml, const QStrin
         if (!f.open(QIODevice::WriteOnly)) {
             return make_ret(Ret::Code::UnknownError);
         }
-        f.write(withTempo(musicXml, tempo).toUtf8());
+        f.write(drumsAsKit(withTempo(musicXml, tempo)).toUtf8());
     }
     dispatcher()->dispatch("starscore-practice-open", actions::ActionData::make_arg2<QUrl, bool>(QUrl::fromLocalFile(path), play));
     return make_ok();
