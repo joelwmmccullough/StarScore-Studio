@@ -5527,6 +5527,11 @@ void StarScoreService::clearComposerInCurrentScore()
     // big song's Scores.
     score->doLayoutRange(engraving::Fraction(0, 1), engraving::Fraction(0, 1));
     n->undoStack()->prepareChanges(TranslatableString::untranslatable("Composer clear of the arrangement label"));
+    // a song with slashed headers on purpose: the instrument name slashed and on the subtitle's line, clear of the
+    // long title, here in StarScore too (not only in the exported sheet)
+    if (starscore::slashHeaders(score)) {
+        starscore::fitInstrumentName(score);
+    }
     // the label on the instrument name's line (an export could leave it moved), then the credit clear of it
     starscore::levelArrangementLabel(score);
     starscore::clearComposerCredit(score);

@@ -4,6 +4,11 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.22.2
+
+- **Slashed instrument names on the artist names' line.** In a song with slashed headers (Live Strong / Strasbourg / St. Denis), the instrument name top left now sits level with the subtitle and the artist names, below the title, on every sheet, and in the part score in StarScore too (when you open its tab), not only in the exported PDF.
+- The Windows build works again (it stopped at a compiler limit in the automatic tests' code).
+
 ## 1.22.1
 
 - **Slashed headers kept.** A song whose subtitle is written with slashes ("Starsign / Cover / Song", Live Strong / Strasbourg / St. Denis) keeps its slash-heavy headers on export: an instrument name written with slashes ("Trumpet / in / B♭") stays as it is, and one StarScore writes gets them too ("Drum / Kit", "Electric / Guitar").

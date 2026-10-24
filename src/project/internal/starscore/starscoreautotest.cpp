@@ -218,6 +218,8 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         std::_Exit(2);
     }
 
+    // (the steps in two chains: MSVC stops at about 128 else-ifs in a row, "blocks nested too deeply")
+    bool handled = true;
     if (step == "report") {
         autotestReport(QString("%1/report-%2").arg(autotestDir()).arg(reportNumber));
         ++reportNumber;
@@ -1887,6 +1889,11 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
                 autotestLog(QString("  %1 of %2 beamed rests placed differently after the edit").arg(changed).arg(after.size()));
             }
         }
+    } else {
+        handled = false;
+    }
+    if (handled) {
+        // (done in the first chain)
     } else if (step.startsWith("formatdiff:")) {
         // formatdiff:<part score A>|<part score B>: how B's formatting differs from A's: system and page breaks,
         // bar widths, texts (offset, alignment, font, placement, visibility; matched by place and words), frames

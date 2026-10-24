@@ -890,35 +890,27 @@ bool fitInstrumentName(Score* score, const QString& plain)
             score->doLayout();
             levelArrangementLabel(score);
         }
-        // into the title (a long title across the page, Joel 24 Oct 2026): the name goes down below what it runs into,
-        // in the space left of the subtitle, kept whole. ("Into": closer than a spatium, so it doesn't touch it either)
-        const double gap = 0.5 * score->style().spatium();
-        auto near = [&]() {
-            const RectF r = name->pageBoundingRect().adjusted(0.0, 0.0, 2.0 * gap, 0.0);
-            for (const Text* t : titles) {
-                if (t->ldata() && !t->plainText().isEmpty() && r.intersects(t->pageBoundingRect())) {
-                    return true;
-                }
+        // on the subtitle's line, level with the artist names, below the title (Joel, 24 Oct 2026: "tpt in bb is still
+        // intersecting live strong. should probably be on the same vertical coordinates as the artist name")
+        const Text* sub = nullptr;
+        for (const Text* t : titles) {
+            if (t->textStyleType() == TextStyleType::SUBTITLE && t->ldata() && !t->plainText().isEmpty()) {
+                sub = t;
             }
-            return false;
+        }
+        auto firstBaseline = [](const Text* t) {
+            const TextBase::LayoutData* ld = t->ldata();
+            return ld && !ld->blocks.empty() ? t->pagePos().y() + ld->blocks.front().y() : 0.0;
         };
-        for (int tries = 0; tries < 3 && near(); ++tries) {
-            const RectF r = name->pageBoundingRect().adjusted(0.0, 0.0, 2.0 * gap, 0.0);
-            double lowest = -1e9;
-            for (const Text* t : titles) {
-                if (t->ldata() && !t->plainText().isEmpty() && r.intersects(t->pageBoundingRect())) {
-                    lowest = std::max(lowest, t->pageBoundingRect().bottom());
-                }
+        if (sub && name->ldata() && !name->ldata()->blocks.empty()) {
+            const double dy = firstBaseline(sub) - firstBaseline(name);
+            if (std::abs(dy) > 0.05 * score->style().spatium()) {
+                name->undoChangeProperty(Pid::OFFSET, name->offset() + PointF(0.0, dy), PropertyFlags::UNSTYLED);
+                changed = true;
+                score->setLayoutAll();
+                score->doLayout();
+                levelArrangementLabel(score);
             }
-            const double dy = lowest + gap - name->pageBoundingRect().top();
-            if (dy <= 0.0 || dy > 20.0 * score->style().spatium()) {
-                break;
-            }
-            name->undoChangeProperty(Pid::OFFSET, name->offset() + PointF(0.0, dy), PropertyFlags::UNSTYLED);
-            changed = true;
-            score->setLayoutAll();
-            score->doLayout();
-            levelArrangementLabel(score);
         }
         const QString current = name->plainText().toQString();
         const int nl = current.indexOf('\n');
