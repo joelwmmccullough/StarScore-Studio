@@ -1476,6 +1476,12 @@ void SystemLayout::layoutSystemElements(System* system, LayoutContext& ctx)
                     || !a->placeAbove() || !a->ldata()->isSetPos()) {
                     continue;
                 }
+                // (only a text placed beside the mark by the layout: one moved by hand keeps its own place, and the mark
+                // stays at its own height. Joel, 27 Oct 2026: Double Entendre's F went up level with "Solo #2", placed by
+                // hand above the chord symbol, nearly into the system above)
+                if (a->propertyFlags(Pid::OFFSET) == PropertyFlags::UNSTYLED) {
+                    continue;
+                }
                 const RectF text = a->ldata()->bbox().translated(a->pos() + PointF(dx, 0.0));
                 const bool beside = text.left() >= mark.right() - 0.1 * rehearsMark->spatium();   // (right of it, same beat)
                 if (beside && text.center().y() < mark.center().y()) {

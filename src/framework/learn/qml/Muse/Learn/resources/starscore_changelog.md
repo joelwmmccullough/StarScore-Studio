@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.22.3
+
+- **Rehearsal marks stay at their own height beside a text moved by hand.** A rehearsal mark went up level with a text at its beat that sits higher (so they read as one line), even when you'd moved that text by hand above the chord symbol, which took the mark up nearly into the system above (Double Entendre's F beside "Solo #2"). Now only a text StarScore placed beside the mark takes it up.
+
 ## 1.22.2
 
 - **Slashed instrument names on the artist names' line.** In a song with slashed headers (Live Strong / Strasbourg / St. Denis), the instrument name top left now sits level with the subtitle and the artist names, below the title, on every sheet, and in the part score in StarScore too (when you open its tab), not only in the exported PDF.
