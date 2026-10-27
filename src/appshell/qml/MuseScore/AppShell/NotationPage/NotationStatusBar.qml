@@ -34,6 +34,8 @@ import MuseScore.Project
 Item {
     id: root
 
+    property bool viewOnly: false
+
     NotationStatusBarModel {
         id: model
     }
@@ -76,6 +78,8 @@ Item {
             id: playbackLoadingInfo
             Layout.fillWidth: false
 
+            enabled: !root.viewOnly
+
             onStarted: {
                 visible = true
             }
@@ -100,6 +104,7 @@ Item {
             text: model.accessibilityInfo
             horizontalAlignment: Text.AlignLeft
 
+            enabled: !root.viewOnly
             visible: !hiddenControlsMenuButton.visible
         }
 
@@ -108,6 +113,8 @@ Item {
 
             Layout.alignment: Qt.AlignVCenter
             Layout.preferredHeight: 28
+
+            enabled: !root.viewOnly
 
             navigationPanel: navPanel
             navigationOrder: 1
@@ -125,6 +132,7 @@ Item {
             orientation: Qt.Horizontal
 
             transparent: true
+            enabled: !root.viewOnly
             visible: statusBarRow.remainingSpace > width + concertPitchControl.width
 
             navigation.panel: navPanel
@@ -155,7 +163,7 @@ Item {
             text: model.concertPitchItem.title
             icon: model.concertPitchItem.icon
             checked: model.concertPitchItem.checked
-            enabled: model.concertPitchItem.enabled
+            enabled: model.concertPitchItem.enabled && !root.viewOnly
             visible: statusBarRow.remainingSpace > width
 
             navigation.panel: navPanel
@@ -263,6 +271,7 @@ Item {
 
             Layout.alignment: Qt.AlignVCenter
 
+            enabled: !root.viewOnly
             visible: !concertPitchControl.visible ||
                      !workspaceControl.visible
 

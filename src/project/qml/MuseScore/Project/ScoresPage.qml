@@ -32,11 +32,15 @@ import "internal/ScoresPage"
 FocusScope {
     id: root
 
+    property string subSection: ""
+
     QtObject {
         id: prv
 
         readonly property int sideMargin: 46
     }
+
+    // (StarScore: one tab only, so the sub-section a link asks for has nothing to switch)
 
     NavigationSection {
         id: navSec
@@ -50,6 +54,7 @@ FocusScope {
         }
     }
 
+    // StarScore: recent scores only, no tab bar (1.18.3)
     ScoresPageModel {
         id: scoresPageModel
     }
@@ -199,6 +204,18 @@ FocusScope {
             onOpenScoreRequested: function(scorePath, displayName) {
                 Qt.callLater(scoresPageModel.openScore, scorePath, displayName)
             }
+
+            onRevealInFileBrowserRequested: function(scorePath) {
+                Qt.callLater(scoresPageModel.revealInFileBrowser, scorePath)
+            }
+
+            onViewOnlineRequested: function(scoreId) {
+                Qt.callLater(scoresPageModel.viewOnline, scoreId)
+            }
+
+            onDeleteScoreRequested: function(scoreId, scoreName) {
+                Qt.callLater(scoresPageModel.deleteScore, scoreId, scoreName)
+            }
         }
     }
 
@@ -235,6 +252,7 @@ FocusScope {
                 navigation.panel: navBottomPanel
                 navigation.column: 2
 
+                accentButton: true
                 text: qsTrc("project", "New")
 
                 onClicked: {
@@ -243,9 +261,21 @@ FocusScope {
             }
 
             FlatButton {
-                navigation.name: "Open other Score"
+                navigation.name: "ConvertFileToScore"
                 navigation.panel: navBottomPanel
                 navigation.column: 3
+
+                text: qsTrc("project", "Convert…")
+
+                onClicked: {
+                    scoresPageModel.convertFileToScore()
+                }
+            }
+
+            FlatButton {
+                navigation.name: "Open other Score"
+                navigation.panel: navBottomPanel
+                navigation.column: 4
 
                 text: qsTrc("project", "Open other…")
 

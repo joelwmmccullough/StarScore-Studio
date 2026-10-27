@@ -49,9 +49,7 @@ DockPage {
         if (Boolean(params["section"])) {
             setCurrentCentral(params["section"])
 
-            if (Boolean(params["subSection"])) {
-                subSection = params["subSection"]
-            }
+            subSection = Boolean(params["subSection"]) ? params["subSection"] : ""
         }
     }
 
@@ -113,6 +111,7 @@ DockPage {
                 iconsOnly: menuPanel.iconsOnly
 
                 onSelected: function(name) {
+                    root.subSection = ""
                     root.setCurrentCentral(name)
                 }
             }
@@ -163,6 +162,7 @@ DockPage {
             }
 
             ScoresPage {
+                subSection: root.subSection
                 SplitView.preferredWidth: parent ? parent.width / 2 : 600
                 SplitView.minimumWidth: 300
             }

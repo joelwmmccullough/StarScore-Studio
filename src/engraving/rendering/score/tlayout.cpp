@@ -2754,10 +2754,11 @@ void TLayout::alignTabGraceNotesToMainStave(GraceNotesGroup* graceNotes, const S
 
     for (Chord* grace : *graceNotes) {
         Chord* linkedGrace = toChord(grace->findLinkedInStaff(notationStaff));
-        PointF linkedGracePos = linkedGrace->ldata()->pos();
-        if (linkedGrace) {
-            grace->setPos(linkedGracePos);
+        if (!linkedGrace) {
+            continue;
         }
+        PointF linkedGracePos = linkedGrace->ldata()->pos();
+        grace->setPos(linkedGracePos);
     }
 }
 

@@ -37,7 +37,7 @@ Item {
 
     property alias navigation: navPanel
 
-    property string currentUri: "musescore://home"
+    property alias currentUri: toolBarModel.currentUri
 
     //! StarScore: a narrow window shows only the Home tab and the current page's tab
     property bool compact: false
@@ -81,6 +81,7 @@ Item {
 
         delegate: PageTabButton {
             required property bool isTitleBold
+            required property bool isChecked
             required title
             required property string uri
             required property int index
@@ -100,7 +101,7 @@ Item {
             navigation.panel: navPanel
             navigation.order: index
 
-            checked: uri === root.currentUri
+            checked: isChecked
 
             onToggled: {
                 root.selected(uri)

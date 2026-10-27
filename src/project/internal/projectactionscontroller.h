@@ -39,13 +39,14 @@
 #include "playback/iplaybackcontroller.h"
 #include "print/iprintprovider.h"
 #include "iexportprojectscenario.h"
+#include "iconvertfiletoscorescenario.h"
 #include "inotationreadersregister.h"
 #include "iopensaveprojectscenario.h"
 #include "imscmetareader.h"
 #include "io/ifilesystem.h"
 #include "notation/inotationconfiguration.h"
 #include "musesounds/imusesoundscheckupdatescenario.h"
-#include "musesounds/imusesamplercheckupdatescenario.h"
+#include "musesounds/imusesamplercheckstatusscenario.h"
 #include "extensions/iextensionsprovider.h"
 
 #include "async/asyncable.h"
@@ -72,6 +73,7 @@ class ProjectActionsController : public IProjectFilesController, public muse::mi
     muse::ContextInject<IStarScoreService> starScoreService = { this };
     muse::ContextInject<IOpenSaveProjectScenario> openSaveProjectScenario = { this };
     muse::ContextInject<IExportProjectScenario> exportProjectScenario = { this };
+    muse::ContextInject<IConvertFileToScoreScenario> convertFileToScoreScenario = { this };
     muse::ContextInject<muse::actions::IActionsDispatcher> dispatcher = { this };
     muse::ContextInject<muse::IInteractive> interactive = { this };
     muse::ContextInject<context::IGlobalContext> globalContext = { this };
@@ -80,7 +82,7 @@ class ProjectActionsController : public IProjectFilesController, public muse::mi
     muse::ContextInject<playback::IPlaybackController> playbackController = { this };
     muse::ContextInject<print::IPrintProvider> printProvider = { this };
     muse::ContextInject<musesounds::IMuseSoundsCheckUpdateScenario> museSoundsCheckUpdateScenario = { this };
-    muse::ContextInject<musesounds::IMuseSamplerCheckUpdateScenario> museSamplerCheckUpdateScenario = { this };
+    muse::ContextInject<musesounds::IMuseSamplerCheckStatusScenario> museSamplerCheckStatusScenario = { this };
     muse::ContextInject<muse::extensions::IExtensionsProvider> extensionsProvider = { this };
 
 public:
@@ -106,6 +108,8 @@ public:
 
     const ProjectBeingDownloaded& projectBeingDownloaded() const override;
     muse::async::Notification projectBeingDownloadedChanged() const override;
+
+    muse::Uri resolveNotationPageUri() const override;
 
 private:
     void setupConnections();
@@ -198,8 +202,7 @@ private:
 
     void moveProject(INotationProjectPtr project, const muse::io::path_t& newPath, bool replace);
 
-    void importPdf();
-    void importAudioToScore();
+    void convertFileToScore(const muse::actions::ActionData& args);
 
     void clearRecentScores();
 
