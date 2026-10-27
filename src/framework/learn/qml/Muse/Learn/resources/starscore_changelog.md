@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.22.4
+
+- **A new 4-Horn 2-Trumpet takes its saxes from the 5-Horn when there's no 3-Horn.** Its Trumpet 1 and 2 still come from the 5-Horn, and its Tenor Sax and doubler from the 3-Horn Standard; a song with a 5-Horn and no 3-Horn with music now gets the 5-Horn's Tenor Sax and its alto (the doubler's chair) too, instead of leaving them empty to copy by hand (Double Entendre).
+
 ## 1.22.3
 
 - **Rehearsal marks stay at their own height beside a text moved by hand.** A rehearsal mark went up level with a text at its beat that sits higher (so they read as one line), even when you'd moved that text by hand above the chord symbol, which took the mark up nearly into the system above (Double Entendre's F beside "Solo #2"). Now only a text StarScore placed beside the mark takes it up.

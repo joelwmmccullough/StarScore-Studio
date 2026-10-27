@@ -917,6 +917,17 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             }
         }
         autotestLog(QString("  %1 issue(s)%2").arg(issues.size()).arg(issues.isEmpty() ? QString() : "\n    - " + issues.join("\n    - ")));
+    } else if (step == "twotrumpet") {
+        // twotrumpet: where the newest 4-Horn 2-Trumpet section's parts would be copied from (as a new one is filled)
+        const std::vector<StarScoreSection> secs = load().sections;
+        for (auto it = secs.rbegin(); it != secs.rend(); ++it) {
+            if (it->templateKey == starscore::TWO_TRUMPET_4H) {
+                for (const auto& [a, b] : twoTrumpetSources(*it)) {
+                    autotestLog("  " + partScoreName(a) + " -> " + partScoreName(b));
+                }
+                break;
+            }
+        }
     } else if (step.startsWith("clearpart:")) {
         // clearpart:<part name>: every bar of the part's staves emptied (rests), one undo step
         const QString name = step.mid(10);

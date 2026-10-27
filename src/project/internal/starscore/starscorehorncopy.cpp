@@ -10,7 +10,7 @@
  * style, layout (system and page breaks), text positions and measure widths, and is marked Sketch.
  *
  * The 4-Horn 2-Trumpet (Joel, 16 Oct 2026) is copied without asking: its Trumpet 1 and 2 from the 5-Horn's, its Tenor
- * Sax and doubler from the 3-Horn Standard's.
+ * Sax and doubler from the 3-Horn Standard's (from the 5-Horn's when there's no 3-Horn with music: Joel, 27 Oct 2026).
  *
  * A new 1-Horn (Joel, 20 Oct 2026) takes the 2-Horn's Trumpet into its Trumpet, also without asking.
  */
@@ -85,14 +85,28 @@ std::map<QString, QString> hornRoles(const mu::engraving::MasterScore* ms, const
     }
     if (rest.size() == 1) {
         roles["doubler"] = rest.front();
+    } else if (rest.size() > 1) {
+        // a 5-Horn's alto (the doubler's chair there) beside its trombone: the one part that isn't a trombone
+        QStringList notLow;
+        for (const QString& pid : rest) {
+            const mu::engraving::Part* p = ms->partById(muse::ID(pid));
+            const QString inst = p ? p->instrumentId().toQString() : QString();
+            if (!inst.contains("trombone") && !inst.contains("tuba") && !inst.contains("baritone")) {
+                notLow << pid;
+            }
+        }
+        if (notLow.size() == 1) {
+            roles["doubler"] = notLow.front();
+        }
     }
     return roles;
 }
 }
 
-//! The 4-Horn 2-Trumpet's parts and where they're copied from: (5-Horn Trumpet 1, its Trumpet 1), (5-Horn Trumpet 2,
-//! its Trumpet 2), (3-Horn Tenor Sax, its Tenor Sax), (3-Horn doubler, its doubler); with no 5-Horn, Trumpet 1 from the
-//! 3-Horn's Trumpet; only the sources with music
+//! The 4-Horn 2-Trumpet's parts and where they're copied from: its Trumpet 1 and 2 from the 5-Horn's; its Tenor Sax
+//! and doubler from the 3-Horn Standard's, or from the 5-Horn's when the song has no 3-Horn with music (Joel, 27 Oct
+//! 2026: Double Entendre had a 5-Horn and no 3-Horn, and the alto and tenor had to be copied by hand); with no 5-Horn,
+//! Trumpet 1 from the 3-Horn's Trumpet. Each part from the first of its sources with music.
 std::vector<std::pair<QString, QString> > StarScoreService::twoTrumpetSources(const StarScoreSection& made) const
 {
     std::vector<std::pair<QString, QString> > pairs;
@@ -102,28 +116,42 @@ std::vector<std::pair<QString, QString> > StarScoreService::twoTrumpetSources(co
     }
     const std::map<QString, QString> to = hornRoles(ms, made);
     const std::vector<StarScoreSection> sections = load().sections;
-    const bool has5 = std::any_of(sections.begin(), sections.end(), [](const StarScoreSection& s) { return s.templateKey == "5-horn"; });
-    for (const StarScoreSection& s : sections) {
-        QStringList roles;
-        if (s.templateKey == "5-horn") {
-            roles = { "trumpet1", "trumpet2" };
-        } else if (s.templateKey == "3-horn") {
-            // with no 5-Horn, the 3-Horn's Trumpet as Trumpet 1 too; Trumpet 2 starts empty (Joel, 17 Oct 2026)
-            roles = has5 ? QStringList { "tenor", "doubler" } : QStringList { "trumpet1", "tenor", "doubler" };
-        }
-        if (roles.isEmpty()) {
-            continue;
-        }
-        const std::map<QString, QString> from = hornRoles(ms, s);
-        for (const QString& role : roles) {
-            auto f = from.find(role);
-            auto t = to.find(role);
-            if (f == from.end() || t == to.end()) {
+    // the sections to copy from, by template, the first with music of its kind
+    auto rolesOf = [&](const QString& templateKey) {
+        std::map<QString, QString> best;
+        for (const StarScoreSection& s : sections) {
+            if (s.templateKey != templateKey || s.id == made.id) {
                 continue;
             }
-            const engraving::Part* p = ms->partById(ID(f->second));
+            const std::map<QString, QString> r = hornRoles(ms, s);
+            if (best.empty() || (sectionHasMusic(s) && std::none_of(best.begin(), best.end(), [&](const auto& kv) {
+                const engraving::Part* p = ms->partById(ID(kv.second));
+                return p && starscore::partHasNotes(p);
+            }))) {
+                best = r;
+            }
+        }
+        return best;
+    };
+    const std::map<QString, QString> five = rolesOf("5-horn");
+    const std::map<QString, QString> three = rolesOf("3-horn");
+    const std::vector<std::pair<QString, std::vector<const std::map<QString, QString>*> > > order {
+        { "trumpet1", { &five, &three } },
+        { "trumpet2", { &five } },
+        { "tenor", { &three, &five } },
+        { "doubler", { &three, &five } },
+    };
+    for (const auto& [role, sources] : order) {
+        const auto t = to.find(role);
+        if (t == to.end()) {
+            continue;
+        }
+        for (const std::map<QString, QString>* src : sources) {
+            const auto f = src->find(role);
+            const engraving::Part* p = f == src->end() ? nullptr : ms->partById(ID(f->second));
             if (p && starscore::partHasNotes(p)) {
                 pairs.emplace_back(f->second, t->second);
+                break;
             }
         }
     }
