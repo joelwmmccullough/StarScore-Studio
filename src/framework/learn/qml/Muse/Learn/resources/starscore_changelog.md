@@ -4,6 +4,23 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.23.0
+
+Built on MuseScore Studio 4.7.6 (it was 4.7.5). What that brings:
+
+- **Convert file… (File menu, and a Convert… button under the recent scores).** Sends a PDF, image or audio file to MuseScore.com to be turned into a score (it needs a MuseScore.com account). It replaces File › Import PDF… and Import Audio to Score…, which only opened the website.
+- **A ⋯ menu on each recent score:** Open, Show in Finder, and Remove from recent files list. The list now updates in place instead of reloading (and blinking) when a file is added or removed.
+- **Showing or hiding notes in a part score no longer changes the main score's stems and beams** (or the other way round) when the two scores show different notes.
+- **Playback:** voltas left open or closed after the last repeat now play, and playback no longer stops at a skipped open volta.
+- **A pedal line moved by hand stays where it was put** after saving and reopening.
+- **Muse Sounds:** a warning when Muse Sounds can't start, with "Open MuseHub" and "Don't show again".
+- **Audio settings:** a buffer size or sample rate change that fails goes back to the previous setting instead of leaving you with no sound, and choosing a device works again after a failed attempt.
+- **Crash fixes:** StarScore no longer crashes at startup on a Mac whose VST3 plugin folder has a link loop in it, or when a plugin adds a hairpin, or with some parentheses and tab grace notes.
+- **MusicXML import:** percussion parts take their stem directions from the file's voices, and named noteheads are no longer put on percussion staves.
+- Bars with items outside their own length are flagged as corrupted, and tremolos and arpeggios only show on the chords that have them.
+
+StarScore's own pages are unchanged: the Dashboard still has the recent scores on its left, and there's still no "My online scores" tab.
+
 ## 1.22.4
 
 - **A new 4-Horn 2-Trumpet takes its saxes from the 5-Horn when there's no 3-Horn.** Its Trumpet 1 and 2 still come from the 5-Horn, and its Tenor Sax and doubler from the 3-Horn Standard; a song with a 5-Horn and no 3-Horn with music now gets the 5-Horn's Tenor Sax and its alto (the doubler's chair) too, instead of leaving them empty to copy by hand (Double Entendre).
