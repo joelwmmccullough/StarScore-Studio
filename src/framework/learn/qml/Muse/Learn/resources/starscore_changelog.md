@@ -6,7 +6,7 @@ Version numbers: the first number changes when files stop being compatible, the 
 
 ## 1.23.1
 
-- **Combine keyboard parts into a Keys part leaves one keyboard part score.** The keyboards' own part scores ("Electric Piano" beside the new "Keys") are removed once the Keys part score holds them, so the song has one Keys tab and one Keys sheet, as Cumulonimbus does. Only a part score holding just one of those keyboards is removed; you can undo it. Running it again on a song that already has Keys removes any that were left (Double Entendre).
+- **Combine keyboard parts into a Keys part leaves one keyboard part score.** The keyboards' own part scores ("Electric Piano" beside the new "Keys") are removed once the Keys part score holds them, so the song has one Keys tab and one Keys sheet, as Cumulonimbus does. Only a part score holding just one of those keyboards is removed; you can undo it. Running it again on a song that already has Keys removes any that were left (Double Entendre). The keyboards it adds also play in the Keys part score (the one it was made from had them muted).
 
 ## 1.23.0
 

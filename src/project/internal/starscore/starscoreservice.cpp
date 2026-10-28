@@ -1932,6 +1932,13 @@ QString StarScoreService::makeKeysPart()
         }
         parts->insertPart(k->clone(), index);
         added << k->partName().toQString();
+        // it plays in the Keys part score: the part score had it muted while it wasn't in it
+        if (INotationSoloMuteStatePtr soloMute = book->notation()->soloMuteState()) {
+            INotationSoloMuteState::SoloMuteState st;
+            st.mute = false;
+            st.solo = false;
+            soloMute->setTrackSoloMuteState(engraving::InstrumentTrackId { k->id(), k->instrumentId() }, st);
+        }
     }
     const QString oldName = book->name();
     if (oldName != "Keys") {
