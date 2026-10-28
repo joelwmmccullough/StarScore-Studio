@@ -1937,18 +1937,46 @@ QString StarScoreService::makeKeysPart()
     if (oldName != "Keys") {
         book->setName("Keys");
     }
+
+    // the keyboards' own part scores go: the Keys part score holds them now, and a song keeps one keyboard sheet
+    // (Double Entendre kept an "Electric Piano" tab beside Keys). Only a part score holding just one of them goes.
+    ExcerptNotationList kept;
+    QStringList removed;
+    for (const IExcerptNotationPtr& e : master->excerpts()) {
+        const std::vector<engraving::Part*> ps = e == book ? std::vector<engraving::Part*>() : bookParts(e);
+        if (ps.size() == 1 && std::find(keys.begin(), keys.end(), ps.front()) != keys.end()) {
+            removed << e->name();
+            continue;
+        }
+        kept.push_back(e);
+    }
+    if (!removed.isEmpty()) {
+        // off a part score that's about to go, onto the Keys one
+        const INotationPtr current = globalContext()->currentNotation();
+        const bool onRemoved = current && current != master->notation()
+                               && std::none_of(kept.begin(), kept.end(), [&](const IExcerptNotationPtr& e) {
+            return e->notation() == current;
+        });
+        if (onRemoved) {
+            master->setExcerptIsOpen(book->notation(), true);
+            globalContext()->setCurrentNotation(book->notation());
+        }
+        master->setExcerpts(kept);
+    }
     tidyKeysBrackets();
     if (INotationProjectPtr project = globalContext()->currentProject()) {
         project->markAsUnsaved();
     }
     master->notation()->notationChanged().notify();
     scheduleChanged();
+    const QString gone = removed.isEmpty() ? QString()
+                         : " " + muse::qtrc("starscore", "Removed the separate part scores: %1.").arg(removed.join(", "));
     if (added.isEmpty() && oldName == "Keys") {
-        return muse::qtrc("starscore", "The Keys part already holds %1.").arg(names.join(", "));
+        return muse::qtrc("starscore", "The Keys part already holds %1.").arg(names.join(", ")) + gone;
     }
     return muse::qtrc("starscore", "The Keys part score now holds %1 (made from “%2”). Each part's status is kept; "
                                    "marking the Keys part marks them all. It exports as one sheet, “Keys”.")
-           .arg(names.join(", "), oldName);
+           .arg(names.join(", "), oldName) + gone;
 }
 
 bool StarScoreService::songIsCover() const
