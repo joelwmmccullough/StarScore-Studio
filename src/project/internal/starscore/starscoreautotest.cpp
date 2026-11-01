@@ -562,7 +562,11 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         setCopyrightYear(step.mid(14).toInt());
         autotestLog(QString("  year %1; notice: %2").arg(copyrightYear()).arg(ms->metaTag(u"copyright").toQString()));
     } else if (step == "recordingswarning") {
-        // the export window's warning for a cover with no recordings ("" when there's none to give)
+        // the export window's warning for a cover with no recordings ("" when there's none to give), with
+        // STARSCORE_AUTOTEST_BAND as Sheets and Demos
+        if (!qEnvironmentVariable("STARSCORE_AUTOTEST_BAND").isEmpty()) {
+            setBandFolder(qEnvironmentVariable("STARSCORE_AUTOTEST_BAND"));
+        }
         const QString w = coverRecordingsWarning();
         autotestLog("  recordings warning: " + (w.isEmpty() ? QString("(none)") : w));
     } else if (step == "copyright") {
