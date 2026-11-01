@@ -742,6 +742,9 @@ public:
     //! This song's recordings, kept in the .starscore (a copy of its part of recordings.json)
     virtual QJsonObject songRecordings() const = 0;
     virtual void setSongRecordings(const QJsonObject& recordings) = 0;
+    //! For a cover in Sheets and Demos (category 2 or 3) with nothing in its Recordings window (no live takes, albums,
+    //! sessions or original): the warning the export window shows. "" otherwise, or when recordings.json can't be read.
+    virtual QString coverRecordingsWarning() const = 0;
 
     // --- the song's place in Projects and Sheets (Joel, 19 Oct 2026) ---
     //! "original", "cover" or "vocal" from the folder the song is in ("" when it isn't in a Starsign song folder)

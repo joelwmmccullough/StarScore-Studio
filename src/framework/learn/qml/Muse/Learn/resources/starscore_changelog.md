@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.23.2
+
+- **A warning when a cover has no recordings.** Export to Sheets and Demos on a cover (a song in "2 …" or "3 …" in Sheets and Demos) whose Recordings window is empty (no live takes, albums, sessions, or original) shows "You haven't added any recordings for this cover yet, not even the original." above the export button, with an "Add recordings…" button that opens the Recordings window. The warning goes away once you add one. It doesn't stop the export.
+
 ## 1.23.1
 
 - **Combine keyboard parts into a Keys part leaves one keyboard part score.** The keyboards' own part scores ("Electric Piano" beside the new "Keys") are removed once the Keys part score holds them, so the song has one Keys tab and one Keys sheet, as Cumulonimbus does. Only a part score holding just one of those keyboards is removed; you can undo it. Running it again on a song that already has Keys removes any that were left. The keyboards it adds also play in the Keys part score (the one it was made from had them muted).

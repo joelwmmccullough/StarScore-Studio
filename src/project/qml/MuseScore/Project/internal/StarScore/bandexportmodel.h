@@ -16,13 +16,14 @@
 #include "project/istarscoreservice.h"
 #include "project/iprojectfilescontroller.h"
 #include "context/iglobalcontext.h"
+#include "async/asyncable.h"
 
 namespace mu::project {
 //! "Export to Sheets and Demos": every planned sheet with a tick box, grouped under a header row per folder.
 //! Un-ticked sheets are remembered per song (by its code) for the next export.
 //! The rows are a list model (roles: header, path, folder, name, checked), so a tick changes one row in place;
 //! until Oct 2026 every tick replaced the whole list and the view rebuilt every row.
-class BandExportModel : public QAbstractListModel, public muse::Contextable
+class BandExportModel : public QAbstractListModel, public muse::Contextable, public muse::async::Asyncable
 {
     Q_OBJECT
 
@@ -48,6 +49,8 @@ class BandExportModel : public QAbstractListModel, public muse::Contextable
     Q_PROPERTY(bool exportHalfTime READ exportHalfTime WRITE setExportHalfTime NOTIFY timeVariantsChanged)
     Q_PROPERTY(bool exportDoubleTime READ exportDoubleTime WRITE setExportDoubleTime NOTIFY timeVariantsChanged)
     Q_PROPERTY(QString result READ result NOTIFY resultChanged)         // what exportNow() reported
+    //! A cover with nothing in its Recordings window yet: the warning shown above the export button ("" otherwise)
+    Q_PROPERTY(QString recordingsWarning READ recordingsWarning NOTIFY recordingsWarningChanged)
 
     QML_ELEMENT
 
@@ -86,6 +89,7 @@ public:
     void setExportDoubleTime(bool on);
     void setExportDemos(bool on);
     QString result() const;
+    QString recordingsWarning() const { return m_recordingsWarning; }
 
     //! After an export: opens the organizer window, which runs the folder organization for this export
     Q_INVOKABLE void openOrganizer();
@@ -104,6 +108,9 @@ public:
     //! Whether the last exportNow() exported (false: cancelled at the save question, or the save failed)
     Q_INVOKABLE bool lastExportRan() const { return m_exportRan; }
 
+    //! Opens the Recordings window; the warning is checked again when it closes
+    Q_INVOKABLE void openRecordings();
+
     //! Where the running export is: running, phase, done, total, step (the window polls it while exporting)
     Q_INVOKABLE QVariantMap progress() const;
 
@@ -115,6 +122,7 @@ signals:
     void exportDemosChanged();
     void timeVariantsChanged();
     void resultChanged();
+    void recordingsWarningChanged();
 
 private:
     enum Roles {
@@ -136,6 +144,7 @@ private:
     //! A header row is ticked when every sheet of its folder is; tells the view about the headers that changed
     void refreshHeaders();
     void setResult(const QString& text);
+    void checkRecordings();
 
     QString m_heading;
     QString m_error;
@@ -152,5 +161,6 @@ private:
     QString m_songTitle;
     QString m_suggestedCode;
     QString m_result;
+    QString m_recordingsWarning;
 };
 }

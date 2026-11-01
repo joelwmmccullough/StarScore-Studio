@@ -327,6 +327,27 @@ StyledDialogView {
                         + "arrangement, in the song's Demos folder (older demos of the same name are replaced). This can take a while.")
         }
 
+        // a cover with an empty Recordings window (Joel, 1 Nov 2026): warned before exporting, not blocked
+        RowLayout {
+            Layout.fillWidth: true
+            visible: root.listMode && !root.done && exportModel.recordingsWarning !== ""
+            spacing: 12
+
+            StyledTextLabel {
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignLeft
+                wrapMode: Text.WordWrap
+                font: ui.theme.bodyBoldFont
+                color: "#d08000"
+                text: "⚠ " + exportModel.recordingsWarning
+            }
+
+            FlatButton {
+                text: qsTrc("starscore", "Add recordings…")
+                onClicked: exportModel.openRecordings()
+            }
+        }
+
         CheckBox {
             visible: root.listMode && !root.done
             text: qsTrc("starscore", "Run organization process")

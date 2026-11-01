@@ -84,6 +84,7 @@
 #include "starscorepdf.h"
 #include "organizer/orgplatform.h"
 #include "organizer/orgcore.h"
+#include "organizer/orgrecordings.h"
 #include "organizer/orgfiling.h"
 
 #include "io/buffer.h"
@@ -781,6 +782,34 @@ void StarScoreService::setSongRecordings(const QJsonObject& recordings)
     data.recordings = recordings;
     storeTo(ms, data, project);
     project->markAsUnsaved();
+}
+
+QString StarScoreService::coverRecordingsWarning() const
+{
+    namespace org = starscore::org;
+    // a cover: its Sheets and Demos folder is "2 …" (Covers) or "3 …" (Vocal Covers)
+    const RetVal<StarScoreBandExportPlan> plan = planBandExportFor(true);
+    if (!plan.ret || plan.val.code.isEmpty()
+        || !(plan.val.songFolder.startsWith("2 ") || plan.val.songFolder.startsWith("3 "))) {
+        return QString();
+    }
+    // counted as the Recordings window shows them: recordings.json with this song's copy from the .starscore merged in
+    const QString band = bandFolder();
+    const org::JsonRead read = band.isEmpty() ? org::JsonRead() : org::readJsonChecked(band + "/6 Inbox/.organizer/recordings.json");
+    if (read.unreadable()) {
+        return QString();   // says nothing about this song: no warning rather than a wrong one
+    }
+    QJsonObject all = read.doc.object();
+    const QJsonObject copy = songRecordings();
+    if (!copy.isEmpty()) {
+        org::mergeSongRecordings(all, plan.val.code, copy);
+    }
+    const QJsonObject mine = org::songRecordings(all, plan.val.code);
+    if (!mine.value("performances").toArray().isEmpty() || !mine.value("releases").toArray().isEmpty()) {
+        return QString();
+    }
+    return muse::qtrc("starscore", "You haven't added any recordings for this cover yet, not even the original. "
+                                   "Add them in the Recordings window.");
 }
 
 INotationProjectPtr StarScoreService::exportSourceProject() const

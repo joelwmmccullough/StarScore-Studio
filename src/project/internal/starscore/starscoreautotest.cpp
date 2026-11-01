@@ -37,6 +37,7 @@
  *   timevariants:half|double|both   the Half-Time / Double-Time sheets (every sheet) into STARSCORE_AUTOTEST_BAND
  *   todouble      the open song rewritten at twice its note lengths
  *   save          saves a copy of the song as saved.starscore
+ *   recordingswarning   the export window's warning for a cover with nothing in its Recordings window
  * Everything is logged to log.txt.
  */
 #include "starscoreservice.h"
@@ -560,6 +561,10 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         // copyrightyear:<year>: as the "…" menu's Copyright year
         setCopyrightYear(step.mid(14).toInt());
         autotestLog(QString("  year %1; notice: %2").arg(copyrightYear()).arg(ms->metaTag(u"copyright").toQString()));
+    } else if (step == "recordingswarning") {
+        // the export window's warning for a cover with no recordings ("" when there's none to give)
+        const QString w = coverRecordingsWarning();
+        autotestLog("  recordings warning: " + (w.isEmpty() ? QString("(none)") : w));
     } else if (step == "copyright") {
         // copyright: the copyright line the song's sheets get, and what it was made from
         if (const QString band = qEnvironmentVariable("STARSCORE_AUTOTEST_BAND"); !band.isEmpty()) {

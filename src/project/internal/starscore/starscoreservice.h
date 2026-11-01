@@ -198,6 +198,7 @@ public:
     muse::RetVal<QString> addVoiceToPartScore(const QString& partScoreName) override;
     QString songCode() const override;
     QJsonObject songRecordings() const override;
+    QString coverRecordingsWarning() const override;
     void setSongRecordings(const QJsonObject& recordings) override;
     muse::RetVal<StarScoreBandExportPlan> planBandExport() const override;
     muse::RetVal<StarScoreBandExportPlan> planBandExportFor(bool titlesOnly) const;

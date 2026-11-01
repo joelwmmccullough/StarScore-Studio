@@ -190,6 +190,10 @@ void BandExportModel::load()
     m_newSong = false;
     m_songTitle.clear();
     m_suggestedCode.clear();
+    if (!m_recordingsWarning.isEmpty()) {
+        m_recordingsWarning.clear();
+        emit recordingsWarningChanged();
+    }
 
     muse::RetVal<StarScoreBandExportPlan> plan = starScore()->planBandExport();
     if (!plan.ret) {
@@ -204,6 +208,7 @@ void BandExportModel::load()
         emit timeVariantsChanged();
         m_heading = muse::qtrc("starscore", "Sheets and Demos / %1").arg(plan.val.songFolder);
         m_notes = plan.val.notes.join("\n");
+        checkRecordings();
         // which version number this export should raise, from what changed since the last export
         const StarScoreVersionSuggestion suggestion = starScore()->suggestVersionBump(plan.val);
         m_suggestedBump = suggestion.bump;
@@ -485,4 +490,22 @@ void BandExportModel::openOrganizer()
     QTimer::singleShot(400, qApp, [ia]() {
         ia->open(muse::UriQuery("musescore://starscore/organizer?mode=export"));
     });
+
+void BandExportModel::checkRecordings()
+{
+    const QString warning = starScore()->coverRecordingsWarning();
+    if (warning != m_recordingsWarning) {
+        m_recordingsWarning = warning;
+        emit recordingsWarningChanged();
+    }
+}
+
+void BandExportModel::openRecordings()
+{
+    auto recheck = [this]() {
+        checkRecordings();
+    };
+    muse::async::Promise<muse::Val> promise = interactive()->open(muse::UriQuery("musescore://starscore/recordings"));
+    promise.onResolve(this, [recheck](const muse::Val&) { recheck(); });
+    promise.onReject(this, [recheck](int, const std::string&) { recheck(); });
 }
