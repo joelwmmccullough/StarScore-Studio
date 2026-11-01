@@ -490,6 +490,7 @@ void BandExportModel::openOrganizer()
     QTimer::singleShot(400, qApp, [ia]() {
         ia->open(muse::UriQuery("musescore://starscore/organizer?mode=export"));
     });
+}
 
 void BandExportModel::checkRecordings()
 {
