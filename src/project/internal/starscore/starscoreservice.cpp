@@ -1572,6 +1572,11 @@ void StarScoreService::toggleDeco()
     }
 
     static const std::vector<StyleId> ids { StyleId::musicalSymbolFont, StyleId::musicalTextFont, StyleId::dynamicsFont };
+    // (1.24.0) One undo step for the whole song (every score's change was a step of its own: undoing it took one
+    // Undo per part score), and the playback events rebuilt once, not after each score
+    const StarScorePlaybackDeferred playbackDeferred(master);
+    INotationUndoStackPtr stack = master->notation()->undoStack();
+    const size_t stepsBefore = stack->currentStateIndex();
     for (const auto& [key, n] : notations) {
         auto current = [&](StyleId id) {
             return n->style()->styleValue(id).value<String>().toQString();
@@ -1605,9 +1610,12 @@ void StarScoreService::toggleDeco()
             n->undoStack()->commitChanges();
         }
     }
-    if (turnOff) {
-        data.decoRestore.clear();
+    if (stepsBefore != muse::nidx && stack->currentStateIndex() > stepsBefore + 1) {
+        stack->mergeCommands(stepsBefore);
     }
+    // (1.24.0) The fonts to go back to are kept after switching Deco off: Undo can switch it back on, and the button
+    // must then still be able to switch it off. (They were cleared, which left an undone "off" stuck on.) Switching
+    // it on again records them afresh.
     store(data);
 }
 
@@ -4206,6 +4214,11 @@ int StarScoreService::applyStylesOnly(const QStringList& partIds, const Data& da
     };
 
     int restyled = 0;
+    // (1.24.0) The whole restyle one undo step ("You can undo it", says the question offering a newer style; it was
+    // three steps per score). The steps every score's restyle makes (each style file loaded is a command of its own)
+    // are merged into one at the end. All the scores of a song share the main score's undo stack.
+    INotationUndoStackPtr stack = master->notation()->undoStack();
+    const size_t stepsBefore = stack->currentStateIndex();
 
     // The main score (a workspace of every arrangement) when restyling everything
     if (partIds.isEmpty() && restyle(master->notation(), QString(), false)) {
@@ -4261,6 +4274,9 @@ int StarScoreService::applyStylesOnly(const QStringList& partIds, const Data& da
             ++restyled;
         }
 
+    }
+    if (stepsBefore != muse::nidx && stack->currentStateIndex() > stepsBefore + 1) {
+        stack->mergeCommands(stepsBefore);
     }
 
     // The Keys sheet: empty staves hide (first system included) and the bass staff is set to "Always hide"
