@@ -354,6 +354,11 @@ void StarScoreService::updateAllNext()
 
 void StarScoreService::updateAllWhenOpen(const QString& path)
 {
+    if (m_tidying) {
+        // (1.24.0) the song opened is still being tidied: nothing closes it or edits it under that
+        QTimer::singleShot(500, &m_timerGuard, [this, path]() { updateAllWhenOpen(path); });
+        return;
+    }
     auto current = globalContext()->currentProject();
     const bool open = current && QFileInfo(current->path().toQString()).absoluteFilePath() == QFileInfo(path).absoluteFilePath();
     if (!open) {

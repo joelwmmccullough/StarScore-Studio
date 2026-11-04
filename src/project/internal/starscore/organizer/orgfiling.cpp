@@ -652,10 +652,11 @@ BandFilingReport fileBand(const Paths& paths, Codes& codes, const Roster& roster
         if (m.hasMatch() && byCode.count(m.captured(1))) {
             return byCode[m.captured(1)];
         }
+        // the title at the start of the name, or the whole name: a title anywhere in it ("Notes on Jeju for Bet.pdf")
+        // filed files into the wrong song; anything else is left for the subfolder, or stays unmatched
         const QString low = normalizeName(fname);
-        const QString padded = " " + low + " ";
         for (const Title& t : byName) {
-            if (low.startsWith(t.norm + " ") || low == t.norm || padded.contains(" " + t.norm + " ")) {
+            if (low.startsWith(t.norm + " ") || low == t.norm) {
                 return t.root;
             }
         }

@@ -2185,6 +2185,20 @@ StarScoreSection StarScoreService::finishNewParts(const std::vector<engraving::P
 {
     IMasterNotationPtr master = globalContext()->currentMasterNotation();
 
+    // (1.24.0) A new part can get the id of one deleted before it (MuseScore numbers parts from the highest id):
+    // nothing kept for that id (status, mutes, flugelhorn, audited, a place in another section) passes to it
+    {
+        QStringList newIds;
+        for (const engraving::Part* p : newParts) {
+            newIds << idText(p);
+        }
+        Data stale = load();
+        if (forgetPartIds(stale, newIds)) {
+            LOGI() << "[starscore] forgot what was kept for the reused part id(s) " << newIds.join(", ").toStdString();
+            store(stale);
+        }
+    }
+
     StarScoreSection section;
     std::vector<std::pair<muse::ID, bool> > hide;
 
@@ -3218,6 +3232,60 @@ void StarScoreService::moveSection(const QString& sectionId, int newIndex)
 void StarScoreService::removePartsKeepingSystemObjects(const QStringList& partIdsToRemove)
 {
     removePartsKeepingSystemObjects(globalContext()->currentMasterNotation(), partIdsToRemove);
+    forgetRemovedParts(partIdsToRemove);
+}
+
+bool StarScoreService::forgetPartIds(Data& data, const QStringList& partIds)
+{
+    const std::set<QString> ids(partIds.begin(), partIds.end());
+    bool changed = false;
+    for (const QString& id : ids) {
+        changed |= data.partStatus.erase(id) > 0;
+        changed |= data.partMutes.erase(id) > 0;
+        changed |= data.flugelhornParts.erase(id) > 0;
+        changed |= data.auditPartAudited.erase(id) > 0;
+    }
+    for (StarScoreSection& s : data.sections) {
+        for (const QString& id : ids) {
+            changed |= s.partIds.removeAll(id) > 0;
+            changed |= s.shownPartIds.removeAll(id) > 0;
+        }
+        for (auto it = s.alternates.begin(); it != s.alternates.end();) {
+            if (ids.count(it->first) || ids.count(it->second)) {
+                it = s.alternates.erase(it);
+                changed = true;
+            } else {
+                ++it;
+            }
+        }
+        for (auto it = s.sheetParts.begin(); it != s.sheetParts.end();) {
+            if (ids.count(it->second)) {
+                it = s.sheetParts.erase(it);
+                changed = true;
+            } else {
+                ++it;
+            }
+        }
+    }
+    return changed;
+}
+
+void StarScoreService::forgetRemovedParts(const QStringList& partIds)
+{
+    engraving::MasterScore* ms = masterScore();
+    if (!ms || partIds.isEmpty()) {
+        return;
+    }
+    QStringList gone;
+    for (const QString& id : partIds) {
+        if (!ms->partById(ID(id))) {
+            gone << id;   // (a part the removal kept, the last instruments, keeps what it had)
+        }
+    }
+    Data data = load();
+    if (!gone.isEmpty() && forgetPartIds(data, gone)) {
+        store(data);
+    }
 }
 
 void StarScoreService::removePartsKeepingSystemObjects(const IMasterNotationPtr& master, const QStringList& partIdsToRemove)
@@ -3431,6 +3499,55 @@ void StarScoreService::moveArrangement(const QString& arrangementId, int newInde
     store(data);
 }
 
+namespace {
+//! (1.24.0) An arrangement taken out of the StarScore data, undoably. Undo puts that one arrangement back at its place
+//! in the data as it is then, and Redo takes it out again; everything else in the tag stays as it is. (Until 1.24.0
+//! the step held a copy of the whole "starscore" tag, so Undo also took back every StarScore change made after it:
+//! statuses, the version, the export records.)
+class StarScoreRemoveArrangement : public engraving::UndoCommand
+{
+    engraving::MasterScore* m_score = nullptr;
+    QString m_arrangementId;
+    StarScoreArrangement m_arrangement;   // as it was when last taken out
+    int m_index = -1;                     // and where it was
+    bool m_removed = false;
+
+    void flip(engraving::EditData*) override
+    {
+        StarScoreService::Data data = StarScoreService::fromJson(m_score->metaTag(STARSCORE_META_TAG).toQString());
+        if (data.unreadable) {
+            m_removed = !m_removed;   // (the tag isn't StarScore's to rewrite: left as it is)
+            return;
+        }
+        auto it = std::find_if(data.arrangements.begin(), data.arrangements.end(),
+                               [&](const StarScoreArrangement& a) { return a.id == m_arrangementId; });
+        if (!m_removed) {
+            if (it != data.arrangements.end()) {
+                m_index = int(it - data.arrangements.begin());
+                m_arrangement = *it;
+                data.arrangements.erase(it);
+            }
+        } else if (it == data.arrangements.end() && m_index >= 0) {
+            const int at = std::clamp(m_index, 0, int(data.arrangements.size()));
+            data.arrangements.insert(data.arrangements.begin() + at, m_arrangement);
+        }
+        m_removed = !m_removed;
+        const String json = String::fromQString(StarScoreService::toJson(data));
+        if (m_score->metaTag(STARSCORE_META_TAG) != json) {
+            m_score->setMetaTag(STARSCORE_META_TAG, json);
+        }
+    }
+
+public:
+    StarScoreRemoveArrangement(engraving::MasterScore* score, const QString& arrangementId)
+        : m_score(score), m_arrangementId(arrangementId) {}
+
+    const char* name() const override { return "StarScoreRemoveArrangement"; }
+    engraving::CommandType type() const override { return engraving::CommandType::ChangeMetaInfo; }
+    std::vector<engraving::EngravingObject*> objectItems() const override { return { m_score }; }
+};
+}
+
 void StarScoreService::removeArrangement(const QString& arrangementId)
 {
     Data data = load();
@@ -3459,7 +3576,7 @@ void StarScoreService::removeArrangement(const QString& arrangementId)
     if (ms && !data.unreadable) {
         INotationUndoStackPtr stack = master->notation()->undoStack();
         stack->prepareChanges(TranslatableString("undoableAction", "Remove arrangement"));
-        ms->undo(new engraving::ChangeMetaText(ms, STARSCORE_META_TAG, String::fromQString(toJson(data))));
+        ms->undo(new StarScoreRemoveArrangement(ms, arrangementId));
         stack->commitChanges();
         if (stack->currentStateIndex() == stepsBefore + 2) {
             stack->mergeCommands(stepsBefore);
@@ -3952,6 +4069,7 @@ void StarScoreService::offerNewerStyle()
     }
     LOGI() << "[starscore] the main score differs from the default style in: " << differ.join(", ").toStdString();
     const QString styleName = QFileInfo(loadStyleSettings().defaultStyle).completeBaseName();
+    const IMasterNotationPtr askedFor = globalContext()->currentMasterNotation();
     const IInteractive::Result answer = interactive()->questionSync(
         muse::trc("starscore", "A newer style is available"),
         muse::qtrc("starscore", "This song was styled with an older version of the default style. “%1” has %n setting(s) "
@@ -3959,6 +4077,9 @@ void StarScoreService::offerNewerStyle()
                                 "You can undo it. If you choose No, you won't be asked again for this song until there's "
                                 "an even newer style.", "", int(differ.size())).arg(styleName).toStdString(),
         { IInteractive::Button::No, IInteractive::Button::Yes }, IInteractive::Button::Yes);
+    if (globalContext()->currentMasterNotation() != askedFor) {
+        return;   // (1.24.0) another song opened while the question was up: the answer isn't for it
+    }
     if (answer.standardButton() == IInteractive::Button::Yes) {
         applyStyles({});
         if (INotationProjectPtr project = globalContext()->currentProject()) {

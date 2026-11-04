@@ -1322,6 +1322,11 @@ void StarScoreService::removeEmptyVersions(const QStringList& partIds)
     }
     if (!ids.empty()) {
         master->parts()->removeParts(ids);
+        QStringList removed;
+        for (const muse::ID& id : ids) {
+            removed << id.toQString();
+        }
+        forgetRemovedParts(removed);   // (1.24.0) the next new part may get one of these ids
     }
 }
 
@@ -2054,6 +2059,7 @@ QString StarScoreService::mergeBassParts(bool apply)
     d.partStatus.erase(dropId);
     d.partMutes.erase(dropId);
     d.flugelhornParts.erase(dropId);
+    d.auditPartAudited.erase(dropId);   // (1.24.0) the id may come back on the next part added
     store(d);
 
     // its part scores go with it; the kept part is "Bass Guitar"
@@ -2131,7 +2137,7 @@ void StarScoreService::tidyOpenedScore()
     auto stillOpen = [this, &master, ms]() {
         return globalContext()->currentMasterNotation() == master && masterScore() == ms;
     };
-    const StarScorePlaybackDeferred playbackDeferred(master);   // (1.24.0) one rebuild of the playback events at the end
+    StarScorePlaybackDeferred playbackDeferred(master);   // (1.24.0) one rebuild of the playback events at the end
     QElapsedTimer clock;   // how long the tidying takes, in the log
     clock.start();
     QElapsedTimer stepClock;   // and where it goes: each step over a tenth of a second
@@ -2160,6 +2166,7 @@ void StarScoreService::tidyOpenedScore()
                                         "are. Check the bars afterwards.", "", count).arg(where.mid(0, 8).join("\n"))
                 .toStdString(), { IInteractive::Button::No, IInteractive::Button::Yes }, IInteractive::Button::Yes);
             if (!stillOpen()) {
+                playbackDeferred.abandon();
                 return;   // (1.24.0) another song is open now
             }
             if (answer.standardButton() == IInteractive::Button::Yes) {
@@ -2222,6 +2229,7 @@ void StarScoreService::tidyOpenedScore()
     if (!nobodyToAsk) {
         offerNewerStyle();
         if (!stillOpen()) {
+            playbackDeferred.abandon();
             return;   // (1.24.0) another song is open now
         }
     }

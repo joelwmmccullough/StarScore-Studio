@@ -46,12 +46,24 @@ StyledDialogView {
     property string noteText: ""
     property bool fullScreen: false
     readonly property bool hf: run.handsFree !== ""
+    //! the current block, read once per change (the page reads its fields dozens of times)
+    readonly property var blk: run.block
+    //! the block the Done bar's choices are for: they're reset only when another block is shown, not on every change
+    property string shownBlock: ""
+    //! beside the score (a narrow window): the header, the parts, and the Done bar on two lines
+    readonly property bool compact: page.width < 640
 
     PracticeRunnerModel {
         id: run
         onChanged: {
-            root.tempoReached = run.block.tempo || 0
-            var s = run.block.stage !== undefined ? run.block.stage : 1
+            var b = run.block
+            var key = run.blockIndex + "|" + (b.code || "") + "|" + (b.title || "")
+            if (key === root.shownBlock) {
+                return
+            }
+            root.shownBlock = key
+            root.tempoReached = b.tempo || 0
+            var s = b.stage !== undefined ? b.stage : 1
             root.stageChoice = Math.max(1, Math.min(4, s + 1))
         }
     }
@@ -77,15 +89,15 @@ StyledDialogView {
     //! hands free: what to do, a line each, and when to move on (when there's no notation)
     function stepsText() {
         var lines = []
-        if (run.block.goal) {
-            lines.push(run.block.goal)
+        if (root.blk.goal) {
+            lines.push(root.blk.goal)
         }
-        var steps = run.block.steps || []
+        var steps = root.blk.steps || []
         for (var i = 0; i < steps.length; ++i) {
             lines.push("•  " + steps[i])
         }
-        if (run.images.length === 0 && !run.rendering && run.block.moveOnWhen) {
-            lines.push(qsTrc("starscore", "Move on when: %1").arg(run.block.moveOnWhen))
+        if (run.images.length === 0 && !run.rendering && root.blk.moveOnWhen) {
+            lines.push(qsTrc("starscore", "Move on when: %1").arg(root.blk.moveOnWhen))
         }
         return lines.join("\n")
     }
@@ -269,7 +281,7 @@ StyledDialogView {
                     Text {
                         Layout.fillWidth: true
                         visible: run.handsFree !== "break" && run.handsFree !== "done"
-                        text: (run.block.song || "") + (run.parts.length > 1
+                        text: (root.blk.song || "") + (run.parts.length > 1
                               ? "  ·  " + qsTrc("starscore", "part %1 of %2").arg(run.partIndex + 1).arg(run.parts.length) : "")
                               + (root.passText() !== "" && run.handsFree === "practice" ? "  ·  " + root.passText() : "")
                         color: root.gold
@@ -282,7 +294,7 @@ StyledDialogView {
                         Layout.fillWidth: true
                         text: run.handsFree === "break" ? qsTrc("starscore", "Break")
                               : run.handsFree === "done" ? qsTrc("starscore", "That's the day done")
-                              : (run.parts.length > 1 ? (run.parts[run.partIndex] ? run.parts[run.partIndex].label : "") : (run.block.title || ""))
+                              : (run.parts.length > 1 ? (run.parts[run.partIndex] ? run.parts[run.partIndex].label : "") : (root.blk.title || ""))
                         color: root.ink
                         font.pixelSize: root.px(32)
                         font.bold: true
@@ -390,7 +402,7 @@ StyledDialogView {
                 spacing: 14
                 Text {
                     visible: run.handsFree === "break"
-                    text: qsTrc("starscore", "Next: %1").arg((run.block.song || "") + " · " + (run.block.title || ""))
+                    text: qsTrc("starscore", "Next: %1").arg((root.blk.song || "") + " · " + (root.blk.title || ""))
                     color: root.teal
                     font.pixelSize: root.px(22)
                 }
@@ -520,7 +532,7 @@ StyledDialogView {
                     spacing: 10
 
                     Text {
-                        text: (run.block.kindName ? run.block.kindName + "  ·  " : "") + (run.block.song || "")
+                        text: (root.blk.kindName ? root.blk.kindName + "  ·  " : "") + (root.blk.song || "")
                         color: root.gold
                         font.pixelSize: root.px(14)
                         font.letterSpacing: 1.5
@@ -528,7 +540,7 @@ StyledDialogView {
                     }
                     Text {
                         Layout.fillWidth: true
-                        text: run.block.title || ""
+                        text: root.blk.title || ""
                         color: root.ink
                         font.pixelSize: root.px(26)
                         font.bold: true
@@ -537,8 +549,8 @@ StyledDialogView {
                     Text {
                         Layout.fillWidth: true
                         visible: text !== ""
-                        text: [run.block.categoryName, run.block.solo, run.block.sections,
-                               run.block.level ? qsTrc("starscore", "level %1").arg(run.block.level) : ""]
+                        text: [root.blk.categoryName, root.blk.solo, root.blk.sections,
+                               root.blk.level ? qsTrc("starscore", "level %1").arg(root.blk.level) : ""]
                               .filter(function(x) { return x }).join("  ·  ")
                         color: root.teal
                         font.pixelSize: root.px(13)
@@ -546,7 +558,7 @@ StyledDialogView {
                     }
                     Text {
                         Layout.fillWidth: true
-                        visible: run.block.missing === true
+                        visible: root.blk.missing === true
                         text: qsTrc("starscore", "This item isn't in the song's practice library any more. Plan again from today on the Practice page.")
                         color: "#E0463A"
                         font.pixelSize: root.px(13)
@@ -554,14 +566,14 @@ StyledDialogView {
                     }
                     Text {
                         Layout.fillWidth: true
-                        visible: (run.block.goal || "") !== ""
-                        text: run.block.goal || ""
+                        visible: (root.blk.goal || "") !== ""
+                        text: root.blk.goal || ""
                         color: root.ink
                         font.pixelSize: root.px(16)
                         wrapMode: Text.WordWrap
                     }
                     Repeater {
-                        model: run.block.steps || []
+                        model: root.blk.steps || []
                         delegate: RowLayout {
                             required property string modelData
                             required property int index
@@ -609,8 +621,8 @@ StyledDialogView {
                         Item { Layout.fillWidth: true }
                         Text {
                             text: root.passText() !== "" ? root.passText()
-                                  : (run.block.tempo || 0) > 0 ? qsTrc("starscore", "Today ♩ = %1").arg(run.block.tempo)
-                                    + ((run.block.tempoGoal || 0) > (run.block.tempo || 0) ? qsTrc("starscore", ", up to %1").arg(run.block.tempoGoal) : "")
+                                  : (root.blk.tempo || 0) > 0 ? qsTrc("starscore", "Today ♩ = %1").arg(root.blk.tempo)
+                                    + ((root.blk.tempoGoal || 0) > (root.blk.tempo || 0) ? qsTrc("starscore", ", up to %1").arg(root.blk.tempoGoal) : "")
                                   : ""
                             color: root.passText() !== "" ? root.teal : root.soft
                             font.pixelSize: root.px(14)
@@ -686,10 +698,10 @@ StyledDialogView {
                         }
                         Item { Layout.fillWidth: true }
                         FlatButton {
-                            visible: run.block.hasExercise === true
+                            visible: root.blk.hasExercise === true
                             text: qsTrc("starscore", "Open in StarScore")
                             minWidth: 110
-                            onClicked: run.openExercise(run.block.tempo || 0, false)
+                            onClicked: run.openExercise(root.blk.tempo || 0, false)
                         }
                         FlatButton {
                             text: qsTrc("starscore", "Open the song")
@@ -697,7 +709,7 @@ StyledDialogView {
                             onClicked: run.openSong()
                         }
                         FlatButton {
-                            visible: run.block.hasIreal === true
+                            visible: root.blk.hasIreal === true
                             text: qsTrc("starscore", "iReal Pro")
                             minWidth: 70
                             toolTipTitle: qsTrc("starscore", "The chart as an iReal Pro link")
@@ -762,7 +774,7 @@ StyledDialogView {
                     Rectangle {
                         Layout.fillWidth: true
                         Layout.topMargin: 6
-                        visible: (run.block.moveOnWhen || "") !== ""
+                        visible: (root.blk.moveOnWhen || "") !== ""
                         implicitHeight: moveOn.implicitHeight + 20
                         color: "transparent"
                         border.color: root.gold
@@ -774,7 +786,7 @@ StyledDialogView {
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
                             anchors.margins: 10
-                            text: "<b>" + qsTrc("starscore", "MOVE ON WHEN") + "</b>&nbsp;&nbsp;" + (run.block.moveOnWhenHtml || "")
+                            text: "<b>" + qsTrc("starscore", "MOVE ON WHEN") + "</b>&nbsp;&nbsp;" + (root.blk.moveOnWhenHtml || "")
                             textFormat: Text.StyledText
                             color: root.gold
                             font.pixelSize: root.px(14)
@@ -783,11 +795,11 @@ StyledDialogView {
                     }
                     Text {
                         Layout.fillWidth: true
-                        visible: (run.block.sessions || 0) > 0
+                        visible: (root.blk.sessions || 0) > 0
                         text: qsTrc("starscore", "So far: %1 sessions, %2%3")
-                              .arg(run.block.sessions).arg(run.block.stageName)
-                              .arg((run.block.bestTempo || 0) > 0 ? qsTrc("starscore", ", best ♩ = %1").arg(run.block.bestTempo) : "")
-                              + ((run.block.lastNote || "") !== "" ? qsTrc("starscore", ". Last note: %1").arg(run.block.lastNote) : "")
+                              .arg(root.blk.sessions).arg(root.blk.stageName)
+                              .arg((root.blk.bestTempo || 0) > 0 ? qsTrc("starscore", ", best ♩ = %1").arg(root.blk.bestTempo) : "")
+                              + ((root.blk.lastNote || "") !== "" ? qsTrc("starscore", ". Last note: %1").arg(root.blk.lastNote) : "")
                         color: root.teal
                         font.pixelSize: root.px(12)
                         wrapMode: Text.WordWrap
@@ -807,11 +819,11 @@ StyledDialogView {
                     text: qsTrc("starscore", "Tempo reached")
                     color: root.soft
                     font.pixelSize: root.px(13)
-                    visible: (run.block.tempo || 0) > 0
+                    visible: (root.blk.tempo || 0) > 0
                 }
                 IncrementalPropertyControl {
                     Layout.preferredWidth: 90
-                    visible: (run.block.tempo || 0) > 0
+                    visible: (root.blk.tempo || 0) > 0
                     currentValue: root.tempoReached
                     step: 2; decimals: 0; minValue: 0; maxValue: 400
                     onValueEdited: function(v) { root.tempoReached = v }
@@ -833,7 +845,7 @@ StyledDialogView {
                     onTextChanged: function(t) { root.noteText = t }
                 }
                 FlatButton {
-                    text: run.block.done ? qsTrc("starscore", "Done again") : qsTrc("starscore", "Done")
+                    text: root.blk.done ? qsTrc("starscore", "Done again") : qsTrc("starscore", "Done")
                     accentButton: true
                     minWidth: 90
                     onClicked: {
@@ -842,7 +854,7 @@ StyledDialogView {
                     }
                 }
                 FlatButton {
-                    visible: run.block.done === true
+                    visible: root.blk.done === true
                     text: qsTrc("starscore", "Not done")
                     minWidth: 80
                     onClicked: run.markNotDone()

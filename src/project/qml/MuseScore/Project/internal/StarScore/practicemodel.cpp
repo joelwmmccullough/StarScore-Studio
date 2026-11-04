@@ -995,50 +995,62 @@ void PracticeModel::rebuildPlan()
         }
         req.songs.push_back(ps);
     }
-    for (const practice::Day& d : old.days) {
-        req.days.push_back({ d.date, d.minutes });
-    }
     practice::Progress progress;
     progress.load();
     const QDate today = QDate::currentDate();
-    // a routine is rebuilt whole; a plan keeps its days before today, and today's done blocks
-    practice::Plan p;
-    if (old.kind == "routine") {
-        p = practice::makePlan(req, librariesFor(req.songs), progress, &old);
+    const bool routine = old.kind == "routine";
+    // today's done blocks stay, first, and the planner fills only the rest of today's minutes around them (no item
+    // again, no second warm-up or jam). A routine is today's session: dated today, its done blocks kept if it was
+    // today's already.
+    std::vector<practice::Block> doneToday;
+    int todayMinutes = -1;   // (-1: today isn't one of the plan's days)
+    for (const practice::Day& d : old.days) {
+        if (!routine && d.date != today) {
+            continue;
+        }
+        todayMinutes = d.minutes;
+        if (d.date == today) {
+            for (const practice::Block& b : d.blocks) {
+                if (b.done) {
+                    doneToday.push_back(b);
+                }
+            }
+        }
+        if (routine) {
+            break;   // (a routine has one day)
+        }
+    }
+    int doneMinutes = 0;
+    for (const practice::Block& b : doneToday) {
+        doneMinutes += b.minutes;
+    }
+    req.alreadyToday = doneToday;
+    if (routine) {
+        const QDate was = old.days.empty() ? today : old.days.front().date;
+        if (was.isValid() && was != today) {
+            req.name.replace(was.toString("ddd d MMM"), today.toString("ddd d MMM"));
+        }
+        if (todayMinutes < 0) {
+            todayMinutes = m_routineMinutes;
+        }
+        req.days = { { today, std::max(0, todayMinutes - doneMinutes) } };
     } else {
-        p = practice::makePlan(req, librariesFor(req.songs), progress, &old, today);
-        // today's blocks that are done stay at the top of today
-        for (const practice::Day& od : old.days) {
-            if (od.date != today) {
-                continue;
-            }
-            for (practice::Day& nd : p.days) {
-                if (nd.date != today) {
-                    continue;
-                }
-                std::vector<practice::Block> kept;
-                int doneMinutes = 0;
-                for (const practice::Block& b : od.blocks) {
-                    if (b.done) {
-                        kept.push_back(b);
-                        doneMinutes += b.minutes;
-                    }
-                }
-                std::vector<practice::Block> rest;
-                int left = nd.minutes - doneMinutes;
-                for (const practice::Block& b : nd.blocks) {
-                    bool dup = false;
-                    for (const practice::Block& k : kept) {
-                        dup = dup || (k.code == b.code && k.itemId == b.itemId);
-                    }
-                    if (!dup && left - b.minutes >= 0) {
-                        rest.push_back(b);
-                        left -= b.minutes;
-                    }
-                }
-                kept.insert(kept.end(), rest.begin(), rest.end());
-                nd.blocks = kept;
-            }
+        for (const practice::Day& d : old.days) {
+            req.days.push_back({ d.date, d.date == today ? std::max(0, d.minutes - doneMinutes) : d.minutes });
+        }
+    }
+    // a plan keeps its days before today as they are
+    practice::Plan p = routine ? practice::makePlan(req, librariesFor(req.songs), progress, &old)
+                               : practice::makePlan(req, librariesFor(req.songs), progress, &old, today);
+    for (practice::Day& nd : p.days) {
+        if (nd.date != today) {
+            continue;
+        }
+        std::vector<practice::Block> blocks = doneToday;
+        blocks.insert(blocks.end(), nd.blocks.begin(), nd.blocks.end());
+        nd.blocks = blocks;
+        if (todayMinutes >= 0) {
+            nd.minutes = todayMinutes;   // (the day's minutes as chosen, the done ones with them)
         }
     }
     p.setlistId = old.setlistId;
@@ -1178,7 +1190,21 @@ void PracticeModel::openRunner(int dayIndex, int blockIndex, bool handsFree)
     }
     const QString uri = QString("musescore://starscore/practicerunner?planId=%1&dayIndex=%2&blockIndex=%3&handsFree=%4&modal=false&floating=true")
                         .arg(m_planId).arg(dayIndex).arg(std::max(0, blockIndex)).arg(handsFree ? 1 : 0);
-    interactive()->open(muse::UriQuery(uri.toStdString()));
+    const muse::UriQuery query(uri.toStdString());
+    // one runner at a time (two would both play, and both mark the same day): the same one again is brought to the
+    // front; another one closes first (keeping its unrated blocks as it closes) and this one opens when it has gone
+    const muse::Uri runnerUri("musescore://starscore/practicerunner");
+    if (interactive()->isOpened(query).val) {
+        interactive()->raise(query);
+        return;
+    }
+    if (interactive()->isOpened(runnerUri).val) {
+        interactive()->close(runnerUri).onResolve(this, [this, query](const muse::Ret&) {
+            interactive()->open(query);
+        });
+        return;
+    }
+    interactive()->open(query);
 }
 
 void PracticeModel::chooseLibraryFolder()

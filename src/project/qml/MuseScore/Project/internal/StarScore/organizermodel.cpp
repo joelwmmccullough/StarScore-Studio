@@ -263,6 +263,10 @@ void OrganizerModel::answerShows(const QVariantList& answers)
             } else if (!link.isEmpty() && !org::youTubeId(link).isEmpty()) {
                 a.kind = org::ShowAnswer::Link;
                 a.link = link;
+            } else if (!link.isEmpty()) {
+                // said, not silently taken as "later"
+                say(muse::qtrc("starscore", "%1, %2: “%3” isn't a link to a YouTube video, so this show is left for next time.")
+                    .arg(QLocale(QLocale::English).toString(s.show.date, "d MMM yyyy"), s.show.venue, link));
             }
         }
         out.push_back(a);

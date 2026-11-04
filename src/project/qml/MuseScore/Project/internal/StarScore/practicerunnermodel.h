@@ -11,15 +11,20 @@
  */
 #pragma once
 
+#include <functional>
+
+#include <QElapsedTimer>
 #include <QObject>
 #include <QStringList>
 #include <QTimer>
 #include <QVariantList>
+#include <QVariantMap>
 #include <qqmlintegration.h>
 
 #include "async/asyncable.h"
 #include "modularity/ioc.h"
 #include "actions/iactionsdispatcher.h"
+#include "playback/iplaybackcontroller.h"
 #include "project/istarscoreservice.h"
 #include "project/internal/starscore/starscorepractice.h"
 
@@ -65,6 +70,7 @@ class PracticeRunnerModel : public QObject, public muse::Contextable, public mus
 
     muse::ContextInject<IStarScoreService> starScore = { this };
     muse::ContextInject<muse::actions::IActionsDispatcher> dispatcher = { this };
+    muse::ContextInject<playback::IPlaybackController> playbackController = { this };
 
 public:
     explicit PracticeRunnerModel(QObject* parent = nullptr);
@@ -159,11 +165,21 @@ private:
     void savePlan(const practice::Block& changed);
     void setupParts();
     void tick();
-    void partFinished();
-    void blockFinishedHandsFree();
-    void startBlockHandsFree();
+    // (these return false when the runner was closed while they opened a score: the caller returns at once)
+    bool partFinished();
+    bool blockFinishedHandsFree();
+    bool startBlockHandsFree();
+    bool startPlayAlong(int partIndex);
+    //! Opens a score in StarScore (which can wait in a save prompt, the event loop running): one at a time, and false
+    //! when this runner was closed meanwhile
+    bool runOpen(const std::function<void()>& open);
     void recordDone(int blockIndex, int minutes, int tempoReached, int stage, const QString& note);
     int nextOpenBlock(int after) const;
+    //! The current block for the page (block()), made again when the block or its progress changes
+    void rebuildBlock();
+    QString blockKey() const;
+    //! The pending hands-free rating of a block (m_toRate), -1: none
+    int pendingFor(const QString& code, const QString& itemId) const;
 
     struct RunPart {
         QString label;
@@ -207,5 +223,14 @@ private:
     int m_breakSecondsLeft = 0;
     int m_minutesSinceBreak = 0;
     std::vector<Pending> m_toRate;
+    QVariantMap m_block;
+    // what was really played of the current block: seconds on the clock, and the top play-along tempo
+    QString m_elapsedKey;
+    int m_blockElapsed = 0;
+    int m_topTempo = 0;
+    bool m_opening = false;
+    QElapsedTimer m_openedClock;
+    bool m_pauseWhenPlays = false;   // paused before the opened exercise's delayed play started
+    bool m_playbackSubscribed = false;
 };
 }

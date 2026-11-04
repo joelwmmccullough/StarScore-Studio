@@ -5286,10 +5286,18 @@ StarScoreVersionSuggestion StarScoreService::suggestVersionBump(const StarScoreB
             continue;
         }
         seen.insert(f.relativePath);
+        // a sheet that only moved or was renamed (the lead folder becoming "1 Lead Sheet + Voice", Section Scores):
+        // compared with what it was exported as before, not counted as removed and new (that suggested a Major version)
+        QJsonObject before = sigs.value(f.relativePath).toObject();
+        for (const QString& old : starscoreFormerPathsOf(f)) {
+            seen.insert(old);
+            if (before.isEmpty()) {
+                before = sigs.value(old).toObject();
+            }
+        }
         if (f.defaultUnchecked || unticked.contains(f.relativePath)) {
             continue;
         }
-        const QJsonObject before = sigs.value(f.relativePath).toObject();
         if (before.isEmpty()) {
             // the Flexible version sheets of one chair share its music: one "new" per chair
             static const QRegularExpression chairRe("^(.* / Horn \\d+)");

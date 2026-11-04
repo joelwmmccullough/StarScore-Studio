@@ -438,7 +438,7 @@ void Organizer::prepare(std::shared_ptr<Run> r)
             }
             bandActions.append(action("Moved", "change", "Song folders moved by hand kept their codes: " + movesHtml(filing.renamedSongs) + "."));
             plainLines << QString("%1 moved by hand kept %2 code.").arg(plural(int(filing.renamedSongs.size()), "song folder"),
-                                                                       filing.renamedSongs.size() == 1 ? "its" : "their");
+                                                                       QString(filing.renamedSongs.size() == 1 ? "its" : "their"));
         }
         if (!filing.intoSheetMusic.isEmpty()) {
             bandActions.append(action("Sheet Music", "change", QString("Sheet folders moved into each song&rsquo;s "
@@ -862,8 +862,10 @@ void Organizer::prepare(std::shared_ptr<Run> r)
         }
         if (r->stoppedEarly || self->m_stop) {
             r->summary.stopped = true;
-            // keep what was filed and registered; nothing else is half-saved
+            // keep what was filed and registered; nothing else is half-saved (the sheet measurements are saved only
+            // when they changed: a song folder moved by hand takes its measurements with it, see fileBand)
             self->saveCodesAndRecordings(r);
+            r->cache.save(self->m_paths);
             self->finish(r);
             return;
         }
