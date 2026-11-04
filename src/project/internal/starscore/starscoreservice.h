@@ -648,6 +648,9 @@ private:
     //! saying what was (or would be) done, empty when the song doesn't have the pair.
     QString mergeBassParts(bool apply);
     void clearComposerInCurrentScore();
+    //! (1.24.0) The part scores clearComposerInCurrentScore saw to, with the undo stack's state then (its index and
+    //! last step): looked at again only after an edit. Cleared when another song opens.
+    std::map<const mu::engraving::Score*, std::pair<size_t, const void*> > m_composerClearedAt;
     void lockFinishedScore(engraving::Score* score);
     void lockFinishedParts(const QStringList& partIds);
     void openPartBooks(const QStringList& partIds);

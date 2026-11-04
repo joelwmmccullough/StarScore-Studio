@@ -2153,6 +2153,12 @@ void StarScoreService::tidyOpenedScore()
         return globalContext()->currentMasterNotation() == master && masterScore() == ms;
     };
     StarScorePlaybackDeferred playbackDeferred(master);   // (1.24.0) one rebuild of the playback events at the end
+    // leaving early: a song closed meanwhile has no score left to rebuild them from (one still open behind a solo has)
+    auto leaveEarly = [this, &master, &playbackDeferred]() {
+        if (!m_mainProject || m_mainProject->masterNotation() != master) {
+            playbackDeferred.abandon();
+        }
+    };
     QElapsedTimer clock;   // how long the tidying takes, in the log
     clock.start();
     QElapsedTimer stepClock;   // and where it goes: each step over a tenth of a second
@@ -2181,7 +2187,7 @@ void StarScoreService::tidyOpenedScore()
                                         "are. Check the bars afterwards.", "", count).arg(where.mid(0, 8).join("\n"))
                 .toStdString(), { IInteractive::Button::No, IInteractive::Button::Yes }, IInteractive::Button::Yes);
             if (!stillOpen()) {
-                playbackDeferred.abandon();
+                leaveEarly();
                 return;   // (1.24.0) another song is open now
             }
             if (answer.standardButton() == IInteractive::Button::Yes) {
@@ -2244,7 +2250,7 @@ void StarScoreService::tidyOpenedScore()
     if (!nobodyToAsk) {
         offerNewerStyle();
         if (!stillOpen()) {
-            playbackDeferred.abandon();
+            leaveEarly();
             return;   // (1.24.0) another song is open now
         }
     }

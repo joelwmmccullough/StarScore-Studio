@@ -417,6 +417,7 @@ int StarScoreService::copyHornParts(const std::vector<std::pair<QString, QString
     ms->doLayout();
     const engraving::Fraction end = ms->lastMeasure()->endTick();
     int copied = 0;
+    QStringList failed;   // (1.24.0) parts whose music couldn't be pasted
     for (const auto& [srcId, dstId] : pairs) {
         engraving::Part* from = ms->partById(ID(srcId));
         engraving::Part* to = ms->partById(ID(dstId));
@@ -482,7 +483,22 @@ int StarScoreService::copyHornParts(const std::vector<std::pair<QString, QString
             ++copied;
         } else {
             LOGW() << "[starscore] copy parts: " << partScoreName(srcId).toStdString() << " not fully copied";
+            failed << partScoreName(srcId) + "  →  " + partScoreName(dstId);
         }
+    }
+    if (!failed.isEmpty()) {
+        // (1.24.0) A part pasted only in part (one of its staves failed) was kept, with the others, as one undo step
+        // marked as copied: the whole copy is taken back instead, and Joel told which parts failed
+        master->notation()->undoStack()->rollbackChanges();
+        master->notation()->notationChanged().notify();
+        LOGE() << "[starscore] copy parts: not copied, " << failed.size() << " part(s) couldn't be pasted: "
+               << failed.join("; ").toStdString();
+        if (!autotestRequested()) {
+            interactive()->error(muse::trc("starscore", "Couldn't copy the parts"),
+                                 (muse::qtrc("starscore", "The music of these parts couldn't be pasted, so nothing was "
+                                                          "copied:") + "\n\n" + failed.join("\n")).toStdString());
+        }
+        return 0;
     }
     if (mmRests) {
         ms->undoChangeStyleVal(engraving::Sid::createMultiMeasureRests, true);

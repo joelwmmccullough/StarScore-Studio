@@ -112,6 +112,7 @@ void StarScoreService::init()
         m_projectOpenedMs = QDateTime::currentMSecsSinceEpoch();
         m_referencePanelTouched = false;
         m_auditRevealed.clear();
+        m_composerClearedAt.clear();   // (1.24.0) the scores seen to belong to the song that was open
         QTimer::singleShot(0, &m_timerGuard, [this]() { pickReferenceForCurrentScore(); });
         QTimer::singleShot(1000, &m_timerGuard, [this]() { pickReferenceForCurrentScore(); });
         QTimer::singleShot(2500, &m_timerGuard, [this]() { pickReferenceForCurrentScore(); });
@@ -3316,10 +3317,13 @@ void StarScoreService::forgetRemovedParts(const QStringList& partIds)
             gone << id;   // (a part the removal kept, the last instruments, keeps what it had)
         }
     }
-    Data data = load();
-    if (!gone.isEmpty() && forgetPartIds(data, gone)) {
-        store(data);
+    if (gone.isEmpty()) {
+        return;
     }
+    // (stored even when only their places in sections went: load() leaves those out, the tag still had them)
+    Data data = load();
+    forgetPartIds(data, gone);
+    store(data);
 }
 
 void StarScoreService::removePartsKeepingSystemObjects(const IMasterNotationPtr& master, const QStringList& partIdsToRemove)
@@ -4127,6 +4131,14 @@ void StarScoreService::offerNewerStyle()
 
 int StarScoreService::applyStyles(const QStringList& partIds)
 {
+    // (1.24.0) The whole restyle one undo step ("You can undo it", says the question offering a newer style; it was
+    // three steps per score, and more for the labels and the lead sheet's bass staff). The steps it makes (each style
+    // file loaded is a command of its own) are merged into one at the end; all the scores of a song share the main
+    // score's undo stack.
+    IMasterNotationPtr undoMaster = globalContext()->currentMasterNotation();
+    INotationUndoStackPtr stack = undoMaster ? undoMaster->notation()->undoStack() : nullptr;
+    const size_t stepsBefore = stack ? stack->currentStateIndex() : muse::nidx;
+
     const Data data = load();
     const int restyled = applyStylesOnly(partIds, data);
     if (partIds.isEmpty()) {
@@ -4154,6 +4166,9 @@ int StarScoreService::applyStyles(const QStringList& partIds)
             }
         }
     }
+    if (stack && stepsBefore != muse::nidx && stack->currentStateIndex() > stepsBefore + 1) {
+        stack->mergeCommands(stepsBefore);
+    }
     return restyled;
 }
 
@@ -4175,7 +4190,7 @@ int StarScoreService::applyStylesOnly(const QStringList& partIds, const Data& da
         return !path.isEmpty() && QFileInfo::exists(path);
     };
 
-    // Style file(s), then the house settings a style file can't hold, in one undo step per score
+    // Style file(s), then the house settings a style file can't hold (applyStyles merges every score's steps into one)
     auto restyle = [&](INotationPtr n, const QString& ruleStyle, bool partBook) {
         if (!n) {
             return false;
@@ -4214,11 +4229,6 @@ int StarScoreService::applyStylesOnly(const QStringList& partIds, const Data& da
     };
 
     int restyled = 0;
-    // (1.24.0) The whole restyle one undo step ("You can undo it", says the question offering a newer style; it was
-    // three steps per score). The steps every score's restyle makes (each style file loaded is a command of its own)
-    // are merged into one at the end. All the scores of a song share the main score's undo stack.
-    INotationUndoStackPtr stack = master->notation()->undoStack();
-    const size_t stepsBefore = stack->currentStateIndex();
 
     // The main score (a workspace of every arrangement) when restyling everything
     if (partIds.isEmpty() && restyle(master->notation(), QString(), false)) {
@@ -4274,9 +4284,6 @@ int StarScoreService::applyStylesOnly(const QStringList& partIds, const Data& da
             ++restyled;
         }
 
-    }
-    if (stepsBefore != muse::nidx && stack->currentStateIndex() > stepsBefore + 1) {
-        stack->mergeCommands(stepsBefore);
     }
 
     // The Keys sheet: empty staves hide (first system included) and the bass staff is set to "Always hide"
@@ -5733,7 +5740,18 @@ void StarScoreService::clearComposerInCurrentScore()
         return;
     }
     engraving::Score* score = n->elements() ? n->elements()->msScore() : nullptr;
-    if (!score || load().sections.empty()) {
+    if (!score || !score->undoStack() || load().sections.empty()) {
+        return;
+    }
+    // (1.24.0) A score already seen to since the song's last edit is left alone: every tab switch opened and closed
+    // an edit here, which refreshed everything (and was an undo step that made the song unsaved when a credit moved).
+    // Forgotten when another song opens.
+    engraving::UndoStack* undo = score->undoStack();
+    auto undoState = [undo]() {
+        return std::make_pair(undo->currentIndex(), static_cast<const void*>(undo->last()));
+    };
+    auto seen = m_composerClearedAt.find(score);
+    if (seen != m_composerClearedAt.end() && seen->second == undoState()) {
         return;
     }
     // part scores with a sheet title (instrument name top left; horn sheets also an arrangement label)
@@ -5746,6 +5764,7 @@ void StarScoreService::clearComposerInCurrentScore()
         }
     }
     if (!hasTitle) {
+        m_composerClearedAt[score] = undoState();
         return;
     }
     // The texts measured are in the title frame, on the first page: that page is laid out again (as MuseScore lays out
@@ -5762,8 +5781,15 @@ void StarScoreService::clearComposerInCurrentScore()
     // the label on the instrument name's line (an export could leave it moved), then the credit clear of it
     starscore::levelArrangementLabel(score);
     starscore::clearComposerCredit(score);
-    n->undoStack()->commitChanges();
-    n->notationChanged().notify();
+    // (1.24.0) nothing moved: no edit to finish, nothing to refresh
+    const engraving::UndoMacro* edit = undo->activeCommand();
+    if (edit && !edit->empty()) {
+        n->undoStack()->commitChanges();
+        n->notationChanged().notify();
+    } else {
+        n->undoStack()->rollbackChanges();
+    }
+    m_composerClearedAt[score] = undoState();
 }
 
 //! Opens the part scores of these parts (one instrument each), the first one showing
