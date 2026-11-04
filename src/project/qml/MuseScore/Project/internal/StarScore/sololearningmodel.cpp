@@ -6,6 +6,7 @@
 #include "sololearningmodel.h"
 
 #include <QCoreApplication>
+#include <QDesktopServices>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QTimer>
@@ -87,6 +88,23 @@ void SoloLearningModel::setKeyState(const QString& id, int keyIndex, const QStri
     const muse::Ret ret = starScore()->setSoloKeyState(id, keyIndex, state);
     if (!ret) {
         interactive()->error(muse::trc("starscore", "Couldn't mark the key"), ret.text().empty() ? ret.toString() : ret.text());
+    }
+    // (the service's notification reloads the list)
+}
+
+void SoloLearningModel::playAudio(const QString& path)
+{
+    if (!path.isEmpty()) {
+        QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+    }
+}
+
+void SoloLearningModel::addAudio(const QString& soloPath)
+{
+    const muse::RetVal<QString> added = starScore()->addSoloAudio(soloPath);
+    if (!added.ret) {
+        interactive()->error(muse::trc("starscore", "Couldn't add the recording"),
+                             added.ret.text().empty() ? added.ret.toString() : added.ret.text());
     }
     // (the service's notification reloads the list)
 }

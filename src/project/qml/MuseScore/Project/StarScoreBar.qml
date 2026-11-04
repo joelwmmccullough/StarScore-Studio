@@ -188,6 +188,29 @@ Rectangle {
                     }
                 }
 
+                // (1.25.0) its recordings: the original, a stem-separated copy…
+                StarScoreChip {
+                    id: soloAudioChip
+                    visible: barModel.isSoloTranscription
+                    text: (barModel.soloInfo.audio || []).length > 0
+                          ? qsTrc("starscore", "♪ Recordings (%1)").arg(barModel.soloInfo.audio.length)
+                          : qsTrc("starscore", "+ Recording…")
+                    dashed: (barModel.soloInfo.audio || []).length === 0
+                    showDot: false
+                    toolTip: qsTrc("starscore", "Recordings of the solo (the original, a stem-separated copy…), kept in its Audio folder")
+                    menuItemsProvider: function() { return barModel.soloAudioMenu() }
+                    onLeftClicked: function(mouse) {
+                        if ((barModel.soloInfo.audio || []).length === 0) {
+                            barModel.handleMenuItem("solo-audio-add")
+                        } else {
+                            soloAudioChip.openMenu(barModel.soloAudioMenu())
+                        }
+                    }
+                    onMenuItemChosen: function(itemId) {
+                        barModel.handleMenuItem(itemId)
+                    }
+                }
+
                 StarScoreChip {
                     visible: barModel.isSoloTranscription && (barModel.soloInfo.tiedSongTitle || "") !== ""
                     text: qsTrc("starscore", "Song: %1").arg(barModel.soloInfo.tiedSongTitle || "")

@@ -12,6 +12,8 @@
 #include <QFileInfo>
 #include <QUrl>
 #include <QDesktopServices>
+#include <QJsonArray>
+#include <QJsonObject>
 
 #include "project/internal/starscore/starscorehornkeys.h"
 #include "project/internal/starscore/starscorestatus.h"
@@ -204,6 +206,7 @@ QVariantMap StarScoreBarModel::soloInfo() const
         return QVariantMap();
     }
     QVariantMap map = info.toVariantMap();
+    map["audio"] = starScore()->soloAudioFiles(starScore()->mainProjectPath().toQString()).toVariantList();
     // the song it's tied to, by name
     const QString code = info.value("tiedSongCode").toString();
     if (!code.isEmpty()) {
@@ -215,6 +218,32 @@ QVariantMap StarScoreBarModel::soloInfo() const
         }
     }
     return map;
+}
+
+QVariantList StarScoreBarModel::soloAudioMenu() const
+{
+    QVariantList items;
+    const QString solo = starScore()->mainProjectPath().toQString();
+    for (const QJsonValue& v : starScore()->soloAudioFiles(solo)) {
+        const QJsonObject a = v.toObject();
+        const QString path = a.value("path").toString();
+        items << QVariantMap {
+            { "title", a.value("name").toString() }, { "enabled", true },
+            { "subitems", QVariantList {
+                  QVariantMap { { "id", "solo-audio-open:" + path }, { "title", muse::qtrc("starscore", "Play") }, { "enabled", true } },
+                  QVariantMap { { "id", "solo-audio-show:" + path }, { "title", muse::qtrc("starscore", "Show in Finder") },
+                                { "enabled", true } },
+                  QVariantMap { { "id", "solo-audio-remove:" + path }, { "title", muse::qtrc("starscore", "Remove from this solo…") },
+                                { "enabled", true } },
+              } }
+        };
+    }
+    if (!items.isEmpty()) {
+        items << QVariantMap {};
+    }
+    items << QVariantMap { { "id", "solo-audio-add" }, { "title", muse::qtrc("starscore", "Add a recording…") },
+                           { "enabled", QFileInfo::exists(solo) } };
+    return items;
 }
 
 QVariantList StarScoreBarModel::tiedSolos() const
@@ -1214,6 +1243,24 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
         if (!link.isEmpty()) {
             QDesktopServices::openUrl(QUrl::fromUserInput(link));
         }
+    } else if (action == "solo-audio-add") {
+        const RetVal<QString> added = starScore()->addSoloAudio(starScore()->mainProjectPath().toQString());
+        if (!added.ret) {
+            interactive()->error(muse::trc("starscore", "Couldn't add the recording"),
+                                 added.ret.text().empty() ? added.ret.toString() : added.ret.text());
+        }
+        refresh();
+    } else if (action == "solo-audio-open") {
+        QDesktopServices::openUrl(QUrl::fromLocalFile(arg));
+    } else if (action == "solo-audio-show") {
+        interactive()->revealInFileBrowser(io::path_t(arg));
+    } else if (action == "solo-audio-remove") {
+        const Ret removed = starScore()->removeSoloAudio(arg);
+        if (!removed) {
+            interactive()->error(muse::trc("starscore", "Couldn't remove the recording"),
+                                 removed.text().empty() ? removed.toString() : removed.text());
+        }
+        refresh();
     } else if (action == "solo-export-sheets") {
         const RetVal<QString> ret = starScore()->exportSoloSheets();
         if (ret.ret) {

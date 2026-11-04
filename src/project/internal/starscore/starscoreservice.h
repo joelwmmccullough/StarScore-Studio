@@ -156,6 +156,9 @@ public:
     QJsonArray soloLearningList() const override;
     muse::Ret setSoloKeyState(const QString& id, int keyIndex, const QString& state) override;
     muse::async::Notification soloLearningChanged() const override;
+    QJsonArray soloAudioFiles(const QString& soloPath) const override;
+    muse::RetVal<QString> addSoloAudio(const QString& soloPath) override;
+    muse::Ret removeSoloAudio(const QString& audioPath) override;
     std::vector<StarScoreHornChoice> doublerChoices() const override;
     std::vector<StarScoreHornChoice> lowHornChoices() const override;
     QString rosterDoublerName() const override;
@@ -557,6 +560,7 @@ private:
     //! (its key names, the date; what's been learned kept)
     void recordSoloExport();
     muse::async::Notification m_soloLearningChanged;
+    muse::RetVal<QString> copySoloAudio(const QString& soloPath, const QString& sourcePath, const QString& base);
     QString soloFileKeyName(int keyIndex, bool written) const;
     bool m_soloRefreshQueued = false;
     bool m_soloUndoRedo = false;

@@ -66,6 +66,8 @@ public:
     bool isSoloTranscription() const;
     QVariantMap soloInfo() const;
     QVariantList tiedSolos() const;
+    //! (1.25.0) The open solo's recordings: each opens in the Mac's player; Add / Show in Finder / Remove
+    Q_INVOKABLE QVariantList soloAudioMenu() const;
 
     Q_INVOKABLE void showSolo(const QString& id);
     Q_INVOKABLE void showMainScore();

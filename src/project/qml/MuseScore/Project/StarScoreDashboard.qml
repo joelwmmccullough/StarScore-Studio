@@ -512,6 +512,29 @@ Rectangle {
                                 }
                             }
 
+                            // its recordings (1.25.0): click to play in the Mac's player
+                            Flow {
+                                Layout.fillWidth: true
+                                spacing: 4
+
+                                Repeater {
+                                    model: soloRow.modelData.audio || []
+
+                                    delegate: FlatButton {
+                                        required property var modelData
+                                        text: "♪ " + modelData.name
+                                        onClicked: solosModel.playAudio(modelData.path)
+                                    }
+                                }
+                                FlatButton {
+                                    text: qsTrc("starscore", "+ Recording…")
+                                    transparent: true
+                                    toolTipTitle: qsTrc("starscore", "Add a recording of the solo")
+                                    toolTipDescription: qsTrc("starscore", "The original, a stem-separated copy…: copied into the solo's Audio folder")
+                                    onClicked: solosModel.addAudio(soloRow.modelData.path)
+                                }
+                            }
+
                             Flow {
                                 Layout.fillWidth: true
                                 spacing: 4
