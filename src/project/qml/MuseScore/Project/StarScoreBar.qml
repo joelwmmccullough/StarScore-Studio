@@ -178,18 +178,6 @@ Rectangle {
                 }
 
                 StarScoreChip {
-                    visible: barModel.isSoloTranscription
-                    text: qsTrc("starscore", "Export the 12 keys")
-                    showDot: false
-                    toolTip: qsTrc("starscore", "Every key's sheet, with the notes colored by pitch, into the solo's Sheets folder: in "
-                                   + "concert pitch, and written for the instrument when it transposes.")
-                    onLeftClicked: function(mouse) {
-                        barModel.handleMenuItem("solo-export-sheets")
-                    }
-                }
-
-                // the keys' names (major / minor) and spellings (D♭ or C♯ major)
-                StarScoreChip {
                     id: soloKeysChip
                     visible: barModel.isSoloTranscription
                     text: (barModel.soloInfo.mode === "minor" ? qsTrc("starscore", "Minor keys") : qsTrc("starscore", "Major keys")) + " ▾"
