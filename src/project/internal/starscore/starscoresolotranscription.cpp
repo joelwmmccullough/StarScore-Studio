@@ -934,13 +934,16 @@ void StarScoreService::respellSoloKey(engraving::Score* es, const engraving::Int
             if (!e || !e->isKeySig()) {
                 continue;
             }
+            if (e->generated()) {
+                continue;   // (a system's own key signature: laid out from the staff's keys)
+            }
             KeySig* ks = toKeySig(e);
             // one the main score doesn't have (no linked copy there) isn't printed: the part score's key goes on as before
             bool inMain = false;
             for (EngravingObject* o : ks->linkList()) {
                 inMain |= o != ks && o->score() == ms;
             }
-            if (!inMain && !ks->generated() && s->tick().isNotZero()) {
+            if (!inMain && s->tick().isNotZero()) {
                 if (ks->visible()) {
                     ks->setVisible(false);
                 }
