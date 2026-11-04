@@ -27,6 +27,9 @@
 #include <QDirIterator>
 #include <QFileInfo>
 #include <QJsonArray>
+#include <QJsonDocument>
+#include <QSaveFile>
+#include <QDate>
 #include <QJsonObject>
 #include <QRegularExpression>
 #include <QTimer>
@@ -656,16 +659,23 @@ QString soloLayoutSignature(mu::engraving::MasterScore* ms)
 }
 
 //! Note colours by the pitch written on this sheet (the 12-note colours). Undoable: an export rolls them back.
-int soloColorNotes(mu::engraving::Score* score)
+//! dark: for the dark-mode sheets (page #15120E): the same hues, the dark ones (navy E, green D, brown G♯, red A,
+//! purple B) lightened until they read on the dark page; F and A♯ a little lighter still, to stay apart from B and E
+int soloColorNotes(mu::engraving::Score* score, bool dark)
 {
     using namespace mu::engraving;
     static const char* COLORS[12] = {
         "#C7C102", "#FF5DA1", "#028800", "#2DD3C0", "#001CA4", "#CC75F8",
         "#92D303", "#F47700", "#915700", "#AD000E", "#829EFF", "#770096"
     };
+    static const char* DARK_COLORS[12] = {
+        "#E6DF2E", "#FF6FAE", "#36C234", "#3FE0CC", "#5072FF", "#E4B2FF",
+        "#A8E621", "#FF8A1F", "#CC8E33", "#F2434F", "#A9BEFF", "#AE45D6"
+    };
     int changed = 0;
     forEachSoloNote(score, [&](Note* n) {
-        const Color color = Color::fromString(COLORS[((n->epitch() % 12) + 12) % 12]);
+        const int pc = ((n->epitch() % 12) + 12) % 12;
+        const Color color = Color::fromString(dark ? DARK_COLORS[pc] : COLORS[pc]);
         auto apply = [&](EngravingItem* item) {
             if (item && item->getProperty(Pid::COLOR).value<Color>() != color) {
                 item->undoChangeProperty(Pid::COLOR, color, PropertyFlags::NOSTYLE);
@@ -985,9 +995,235 @@ QString StarScoreService::prepareSoloKeyForSheet(const SoloKeyScore& k, bool wri
     return label;
 }
 
-int StarScoreService::colorSoloSheet(engraving::Score* score)
+int StarScoreService::colorSoloSheet(engraving::Score* score, bool dark)
 {
-    return soloColorNotes(score);
+    return soloColorNotes(score, dark);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+//  Learning the solos (1.25.0, Joel 4 Nov 2026): Home lists every solo transcription whose sheets have been exported,
+//  each key marked learned or memorized. Kept beside the solos, so it travels with them (Google Drive):
+//  "8 Solo Transcriptions/.solo-progress.json" = { "version": 1, "solos": { "<file relative to the folder>": {
+//  "player", "song", "instrument", "exported": "yyyy-MM-dd", "keys": [ { "name", "state" } × 12 ] } } }
+// ---------------------------------------------------------------------------------------------------------------------
+
+static QString soloProgressPath(const QString& folder)
+{
+    return folder.isEmpty() ? QString() : folder + "/.solo-progress.json";
+}
+
+static QJsonObject soloReadProgress(const QString& folder)
+{
+    QFile f(soloProgressPath(folder));
+    if (!f.open(QIODevice::ReadOnly)) {
+        return QJsonObject();
+    }
+    return QJsonDocument::fromJson(f.readAll()).object();
+}
+
+static bool soloWriteProgress(const QString& folder, QJsonObject root)
+{
+    root["version"] = 1;
+    QSaveFile f(soloProgressPath(folder));
+    if (!f.open(QIODevice::WriteOnly)) {
+        return false;
+    }
+    f.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
+    return f.commit();
+}
+
+//! "E♭ (original)" -> "E♭", "in D♭" -> "D♭"
+static QString soloShortKey(QString name)
+{
+    name = name.trimmed();
+    if (name.startsWith("in ")) {
+        name = name.mid(3);
+    }
+    const int paren = name.indexOf(" (");
+    return paren > 0 ? name.left(paren) : name;
+}
+
+//! Solos exported before the list existed (1.24.0): a solo folder with concert sheets and no entry gets one, its keys
+//! read from the sheets' names ("… - 04 Db (concert).pdf"). Returns whether any was added.
+static bool soloAddUnlisted(const QString& folder, QJsonObject& root)
+{
+    QJsonObject solos = root.value("solos").toObject();
+    bool added = false;
+    static const QRegularExpression sheetRe("^(.+) - (.+) - (\\d\\d) (\\S+) \\(concert\\)\\.pdf$");
+    QDirIterator it(folder, { "*.starscore" }, QDir::Files, QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        const QString path = it.next();
+        if (path.contains("/Version History/")) {
+            continue;
+        }
+        const QString id = QDir(folder).relativeFilePath(path);
+        if (solos.contains(id)) {
+            continue;
+        }
+        const QDir concert(QFileInfo(path).absolutePath() + "/Sheets/Concert");
+        std::map<int, QString> keys;
+        QString player, song;
+        for (const QString& f : concert.entryList({ "*(concert).pdf" }, QDir::Files)) {
+            const QRegularExpressionMatch m = sheetRe.match(f);
+            if (m.hasMatch()) {
+                player = m.captured(1);
+                song = m.captured(2);
+                QString key = m.captured(4);
+                key.replace("b", QString::fromUtf8("♭")).replace("#", QString::fromUtf8("♯"));
+                keys[m.captured(3).toInt() - 1] = key;
+            }
+        }
+        if (keys.size() < 12) {
+            continue;
+        }
+        QJsonArray list;
+        for (const auto& [index, key] : keys) {
+            list.append(QJsonObject { { "index", index }, { "name", index == 0 ? key + " (original)" : "in " + key }, { "state", "" } });
+        }
+        solos[id] = QJsonObject { { "player", player }, { "song", song }, { "instrument", "" },
+                                  { "exported", QFileInfo(concert.absolutePath()).lastModified().date().toString(Qt::ISODate) },
+                                  { "keys", list } };
+        added = true;
+    }
+    if (added) {
+        root["solos"] = solos;
+    }
+    return added;
+}
+
+void StarScoreService::recordSoloExport()
+{
+    INotationProjectPtr project = globalContext()->currentProject();
+    const QString folder = soloTranscriptionsFolder();
+    if (!project || folder.isEmpty() || !isSoloTranscription()) {
+        return;
+    }
+    const QString file = QDir::cleanPath(project->path().toQString());
+    if (!file.startsWith(QDir::cleanPath(folder) + "/")) {
+        return;   // (a solo kept somewhere else isn't on the list)
+    }
+    const QString id = QDir(folder).relativeFilePath(file);
+    const QJsonObject info = load().solo;
+    QJsonObject root = soloReadProgress(folder);
+    QJsonObject solos = root.value("solos").toObject();
+    QJsonObject entry = solos.value(id).toObject();
+    const QJsonArray oldKeys = entry.value("keys").toArray();
+    QJsonArray keys;
+    const QJsonArray infoKeys = info.value("keys").toArray();
+    for (int i = 0; i < infoKeys.size(); ++i) {
+        const QJsonObject k = infoKeys.at(i).toObject();
+        const int index = k.value("index").toInt(i);
+        QString state;
+        for (const QJsonValue& v : oldKeys) {
+            if (v.toObject().value("index").toInt(-1) == index) {
+                state = v.toObject().value("state").toString();
+            }
+        }
+        keys.append(QJsonObject { { "index", index }, { "name", k.value("name").toString() }, { "state", state } });
+    }
+    entry["player"] = info.value("player").toString();
+    entry["song"] = info.value("song").toString();
+    entry["instrument"] = info.value("instrumentName").toString();
+    entry["tiedSongCode"] = info.value("tiedSongCode").toString();
+    entry["exported"] = QDate::currentDate().toString(Qt::ISODate);
+    entry["keys"] = keys;
+    solos[id] = entry;
+    root["solos"] = solos;
+    if (soloWriteProgress(folder, root)) {
+        m_soloLearningChanged.notify();
+    } else {
+        LOGW() << "[starscore] couldn't write " << soloProgressPath(folder).toStdString();
+    }
+}
+
+QJsonArray StarScoreService::soloLearningList() const
+{
+    QJsonArray out;
+    const QString folder = soloTranscriptionsFolder();
+    if (folder.isEmpty() || !QFileInfo(folder).isDir()) {
+        return out;
+    }
+    QJsonObject root = soloReadProgress(folder);
+    if (soloAddUnlisted(folder, root)) {
+        soloWriteProgress(folder, root);
+    }
+    const QJsonObject solos = root.value("solos").toObject();
+    std::vector<QJsonObject> list;
+    for (auto it = solos.begin(); it != solos.end(); ++it) {
+        const QString path = folder + "/" + it.key();
+        if (!QFileInfo::exists(path)) {
+            continue;   // (moved or deleted)
+        }
+        QJsonObject e = it.value().toObject();
+        QJsonArray keys;
+        for (const QJsonValue& v : e.value("keys").toArray()) {
+            QJsonObject k = v.toObject();
+            k["short"] = soloShortKey(k.value("name").toString());
+            keys.append(k);
+        }
+        e["keys"] = keys;
+        e["id"] = it.key();
+        e["path"] = path;
+        list.push_back(e);
+    }
+    std::sort(list.begin(), list.end(), [](const QJsonObject& a, const QJsonObject& b) {
+        const int c = a.value("player").toString().compare(b.value("player").toString(), Qt::CaseInsensitive);
+        return c != 0 ? c < 0 : a.value("song").toString().compare(b.value("song").toString(), Qt::CaseInsensitive) < 0;
+    });
+    for (const QJsonObject& e : list) {
+        out.append(e);
+    }
+    return out;
+}
+
+Ret StarScoreService::setSoloKeyState(const QString& id, int keyIndex, const QString& state)
+{
+    const QString folder = soloTranscriptionsFolder();
+    if (folder.isEmpty()) {
+        return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "The Projects and Sheets folder wasn't found."));
+    }
+    if (!state.isEmpty() && state != "learned" && state != "memorized") {
+        return make_ret(Ret::Code::UnknownError);
+    }
+    QJsonObject root = soloReadProgress(folder);
+    soloAddUnlisted(folder, root);
+    QJsonObject solos = root.value("solos").toObject();
+    if (!solos.contains(id)) {
+        return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "That solo isn't on the list any more."));
+    }
+    QJsonObject entry = solos.value(id).toObject();
+    QJsonArray keys = entry.value("keys").toArray();
+    bool found = false;
+    for (int i = 0; i < keys.size(); ++i) {
+        QJsonObject k = keys.at(i).toObject();
+        if (k.value("index").toInt(i) == keyIndex) {
+            k["state"] = state;
+            if (!state.isEmpty()) {
+                k["date"] = QDate::currentDate().toString(Qt::ISODate);
+            } else {
+                k.remove("date");
+            }
+            keys[i] = k;
+            found = true;
+        }
+    }
+    if (!found) {
+        return make_ret(Ret::Code::UnknownError);
+    }
+    entry["keys"] = keys;
+    solos[id] = entry;
+    root["solos"] = solos;
+    if (!soloWriteProgress(folder, root)) {
+        return make_ret(Ret::Code::UnknownError,
+                        muse::qtrc("starscore", "Couldn't write %1.").arg(soloProgressPath(folder)).toStdString());
+    }
+    m_soloLearningChanged.notify();
+    return make_ok();
+}
+
+muse::async::Notification StarScoreService::soloLearningChanged() const
+{
+    return m_soloLearningChanged;
 }
 
 QString StarScoreService::soloFileKeyName(int keyIndex, bool written) const
@@ -1016,6 +1252,7 @@ QString StarScoreService::soloFileKeyName(int keyIndex, bool written) const
 //    soloload                      the saved file read back on its own: each key's first notes as written
 //    soloexport                    the twelve keys' sheets (and a list of what was written)
 //    soloshow:<name>               an old solo kept in the song shown
+//    sololist, solomark:<key>|<learned|memorized|->   Home's learning list (and a key marked on its first solo)
 //    solountag                     the open solo transcription made a plain one-instrument score (for soloconvert)
 //    soloconvert:<player>|<song>   the open score made into a Solo Transcription file
 // ---------------------------------------------------------------------------------------------------------------------
@@ -1269,6 +1506,29 @@ bool StarScoreService::autotestSoloStep(const QString& step)
             }
         }
         soloTestLog("  no such solo");
+        return true;
+    }
+    if (step == "sololist" || step.startsWith("solomark:")) {
+        // solomark:<key index>|<learned|memorized|-> on the first listed solo, then the list; sololist: the list
+        if (step.startsWith("solomark:")) {
+            const QJsonArray list = soloLearningList();
+            const QString state = step.mid(9).section('|', 1);
+            const Ret ret = list.isEmpty() ? make_ret(Ret::Code::UnknownError)
+                            : setSoloKeyState(list.at(0).toObject().value("id").toString(), step.mid(9).section('|', 0, 0).toInt(),
+                                              state == "-" ? QString() : state);
+            soloTestLog("  mark: " + QString(ret ? "ok" : QString::fromStdString(ret.toString())));
+        }
+        for (const QJsonValue& v : soloLearningList()) {
+            const QJsonObject e = v.toObject();
+            QStringList keys;
+            for (const QJsonValue& k : e.value("keys").toArray()) {
+                const QString st = k.toObject().value("state").toString();
+                keys << k.toObject().value("short").toString() + (st.isEmpty() ? QString() : "=" + st);
+            }
+            soloTestLog(QString("  %1 | %2 – %3 (%4) exported %5 | %6").arg(e.value("id").toString(), e.value("player").toString(),
+                                                                        e.value("song").toString(), e.value("instrument").toString(),
+                                                                        e.value("exported").toString(), keys.join(" ")));
+        }
         return true;
     }
     if (step == "solountag") {

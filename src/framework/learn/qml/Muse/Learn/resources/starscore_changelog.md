@@ -4,6 +4,11 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.25.0
+
+- **Learning the solos, on Home.** The Dashboard has a "Solo transcriptions" list: every solo transcription whose sheets have been exported, with its twelve keys. Click a key to mark it learned (amber), again for memorized (green), once more to clear it; hovering over a key shows when you marked it. The original key has a ★. Click a solo's name to open it. The marks are kept in Projects and Sheets/8 Solo Transcriptions (".solo-progress.json"), so they go wherever that folder goes. A solo you exported with 1.24.0 is on the list too.
+- **Dark-mode solo sheets.** "Export the 12 keys" also writes a dark-mode copy of every sheet, in Sheets/Dark Mode/Concert (and Sheets/Dark Mode/<Instrument> for a transposing instrument): the course books' dark page, with the note colours lightened where the normal ones are too dark to read on it (the navy E, green D, brown G♯, red A and purple B; F and A♯ a little lighter too, so they stay apart from B and E).
+
 ## 1.24.0
 
 ### Solo Transcriptions

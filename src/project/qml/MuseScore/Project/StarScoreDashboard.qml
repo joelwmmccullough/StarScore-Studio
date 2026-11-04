@@ -22,6 +22,7 @@ Rectangle {
 
     readonly property color doneColor: "#3FB05A"
     readonly property color auditColor: "#8E7CF0"
+    readonly property color learnedColor: "#E3A72B"   // a solo's key learned (memorized = doneColor)
     readonly property var statusColors: dash.statusColors   // (starscorestatus.h: the one table of the status colours)
 
     // "Every song" in a narrow Dashboard (it's half of Home, beside the recent scores): a narrower song column, no
@@ -54,7 +55,18 @@ Rectangle {
         id: dash
     }
 
+    SoloLearningModel {
+        id: solosModel
+    }
+    // (another window's export or mark is in the file, not in this window's list)
+    onVisibleChanged: {
+        if (visible) {
+            solosModel.load()
+        }
+    }
+
     Component.onCompleted: {
+        solosModel.load()
         dash.load()
         if (dash.folder !== "" && dash.unscanned > 0) {
             dash.scan(false)
@@ -417,6 +429,137 @@ Rectangle {
                                     visible: tierRow.modelData.next !== ""
                                     text: qsTrc("starscore", "Next: %1").arg(tierRow.modelData.next)
                                     opacity: 0.6
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ---------------- Solo transcriptions (1.25.0) ----------------
+            // every solo whose sheets have been exported; each key clicked through not yet -> learned -> memorized
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 8
+                visible: solosModel.solos.length > 0
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    StyledTextLabel {
+                        text: qsTrc("starscore", "Solo transcriptions")
+                        font: ui.theme.bodyBoldFont
+                    }
+                    Item { Layout.fillWidth: true }
+                    StyledTextLabel {
+                        text: qsTrc("starscore", "%1 of %2 keys memorized").arg(solosModel.keysMemorized).arg(solosModel.keysTotal)
+                        opacity: 0.8
+                    }
+                }
+
+                StyledTextLabel {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignLeft
+                    wrapMode: Text.WordWrap
+                    text: qsTrc("starscore", "Click a key to mark it learned, again for memorized, once more to clear it.")
+                    opacity: 0.6
+                }
+
+                Repeater {
+                    model: solosModel.solos
+
+                    delegate: Rectangle {
+                        id: soloRow
+                        required property var modelData
+
+                        Layout.fillWidth: true
+                        implicitHeight: soloLayout.implicitHeight + 16
+                        radius: 6
+                        color: ui.theme.backgroundPrimaryColor
+                        border.width: 1
+                        border.color: ui.theme.strokeColor
+
+                        ColumnLayout {
+                            id: soloLayout
+                            x: 10
+                            y: 8
+                            width: parent.width - 20
+                            spacing: 6
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 8
+
+                                StyledTextLabel {
+                                    Layout.fillWidth: true
+                                    horizontalAlignment: Text.AlignLeft
+                                    elide: Text.ElideRight
+                                    text: soloRow.modelData.player + " – " + soloRow.modelData.song
+                                          + (soloRow.modelData.instrument ? "  ·  " + soloRow.modelData.instrument : "")
+                                    font: ui.theme.bodyBoldFont
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: solosModel.openSolo(soloRow.modelData.path)
+                                    }
+                                }
+                                StyledTextLabel {
+                                    text: soloRow.modelData.memorized === soloRow.modelData.keys.length
+                                          ? qsTrc("starscore", "all %1 keys memorized").arg(soloRow.modelData.keys.length)
+                                          : qsTrc("starscore", "%1 memorized · %2 learned").arg(soloRow.modelData.memorized)
+                                            .arg(soloRow.modelData.learned)
+                                    opacity: 0.75
+                                }
+                            }
+
+                            Flow {
+                                Layout.fillWidth: true
+                                spacing: 4
+
+                                Repeater {
+                                    model: soloRow.modelData.keys
+
+                                    delegate: Rectangle {
+                                        id: keyCell
+                                        required property var modelData
+
+                                        readonly property color fill: keyCell.modelData.state === "memorized" ? root.doneColor
+                                                                      : keyCell.modelData.state === "learned" ? root.learnedColor
+                                                                      : "transparent"
+                                        width: Math.max(44, keyLabel.implicitWidth + 14)
+                                        height: 26
+                                        radius: 4
+                                        color: keyCell.fill
+                                        border.width: keyCell.modelData.state === "" ? 1 : 0
+                                        border.color: ui.theme.strokeColor
+
+                                        StyledTextLabel {
+                                            id: keyLabel
+                                            anchors.centerIn: parent
+                                            text: keyCell.modelData["short"] + (keyCell.modelData.index === 0 ? " ★" : "")
+                                            font: ui.theme.bodyBoldFont
+                                            color: keyCell.modelData.state === "" ? ui.theme.fontPrimaryColor : root.textOn(keyCell.fill)
+                                        }
+
+                                        MouseArea {
+                                            id: keyMouse
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: solosModel.cycleKey(soloRow.modelData.id, keyCell.modelData.index)
+                                            onContainsMouseChanged: {
+                                                if (containsMouse) {
+                                                    var st = keyCell.modelData.state === "memorized" ? qsTrc("starscore", "Memorized")
+                                                             : keyCell.modelData.state === "learned" ? qsTrc("starscore", "Learned")
+                                                             : qsTrc("starscore", "Not yet")
+                                                    ui.tooltip.show(keyCell, keyCell.modelData.name,
+                                                                    st + (keyCell.modelData.date ? " (" + keyCell.modelData.date + ")" : ""))
+                                                } else {
+                                                    ui.tooltip.hide(keyCell)
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }

@@ -19,6 +19,7 @@
 #include <vector>
 
 #include <QJsonObject>
+#include <QJsonArray>
 #include <QString>
 #include <QStringList>
 
@@ -595,6 +596,13 @@ public:
     virtual muse::RetVal<QString> exportSoloSheets() = 0;
     //! The open score (one instrument: an old solo kept in a song) copied into a new Solo Transcription file
     virtual muse::Ret convertToSoloTranscription(const StarScoreSoloTranscriptionOptions& options) = 0;
+    //! (1.25.0) The solo transcriptions whose sheets have been exported, for Home's learning list: each with "id"
+    //! (its file, relative to 8 Solo Transcriptions), "path", "player", "song", "instrument", "exported" (date) and
+    //! "keys" [{ "name", "short", "state": "" | "learned" | "memorized" }], the original key first
+    virtual QJsonArray soloLearningList() const = 0;
+    //! A key of a solo marked as learned or memorized ("" = not yet); kept in 8 Solo Transcriptions/.solo-progress.json
+    virtual muse::Ret setSoloKeyState(const QString& id, int keyIndex, const QString& state) = 0;
+    virtual muse::async::Notification soloLearningChanged() const = 0;
     //! New StarScore dialog: the instruments the woodwind doubler can play (Soprano Sax … Flute), in menu order
     virtual std::vector<StarScoreHornChoice> doublerChoices() const = 0;
     //! New StarScore dialog: the low horns the 7-Horn section's 7th chair can be (Bass Trombone first), in menu order

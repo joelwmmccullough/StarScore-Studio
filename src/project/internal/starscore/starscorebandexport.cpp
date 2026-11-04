@@ -6369,33 +6369,56 @@ RetVal<QString> StarScoreService::exportSoloSheets()
                              : muse::qtrc("starscore", "%1 (concert pitch)").arg(instrumentName);
         for (const SoloKeyScore& k : keys) {
             const QString label = prepareSoloKeyForSheet(k, forInstrument);
-            INotationUndoStackPtr stack = master->notation()->undoStack();
-            stack->prepareChanges(TranslatableString::untranslatable("Solo sheet"));
-            colorSoloSheet(k.score);
-            k.score->setLayoutAll();
-            QByteArray pdf;
-            const Ret ret = starscorePrintSheet(writer, k.notation, left, label, true, pdf, true);
-            stack->rollbackChanges();
-            const QString name = QString("%1 - %2 - %3 %4%5.pdf")
+            const QString name = QString("%1 - %2 - %3 %4%5")
                                  .arg(starscoreSafeFileName(player), starscoreSafeFileName(song))
                                  .arg(k.index + 1, 2, 10, QChar('0'))
                                  .arg(soloFileKeyName(k.index, forInstrument))
                                  .arg(forInstrument ? QString() : QString(" (concert)"));
-            if (!ret || pdf.isEmpty()) {
-                problems << muse::qtrc("starscore", "%1: not made (%2)").arg(name, QString::fromStdString(ret.toString()));
-                continue;
+            // the sheet, then (1.25.0) its dark-mode copy: "Sheets/Dark Mode/<Concert or instrument>/… (Dark Mode).pdf",
+            // the course books' dark page, the note colours lightened to read on it
+            INotationUndoStackPtr stack = master->notation()->undoStack();
+            stack->prepareChanges(TranslatableString::untranslatable("Solo sheet"));
+            colorSoloSheet(k.score, false);
+            k.score->setLayoutAll();
+            QByteArray pdf;
+            const Ret ret = starscorePrintSheet(writer, k.notation, left, label, true, pdf, true);
+            QByteArray darkPdf;
+            Ret darkRet = make_ret(Ret::Code::Cancel);
+            if (ret) {
+                colorSoloSheet(k.score, true);
+                k.score->setLayoutAll();
+                s_starscoreDarkPdf = true;
+                darkRet = starscorePrintSheet(writer, k.notation, left, label, true, darkPdf, true);
+                s_starscoreDarkPdf = false;
             }
-            QSaveFile out(dir + "/" + name);
-            if (!out.open(QIODevice::WriteOnly) || out.write(pdf) != pdf.size() || !out.commit()) {
-                problems << muse::qtrc("starscore", "%1: couldn't be written").arg(name);
-                continue;
+            stack->rollbackChanges();
+            auto save = [&](const QString& folder, const QString& file, const QByteArray& bytes, const Ret& made) {
+                if (!made || bytes.isEmpty()) {
+                    problems << muse::qtrc("starscore", "%1: not made (%2)").arg(file, QString::fromStdString(made.toString()));
+                    return;
+                }
+                QDir().mkpath(folder);
+                QSaveFile out(folder + "/" + file);
+                if (!out.open(QIODevice::WriteOnly) || out.write(bytes) != bytes.size() || !out.commit()) {
+                    problems << muse::qtrc("starscore", "%1: couldn't be written").arg(file);
+                    return;
+                }
+                ++written;
+            };
+            save(dir, name + ".pdf", pdf, ret);
+            if (ret) {
+                save(sheets + "/" + STARSCORE_DARK_FOLDER + "/" + sub, name + " (Dark Mode).pdf", darkPdf, darkRet);
             }
-            ++written;
         }
     }
+    s_starscoreDarkPdf = false;
     m_soloRefreshing = false;
     // back as they were: each key in concert pitch, in the octave it had
     refreshSoloTranscription(master, false);
+    // on Home's list of solos to learn (1.25.0)
+    if (written > 0) {
+        recordSoloExport();
+    }
     for (const SoloKeyScore& k : keys) {
         k.score->setLayoutAll();
         k.score->doLayout();
@@ -6404,7 +6427,7 @@ RetVal<QString> StarScoreService::exportSoloSheets()
         }
     }
 
-    const QString summary = muse::qtrc("starscore", "Wrote %1 sheet(s) to %2.").arg(written).arg(QDir::toNativeSeparators(sheets));
+    const QString summary = muse::qtrc("starscore", "Wrote %1 sheet(s), dark-mode copies included, to %2.").arg(written).arg(QDir::toNativeSeparators(sheets));
     LOGI() << "[starscore] solo sheets: " << summary.toStdString();
     if (!problems.isEmpty()) {
         return RetVal<QString>::make_ret(Ret::Code::UnknownError, (QStringList { summary } + problems).join("\n").toStdString());

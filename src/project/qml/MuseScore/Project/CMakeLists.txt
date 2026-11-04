@@ -110,6 +110,8 @@ qt_add_qml_module(project_qml
         internal/StarScore/auditlibrarymodel.h
         internal/StarScore/dashboardmodel.cpp
         internal/StarScore/dashboardmodel.h
+        internal/StarScore/sololearningmodel.cpp
+        internal/StarScore/sololearningmodel.h
         internal/StarScore/starscoresongs.h
         internal/StarScore/songbookmodel.cpp
         internal/StarScore/songbookmodel.h

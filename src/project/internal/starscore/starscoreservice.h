@@ -153,6 +153,9 @@ public:
     QStringList soloTranscriptionsTiedTo(const QString& songCode) const override;
     muse::RetVal<QString> exportSoloSheets() override;
     muse::Ret convertToSoloTranscription(const StarScoreSoloTranscriptionOptions& options) override;
+    QJsonArray soloLearningList() const override;
+    muse::Ret setSoloKeyState(const QString& id, int keyIndex, const QString& state) override;
+    muse::async::Notification soloLearningChanged() const override;
     std::vector<StarScoreHornChoice> doublerChoices() const override;
     std::vector<StarScoreHornChoice> lowHornChoices() const override;
     QString rosterDoublerName() const override;
@@ -548,7 +551,12 @@ private:
     mu::engraving::Interval soloInstrumentInterval() const;
     //! A key's part score made ready to print: in concert pitch, or written for the instrument. Returns its label.
     QString prepareSoloKeyForSheet(const SoloKeyScore& key, bool written);
-    int colorSoloSheet(mu::engraving::Score* score);
+    //! dark: the colours lightened for a dark page (the dark-mode sheets)
+    int colorSoloSheet(mu::engraving::Score* score, bool dark = false);
+    //! The open solo's entry in 8 Solo Transcriptions/.solo-progress.json made or brought up to date after an export
+    //! (its key names, the date; what's been learned kept)
+    void recordSoloExport();
+    muse::async::Notification m_soloLearningChanged;
     QString soloFileKeyName(int keyIndex, bool written) const;
     bool m_soloRefreshQueued = false;
     bool m_soloUndoRedo = false;
