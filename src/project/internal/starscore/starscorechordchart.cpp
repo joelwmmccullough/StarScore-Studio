@@ -2483,15 +2483,196 @@ QString irealScramble(QString s)
 
 //! An "irealbook://Title=Composer=Style=Key=n=Chords" link as one song of an "irealb://" playlist:
 //! "Title=Composer==Style=Key==1r34LbKcu7<scrambled chords>==0=0"
-QString irealPlaylistSong(const QString& irealbookUrl)
+QString irealPlaylistSong(const QString& irealbookUrl, int bpm = 0, int repeats = 0)
 {
     const QStringList f = irealbookUrl.mid(QString("irealbook://").size()).split('=');
     if (f.size() < 6) {
         return QString();
     }
     const QString chords = f.mid(5).join('=');
-    return QStringList { f[0], f[1], QString(), f[2], f[3], QString(), "1r34LbKcu7" + irealScramble(chords), QString(), "0", "0" }
-           .join('=');
+    return QStringList { f[0], f[1], QString(), f[2], f[3], QString(), "1r34LbKcu7" + irealScramble(chords), QString(),
+                         QString::number(bpm), QString::number(repeats) }.join('=');
+}
+
+//! A bar's harmony for comparing choruses: its chords ("t root q /bass"), the chord still sounding from before at its
+//! start when it has none there. Empty when nothing has sounded yet.
+QString soloBarHarmony(const ChordChartMeasure& m, QString& sounding)
+{
+    QStringList out;
+    QString last = sounding;
+    for (const ChordChartChord& c : m.chords) {
+        if (c.hidden) {
+            continue;
+        }
+        const QString ch = c.root + " " + c.q + (c.bass.isEmpty() ? QString() : "/" + c.bass);
+        if (out.isEmpty() && c.t != "0" && !last.isEmpty()) {
+            out << "0 " + last;
+        }
+        out << c.t + " " + ch;
+        last = ch;
+    }
+    if (out.isEmpty() && !last.isEmpty()) {
+        out << "0 " + last;
+    }
+    sounding = last;
+    return out.join(" | ");
+}
+
+//! (Joel, 4 Nov 2026: a solo's iReal Pro chart on one sheet) A solo is choruses over one form: the shortest form
+//! (4 bars or more) that at least 90% of the bars with chord symbols follow, played twice or more, is written once,
+//! each bar with the chords most of the choruses have there, and `choruses` set to how many times it's played.
+//! `lastBar`: the last bar with music (0-based). False (`data` unchanged) when the chords don't repeat like that.
+bool soloOneChorus(ChordChartData& data, int lastBar, int& choruses)
+{
+    std::vector<ChordChartMeasure>& ms = data.measures;
+    int start = 0;
+    if (!ms.empty() && !ms.front().len.isEmpty() && !ms.front().ts.isEmpty()
+        && parseFrac(ms.front().len) < parseFrac(ms.front().ts)) {
+        start = 1;   // (a pickup bar: the form starts after it)
+    }
+    const int end = std::min(int(ms.size()), lastBar + 1);
+    const int total = end - start;
+    if (total < 8) {
+        return false;
+    }
+    std::vector<QString> harmony;
+    std::vector<bool> explicitBar;
+    QString sounding;
+    for (int i = 0; i < int(ms.size()) && i < end; ++i) {
+        const QString h = soloBarHarmony(ms[size_t(i)], sounding);
+        if (i >= start) {
+            harmony.push_back(h);
+            bool any = false;
+            for (const ChordChartChord& c : ms[size_t(i)].chords) {
+                any = any || !c.hidden;
+            }
+            explicitBar.push_back(any);
+        }
+    }
+    int explicitCount = 0;
+    for (bool b : explicitBar) {
+        explicitCount += b ? 1 : 0;
+    }
+    if (explicitCount == 0) {
+        return false;
+    }
+    for (int P = 4; P <= std::min(64, total / 2); ++P) {
+        std::vector<QString> form(size_t(P));
+        int matches = 0;
+        for (int p = 0; p < P; ++p) {
+            std::map<QString, int> votes;
+            for (int i = p; i < total; i += P) {
+                if (explicitBar[size_t(i)]) {
+                    ++votes[harmony[size_t(i)]];
+                }
+            }
+            if (votes.empty()) {
+                for (int i = p; i < total && form[size_t(p)].isEmpty(); i += P) {
+                    form[size_t(p)] = harmony[size_t(i)];
+                }
+                continue;
+            }
+            const auto best = std::max_element(votes.begin(), votes.end(),
+                                               [](const auto& a, const auto& b) { return a.second < b.second; });
+            form[size_t(p)] = best->first;
+            matches += best->second;
+        }
+        if (matches < explicitCount * 0.9) {
+            continue;
+        }
+        // the form found: its first chorus's bars, each with the chords most choruses have there
+        std::vector<ChordChartMeasure> chorus;
+        for (int p = 0; p < P; ++p) {
+            int pick = -1;
+            for (int i = p; i < total && pick < 0; i += P) {
+                if (harmony[size_t(i)] == form[size_t(p)] && explicitBar[size_t(i)]) {
+                    pick = i;
+                }
+            }
+            ChordChartMeasure m = ms[size_t(start + (pick < 0 ? p : pick))];
+            m.i = p;
+            m.startRepeat = false;
+            m.endRepeat = 0;
+            m.volta.reset();
+            m.jumps.clear();
+            m.markers.clear();
+            m.bar.reset();
+            if (p > 0) {
+                m.rm.reset();
+            }
+            if (pick < 0) {
+                // (no chord symbol at this point of the form in any chorus: the chord before goes on)
+                m.chords.clear();
+            }
+            m.texts.erase(std::remove_if(m.texts.begin(), m.texts.end(), [](const ChordChartText& t) { return t.k != "Tempo"; }),
+                          m.texts.end());
+            chorus.push_back(m);
+        }
+        // the first bar keeps the tempo and the time signature the solo starts with
+        for (const ChordChartText& t : ms.front().texts) {
+            if (t.k == "Tempo" && std::none_of(chorus.front().texts.begin(), chorus.front().texts.end(),
+                                               [](const ChordChartText& x) { return x.k == "Tempo"; })) {
+                chorus.front().texts.push_back(t);
+            }
+        }
+        if (chorus.front().chords.empty() || chorus.front().chords.front().t != "0") {
+            // (the chord sounding at the form's start written out)
+            const QString first = form.front().section(" | ", 0, 0);
+            if (first.startsWith("0 ")) {
+                const QString ch = first.mid(2);
+                ChordChartChord c;
+                c.t = "0";
+                c.root = ch.section(' ', 0, 0);
+                QString rest = ch.section(' ', 1);
+                c.bass = rest.contains('/') ? rest.section('/', 1) : QString();
+                c.q = rest.section('/', 0, 0);
+                chorus.front().chords.insert(chorus.front().chords.begin(), c);
+            }
+        }
+        choruses = (total + P - 1) / P;
+        ms = chorus;
+        return true;
+    }
+    return false;
+}
+
+int soloBpm(const ChordChartData& data)
+{
+    for (const ChordChartMeasure& m : data.measures) {
+        for (const ChordChartText& t : m.texts) {
+            if (t.k == "Tempo") {
+                static const QRegularExpression num("=\\s*(\\d+)");
+                const QRegularExpressionMatch mt = num.match(t.t);
+                if (mt.hasMatch()) {
+                    return mt.captured(1).toInt();
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+//! The last bar (0-based) with a note or a chord symbol in it
+int soloLastBar(const MasterScore* ms)
+{
+    int last = 0;
+    int i = 0;
+    for (const Measure* m = ms ? ms->firstMeasure() : nullptr; m; m = m->nextMeasure(), ++i) {
+        for (const Segment* s = m->first(SegmentType::ChordRest); s; s = s->next(SegmentType::ChordRest)) {
+            bool music = false;
+            for (const EngravingItem* e : s->elist()) {
+                music = music || (e && e->isChord());
+            }
+            for (const EngravingItem* a : s->annotations()) {
+                music = music || (a && a->isHarmony());
+            }
+            if (music) {
+                last = i;
+                break;
+            }
+        }
+    }
+    return last;
 }
 }
 
@@ -2514,17 +2695,25 @@ ChordChartResult writeSoloChordCharts(const MasterScore* ms, const QString& fold
     const auto keep = [](const QString&, QString*) { return true; };
     const QString stem = "Chord Charts/" + base;
 
-    // iReal Pro: the concert key it's written in, once
+    // iReal Pro: the concert key it's written in, once; one chorus of the form when the solo is choruses over one
     {
         ChordChartData data = concert;
+        int choruses = 0;
+        const int bpm = soloBpm(concert);
+        soloOneChorus(data, soloLastBar(ms), choruses);
         const QString rel = stem + " - iReal Pro.html";
         if (placeFile(folder, rel, chordChartIRealHtml(data, title, QString()).toUtf8(), keep, problems)) {
             result.written << rel;
         }
         const Analysis a = analyse(data);
         std::set<QString> notes;
-        for (const IRealLink& l : irealParts(data, a, title, composerForIReal(data.composer), notes)) {
-            const QString song = irealPlaylistSong(l.url);
+        const std::vector<IRealLink> links = irealParts(data, a, title, composerForIReal(data.composer), notes);
+        if (links.size() > 1) {
+            problems << muse::qtrc("starscore", "iReal Pro: the chords are too long for one iReal Pro chart (12 lines), so it's "
+                                                "in %1 parts.").arg(links.size());
+        }
+        for (const IRealLink& l : links) {
+            const QString song = irealPlaylistSong(l.url, bpm, choruses);
             if (!song.isEmpty()) {
                 irealSongs << song;
             }
