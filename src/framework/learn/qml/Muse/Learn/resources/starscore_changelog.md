@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.25.1
+
+- **Slash notation left uncoloured.** On a solo's sheets, rhythmic slash notation (slash heads that show a rhythm but no pitch, like the bass staff's in bars 68–69 of Tumba) stays in the page's ink colour instead of taking a 12-note colour from the pitch hidden under it.
+
 ## 1.25.0
 
 - **The panel tabs stay in a narrow window.** With the window made narrow, the left panel could show only its To-do tab, with Palettes, Layout and Properties gone from the tab bar. Every tab now keeps at least the start of its name, and when even that doesn't fit, they share the bar equally.

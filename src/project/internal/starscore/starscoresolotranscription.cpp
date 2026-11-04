@@ -858,6 +858,11 @@ int soloColorNotes(mu::engraving::Score* score, bool dark)
     };
     int changed = 0;
     forEachSoloNote(score, [&](Note* n) {
+        // rhythmic slash notation (a slash head on a fixed line: Tumba bars 68–69, Joel 4 Nov 2026) shows no pitch,
+        // so it stays in the page's ink colour
+        if (n->fixed() || n->headGroup() == NoteHeadGroup::HEAD_SLASH) {
+            return;
+        }
         const int pc = ((n->epitch() % 12) + 12) % 12;
         const Color color = Color::fromString(dark ? DARK_COLORS[pc] : COLORS[pc]);
         auto apply = [&](EngravingItem* item) {
