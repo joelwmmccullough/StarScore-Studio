@@ -6865,6 +6865,11 @@ void Score::undoAddElement(EngravingItem* element, bool addToLinkedStaves, bool 
                 links = 0;
             }
         }
+        // StarScore Studio (1.24.0): in a Solo Transcription (its twelve part scores, each in another key) a
+        // fingering belongs to its key: it stays in the score it's written in
+        if (et == ElementType::FINGERING && masterScore() && masterScore()->metaTags().count(u"starscoreSoloTranscription")) {
+            links = 0;
+        }
         if (links == 0 || !addToLinkedStaves) {
             doUndoAddElement(element);
             return;

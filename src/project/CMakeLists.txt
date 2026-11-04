@@ -120,6 +120,7 @@ target_sources(project PRIVATE
     internal/starscore/starscoremixer.cpp
     internal/starscore/starscoredemos.cpp
     internal/starscore/starscoreupdate.cpp
+    internal/starscore/starscoresolotranscription.cpp
     internal/starscore/starscoredoubletime.cpp
     internal/starscore/starscorestandardize.cpp
     internal/starscore/starscoreprogress.cpp

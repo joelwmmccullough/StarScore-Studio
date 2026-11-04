@@ -38,6 +38,8 @@
  *   todouble      the open song rewritten at twice its note lengths
  *   save          saves a copy of the song as saved.starscore
  *   recordingswarning   the export window's warning for a cover with nothing in its Recordings window
+ *   solonew:, solonotes:, solochord:, solofinger:, solobreak:, solocheck, solosave, soloload, soloexport, soloconvert:
+ *                 Solo Transcriptions (starscoresolotranscription.cpp)
  * Everything is logged to log.txt.
  */
 #include "starscoreservice.h"
@@ -1911,6 +1913,10 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         }
     } else {
         handled = false;
+    }
+    // (1.24.0) the Solo Transcription steps (solonew:, solonotes:, solocheck …), in starscoresolotranscription.cpp
+    if (!handled && step.startsWith("solo") && autotestSoloStep(step)) {
+        handled = true;
     }
     if (handled) {
         // (done in the first chain)

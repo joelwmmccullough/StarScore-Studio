@@ -6315,3 +6315,99 @@ RetVal<QString> StarScoreService::exportTimeVariants(const QStringList& onlyPath
     }
     return RetVal<QString>::make_ok(lines.join("\n"));
 }
+
+// ---------------------------------------------------------------------------------------------------------------------
+//  Solo Transcriptions (1.24.0): the twelve keys' sheets, in concert pitch and (for a transposing instrument) written
+//  for it, each with the 12-note colours of the notes as written on it, into the solo's Sheets folder
+// ---------------------------------------------------------------------------------------------------------------------
+
+RetVal<QString> StarScoreService::exportSoloSheets()
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    INotationProjectPtr project = globalContext()->currentProject();
+    engraving::MasterScore* ms = masterScore();
+    if (!master || !project || !ms || !isSoloTranscription()) {
+        return RetVal<QString>::make_ret(Ret::Code::UnknownError, muse::trc("starscore", "Open a solo transcription first."));
+    }
+    const QString file = project->path().toQString();
+    if (file.isEmpty() || !QFileInfo::exists(file)) {
+        return RetVal<QString>::make_ret(Ret::Code::UnknownError, muse::trc("starscore", "Save the solo transcription first."));
+    }
+    INotationWriterPtr writer = writers()->writer("pdf");
+    if (!writer) {
+        return RetVal<QString>::make_ret(Ret::Code::InternalError);
+    }
+    const Data data = load();
+    const QString player = data.solo.value("player").toString();
+    const QString song = data.solo.value("song").toString();
+    QString instrumentName = ms->parts().empty() ? QString() : ms->parts().front()->partName().toQString();
+    if (instrumentName.isEmpty()) {
+        instrumentName = data.solo.value("instrumentName").toString();
+    }
+    const QString sheets = QFileInfo(file).absolutePath() + "/Sheets";
+    const bool transposing = !soloInstrumentInterval().isZero();
+
+    // spelled as they're saved first (the keys' octaves picked from the notes as they are now)
+    refreshSoloTranscription(master, false);
+    const std::vector<SoloKeyScore> keys = soloKeyScores(master);
+    if (keys.empty()) {
+        return RetVal<QString>::make_ret(Ret::Code::UnknownError,
+                                         muse::trc("starscore", "The solo's twelve key part scores weren't found."));
+    }
+
+    QStringList problems;
+    int written = 0;
+    m_soloRefreshing = true;   // (nothing respelled behind the export's back)
+    for (const bool forInstrument : { false, true }) {
+        if (forInstrument && !transposing) {
+            continue;
+        }
+        const QString sub = forInstrument ? starscoreSafeFileName(instrumentName) : QString("Concert");
+        const QString dir = sheets + "/" + sub;
+        QDir().mkpath(dir);
+        const QString left = forInstrument || !transposing ? instrumentName
+                             : muse::qtrc("starscore", "%1 (concert pitch)").arg(instrumentName);
+        for (const SoloKeyScore& k : keys) {
+            const QString label = prepareSoloKeyForSheet(k, forInstrument);
+            INotationUndoStackPtr stack = master->notation()->undoStack();
+            stack->prepareChanges(TranslatableString::untranslatable("Solo sheet"));
+            colorSoloSheet(k.score);
+            k.score->setLayoutAll();
+            QByteArray pdf;
+            const Ret ret = starscorePrintSheet(writer, k.notation, left, label, true, pdf, true);
+            stack->rollbackChanges();
+            const QString name = QString("%1 - %2 - %3 %4%5.pdf")
+                                 .arg(starscoreSafeFileName(player), starscoreSafeFileName(song))
+                                 .arg(k.index + 1, 2, 10, QChar('0'))
+                                 .arg(soloFileKeyName(k.index, forInstrument))
+                                 .arg(forInstrument ? QString() : QString(" (concert)"));
+            if (!ret || pdf.isEmpty()) {
+                problems << muse::qtrc("starscore", "%1: not made (%2)").arg(name, QString::fromStdString(ret.toString()));
+                continue;
+            }
+            QSaveFile out(dir + "/" + name);
+            if (!out.open(QIODevice::WriteOnly) || out.write(pdf) != pdf.size() || !out.commit()) {
+                problems << muse::qtrc("starscore", "%1: couldn't be written").arg(name);
+                continue;
+            }
+            ++written;
+        }
+    }
+    m_soloRefreshing = false;
+    // back as they were: each key in concert pitch, in the octave it had
+    refreshSoloTranscription(master, false);
+    for (const SoloKeyScore& k : keys) {
+        k.score->setLayoutAll();
+        k.score->doLayout();
+        if (k.notation) {
+            k.notation->notationChanged().notify();
+        }
+    }
+
+    const QString summary = muse::qtrc("starscore", "Wrote %1 sheet(s) to %2.").arg(written).arg(QDir::toNativeSeparators(sheets));
+    LOGI() << "[starscore] solo sheets: " << summary.toStdString();
+    if (!problems.isEmpty()) {
+        return RetVal<QString>::make_ret(Ret::Code::UnknownError, (QStringList { summary } + problems).join("\n").toStdString());
+    }
+    return RetVal<QString>::make_ok(summary);
+}

@@ -38,6 +38,11 @@ class StarScoreBarModel : public QObject, public muse::Contextable, public muse:
     Q_PROPERTY(bool canAddSolos READ canAddSolos NOTIFY changed)
     Q_PROPERTY(bool decoOn READ decoOn NOTIFY changed)
     Q_PROPERTY(bool progressShown READ progressShown NOTIFY changed)
+    //! (1.24.0) The open score is a Solo Transcription: its song, player, instrument and the song it's tied to
+    Q_PROPERTY(bool isSoloTranscription READ isSoloTranscription NOTIFY changed)
+    Q_PROPERTY(QVariantMap soloInfo READ soloInfo NOTIFY changed)
+    //! A song's Solo Transcriptions (tied to it): name and file
+    Q_PROPERTY(QVariantList tiedSolos READ tiedSolos NOTIFY changed)
 
     QML_ELEMENT
 
@@ -58,6 +63,9 @@ public:
     QVariantList solos() const;
     bool isSoloView() const;
     bool canAddSolos() const;
+    bool isSoloTranscription() const;
+    QVariantMap soloInfo() const;
+    QVariantList tiedSolos() const;
 
     Q_INVOKABLE void showSolo(const QString& id);
     Q_INVOKABLE void showMainScore();

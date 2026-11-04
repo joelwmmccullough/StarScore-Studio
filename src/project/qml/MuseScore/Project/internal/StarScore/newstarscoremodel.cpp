@@ -6,6 +6,9 @@
 #include "newstarscoremodel.h"
 
 #include <QSettings>
+#include <QFileInfo>
+
+#include "engraving/dom/masterscore.h"
 
 #include "project/internal/starscore/starscorehornkeys.h"
 #include "translation.h"
@@ -259,6 +262,90 @@ bool NewStarScoreModel::addArrangement(const QString& arrangementKey, const QStr
     }
     if (!lowHornInstrumentId.isEmpty()) {
         settings.setValue(SETTING_LOW_HORN, lowHornInstrumentId);
+    }
+    return true;
+}
+
+// --- Solo Transcription (1.24.0) ---
+
+static const char* SETTING_SOLO_INSTRUMENT = "StarScore/newSoloInstrument";
+
+QVariantList NewStarScoreModel::songsForTying() const
+{
+    QVariantList list;
+    list << QVariantMap { { "text", muse::qtrc("starscore", "Not tied to a song") }, { "value", QString() } };
+    for (const auto& [code, title, path] : starScore()->soloTiableSongs()) {
+        (void)path;
+        list << QVariantMap { { "text", QString("%1 (%2)").arg(title, code) }, { "value", code } };
+    }
+    return list;
+}
+
+QVariantList NewStarScoreModel::soloInstruments() const
+{
+    static const std::vector<std::pair<const char*, const char*> > INSTRUMENTS = {
+        { "tenor-saxophone", "Tenor Saxophone" }, { "alto-saxophone", "Alto Saxophone" },
+        { "soprano-saxophone", "Soprano Saxophone" }, { "baritone-saxophone", "Baritone Saxophone" },
+        { "bb-trumpet", "Trumpet" }, { "flugelhorn", "Flugelhorn" }, { "trombone", "Trombone" },
+        { "flute", "Flute" }, { "bb-clarinet", "Clarinet" }, { "piano", "Piano" }, { "electric-piano", "Electric Piano" },
+        { "organ", "Organ" }, { "vibraphone", "Vibraphone" }, { "electric-guitar", "Electric Guitar" },
+        { "bass-guitar", "Bass Guitar" }, { "voice", "Voice" },
+    };
+    QVariantList list;
+    for (const auto& [id, name] : INSTRUMENTS) {
+        list << QVariantMap { { "text", muse::qtrc("starscore", name) }, { "value", QString(id) } };
+    }
+    return list;
+}
+
+QString NewStarScoreModel::lastSoloInstrumentId() const
+{
+    return QSettings().value(SETTING_SOLO_INSTRUMENT, "tenor-saxophone").toString();
+}
+
+QString NewStarScoreModel::openTitle() const
+{
+    const mu::notation::IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    const mu::engraving::MasterScore* ms = master ? master->masterScore() : nullptr;
+    return ms ? ms->metaTag(u"workTitle").toQString() : QString();
+}
+
+QString NewStarScoreModel::openSongCode() const
+{
+    return starScore()->songCode();
+}
+
+bool NewStarScoreModel::createSolo(const QVariantMap& o, bool convert)
+{
+    StarScoreSoloTranscriptionOptions options;
+    options.song = o.value("song").toString();
+    options.player = o.value("player").toString();
+    options.band = o.value("band").toString();
+    options.recording = o.value("recording").toString();
+    options.link = o.value("link").toString();
+    options.instrumentId = convert ? QString() : o.value("instrumentId").toString();
+    options.tiedSongCode = o.value("tiedSongCode").toString();
+    options.keyFifths = o.value("keyFifths", 0).toInt();
+    options.timeSigNumerator = o.value("timeSigNumerator", 4).toInt();
+    options.timeSigDenominator = o.value("timeSigDenominator", 4).toInt();
+    options.tempoBpm = o.value("tempoBpm", 120).toInt();
+    options.measures = o.value("measures", 32).toInt();
+
+    const muse::Ret ret = convert ? starScore()->convertToSoloTranscription(options) : starScore()->newSoloTranscription(options);
+    if (!ret) {
+        LOGE() << ret.toString();
+        interactive()->error(muse::trc("starscore", "The solo transcription couldn't be made"),
+                             ret.text().empty() ? ret.toString() : ret.text());
+        return false;
+    }
+    if (!convert) {
+        QSettings().setValue(SETTING_SOLO_INSTRUMENT, options.instrumentId);
+    } else {
+        interactive()->info(muse::trc("starscore", "Solo transcription made"),
+                            muse::qtrc("starscore", "Saved in Projects and Sheets/8 Solo Transcriptions/%1 - %2, and opened. The "
+                                                    "solo in the song is as it was: remove it from the song when you're happy with "
+                                                    "the new file.")
+                            .arg(options.player.trimmed(), options.song.trimmed()).toStdString());
     }
     return true;
 }

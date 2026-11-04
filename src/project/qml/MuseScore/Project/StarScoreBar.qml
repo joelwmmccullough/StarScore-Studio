@@ -154,7 +154,7 @@ Rectangle {
                 Layout.alignment: Qt.AlignTop | Qt.AlignLeft
                 Layout.topMargin: 5
                 horizontalAlignment: Text.AlignLeft
-                text: qsTrc("starscore", "Arrangements")
+                text: barModel.isSoloTranscription ? qsTrc("starscore", "Solo") : qsTrc("starscore", "Arrangements")
                 font: ui.theme.bodyBoldFont
             }
 
@@ -165,8 +165,39 @@ Rectangle {
                 Layout.preferredWidth: 1
                 spacing: 6
 
+                // (1.24.0) a Solo Transcription: who and what, its sheets, the song it's tied to
+                StarScoreChip {
+                    visible: barModel.isSoloTranscription
+                    text: (barModel.soloInfo.player || "") + " – " + (barModel.soloInfo.song || "")
+                          + (barModel.soloInfo.instrumentName ? " · " + barModel.soloInfo.instrumentName : "")
+                    showDot: false
+                    toolTip: [ barModel.soloInfo.band || "", barModel.soloInfo.recording || "", barModel.soloInfo.link || "" ]
+                             .filter(function(t) { return t !== "" }).join("\n")
+                }
+
+                StarScoreChip {
+                    visible: barModel.isSoloTranscription
+                    text: qsTrc("starscore", "Export the 12 keys")
+                    showDot: false
+                    toolTip: qsTrc("starscore", "Every key's sheet, with the notes colored by pitch, into the solo's Sheets folder: in "
+                                   + "concert pitch, and written for the instrument when it transposes.")
+                    onLeftClicked: function(mouse) {
+                        barModel.handleMenuItem("solo-export-sheets")
+                    }
+                }
+
+                StarScoreChip {
+                    visible: barModel.isSoloTranscription && (barModel.soloInfo.tiedSongTitle || "") !== ""
+                    text: qsTrc("starscore", "Song: %1").arg(barModel.soloInfo.tiedSongTitle || "")
+                    showDot: false
+                    toolTip: qsTrc("starscore", "Open the song")
+                    onLeftClicked: function(mouse) {
+                        barModel.handleMenuItem("solo-open-tied")
+                    }
+                }
+
                 Repeater {
-                    model: barModel.arrangements
+                    model: barModel.isSoloTranscription ? [] : barModel.arrangements
 
                     delegate: StarScoreChip {
                         required property var modelData
@@ -189,6 +220,7 @@ Rectangle {
 
                 StarScoreChip {
                     id: newArrangementChip
+                    visible: !barModel.isSoloTranscription
                     text: qsTrc("starscore", "+ New arrangement")
                     dashed: true
                     showDot: false
@@ -248,7 +280,7 @@ Rectangle {
         // --- Sections ---
         RowLayout {
             Layout.fillWidth: true
-            visible: !root.collapsed
+            visible: !root.collapsed && !barModel.isSoloTranscription
             spacing: 8
 
             StyledTextLabel {
@@ -394,7 +426,8 @@ Rectangle {
         // --- Solos ---
         RowLayout {
             Layout.fillWidth: true
-            visible: !root.collapsed && (barModel.solos.length > 0 || barModel.canAddSolos)
+            visible: !root.collapsed && !barModel.isSoloTranscription
+                     && (barModel.solos.length > 0 || barModel.canAddSolos || barModel.tiedSolos.length > 0)
             spacing: 8
 
             StyledTextLabel {
@@ -444,13 +477,37 @@ Rectangle {
                     }
                 }
 
+                // (1.24.0) the song's Solo Transcriptions, each in its own file: clicked, it opens
+                Repeater {
+                    model: barModel.tiedSolos
+
+                    delegate: StarScoreChip {
+                        required property var modelData
+
+                        text: modelData.name
+                        showDot: false
+                        toolTip: qsTrc("starscore", "Solo transcription (its own file): click to open it")
+                        onLeftClicked: function(mouse) {
+                            barModel.handleMenuItem("solo-open-file:" + modelData.path)
+                        }
+                    }
+                }
+
                 StarScoreChip {
                     visible: barModel.canAddSolos
-                    text: qsTrc("starscore", "+ Add solo transcription")
+                    text: qsTrc("starscore", "+ New solo transcription")
                     dashed: true
                     showDot: false
+                    toolTip: qsTrc("starscore", "A solo transcription in its own file, in all twelve keys, tied to this song.\n"
+                                   + "Right-click to add a solo kept inside the song instead (the old way).")
+                    menuItemsProvider: function() {
+                        return [ { "id": "solo-add", "title": qsTrc("starscore", "Add a solo kept inside the song (the old way)…"), "enabled": true } ]
+                    }
                     onLeftClicked: function(mouse) {
-                        barModel.handleMenuItem("solo-add")
+                        barModel.handleMenuItem("solo-new")
+                    }
+                    onMenuItemChosen: function(itemId) {
+                        barModel.handleMenuItem(itemId)
                     }
                 }
             }

@@ -15,6 +15,7 @@
 #include <map>
 #include <optional>
 #include <utility>
+#include <tuple>
 #include <vector>
 
 #include <QJsonObject>
@@ -219,6 +220,26 @@ struct StarScoreNewOptions
     //! 7-Horn Standard: the main low horn (a lowHornChoices() id), the 7th chair instead of the bass trombone.
     //! Empty = bass trombone.
     QString lowHornInstrumentId;
+};
+
+//! File › New › Solo Transcription (1.24.0): a transcribed solo, in all twelve keys
+struct StarScoreSoloTranscriptionOptions
+{
+    QString song;
+    QString player;
+    QString band;
+    QString recording;           // album or recording
+    QString link;                // a YouTube (or other) link to the recording
+    QString instrumentId;        // MuseScore instrument id ("tenor-saxophone")
+    QString tiedSongCode;        // the Starsign song it belongs to ("AMPL"), or ""
+    int keyFifths = 0;           // concert key signature
+    int timeSigNumerator = 4;
+    int timeSigDenominator = 4;
+    int tempoBpm = 120;
+    int measures = 32;
+    //! With a song open in this window the new file is made and saved on its own, then opened (in a window of its
+    //! own); true (the autotest) makes it this window's score instead
+    bool replaceOpenScore = false;
 };
 
 //! An instrument a New StarScore dropdown offers: its MuseScore id, the part name it gets, and the band's name for it
@@ -553,6 +574,27 @@ public:
 
     //! Create a brand-new score holding the template arrangement (3-Horn Standard by default) and make it current.
     virtual muse::Ret newStarScore(const StarScoreNewOptions& options) = 0;
+
+    // --- Solo Transcriptions (1.24.0): their own .starscore files in Projects and Sheets/8 Solo Transcriptions, with
+    // twelve part scores of the one solo part, each in another key; the score's notes and formatting show in all
+    // twelve, fingerings stay where they're written
+    //! Makes the solo's score and its twelve key part scores, and saves it in its folder
+    virtual muse::Ret newSoloTranscription(const StarScoreSoloTranscriptionOptions& options) = 0;
+    //! "Projects and Sheets/8 Solo Transcriptions" ("" when Projects and Sheets isn't found)
+    virtual QString soloTranscriptionsFolder() const = 0;
+    //! Whether the open score is a Solo Transcription
+    virtual bool isSoloTranscription() const = 0;
+    //! The open Solo Transcription's details: song, player, band, recording, link, instrument, tiedSongCode
+    virtual QJsonObject soloTranscriptionInfo() const = 0;
+    //! The songs a solo can be tied to: (code, title, path) from Projects and Sheets' 1 Starsign
+    virtual std::vector<std::tuple<QString, QString, QString> > soloTiableSongs() const = 0;
+    //! The Solo Transcription files tied to a song (by its code): their paths, newest first
+    virtual QStringList soloTranscriptionsTiedTo(const QString& songCode) const = 0;
+    //! Writes the 24 sheets (twelve keys, concert and for the soloist's instrument), notes coloured by pitch, into
+    //! the solo's Sheets folder. Returns what it wrote.
+    virtual muse::RetVal<QString> exportSoloSheets() = 0;
+    //! The open score (one instrument: an old solo kept in a song) copied into a new Solo Transcription file
+    virtual muse::Ret convertToSoloTranscription(const StarScoreSoloTranscriptionOptions& options) = 0;
     //! New StarScore dialog: the instruments the woodwind doubler can play (Soprano Sax … Flute), in menu order
     virtual std::vector<StarScoreHornChoice> doublerChoices() const = 0;
     //! New StarScore dialog: the low horns the 7-Horn section's 7th chair can be (Bass Trombone first), in menu order

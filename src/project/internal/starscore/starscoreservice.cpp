@@ -142,6 +142,14 @@ void StarScoreService::init()
             LOGI() << "[starscore] saving: the listen-through stopped first";
             stopListening();
         }
+        // (1.24.0) a Solo Transcription saved with each key's notes spelled for it: a part score note spelled for
+        // another key would be "fixed" when the file is opened, by changing its pitch (Note::setupAfterRead)
+        if (alive) {
+            INotationProjectPtr current = globalContext()->currentProject();
+            if (current && project == static_cast<const void*>(current.get()) && isSoloTranscription()) {
+                refreshSoloTranscription(current->masterNotation(), false);
+            }
+        }
     });
 
     // Audit listen-through: stop at the end of the rehearsal section
@@ -165,10 +173,13 @@ void StarScoreService::listenCurrentProject()
         scheduleChanged();
         scheduleIntegrityCheck();
         QTimer::singleShot(0, &m_timerGuard, [this]() { syncCreditsAfterEdit(); });
+        // (1.24.0) a Solo Transcription's twelve keys spelled and laid out again
+        scheduleSoloRefresh();
     });
     // (an undo or redo of a composer change isn't followed by another step: that would clear what can be redone)
     master->notation()->undoStack()->undoRedoNotification().onNotify(this, [this]() {
         m_creditsUndoRedo = true;
+        m_soloUndoRedo = true;
     });
     m_lastCredits = starscore::creditTexts(masterScore());
 }
@@ -503,6 +514,7 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
     }
     data.scoreSystems = root.value("scoreSystems").toObject();
     data.recordings = root.value("recordings").toObject();
+    data.solo = root.value("solo").toObject();
     const QJsonObject partStatus = root.value("partStatus").toObject();
     for (auto it = partStatus.begin(); it != partStatus.end(); ++it) {
         data.partStatus[it.key()] = it.value().toString();
@@ -676,6 +688,9 @@ QString StarScoreService::toJson(const Data& data)
     }
     if (!data.scoreSystems.isEmpty()) {
         root["scoreSystems"] = data.scoreSystems;
+    }
+    if (!data.solo.isEmpty()) {
+        root["solo"] = data.solo;
     }
     if (!data.recordings.isEmpty()) {
         root["recordings"] = data.recordings;
@@ -4781,7 +4796,14 @@ void StarScoreService::onCurrentProjectChanged()
     extractSolos();
     ensureFileId();
     // once the score is fully set up
-    QTimer::singleShot(0, &m_timerGuard, [this]() { tidyOpenedScore(); });
+    QTimer::singleShot(0, &m_timerGuard, [this]() {
+        // (1.24.0) a Solo Transcription isn't a band song: none of a song's tidying
+        if (isSoloTranscription()) {
+            onSoloTranscriptionOpened();
+        } else {
+            tidyOpenedScore();
+        }
+    });
     if (autotestRequested()) {
         startAutotest();
     }

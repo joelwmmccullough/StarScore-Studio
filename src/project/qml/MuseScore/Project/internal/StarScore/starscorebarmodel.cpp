@@ -11,6 +11,7 @@
 
 #include <QFileInfo>
 #include <QUrl>
+#include <QDesktopServices>
 
 #include "project/internal/starscore/starscorehornkeys.h"
 #include "project/internal/starscore/starscorestatus.h"
@@ -191,6 +192,46 @@ bool StarScoreBarModel::canAddSolos() const
     return starScore()->canAddSolos();
 }
 
+bool StarScoreBarModel::isSoloTranscription() const
+{
+    return starScore()->isSoloTranscription();
+}
+
+QVariantMap StarScoreBarModel::soloInfo() const
+{
+    const QJsonObject info = starScore()->soloTranscriptionInfo();
+    if (info.isEmpty()) {
+        return QVariantMap();
+    }
+    QVariantMap map = info.toVariantMap();
+    // the song it's tied to, by name
+    const QString code = info.value("tiedSongCode").toString();
+    if (!code.isEmpty()) {
+        for (const auto& [c, title, path] : starScore()->soloTiableSongs()) {
+            if (c == code) {
+                map["tiedSongTitle"] = title;
+                map["tiedSongPath"] = path;
+            }
+        }
+    }
+    return map;
+}
+
+QVariantList StarScoreBarModel::tiedSolos() const
+{
+    QVariantList list;
+    if (starScore()->isSoloTranscription() || isSoloView()) {
+        return list;
+    }
+    const QString code = starScore()->songCode();
+    for (const QString& path : starScore()->soloTranscriptionsTiedTo(code)) {
+        QString name = QFileInfo(path).completeBaseName();
+        name = name.mid(name.indexOf(QString::fromUtf8(" · ")) >= 0 ? name.indexOf(QString::fromUtf8(" · ")) + 3 : 0);
+        list << QVariantMap { { "name", name }, { "path", path } };
+    }
+    return list;
+}
+
 void StarScoreBarModel::showSolo(const QString& id)
 {
     muse::Ret ret = starScore()->showSolo(id);
@@ -215,6 +256,8 @@ QVariantList StarScoreBarModel::soloMenu(const QString& id) const
         QVariantMap { { "id", "solo-export:" + id }, { "title", muse::qtrc("starscore", "Export as MuseScore file (.mscz)…") },
                       { "enabled", true } },
         QVariantMap {},
+        QVariantMap { { "id", "solo-convert:" + id }, { "title", muse::qtrc("starscore", "Make a Solo Transcription file from this solo…") },
+                      { "enabled", true } },
         QVariantMap { { "id", "solo-remove:" + id }, { "title", muse::qtrc("starscore", "Remove solo from this file") }, { "enabled", true } },
     };
 }
@@ -587,6 +630,20 @@ QVariantList StarScoreBarModel::moreMenu() const
     auto item = [](const QString& id, const QString& title, bool enabled = true) {
         return QVariantMap { { "id", id }, { "title", title }, { "enabled", enabled } };
     };
+    if (starScore()->isSoloTranscription()) {
+        const QVariantMap info = soloInfo();
+        return {
+            item("solo-export-sheets", muse::qtrc("starscore", "Export the twelve keys' sheets")),
+            item("solo-open-tied", info.value("tiedSongTitle").toString().isEmpty()
+                 ? muse::qtrc("starscore", "Open the song it's tied to (none)")
+                 : muse::qtrc("starscore", "Open %1").arg(info.value("tiedSongTitle").toString()),
+                 !info.value("tiedSongPath").toString().isEmpty()),
+            item("solo-open-link", muse::qtrc("starscore", "Open the recording's link"), !info.value("link").toString().isEmpty()),
+            QVariantMap {},
+            item("color-notes", muse::qtrc("starscore", "Color notes by pitch")),
+            item("uncolor-notes", muse::qtrc("starscore", "Remove note colors")),
+        };
+    }
     auto checkItem = [](const QString& id, const QString& title, bool checked) {
         return QVariantMap { { "id", id }, { "title", title }, { "checkable", true }, { "checked", checked }, { "enabled", true } };
     };
@@ -1118,7 +1175,52 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
     } else if (action == "practice-flags") {
         interactive()->open(UriQuery("musescore://starscore/practiceflags?modal=false&floating=true"));
     } else if (action == "solo-add") {
+        // the old way: a solo kept inside the song (still on the solo chips' menu as "Add a solo kept in the song…")
         interactive()->open(UriQuery("musescore://starscore/addsolo"));
+    } else if (action == "solo-new") {
+        // (1.24.0) a Solo Transcription of its own, tied to this song
+        UriQuery query("musescore://starscore/new");
+        query.addParam("soloMode", Val(std::string("new")));
+        query.addParam("soloTiedCode", Val(starScore()->songCode().toStdString()));
+        interactive()->open(query);
+    } else if (action == "solo-convert") {
+        // an old solo in the song made into a Solo Transcription file: shown first (it's what's copied)
+        const QString code = starScore()->songCode();
+        QString name;
+        for (const StarScoreSolo& solo : starScore()->solos()) {
+            if (solo.id == arg) {
+                name = solo.name;
+            }
+        }
+        const Ret shown = starScore()->showSolo(arg);
+        if (!shown) {
+            interactive()->error(muse::trc("starscore", "Couldn't open the solo"), shown.toString());
+            return;
+        }
+        UriQuery query("musescore://starscore/new");
+        query.addParam("soloMode", Val(std::string("convert")));
+        query.addParam("soloTiedCode", Val(code.toStdString()));
+        query.addParam("soloName", Val(name.toStdString()));
+        interactive()->open(query);
+    } else if (action == "solo-open-file") {
+        dispatcher()->dispatch("file-open", muse::actions::ActionData::make_arg1<QUrl>(QUrl::fromLocalFile(arg)));
+    } else if (action == "solo-open-tied") {
+        const QString path = soloInfo().value("tiedSongPath").toString();
+        if (!path.isEmpty()) {
+            dispatcher()->dispatch("file-open", muse::actions::ActionData::make_arg1<QUrl>(QUrl::fromLocalFile(path)));
+        }
+    } else if (action == "solo-open-link") {
+        const QString link = soloInfo().value("link").toString();
+        if (!link.isEmpty()) {
+            QDesktopServices::openUrl(QUrl::fromUserInput(link));
+        }
+    } else if (action == "solo-export-sheets") {
+        const RetVal<QString> ret = starScore()->exportSoloSheets();
+        if (ret.ret) {
+            interactive()->info(muse::trc("starscore", "Solo sheets"), ret.val.toStdString());
+        } else {
+            interactive()->error(muse::trc("starscore", "Solo sheets"), ret.ret.text().empty() ? ret.ret.toString() : ret.ret.text());
+        }
     } else if (action == "part-styles") {
         dispatcher()->dispatch("starscore-part-styles");
     } else if (action == "apply-styles") {

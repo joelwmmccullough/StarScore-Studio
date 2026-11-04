@@ -38,6 +38,8 @@ class MasterScore;
 class Part;
 class Excerpt;
 class Measure;
+class Score;
+struct Interval;
 }
 
 namespace mu::project {
@@ -143,6 +145,14 @@ public:
     std::vector<StarScoreSectionTemplate> sectionTemplates() const override;
     std::vector<StarScoreArrangementTemplate> arrangementTemplates() const override;
     muse::Ret newStarScore(const StarScoreNewOptions& options) override;
+    muse::Ret newSoloTranscription(const StarScoreSoloTranscriptionOptions& options) override;
+    QString soloTranscriptionsFolder() const override;
+    bool isSoloTranscription() const override;
+    QJsonObject soloTranscriptionInfo() const override;
+    std::vector<std::tuple<QString, QString, QString> > soloTiableSongs() const override;
+    QStringList soloTranscriptionsTiedTo(const QString& songCode) const override;
+    muse::RetVal<QString> exportSoloSheets() override;
+    muse::Ret convertToSoloTranscription(const StarScoreSoloTranscriptionOptions& options) override;
     std::vector<StarScoreHornChoice> doublerChoices() const override;
     std::vector<StarScoreHornChoice> lowHornChoices() const override;
     QString rosterDoublerName() const override;
@@ -400,6 +410,9 @@ public:
         // ticks}); worked out again when the reference part's systems or the song's bars change
         QJsonObject scoreSystems;
         QJsonObject recordings;
+        // a Solo Transcription (1.24.0): its song, player, band, recording, link, instrument, the song it's tied to,
+        // and its twelve key part scores ("keys": [{ "shift", "name" }]); empty for a band song
+        QJsonObject solo;
 
         // Audit mode
         QString auditReferenceSectionId;          // section the others are compared with (empty = automatic)
@@ -513,6 +526,36 @@ private:
     QObject m_timerGuard;
     std::vector<StarScoreFileArrangement> summarizeArrangements(const Data& data, const StarScoreAuditReport& report) const;
     void storeTo(mu::engraving::MasterScore* score, const Data& data, const std::shared_ptr<INotationProject>& project);
+
+    // Solo Transcriptions (starscoresolotranscription.cpp)
+    struct SoloKeyScore {
+        int index = 0;   // semitones above the original key (0 = the original)
+        QString name;
+        notation::INotationPtr notation;
+        mu::engraving::Score* score = nullptr;
+    };
+    std::vector<SoloKeyScore> soloKeyScores(const notation::IMasterNotationPtr& master) const;
+    QString soloTranscriptionPath(const StarScoreSoloTranscriptionOptions& options) const;
+    static QString soloSubtitle(const StarScoreSoloTranscriptionOptions& options);
+    //! The solo's tag, its twelve key part scores and its data on the (main score of the) project
+    muse::Ret setUpSoloTranscription(const INotationProjectPtr& project, const StarScoreSoloTranscriptionOptions& options);
+    //! One key's part score: its instrument transposed by `iv`, its notes, key signatures and chord symbols spelled for
+    //! it, its clefs the concert ones (or the instrument's own, `writtenClefs`). Nothing undoable.
+    void respellSoloKey(mu::engraving::Score* score, const mu::engraving::Interval& iv, bool writtenClefs);
+    void scheduleSoloRefresh();
+    void refreshSoloTranscription(const notation::IMasterNotationPtr& master, bool syncLayout);
+    void onSoloTranscriptionOpened();
+    mu::engraving::Interval soloInstrumentInterval() const;
+    //! A key's part score made ready to print: in concert pitch, or written for the instrument. Returns its label.
+    QString prepareSoloKeyForSheet(const SoloKeyScore& key, bool written);
+    int colorSoloSheet(mu::engraving::Score* score);
+    QString soloFileKeyName(int keyIndex, bool written) const;
+    bool m_soloRefreshQueued = false;
+    bool m_soloUndoRedo = false;
+    bool m_soloRefreshing = false;
+    QString m_soloLayoutSig;   // the main score's formatting last copied into the twelve keys
+    //! The autotest's solo… steps (false: not one of them)
+    bool autotestSoloStep(const QString& step);
 
     // solos
     void onCurrentProjectChanged();

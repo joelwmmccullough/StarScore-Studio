@@ -5,7 +5,8 @@
  *
  * File › New: first "Starsign Score" or "Non-Starsign Score". Non-Starsign hands over to MuseScore's own new-score
  * wizard (the dialog closes with the value "musescore-wizard"; ProjectActionsController::newProject opens the wizard);
- * Starsign goes on to the StarScore form below.
+ * Starsign goes on to the StarScore form below; Solo Transcription (1.24.0) to its own form: the solo's song,
+ * player, band, recording, link and instrument, and the song it's tied to.
  */
 import QtQuick
 import QtQuick.Layouts
@@ -19,10 +20,10 @@ StyledDialogView {
 
     title: qsTrc("starscore", "New Score")
 
-    // 0 = the Starsign / Non-Starsign choice, 1 = the StarScore form
+    // 0 = the Starsign / Non-Starsign / Solo Transcription choice, 1 = the StarScore form, 2 = the solo form
     property int page: 0
 
-    contentWidth: 460
+    contentWidth: root.page === 0 ? 560 : 460
     contentHeight: root.page === 0 ? 220 : 680
     margins: 20
 
@@ -70,6 +71,60 @@ StyledDialogView {
     function chooseStarsign() {
         root.page = 1
         titleField.ensureActiveFocus()
+    }
+
+    // --- the Solo Transcription form
+    property string soloSong: ""
+    property string soloPlayer: ""
+    property string soloBand: ""
+    property string soloRecording: ""
+    property string soloLink: ""
+    property string soloInstrument: newModel.lastSoloInstrumentId
+    property string soloTiedCode: ""
+    // opened for a solo (the StarScore bar): "new" (a new one, tied to the song), "convert" (the open score, an old solo
+    // kept in a song, made into a Solo Transcription file: no instrument, key or bars to ask)
+    property string soloMode: ""
+    property string soloName: ""
+    readonly property bool converting: root.soloMode === "convert"
+
+    Component.onCompleted: {
+        if (root.soloMode !== "") {
+            root.page = 2
+            if (root.converting) {
+                root.soloSong = newModel.openTitle
+            }
+            Qt.callLater(function() {
+                soloSongField.ensureActiveFocus()
+            })
+        }
+    }
+
+    function chooseSolo() {
+        root.page = 2
+        soloSongField.ensureActiveFocus()
+    }
+
+    function createSolo() {
+        if (root.soloSong.trim() === "" || root.soloPlayer.trim() === "") {
+            return
+        }
+        if (newModel.createSolo({
+            "song": root.soloSong,
+            "player": root.soloPlayer,
+            "band": root.soloBand,
+            "recording": root.soloRecording,
+            "link": root.soloLink,
+            "instrumentId": root.soloInstrument,
+            "tiedSongCode": root.soloTiedCode,
+            "keyFifths": root.keyFifths,
+            "timeSigNumerator": root.timeNum,
+            "timeSigDenominator": root.timeDen,
+            "tempoBpm": root.tempo,
+            "measures": root.measures
+        }, root.converting)) {
+            root.ret = { "errcode": 0, "value": "created" }
+            root.hide()
+        }
     }
 
     function chooseMuseScore() {
@@ -137,6 +192,16 @@ StyledDialogView {
                 navigation.panel: choicePanel
                 navigation.order: 2
                 onClicked: root.chooseMuseScore()
+            }
+
+            FlatButton {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                text: qsTrc("starscore", "Solo Transcription")
+                toolTipTitle: qsTrc("starscore", "A transcribed solo in all twelve keys, kept in Projects and Sheets/8 Solo Transcriptions")
+                navigation.panel: choicePanel
+                navigation.order: 3
+                onClicked: root.chooseSolo()
             }
         }
 
@@ -329,6 +394,180 @@ StyledDialogView {
             onStandardButtonClicked: function(buttonId) {
                 if (buttonId === ButtonBoxModel.Cancel) {
                     root.reject()
+                }
+            }
+        }
+    }
+
+    // --- Page 2: the Solo Transcription ---
+    StyledFlickable {
+        anchors.fill: parent
+        visible: root.page === 2
+        contentHeight: soloColumn.implicitHeight
+        clip: true
+
+        ColumnLayout {
+            id: soloColumn
+            width: parent.width
+            spacing: 10
+
+            StyledTextLabel { text: qsTrc("starscore", "Song"); font: ui.theme.bodyBoldFont }
+            TextInputField {
+                id: soloSongField
+                Layout.fillWidth: true
+                hint: qsTrc("starscore", "Song title")
+                currentText: root.soloSong
+                onTextEdited: function(t) { root.soloSong = t }
+                onAccepted: root.createSolo()
+            }
+
+            StyledTextLabel { text: qsTrc("starscore", "Tied to a Starsign song"); font: ui.theme.bodyBoldFont }
+            StyledDropdown {
+                Layout.fillWidth: true
+                model: newModel.songsForTying
+                currentIndex: Math.max(0, indexOfValue(root.soloTiedCode))
+                onActivated: function(index, value) { root.soloTiedCode = value }
+            }
+
+            StyledTextLabel { text: qsTrc("starscore", "Player"); font: ui.theme.bodyBoldFont }
+            TextInputField {
+                Layout.fillWidth: true
+                hint: qsTrc("starscore", "Who plays the solo")
+                onTextEdited: function(t) { root.soloPlayer = t }
+                onAccepted: root.createSolo()
+            }
+
+            StyledTextLabel { text: qsTrc("starscore", "Band"); font: ui.theme.bodyBoldFont }
+            TextInputField {
+                Layout.fillWidth: true
+                hint: qsTrc("starscore", "Band (optional)")
+                onTextEdited: function(t) { root.soloBand = t }
+                onAccepted: root.createSolo()
+            }
+
+            StyledTextLabel { text: qsTrc("starscore", "Album / recording"); font: ui.theme.bodyBoldFont }
+            TextInputField {
+                Layout.fillWidth: true
+                hint: qsTrc("starscore", "Album or recording (optional)")
+                onTextEdited: function(t) { root.soloRecording = t }
+                onAccepted: root.createSolo()
+            }
+
+            StyledTextLabel { text: qsTrc("starscore", "Link"); font: ui.theme.bodyBoldFont }
+            TextInputField {
+                Layout.fillWidth: true
+                hint: qsTrc("starscore", "YouTube or other link (optional)")
+                onTextEdited: function(t) { root.soloLink = t }
+                onAccepted: root.createSolo()
+            }
+
+            StyledTextLabel { visible: !root.converting; text: qsTrc("starscore", "Instrument"); font: ui.theme.bodyBoldFont }
+            StyledDropdown {
+                visible: !root.converting
+                Layout.fillWidth: true
+                model: newModel.soloInstruments
+                currentIndex: indexOfValue(root.soloInstrument)
+                onActivated: function(index, value) { root.soloInstrument = value }
+            }
+
+            StyledTextLabel { visible: !root.converting; text: qsTrc("starscore", "Key signature (concert)"); font: ui.theme.bodyBoldFont }
+            StyledDropdown {
+                visible: !root.converting
+                Layout.fillWidth: true
+                model: newModel.keys
+                currentIndex: indexOfValue(root.keyFifths)
+                onActivated: function(index, value) { root.keyFifths = value }
+            }
+
+            RowLayout {
+                visible: !root.converting
+                Layout.fillWidth: true
+                spacing: 12
+
+                ColumnLayout {
+                    StyledTextLabel { text: qsTrc("starscore", "Time signature"); font: ui.theme.bodyBoldFont }
+                    RowLayout {
+                        IncrementalPropertyControl {
+                            Layout.preferredWidth: 64
+                            currentValue: root.timeNum
+                            step: 1; decimals: 0; minValue: 1; maxValue: 63
+                            onValueEdited: function(v) { root.timeNum = v }
+                        }
+                        StyledTextLabel { text: "/" }
+                        StyledDropdown {
+                            Layout.preferredWidth: 64
+                            model: [ { "text": "1", "value": 1 }, { "text": "2", "value": 2 }, { "text": "4", "value": 4 },
+                                     { "text": "8", "value": 8 }, { "text": "16", "value": 16 }, { "text": "32", "value": 32 } ]
+                            currentIndex: indexOfValue(root.timeDen)
+                            onActivated: function(index, value) { root.timeDen = value }
+                        }
+                    }
+                }
+
+                ColumnLayout {
+                    StyledTextLabel { text: root.tempoLabel(root.timeNum, root.timeDen); font: ui.theme.bodyBoldFont }
+                    IncrementalPropertyControl {
+                        Layout.preferredWidth: 80
+                        currentValue: root.tempo
+                        step: 1; decimals: 0; minValue: 20; maxValue: 400
+                        onValueEdited: function(v) { root.tempo = v }
+                    }
+                }
+
+                ColumnLayout {
+                    StyledTextLabel { text: qsTrc("starscore", "Bars"); font: ui.theme.bodyBoldFont }
+                    IncrementalPropertyControl {
+                        Layout.preferredWidth: 80
+                        currentValue: root.measures
+                        step: 1; decimals: 0; minValue: 1; maxValue: 999
+                        onValueEdited: function(v) { root.measures = v }
+                    }
+                }
+            }
+
+            StyledTextLabel {
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignLeft
+                wrapMode: Text.WordWrap
+                color: ui.theme.fontSecondaryColor
+                text: root.converting
+                      ? qsTrc("starscore", "Copies the solo that's open (%1) into a Solo Transcription file of its own, with twelve part "
+                              + "scores, one in each key. Only the soloist's part is copied; the solo in the song stays as it is. "
+                              + "Saved in Projects and Sheets/8 Solo Transcriptions.").arg(root.soloName || qsTrc("starscore", "the open score"))
+                      : qsTrc("starscore", "Makes the solo's score and twelve part scores, one in each key (the original first). What you "
+                              + "write in the score shows in all twelve; fingerings stay in the part score they're written in. Saved in "
+                              + "Projects and Sheets/8 Solo Transcriptions.")
+            }
+
+            ButtonBox {
+                Layout.fillWidth: true
+
+                buttons: [ ButtonBoxModel.Cancel ]
+
+                navigationPanel.section: root.navigationSection
+                navigationPanel.order: 4
+
+                FlatButton {
+                    visible: root.soloMode === ""
+                    text: qsTrc("starscore", "Back")
+                    buttonRole: ButtonBoxModel.BackRole
+                    buttonId: ButtonBoxModel.CustomButton + 4
+                    onClicked: root.page = 0
+                }
+
+                FlatButton {
+                    text: root.converting ? qsTrc("starscore", "Make") : qsTrc("starscore", "Create")
+                    accentButton: true
+                    enabled: root.soloSong.trim() !== "" && root.soloPlayer.trim() !== ""
+                    buttonRole: ButtonBoxModel.ApplyRole
+                    buttonId: ButtonBoxModel.CustomButton + 3
+                    onClicked: root.createSolo()
+                }
+
+                onStandardButtonClicked: function(buttonId) {
+                    if (buttonId === ButtonBoxModel.Cancel) {
+                        root.reject()
+                    }
                 }
             }
         }
