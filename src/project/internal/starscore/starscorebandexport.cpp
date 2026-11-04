@@ -6419,9 +6419,12 @@ RetVal<QString> StarScoreService::exportSoloSheets()
     m_soloRefreshing = false;
     // back as they were: each key in concert pitch, in the octave it had
     refreshSoloTranscription(master, false);
+    // (1.25.0) its chord charts in every key, and its iReal Pro chart (and the playlist of every solo's)
+    QStringList irealSongs;
+    const int charts = written > 0 ? exportSoloChordCharts(irealSongs, problems) : 0;
     // on Home's list of solos to learn (1.25.0)
     if (written > 0) {
-        recordSoloExport();
+        recordSoloExport(irealSongs);
     }
     for (const SoloKeyScore& k : keys) {
         k.score->setLayoutAll();
@@ -6431,7 +6434,11 @@ RetVal<QString> StarScoreService::exportSoloSheets()
         }
     }
 
-    const QString summary = muse::qtrc("starscore", "Wrote %1 sheet(s), dark-mode copies included, to %2.").arg(written).arg(QDir::toNativeSeparators(sheets));
+    QString summary = muse::qtrc("starscore", "Wrote %1 sheet(s), dark-mode copies included, to %2.").arg(written).arg(QDir::toNativeSeparators(sheets));
+    if (charts > 0) {
+        summary += " " + muse::qtrc("starscore", "Wrote %1 chord chart file(s) to the Chord Charts folder, and added it to the "
+                                                 "solo transcriptions' iReal Pro playlist.").arg(charts);
+    }
     LOGI() << "[starscore] solo sheets: " << summary.toStdString();
     if (!problems.isEmpty()) {
         return RetVal<QString>::make_ret(Ret::Code::UnknownError, (QStringList { summary } + problems).join("\n").toStdString());

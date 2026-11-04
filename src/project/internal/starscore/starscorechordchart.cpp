@@ -40,6 +40,9 @@
 #include "engraving/dom/chordlist.h"
 #include "engraving/dom/fret.h"
 #include "engraving/dom/text.h"
+#include "engraving/dom/interval.h"
+#include "engraving/dom/pitchspelling.h"
+#include "engraving/editing/transpose.h"
 #include "engraving/dom/box.h"
 #include "engraving/dom/keysig.h"
 #include "engraving/dom/barline.h"
@@ -2142,7 +2145,11 @@ std::vector<IRealLink> irealParts(const ChordChartData& song, const Analysis& a,
         parts.push_back(cur);
     }
     const int keyNo = song.key ? *song.key : 0;
-    const QString key = KEYS_MAJOR.count(keyNo) ? KEYS_MAJOR.at(keyNo) : "C";
+    QString key = KEYS_MAJOR.count(keyNo) ? KEYS_MAJOR.at(keyNo) : "C";
+    if (song.minor && KEYS_MAJOR.count(keyNo + 3)) {
+        key = KEYS_MAJOR.at(keyNo + 3) + "-";   // (the relative minor: A- for no sharps or flats)
+    }
+    const QString style = song.irealStyle.isEmpty() ? QString("Funk") : song.irealStyle;
     std::vector<IRealLink> links;
     for (size_t n = 0; n < parts.size(); ++n) {
         QString prog;
@@ -2162,7 +2169,7 @@ std::vector<IRealLink> irealParts(const ChordChartData& song, const Analysis& a,
         const QString t = parts.size() == 1 ? title : QString("%1 (Part %2 of %3)").arg(title).arg(n + 1).arg(parts.size());
         QString safeTitle = t;
         safeTitle.replace('=', '-');
-        links.push_back({ t, "irealbook://" + QStringList { safeTitle, composer, "Funk", key, "n", prog }.join('='), lineCount });
+        links.push_back({ t, "irealbook://" + QStringList { safeTitle, composer, style, key, "n", prog }.join('='), lineCount });
     }
     return links;
 }
@@ -2410,5 +2417,177 @@ ChordChartResult writeChordCharts(const MasterScore* ms, const QString& folder, 
         result.written << rel;
     }
     return result;
+
+namespace {
+//! "Eb" -> its tonal pitch class (F 13, C 14 … B 19; a sharp +7, a flat -7)
+int chartTpcOf(const QString& name)
+{
+    static const QString LETTERS = "FCGDAEB";
+    if (name.isEmpty() || LETTERS.indexOf(name.at(0).toUpper()) < 0) {
+        return Tpc::TPC_INVALID;
+    }
+    int tpc = 13 + int(LETTERS.indexOf(name.at(0).toUpper()));
+    for (int i = 1; i < name.size(); ++i) {
+        if (name.at(i) == '#') {
+            tpc += 7;
+        } else if (name.at(i) == 'b') {
+            tpc -= 7;
+        }
+    }
+    return tpc;
 }
+
+QString chartNameOf(int tpc)
+{
+    static const QString LETTERS = "FCGDAEB";
+    const int k = tpc - 13;
+    const int letter = ((k % 7) + 7) % 7;
+    const int acc = (k - letter) / 7;
+    return QString(LETTERS.at(letter)) + (acc > 0 ? QString(acc, '#') : QString(-acc, 'b'));
+}
+
+QString chartTranspose(const QString& name, const Interval& iv)
+{
+    const int tpc = chartTpcOf(name);
+    if (tpc == Tpc::TPC_INVALID || iv.isZero()) {
+        return name;
+    }
+    return chartNameOf(Transpose::transposeTpc(tpc, iv, false));
+}
+
+//! iReal Pro's scrambling of a chart's chords (its "1r34LbKcu7" form): each 50-character block but the last has its
+//! characters 0-4 and 10-23 swapped with the mirrored ones. (It undoes itself.)
+QString irealScramble(QString s)
+{
+    const auto block = [](const QString& p) {
+        QString r = p;
+        for (int i = 0; i < 5; ++i) {
+            r[49 - i] = p[i];
+            r[i] = p[49 - i];
+        }
+        for (int i = 10; i < 24; ++i) {
+            r[49 - i] = p[i];
+            r[i] = p[49 - i];
+        }
+        return r;
+    };
+    QString out;
+    while (s.size() > 50) {
+        const QString p = s.left(50);
+        s = s.mid(50);
+        out += s.size() < 2 ? p : block(p);
+    }
+    return out + s;
+}
+
+//! An "irealbook://Title=Composer=Style=Key=n=Chords" link as one song of an "irealb://" playlist:
+//! "Title=Composer==Style=Key==1r34LbKcu7<scrambled chords>==0=0"
+QString irealPlaylistSong(const QString& irealbookUrl)
+{
+    const QStringList f = irealbookUrl.mid(QString("irealbook://").size()).split('=');
+    if (f.size() < 6) {
+        return QString();
+    }
+    const QString chords = f.mid(5).join('=');
+    return QStringList { f[0], f[1], QString(), f[2], f[3], QString(), "1r34LbKcu7" + irealScramble(chords), QString(), "0", "0" }
+           .join('=');
+}
+}
+
+ChordChartResult writeSoloChordCharts(const MasterScore* ms, const QString& folder, const QString& base, const QString& title,
+                                      const QString& player, bool minor, const std::vector<SoloChartKey>& keys,
+                                      QStringList& irealSongs, QStringList& problems)
+{
+    ChordChartResult result;
+    ChordChartData concert = extractChordChart(ms);
+    int chords = 0;
+    for (const ChordChartMeasure& m : concert.measures) {
+        chords += int(m.chords.size());
+    }
+    if (chords == 0 || keys.empty()) {
+        return result;   // (a solo without chord symbols has no chart)
+    }
+    concert.composer = player;     // (iReal Pro's composer: the soloist, surname first)
+    concert.minor = minor;
+    concert.irealStyle = "Medium Swing";
+    const auto keep = [](const QString&, QString*) { return true; };
+    const QString stem = "Chord Charts/" + base;
+
+    // iReal Pro: the concert key it's written in, once
+    {
+        ChordChartData data = concert;
+        const QString rel = stem + " - iReal Pro.html";
+        if (placeFile(folder, rel, chordChartIRealHtml(data, title, QString()).toUtf8(), keep, problems)) {
+            result.written << rel;
+        }
+        const Analysis a = analyse(data);
+        std::set<QString> notes;
+        for (const IRealLink& l : irealParts(data, a, title, composerForIReal(data.composer), notes)) {
+            const QString song = irealPlaylistSong(l.url);
+            if (!song.isEmpty()) {
+                irealSongs << song;
+            }
+        }
+    }
+
+    // the chord charts: every key
+    const bool pdf = org::canRenderPdf();
+    for (const SoloChartKey& k : keys) {
+        ChordChartData data = concert;
+        const Interval iv(k.diatonic, k.chromatic);
+        for (ChordChartMeasure& m : data.measures) {
+            for (ChordChartChord& c : m.chords) {
+                c.root = chartTranspose(c.root, iv);
+                c.bass = chartTranspose(c.bass, iv);
+            }
+        }
+        data.key = k.fifths;
+        const QString chartHtml = chordChartHtml(data, QString("%1 (%2)").arg(title, k.label), chordChartEmbeddedFonts(),
+                                                 QString());
+        const QString rel = stem + " - " + k.fileKey + " - Chord Chart" + (pdf ? ".pdf" : ".html");
+        if (!pdf) {
+            if (placeFile(folder, rel, chartHtml.toUtf8(), keep, problems)) {
+                result.written << rel;
+            }
+            continue;
+        }
+        const QString tmp = QDir::tempPath() + QString("/StarScoreSoloChart-%1.pdf").arg(QDateTime::currentMSecsSinceEpoch());
+        if (!renderChartPdf(chartHtml, tmp)) {
+            QFile::remove(tmp);
+            problems << muse::qtrc("starscore", "Chord chart (%1): the PDF couldn't be made.").arg(k.label);
+            continue;
+        }
+        const QByteArray bytes = readAll(tmp);
+        QFile::remove(tmp);
+        if (placeFile(folder, rel, bytes, keep, problems)) {
+            result.written << rel;
+        }
+    }
+    if (!pdf) {
+        problems << muse::qtrc("starscore", "Chord charts: the PDFs need macOS; the pages were written as .html instead.");
+    }
+    return result;
+}
+
+QString iRealPlaylistHtml(const QString& name, const QStringList& songs)
+{
+    QString list;
+    for (int i = 0; i < songs.size(); ++i) {
+        const QStringList f = songs.at(i).split('=');
+        list += QString("%1. %2 - %3<br>").arg(QString::number(i + 1), esc(f.value(0)), esc(f.value(1)));
+    }
+    QString safeName = name;
+    safeName.replace('=', '-');
+    const QString url = urlQuote("irealb://" + songs.join("===") + "===" + safeName);
+    // (one arg() call per placeholder-free piece: the quoted URL is full of "%2"s)
+    return QString("<!DOCTYPE html>\n<html>\n<head>\n<meta name=\"viewport\" content=\"width=device-width, minimum-scale=1, "
+                   "maximum-scale=1\" />\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" />\n"
+                   "<title>iReal Pro</title>\n</head>\n<body style=\"color: rgb(230, 227, 218); background-color: rgb(27, 39, 48); "
+                   "font-family: Helvetica,Arial,sans-serif;\" alink=\"#b2e0ff\" link=\"#94d5ff\" vlink=\"#b2e0ff\">\n<br/><br/>\n"
+                   "<h3><a href=\"") + url + QString("\">") + esc(name) + QString("</a> (%1)<br/></h3><br/>\n").arg(songs.size())
+           + QString("<p>") + list + QString("</p><br/>\n<br/><span style=\"font-size: small; color: #999999;\">- iOS: tap "
+                                                 "Share/Export and choose iReal Pro.<br />- Mac: drag the .html file on the iReal Pro "
+                                                 "App icon in the dock.</span><br/>\n</body>\n</html>\n");
+}
+
 }

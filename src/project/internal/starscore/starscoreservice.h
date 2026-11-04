@@ -570,13 +570,19 @@ private:
     int colorSoloSheet(mu::engraving::Score* score, bool dark = false);
     //! The open solo's entry in 8 Solo Transcriptions/.solo-progress.json made or brought up to date after an export
     //! (its key names, the date; what's been learned kept)
-    void recordSoloExport();
+    void recordSoloExport(const QStringList& irealSongs);
+    int exportSoloChordCharts(QStringList& irealSongs, QStringList& problems);
+    void writeSoloIRealPlaylist(const QString& folder, const QJsonObject& solos);
+    void watchSoloChordMutes();
+    void syncSoloChordMute(const mu::engraving::InstrumentTrackId& trackId, bool mute);
     muse::async::Notification m_soloLearningChanged;
     muse::RetVal<QString> copyScoreAudio(const QString& soloPath, const QString& sourcePath, const QString& base);
     QString soloFileKeyName(int keyIndex, bool written) const;
     bool m_soloRefreshQueued = false;
     bool m_soloUndoRedo = false;
     bool m_soloRefreshing = false;
+    bool m_soloMuteSyncing = false;
+    std::vector<std::weak_ptr<mu::notation::INotation> > m_soloMuteWatched;
     QString m_soloLayoutSig;   // the main score's formatting last copied into the twelve keys
     //! The autotest's solo… steps (false: not one of them)
     bool autotestSoloStep(const QString& step);

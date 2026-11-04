@@ -17,6 +17,7 @@
  */
 #include "starscoreservice.h"
 #include "starscoreengraving.h"
+#include "starscorechordchart.h"
 
 #include <algorithm>
 #include <cmath>
@@ -569,6 +570,7 @@ Ret StarScoreService::setUpSoloTranscription(const INotationProjectPtr& project,
     storeTo(ms, data, project);
     if (here) {
         applySoloStyles();
+        watchSoloChordMutes();
     }
 
     m_soloLayoutSig.clear();
@@ -1182,6 +1184,7 @@ void StarScoreService::onSoloTranscriptionOpened()
 {
     m_soloLayoutSig.clear();
     m_soloUndoRedo = false;
+    watchSoloChordMutes();
     if (!isSoloTranscription()) {
         return;
     }
@@ -1193,6 +1196,60 @@ void StarScoreService::onSoloTranscriptionOpened()
     m_soloLayoutSig = soloLayoutSignature(masterScore());
     soloRememberStyle(masterScore());
     refreshSoloTranscription(globalContext()->currentMasterNotation(), false);
+}
+
+void StarScoreService::watchSoloChordMutes()
+{
+    for (const std::weak_ptr<INotation>& w : m_soloMuteWatched) {
+        const INotationPtr n = w.lock();
+        if (n && n->soloMuteState()) {
+            n->soloMuteState()->trackSoloMuteStateChanged().disconnect(this);
+        }
+    }
+    m_soloMuteWatched.clear();
+    if (!isSoloTranscription()) {
+        return;
+    }
+    // (1.25.0, Joel) the chords muted on one key's part score (or the main score) are muted on all of them
+    if (IMasterNotationPtr master = globalContext()->currentMasterNotation()) {
+        m_soloMuteWatched.push_back(master->notation());
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            if (e && e->notation()) {
+                m_soloMuteWatched.push_back(e->notation());
+            }
+        }
+        for (const std::weak_ptr<INotation>& w : m_soloMuteWatched) {
+            const INotationPtr n = w.lock();
+            if (n && n->soloMuteState()) {
+                n->soloMuteState()->trackSoloMuteStateChanged().onReceive(
+                    this, [this](const engraving::InstrumentTrackId& id, const INotationSoloMuteState::SoloMuteState& st) {
+                    syncSoloChordMute(id, st.mute);
+                });
+            }
+        }
+    }
+}
+
+void StarScoreService::syncSoloChordMute(const engraving::InstrumentTrackId& trackId, bool mute)
+{
+    if (m_soloMuteSyncing || trackId.instrumentId != muse::String(u"chord_symbols")) {
+        return;
+    }
+    m_soloMuteSyncing = true;
+    for (const std::weak_ptr<INotation>& w : m_soloMuteWatched) {
+        const INotationPtr n = w.lock();
+        INotationSoloMuteStatePtr sm = n ? n->soloMuteState() : nullptr;
+        if (!sm) {
+            continue;
+        }
+        INotationSoloMuteState::SoloMuteState st = sm->trackSoloMuteStateExists(trackId)
+                                                   ? sm->trackSoloMuteState(trackId) : INotationSoloMuteState::SoloMuteState();
+        if (st.mute != mute) {
+            st.mute = mute;
+            sm->setTrackSoloMuteState(trackId, st);
+        }
+    }
+    m_soloMuteSyncing = false;
 }
 
 void StarScoreService::updateSoloPlaybackTranspose()
@@ -1384,7 +1441,7 @@ static bool soloAddUnlisted(const QString& folder, QJsonObject& root)
     return added;
 }
 
-void StarScoreService::recordSoloExport()
+void StarScoreService::recordSoloExport(const QStringList& irealSongs)
 {
     INotationProjectPtr project = globalContext()->currentProject();
     const QString folder = soloTranscriptionsFolder();
@@ -1420,12 +1477,84 @@ void StarScoreService::recordSoloExport()
     entry["tiedSongCode"] = info.value("tiedSongCode").toString();
     entry["exported"] = QDate::currentDate().toString(Qt::ISODate);
     entry["keys"] = keys;
+    entry["ireal"] = QJsonArray::fromStringList(irealSongs);   // (its iReal Pro chart, for the playlist of them all)
     solos[id] = entry;
     root["solos"] = solos;
+    writeSoloIRealPlaylist(folder, solos);
     if (soloWriteProgress(folder, root)) {
         m_soloLearningChanged.notify();
     } else {
         LOGW() << "[starscore] couldn't write " << soloProgressPath(folder).toStdString();
+    }
+}
+
+//! (1.25.0, Joel) The chord charts of a solo's export: one per key, numbered like its sheets, in the concert keys;
+//! and its iReal Pro page once, in the key it's written in (iReal Pro transposes it). Returns the files written.
+int StarScoreService::exportSoloChordCharts(QStringList& irealSongs, QStringList& problems)
+{
+    INotationProjectPtr project = globalContext()->currentProject();
+    engraving::MasterScore* ms = masterScore();
+    if (!project || !ms) {
+        return 0;
+    }
+    const Data data = load();
+    const int orig = data.solo.value("fifths").toInt();
+    std::vector<starscore::SoloChartKey> keys;
+    for (const QJsonValue& v : data.solo.value("keys").toArray()) {
+        const QJsonObject k = v.toObject();
+        const int index = k.value("index").toInt();
+        const int target = soloTargetFifths(data.solo, index);
+        engraving::Interval iv = soloIntervalTo(orig, target, k.value("shift").toInt());
+        iv.flip();   // (concert -> this key)
+        starscore::SoloChartKey key;
+        key.fileKey = QString("%1 %2").arg((index * 7) % 12 + 1, 2, 10, QChar('0')).arg(soloFileKeyName(index, false));
+        key.label = soloKeyLabel(target, soloMinor(data.solo));
+        key.diatonic = iv.diatonic;
+        key.chromatic = iv.chromatic;
+        key.fifths = target;
+        keys.push_back(key);
+    }
+    std::sort(keys.begin(), keys.end(), [](const starscore::SoloChartKey& a, const starscore::SoloChartKey& b) {
+        return a.fileKey < b.fileKey;
+    });
+    const QString player = data.solo.value("player").toString();
+    const QString song = data.solo.value("song").toString();
+    const auto safe = [](QString n) {
+        static const QRegularExpression unsafe("[/:\\\\]");
+        return n.replace(unsafe, "-").trimmed();
+    };
+    const QString base = safe(player) + " - " + safe(song);
+    const QString title = player.isEmpty() ? song : QString("%1 (%2)").arg(song, player);
+    const starscore::ChordChartResult r = starscore::writeSoloChordCharts(ms, QFileInfo(project->path().toQString()).absolutePath(), base, title,
+                                                    player, soloMinor(data.solo), keys, irealSongs, problems);
+    return int(r.written.size());
+}
+
+//! (1.25.0, Joel) "8 Solo Transcriptions/Solo Transcriptions - iReal Pro Playlist.html": every exported solo's iReal
+//! Pro chart as one playlist, so opening the one file imports them all. Rebuilt at each export.
+void StarScoreService::writeSoloIRealPlaylist(const QString& folder, const QJsonObject& solos)
+{
+    QStringList songs;
+    QStringList ids = solos.keys();
+    ids.sort(Qt::CaseInsensitive);
+    for (const QString& id : ids) {
+        if (!QFileInfo::exists(folder + "/" + id)) {
+            continue;   // (a solo since moved or deleted)
+        }
+        for (const QJsonValue& v : solos.value(id).toObject().value("ireal").toArray()) {
+            if (!v.toString().isEmpty()) {
+                songs << v.toString();
+            }
+        }
+    }
+    const QString path = folder + "/" + muse::qtrc("starscore", "Solo Transcriptions - iReal Pro Playlist.html");
+    if (songs.isEmpty()) {
+        return;
+    }
+    QSaveFile out(path);
+    const QByteArray bytes = starscore::iRealPlaylistHtml(muse::qtrc("starscore", "Solo Transcriptions"), songs).toUtf8();
+    if (!out.open(QIODevice::WriteOnly) || out.write(bytes) != bytes.size() || !out.commit()) {
+        LOGW() << "[starscore] couldn't write " << path.toStdString();
     }
 }
 
@@ -1801,6 +1930,7 @@ QString StarScoreService::soloFileKeyName(int keyIndex, bool written) const
 //    soloload                      the saved file read back on its own: each key's first notes as written
 //    soloexport                    the twelve keys' sheets (and a list of what was written)
 //    soloshow:<name>               an old solo kept in the song shown
+//    solomute:<key index|main>[|0]  the chord symbols muted (|0 unmuted) there; each score's mute state after
 //    sololist, solomark:<key>|<learned|memorized|->   Home's learning list (and a key marked on its first solo)
 //    soloaudioadd:<file>|<name>    a recording copied into the open solo's Audio folder
 //    solountag                     the open solo transcription made a plain one-instrument score (for soloconvert)
@@ -2048,7 +2178,60 @@ bool StarScoreService::autotestSoloStep(const QString& step)
             for (const QString& f : files) {
                 soloTestLog("    " + f);
             }
+            QDirIterator charts(QFileInfo(project->path().toQString()).absolutePath() + "/Chord Charts", QDir::Files);
+            QStringList chartFiles;
+            while (charts.hasNext()) {
+                const QString f = charts.next();
+                chartFiles << QString("Chord Charts/%1 (%2 bytes)").arg(QFileInfo(f).fileName()).arg(QFileInfo(f).size());
+            }
+            chartFiles.sort();
+            for (const QString& f : chartFiles) {
+                soloTestLog("    " + f);
+            }
+            const QString playlist = soloTranscriptionsFolder() + "/Solo Transcriptions - iReal Pro Playlist.html";
+            QFile pl(playlist);
+            if (pl.open(QIODevice::ReadOnly)) {
+                const QString html = QString::fromUtf8(pl.readAll());
+                const int a = html.indexOf("irealb://");
+                soloTestLog(QString("  playlist: %1 bytes; link starts %2").arg(html.size()).arg(html.mid(a, 160)));
+            } else {
+                soloTestLog("  playlist: none at " + playlist);
+            }
         }
+        return true;
+    }
+    if (step.startsWith("solomute:")) {
+        // solomute:<key index | main>[|0]: the chord symbols muted (unmuted with |0) on that score, then each score's state
+        IMasterNotationPtr master = globalContext()->currentMasterNotation();
+        if (!master || master->masterScore()->parts().empty()) {
+            soloTestLog("  no score");
+            return true;
+        }
+        const QString which = step.mid(9).section('|', 0, 0);
+        const bool mute = step.section('|', 1, 1) != "0";
+        INotationPtr target = master->notation();
+        for (const SoloKeyScore& k : soloKeyScores(master)) {
+            if (QString::number(k.index) == which) {
+                target = k.notation;
+            }
+        }
+        const engraving::InstrumentTrackId id { master->masterScore()->parts().front()->id(), String(u"chord_symbols") };
+        INotationSoloMuteState::SoloMuteState st;
+        st.mute = mute;
+        if (target && target->soloMuteState()) {
+            target->soloMuteState()->setTrackSoloMuteState(id, st);
+        }
+        QStringList states;
+        std::vector<INotationPtr> all { master->notation() };
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            all.push_back(e ? e->notation() : nullptr);
+        }
+        for (const INotationPtr& n : all) {
+            const bool m = n && n->soloMuteState() && n->soloMuteState()->trackSoloMuteStateExists(id)
+                           && n->soloMuteState()->trackSoloMuteState(id).mute;
+            states << (m ? "M" : "-");
+        }
+        soloTestLog("  chord symbols muted (main, then each part score): " + states.join(' '));
         return true;
     }
     if (step.startsWith("soloshow:")) {
