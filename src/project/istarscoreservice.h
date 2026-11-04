@@ -234,6 +234,7 @@ struct StarScoreSoloTranscriptionOptions
     QString instrumentId;        // MuseScore instrument id ("tenor-saxophone")
     QString tiedSongCode;        // the Starsign song it belongs to ("AMPL"), or ""
     QString copyright;           // the sheets' copyright line ("" = soloAutoCopyright's)
+    QString mode = "major";      // "major" / "minor": how the keys are named ("D♭ major", "B♭ minor")
     int keyFifths = 0;           // concert key signature
     int timeSigNumerator = 4;
     int timeSigDenominator = 4;
@@ -600,6 +601,13 @@ public:
     //! (1.25.0) The copyright line a solo transcription gets unless another is typed: "Transcription © <year> Joel
     //! McCullough. <Song> as played by <Player> (<Band>), from <Recording>."
     virtual QString soloAutoCopyright(const StarScoreSoloTranscriptionOptions& options) const = 0;
+    //! The open solo's keys for the StarScore bar's Keys menu: "mode" and "keys" [{ index, title, fifths, otherFifths,
+    //! otherTitle }] (otherFifths 99 when the key has only one spelling)
+    virtual QJsonObject soloKeyMenuInfo() const = 0;
+    //! Named as major or minor keys ("D♭ major" / "B♭ minor"): the part scores, sheets and Home's list follow
+    virtual void setSoloMode(const QString& mode) = 0;
+    //! A key shown in its other spelling (C♯ major instead of D♭ major): its key signature, notes and chord symbols
+    virtual void setSoloKeySpelling(int keyIndex, int fifths) = 0;
     //! (1.25.0) The solo transcriptions whose sheets have been exported, for Home's learning list: each with "id"
     //! (its file, relative to 8 Solo Transcriptions), "path", "player", "song", "instrument", "exported" (date) and
     //! "keys" [{ "name", "short", "state": "" | "learned" | "memorized" }], the original key first

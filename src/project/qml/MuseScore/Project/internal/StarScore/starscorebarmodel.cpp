@@ -6,6 +6,8 @@
 #include "starscorebarmodel.h"
 
 #include <set>
+#include <cstdlib>
+#include <vector>
 
 #include <QRegularExpression>
 
@@ -217,6 +219,41 @@ QVariantMap StarScoreBarModel::soloInfo() const
         }
     }
     return map;
+}
+
+QVariantList StarScoreBarModel::soloKeysMenu() const
+{
+    const QJsonObject info = starScore()->soloKeyMenuInfo();
+    const bool minor = info.value("mode").toString() == "minor";
+    QVariantList items {
+        QVariantMap { { "id", "solo-mode:major" }, { "title", muse::qtrc("starscore", "Major keys (C major, D♭ major…)") },
+                      { "checkable", true }, { "checked", !minor }, { "enabled", true } },
+        QVariantMap { { "id", "solo-mode:minor" }, { "title", muse::qtrc("starscore", "Minor keys (A minor, B♭ minor…)") },
+                      { "checkable", true }, { "checked", minor }, { "enabled", true } },
+        QVariantMap {},
+    };
+    for (const QJsonValue& v : info.value("keys").toArray()) {
+        const QJsonObject k = v.toObject();
+        if (k.value("otherFifths").toInt() == 99) {
+            continue;
+        }
+        const int index = k.value("index").toInt();
+        const int f = k.value("fifths").toInt();
+        const int other = k.value("otherFifths").toInt();
+        // the two spellings, the one with fewer flats or sharps first
+        QVariantList sub;
+        for (const int spelling : (std::abs(f) <= std::abs(other) ? std::vector<int> { f, other } : std::vector<int> { other, f })) {
+            const QString title = spelling == f ? k.value("title").toString() : k.value("otherTitle").toString();
+            sub << QVariantMap { { "id", QString("solo-spell:%1:%2").arg(index).arg(spelling) },
+                                 { "title", QString("%1 (%2)").arg(title, spelling == 0 ? muse::qtrc("starscore", "no sharps or flats")
+                                                                   : spelling > 0 ? muse::qtrc("starscore", "%1 sharps").arg(spelling)
+                                                                   : muse::qtrc("starscore", "%1 flats").arg(-spelling)) },
+                                 { "checkable", true }, { "checked", spelling == f }, { "enabled", true } };
+        }
+        items << QVariantMap { { "title", k.value("title").toString() + (index == 0 ? muse::qtrc("starscore", " (original)") : QString()) },
+                               { "subitems", sub }, { "enabled", true } };
+    }
+    return items;
 }
 
 QVariantList StarScoreBarModel::audioFiles() const
@@ -1257,6 +1294,12 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
             interactive()->error(muse::trc("starscore", "Couldn't remove the file"),
                                  removed.text().empty() ? removed.toString() : removed.text());
         }
+        refresh();
+    } else if (action == "solo-mode") {
+        starScore()->setSoloMode(arg);
+        refresh();
+    } else if (action == "solo-spell") {
+        starScore()->setSoloKeySpelling(arg.section(':', 0, 0).toInt(), arg.section(':', 1).toInt());
         refresh();
     } else if (action == "solo-export-sheets") {
         // (as Export and Organize: saved first)

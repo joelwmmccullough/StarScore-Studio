@@ -154,6 +154,11 @@ public:
     muse::RetVal<QString> exportSoloSheets() override;
     muse::Ret convertToSoloTranscription(const StarScoreSoloTranscriptionOptions& options) override;
     QString soloAutoCopyright(const StarScoreSoloTranscriptionOptions& options) const override;
+    QJsonObject soloKeyMenuInfo() const override;
+    void setSoloMode(const QString& mode) override;
+    void setSoloKeySpelling(int keyIndex, int fifths) override;
+    //! Home's list: the open solo's key names brought up to date (when it's on the list)
+    void updateSoloRegistryNames();
     //! The default Starsign style settings on the open solo transcription (its main score kept in concert pitch)
     void applySoloStyles();
     QJsonArray soloLearningList() const override;
@@ -542,6 +547,7 @@ private:
         QString name;
         notation::INotationPtr notation;
         mu::engraving::Score* score = nullptr;
+        notation::IExcerptNotationPtr excerpt;
     };
     std::vector<SoloKeyScore> soloKeyScores(const notation::IMasterNotationPtr& master) const;
     QString soloTranscriptionPath(const StarScoreSoloTranscriptionOptions& options) const;

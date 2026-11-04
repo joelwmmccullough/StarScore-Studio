@@ -188,6 +188,22 @@ Rectangle {
                     }
                 }
 
+                // the keys' names (major / minor) and spellings (D♭ or C♯ major)
+                StarScoreChip {
+                    id: soloKeysChip
+                    visible: barModel.isSoloTranscription
+                    text: (barModel.soloInfo.mode === "minor" ? qsTrc("starscore", "Minor keys") : qsTrc("starscore", "Major keys")) + " ▾"
+                    showDot: false
+                    toolTip: qsTrc("starscore", "Name the keys major or minor, and pick a key's other spelling (C♯ major for D♭ major)")
+                    menuItemsProvider: function() { return barModel.soloKeysMenu() }
+                    onLeftClicked: function(mouse) {
+                        soloKeysChip.openMenu(barModel.soloKeysMenu())
+                    }
+                    onMenuItemChosen: function(itemId) {
+                        barModel.handleMenuItem(itemId)
+                    }
+                }
+
                 StarScoreChip {
                     visible: barModel.isSoloTranscription && (barModel.soloInfo.tiedSongTitle || "") !== ""
                     text: qsTrc("starscore", "Song: %1").arg(barModel.soloInfo.tiedSongTitle || "")

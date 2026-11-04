@@ -6349,7 +6349,11 @@ RetVal<QString> StarScoreService::exportSoloSheets()
 
     // spelled as they're saved first (the keys' octaves picked from the notes as they are now)
     refreshSoloTranscription(master, false);
-    const std::vector<SoloKeyScore> keys = soloKeyScores(master);
+    // numbered round the circle of fifths from the original key (Joel, 4 Nov 2026): C, G, D, A … F for a solo in C
+    std::vector<SoloKeyScore> keys = soloKeyScores(master);
+    std::sort(keys.begin(), keys.end(), [](const SoloKeyScore& a, const SoloKeyScore& b) {
+        return (a.index * 7) % 12 < (b.index * 7) % 12;
+    });
     if (keys.empty()) {
         return RetVal<QString>::make_ret(Ret::Code::UnknownError,
                                          muse::trc("starscore", "The solo's twelve key part scores weren't found."));
@@ -6371,7 +6375,7 @@ RetVal<QString> StarScoreService::exportSoloSheets()
             const QString label = prepareSoloKeyForSheet(k, forInstrument);
             const QString name = QString("%1 - %2 - %3 %4%5")
                                  .arg(starscoreSafeFileName(player), starscoreSafeFileName(song))
-                                 .arg(k.index + 1, 2, 10, QChar('0'))
+                                 .arg((k.index * 7) % 12 + 1, 2, 10, QChar('0'))
                                  .arg(soloFileKeyName(k.index, forInstrument))
                                  .arg(forInstrument ? QString() : QString(" (concert)"));
             // the sheet, then (1.25.0) its dark-mode copy: "Sheets/Dark Mode/<Concert or instrument>/… (Dark Mode).pdf",

@@ -335,6 +335,7 @@ bool NewStarScoreModel::createSolo(const QVariantMap& o, bool convert)
 {
     StarScoreSoloTranscriptionOptions options;
     options.copyright = o.value("copyright").toString();
+    options.mode = o.value("mode", "major").toString();
     options.song = o.value("song").toString();
     options.player = o.value("player").toString();
     options.band = o.value("band").toString();

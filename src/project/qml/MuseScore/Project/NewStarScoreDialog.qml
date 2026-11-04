@@ -81,6 +81,27 @@ StyledDialogView {
     property string soloLink: ""
     property string soloInstrument: newModel.lastSoloInstrumentId
     property string soloTiedCode: ""
+    // the key as a tonic and a mode (Joel, 4 Nov 2026), instead of the "C major / A minor" list: the tonic's place on
+    // the circle of fifths (C 0, G 1 … F -1), the key signature from it (a minor key 3 fewer sharps)
+    property int soloTonic: 0
+    property string soloKeyMode: "major"
+    readonly property var soloTonics: [
+        { "text": "C", "value": 0 }, { "text": "C♯", "value": 7 }, { "text": "D♭", "value": -5 }, { "text": "D", "value": 2 },
+        { "text": "D♯", "value": 9 }, { "text": "E♭", "value": -3 }, { "text": "E", "value": 4 }, { "text": "F", "value": -1 },
+        { "text": "F♯", "value": 6 }, { "text": "G♭", "value": -6 }, { "text": "G", "value": 1 }, { "text": "G♯", "value": 8 },
+        { "text": "A♭", "value": -4 }, { "text": "A", "value": 3 }, { "text": "A♯", "value": 10 }, { "text": "B♭", "value": -2 },
+        { "text": "B", "value": 5 }
+    ]
+    function soloKeyFifths() {
+        var f = root.soloKeyMode === "minor" ? root.soloTonic - 3 : root.soloTonic
+        // (G♯ major and the like: their other spelling, A♭ major)
+        if (f > 7) {
+            f -= 12
+        } else if (f < -7) {
+            f += 12
+        }
+        return f
+    }
     // the copyright line: made from the fields above until it's typed in (1.25.0)
     property string soloCopyright: ""
     property bool soloCopyrightTyped: false
@@ -122,7 +143,8 @@ StyledDialogView {
             "instrumentId": root.soloInstrument,
             "tiedSongCode": root.soloTiedCode,
             "copyright": root.soloCopyrightTyped ? root.soloCopyright : "",
-            "keyFifths": root.keyFifths,
+            "keyFifths": root.soloKeyFifths(),
+            "mode": root.soloKeyMode,
             "timeSigNumerator": root.timeNum,
             "timeSigDenominator": root.timeDen,
             "tempoBpm": root.tempo,
@@ -488,13 +510,34 @@ StyledDialogView {
                 onActivated: function(index, value) { root.soloInstrument = value }
             }
 
-            StyledTextLabel { visible: !root.converting; text: qsTrc("starscore", "Key signature (concert)"); font: ui.theme.bodyBoldFont }
-            StyledDropdown {
-                visible: !root.converting
+            StyledTextLabel { text: qsTrc("starscore", "Key (concert)"); font: ui.theme.bodyBoldFont }
+            RowLayout {
                 Layout.fillWidth: true
-                model: newModel.keys
-                currentIndex: indexOfValue(root.keyFifths)
-                onActivated: function(index, value) { root.keyFifths = value }
+                spacing: 8
+                StyledDropdown {
+                    visible: !root.converting
+                    Layout.preferredWidth: 100
+                    model: root.soloTonics
+                    currentIndex: indexOfValue(root.soloTonic)
+                    onActivated: function(index, value) { root.soloTonic = value }
+                }
+                StyledDropdown {
+                    Layout.preferredWidth: 120
+                    model: [ { "text": qsTrc("starscore", "major"), "value": "major" }, { "text": qsTrc("starscore", "minor"), "value": "minor" } ]
+                    currentIndex: indexOfValue(root.soloKeyMode)
+                    onActivated: function(index, value) { root.soloKeyMode = value }
+                }
+                StyledTextLabel {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignLeft
+                    visible: !root.converting
+                    opacity: 0.6
+                    text: {
+                        var f = root.soloKeyFifths()
+                        return f === 0 ? qsTrc("starscore", "no sharps or flats")
+                             : f > 0 ? qsTrc("starscore", "%1 sharp(s)").arg(f) : qsTrc("starscore", "%1 flat(s)").arg(-f)
+                    }
+                }
             }
 
             RowLayout {

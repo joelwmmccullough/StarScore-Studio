@@ -88,6 +88,62 @@ QString soloKeyName(int fifths)
     return QString::fromUtf8(NAMES[std::clamp(fifths, -7, 7) + 7]);
 }
 
+//! The minor key with this key signature ("C" for 3 flats)
+QString soloMinorName(int fifths)
+{
+    static const char* NAMES[15] = { "A♭", "E♭", "B♭", "F", "C", "G", "D", "A", "E", "B", "F♯", "C♯", "G♯", "D♯", "A♯" };
+    return QString::fromUtf8(NAMES[std::clamp(fifths, -7, 7) + 7]);
+}
+
+//! "D♭ major", "B♭ minor" (Joel, 4 Nov 2026: the sheets named by key and mode)
+QString soloKeyLabel(int fifths, bool minor)
+{
+    return minor ? muse::qtrc("starscore", "%1 minor").arg(soloMinorName(fifths))
+           : muse::qtrc("starscore", "%1 major").arg(soloKeyName(fifths));
+}
+
+//! A key's part score name: "C major (original)", "D♭ major"
+QString soloKeyTitle(int fifths, bool minor, int index)
+{
+    return index == 0 ? muse::qtrc("starscore", "%1 (original)").arg(soloKeyLabel(fifths, minor)) : soloKeyLabel(fifths, minor);
+}
+
+//! Whether a key signature is `index` semitones above the original's (a spelling of that key)
+bool soloSpellsKey(int originalFifths, int fifths, int index)
+{
+    return fifths >= -7 && fifths <= 7 && (((fifths - originalFifths) * 7) % 12 + 12) % 12 == ((index % 12) + 12) % 12;
+}
+
+//! The other spelling of a key, if it has one with at most 7 flats or sharps (D♭ / C♯, G♭ / F♯, B / C♭), else 99
+int soloOtherSpelling(int fifths)
+{
+    if (fifths + 12 <= 7) {
+        return fifths + 12;
+    }
+    if (fifths - 12 >= -7) {
+        return fifths - 12;
+    }
+    return 99;
+}
+
+//! The key signature a key is shown in: the one picked for it (its other spelling), else ≤ 6 flats / 5 sharps
+int soloTargetFifths(const QJsonObject& solo, int index)
+{
+    const int original = solo.value("fifths").toInt();
+    for (const QJsonValue& v : solo.value("keys").toArray()) {
+        const QJsonObject k = v.toObject();
+        if (k.value("index").toInt(-1) == index && k.contains("fifths") && soloSpellsKey(original, k.value("fifths").toInt(), index)) {
+            return k.value("fifths").toInt();
+        }
+    }
+    return soloKeyAfter(original, index);
+}
+
+bool soloMinor(const QJsonObject& solo)
+{
+    return solo.value("mode").toString() == "minor";
+}
+
 //! Letter steps from one key's tonic up to another's (0 … 6)
 int soloLetterSteps(int fromFifths, int toFifths)
 {
@@ -477,8 +533,7 @@ Ret StarScoreService::setUpSoloTranscription(const INotationProjectPtr& project,
     const QString instrumentName = part->partName().toQString();
     for (int k = 0; k < 12; ++k) {
         const int keyFifths = soloKeyAfter(fifths, k);
-        QString name = k == 0 ? muse::qtrc("starscore", "%1 (original)").arg(soloKeyName(keyFifths))
-                       : muse::qtrc("starscore", "in %1").arg(soloKeyName(keyFifths));
+        QString name = soloKeyTitle(keyFifths, false, k);
         for (int i = 2; std::any_of(excerpts.begin(), excerpts.end(), [&](const IExcerptNotationPtr& e) { return e->name() == name; }); ++i) {
             name = QString("%1 (%2)").arg(name.section(" (", 0, 0)).arg(i);
         }
@@ -502,7 +557,7 @@ Ret StarScoreService::setUpSoloTranscription(const INotationProjectPtr& project,
         { "song", options.song.trimmed() }, { "player", options.player.trimmed() }, { "band", options.band.trimmed() },
         { "recording", options.recording.trimmed() }, { "link", options.link.trimmed() }, { "instrument", options.instrumentId },
         { "instrumentName", instrumentName }, { "tiedSongCode", options.tiedSongCode.trimmed() }, { "fifths", fifths },
-        { "keys", keys },
+        { "mode", options.mode == "minor" ? "minor" : "major" }, { "keys", keys },
     };
     // the default Starsign style settings (Joel, 4 Nov 2026): now when it's this window's score, else when it's
     // first opened
@@ -667,6 +722,7 @@ std::vector<StarScoreService::SoloKeyScore> StarScoreService::soloKeyScores(cons
         s.name = e->name();
         s.notation = e->notation();
         s.score = e->notation()->elements()->msScore();
+        s.excerpt = e;
         out.push_back(s);
         taken.insert(e.get());
     };
@@ -707,7 +763,11 @@ std::vector<SoloPitch> soloPitches(mu::engraving::MasterScore* ms)
         if (!n->staff() || !n->chord()) {
             return;
         }
-        const ClefTypeList clefs = n->staff()->clefType(n->chord()->tick());
+        // the staff the note is shown on: a cross-staff note (a left-hand chord moved up to the treble staff) is read
+        // against that staff's clef (Joel, 4 Nov 2026: Pinetop's Boogie Woogie in D♭ went down 11 semitones because
+        // its bass-staff chords shown on the treble staff counted as far above the bass staff)
+        Staff* shown = ms->staff(n->chord()->vStaffIdx());
+        const ClefTypeList clefs = (shown ? shown : n->staff())->clefType(n->chord()->tick());
         SoloPitch p;
         p.pitch = n->pitch();
         p.concertMiddle = soloClefMiddle(clefs.concertClef);
@@ -951,12 +1011,49 @@ void StarScoreService::refreshSoloTranscription(const IMasterNotationPtr& master
     } done { m_soloRefreshing };
 
     Data data = loadFrom(ms);
+    bool keysChanged = false;
+    // the original key is the main score's key signature at the start: a new one there, and the twelve keys follow
+    // (each key's own spelling dropped when it no longer spells that key)
+    {
+        const int now = std::clamp(int(ms->staff(0) ? ms->staff(0)->concertKey(Fraction(0, 1)) : Key::C), -7, 7);
+        if (now != data.solo.value("fifths").toInt()) {
+            data.solo["fifths"] = now;
+            keysChanged = true;
+        }
+    }
     const int fifths = data.solo.value("fifths").toInt();
+    const bool minor = soloMinor(data.solo);
     QJsonArray keys = data.solo.value("keys").toArray();
     const std::vector<SoloPitch> pitches = soloPitches(ms);
 
-    bool keysChanged = false;
     const std::vector<SoloKeyScore> scores = soloKeyScores(master);
+    // the part scores' names follow the keys ("D♭ major"; "B♭ minor" for a minor solo): found by their old names
+    // above, renamed here (names aren't undoable)
+    bool renamed = false;
+    for (const SoloKeyScore& k : scores) {
+        for (int i = 0; i < keys.size(); ++i) {
+            QJsonObject entry = keys.at(i).toObject();
+            if (entry.value("index").toInt() != k.index) {
+                continue;
+            }
+            const int target = soloTargetFifths(data.solo, k.index);
+            if (entry.value("fifths").toInt(99) != target) {
+                entry["fifths"] = target;
+                keysChanged = true;
+            }
+            const QString title = soloKeyTitle(target, minor, k.index);
+            if (entry.value("name").toString() != title || k.name != title) {
+                if (k.excerpt && k.excerpt->name() != title) {
+                    k.excerpt->setName(title);
+                    renamed = true;
+                }
+                entry["name"] = title;
+                keysChanged = true;
+            }
+            keys[i] = entry;
+        }
+    }
+    data.solo["keys"] = keys;
     for (const SoloKeyScore& k : scores) {
         int at = -1;
         for (int i = 0; i < keys.size(); ++i) {
@@ -975,11 +1072,14 @@ void StarScoreService::refreshSoloTranscription(const IMasterNotationPtr& master
             keys[at] = entry;
             keysChanged = true;
         }
-        respellSoloKey(k.score, soloInterval(fifths, k.index, shift), false);
+        respellSoloKey(k.score, soloIntervalTo(fifths, soloTargetFifths(data.solo, k.index), shift), false);
     }
     if (keysChanged) {
         data.solo["keys"] = keys;
         storeTo(ms, data, projectOf(ms));
+    }
+    if (renamed) {
+        updateSoloRegistryNames();
     }
 
     // the main score's formatting in all twelve, in one undo step with the edit that changed it (not after an undo
@@ -1072,16 +1172,17 @@ QString StarScoreService::prepareSoloKeyForSheet(const SoloKeyScore& k, bool wri
     }
     const Data data = load();
     const int fifths = data.solo.value("fifths").toInt();
-    const int keyFifths = soloKeyAfter(fifths, k.index);
+    const int keyFifths = soloTargetFifths(data.solo, k.index);
+    const bool minor = soloMinor(data.solo);
     int shift = 0;
     for (const QJsonValue& v : data.solo.value("keys").toArray()) {
         if (v.toObject().value("index").toInt() == k.index) {
             shift = v.toObject().value("shift").toInt();
         }
     }
-    Interval iv = soloInterval(fifths, k.index, shift);
-    QString label = k.index == 0 ? muse::qtrc("starscore", "%1 (original key)").arg(soloKeyName(keyFifths))
-                    : muse::qtrc("starscore", "in %1").arg(soloKeyName(keyFifths));
+    Interval iv = soloIntervalTo(fifths, keyFifths, shift);
+    // "C major (original)", "D♭ major"; written for the instrument "E♭ major (concert D♭ major)"
+    QString label = soloKeyTitle(keyFifths, minor, k.index);
     if (written) {
         // for the instrument: its own transposition on top, the octave picked again for its own clef
         // (the written key as a key signature of at most 6 flats or 5 sharps, the letters counted from the original)
@@ -1090,8 +1191,8 @@ QString StarScoreService::prepareSoloKeyForSheet(const SoloKeyScore& k, bool wri
         const int writtenFifths = soloKeyAbove(keyFifths, -own.chromatic);
         iv = soloIntervalTo(fifths, writtenFifths, writtenShift - own.chromatic);
         label = k.index == 0
-                ? muse::qtrc("starscore", "in %1 (concert %2, original key)").arg(soloKeyName(writtenFifths), soloKeyName(keyFifths))
-                : muse::qtrc("starscore", "in %1 (concert %2)").arg(soloKeyName(writtenFifths), soloKeyName(keyFifths));
+                ? muse::qtrc("starscore", "%1 (concert %2, original)").arg(soloKeyLabel(writtenFifths, minor), soloKeyLabel(keyFifths, minor))
+                : muse::qtrc("starscore", "%1 (concert %2)").arg(soloKeyLabel(writtenFifths, minor), soloKeyLabel(keyFifths, minor));
     }
     respellSoloKey(k.score, iv, written);
     return label;
@@ -1134,7 +1235,7 @@ static bool soloWriteProgress(const QString& folder, QJsonObject root)
     return f.commit();
 }
 
-//! "E♭ (original)" -> "E♭", "in D♭" -> "D♭"
+//! "E♭ major (original)" -> "E♭", "B♭ minor" -> "B♭m" (and the 1.24.0 names: "in D♭" -> "D♭")
 static QString soloShortKey(QString name)
 {
     name = name.trimmed();
@@ -1142,7 +1243,16 @@ static QString soloShortKey(QString name)
         name = name.mid(3);
     }
     const int paren = name.indexOf(" (");
-    return paren > 0 ? name.left(paren) : name;
+    if (paren > 0) {
+        name = name.left(paren);
+    }
+    if (name.endsWith(" minor")) {
+        return name.left(name.size() - 6) + "m";
+    }
+    if (name.endsWith(" major")) {
+        return name.left(name.size() - 6);
+    }
+    return name;
 }
 
 //! Solos exported before the list existed (1.24.0): a solo folder with concert sheets and no entry gets one, its keys
@@ -1151,7 +1261,7 @@ static bool soloAddUnlisted(const QString& folder, QJsonObject& root)
 {
     QJsonObject solos = root.value("solos").toObject();
     bool added = false;
-    static const QRegularExpression sheetRe("^(.+) - (.+) - (\\d\\d) (\\S+) \\(concert\\)\\.pdf$");
+    static const QRegularExpression sheetRe("^(.+) - (.+) - (\\d\\d) (.+?) \\(concert\\)\\.pdf$");
     QDirIterator it(folder, { "*.starscore" }, QDir::Files, QDirIterator::Subdirectories);
     while (it.hasNext()) {
         const QString path = it.next();
@@ -1172,7 +1282,9 @@ static bool soloAddUnlisted(const QString& folder, QJsonObject& root)
                 song = m.captured(2);
                 QString key = m.captured(4);
                 key.replace("b", QString::fromUtf8("♭")).replace("#", QString::fromUtf8("♯"));
-                keys[m.captured(3).toInt() - 1] = key;
+                // (1.24.0 numbered the keys by semitone, 1.25.0 round the circle of fifths: the number is the place)
+                const int number = m.captured(3).toInt() - 1;
+                keys[key.contains(" major") || key.contains(" minor") ? (number * 7) % 12 : number] = key;
             }
         }
         if (keys.size() < 12) {
@@ -1180,7 +1292,7 @@ static bool soloAddUnlisted(const QString& folder, QJsonObject& root)
         }
         QJsonArray list;
         for (const auto& [index, key] : keys) {
-            list.append(QJsonObject { { "index", index }, { "name", index == 0 ? key + " (original)" : "in " + key }, { "state", "" } });
+            list.append(QJsonObject { { "index", index }, { "name", index == 0 ? key + " (original)" : key }, { "state", "" } });
         }
         solos[id] = QJsonObject { { "player", player }, { "song", song }, { "instrument", "" },
                                   { "exported", QFileInfo(concert.absolutePath()).lastModified().date().toString(Qt::ISODate) },
@@ -1257,10 +1369,18 @@ QJsonArray StarScoreService::soloLearningList() const
             continue;   // (moved or deleted)
         }
         QJsonObject e = it.value().toObject();
-        QJsonArray keys;
+        // in the sheets' order: round the circle of fifths from the original key
+        std::vector<QJsonObject> ordered;
         for (const QJsonValue& v : e.value("keys").toArray()) {
             QJsonObject k = v.toObject();
             k["short"] = soloShortKey(k.value("name").toString());
+            ordered.push_back(k);
+        }
+        std::stable_sort(ordered.begin(), ordered.end(), [](const QJsonObject& a, const QJsonObject& b) {
+            return (a.value("index").toInt() * 7) % 12 < (b.value("index").toInt() * 7) % 12;
+        });
+        QJsonArray keys;
+        for (const QJsonObject& k : ordered) {
             keys.append(k);
         }
         e["keys"] = keys;
@@ -1322,6 +1442,93 @@ Ret StarScoreService::setSoloKeyState(const QString& id, int keyIndex, const QSt
     }
     m_soloLearningChanged.notify();
     return make_ok();
+}
+
+void StarScoreService::updateSoloRegistryNames()
+{
+    INotationProjectPtr project = globalContext()->currentProject();
+    const QString folder = soloTranscriptionsFolder();
+    if (!project || folder.isEmpty() || !isSoloTranscription()) {
+        return;
+    }
+    const QString id = QDir(folder).relativeFilePath(QDir::cleanPath(project->path().toQString()));
+    QJsonObject root = soloReadProgress(folder);
+    QJsonObject solos = root.value("solos").toObject();
+    if (!solos.contains(id)) {
+        return;
+    }
+    QJsonObject entry = solos.value(id).toObject();
+    QJsonArray keys = entry.value("keys").toArray();
+    const QJsonArray now = load().solo.value("keys").toArray();
+    for (int i = 0; i < keys.size(); ++i) {
+        QJsonObject k = keys.at(i).toObject();
+        for (const QJsonValue& v : now) {
+            if (v.toObject().value("index").toInt(-1) == k.value("index").toInt(i)) {
+                k["name"] = v.toObject().value("name").toString();
+            }
+        }
+        keys[i] = k;
+    }
+    entry["keys"] = keys;
+    solos[id] = entry;
+    root["solos"] = solos;
+    if (soloWriteProgress(folder, root)) {
+        m_soloLearningChanged.notify();
+    }
+}
+
+QJsonObject StarScoreService::soloKeyMenuInfo() const
+{
+    if (!isSoloTranscription()) {
+        return QJsonObject();
+    }
+    const QJsonObject solo = load().solo;
+    const bool minor = soloMinor(solo);
+    QJsonArray keys;
+    for (int index = 0; index < 12; ++index) {
+        const int f = soloTargetFifths(solo, index);
+        const int other = soloOtherSpelling(f);
+        keys.append(QJsonObject { { "index", index }, { "fifths", f }, { "title", soloKeyLabel(f, minor) },
+                                  { "otherFifths", other }, { "otherTitle", other == 99 ? QString() : soloKeyLabel(other, minor) } });
+    }
+    return QJsonObject { { "mode", minor ? "minor" : "major" }, { "keys", keys } };
+}
+
+void StarScoreService::setSoloMode(const QString& mode)
+{
+    if (!isSoloTranscription()) {
+        return;
+    }
+    Data data = load();
+    const QString m = mode == "minor" ? "minor" : "major";
+    if (data.solo.value("mode").toString("major") == m) {
+        return;
+    }
+    data.solo["mode"] = m;
+    store(data);
+    refreshSoloTranscription(globalContext()->currentMasterNotation(), false);
+}
+
+void StarScoreService::setSoloKeySpelling(int keyIndex, int fifths)
+{
+    if (!isSoloTranscription()) {
+        return;
+    }
+    Data data = load();
+    if (!soloSpellsKey(data.solo.value("fifths").toInt(), fifths, keyIndex)) {
+        return;
+    }
+    QJsonArray keys = data.solo.value("keys").toArray();
+    for (int i = 0; i < keys.size(); ++i) {
+        QJsonObject k = keys.at(i).toObject();
+        if (k.value("index").toInt(-1) == keyIndex) {
+            k["fifths"] = fifths;
+            keys[i] = k;
+        }
+    }
+    data.solo["keys"] = keys;
+    store(data);
+    refreshSoloTranscription(globalContext()->currentMasterNotation(), false);
 }
 
 muse::async::Notification StarScoreService::soloLearningChanged() const
@@ -1492,14 +1699,13 @@ Ret StarScoreService::removeScoreAudio(const QString& audioPath)
 
 QString StarScoreService::soloFileKeyName(int keyIndex, bool written) const
 {
-    // the key in a file name, without ♭ and ♯ ("Db", "F#")
+    // the key in a file name, without ♭ and ♯ ("Db major", "F# minor")
     const Data data = load();
-    const int fifths = data.solo.value("fifths").toInt();
-    int keyFifths = soloKeyAfter(fifths, keyIndex);
+    int keyFifths = soloTargetFifths(data.solo, keyIndex);
     if (written) {
         keyFifths = soloKeyAbove(keyFifths, -soloInstrumentInterval().chromatic);
     }
-    return soloKeyName(keyFifths).replace(QString::fromUtf8("♭"), "b").replace(QString::fromUtf8("♯"), "#");
+    return soloKeyLabel(keyFifths, soloMinor(data.solo)).replace(QString::fromUtf8("♭"), "b").replace(QString::fromUtf8("♯"), "#");
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
