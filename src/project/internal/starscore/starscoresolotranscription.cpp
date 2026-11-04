@@ -841,8 +841,7 @@ int soloColorNotes(mu::engraving::Score* score, bool dark)
             }
             return false;
         };
-        bool any = apply(n);
-        any |= apply(n->accidental());
+        bool any = apply(n);   // (not its accidental: Joel, 4 Nov 2026, accidentals stay black)
         for (NoteDot* dot : n->dots()) {
             any |= apply(dot);
         }
