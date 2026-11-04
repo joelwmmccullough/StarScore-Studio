@@ -2557,7 +2557,7 @@ bool soloOneChorus(ChordChartData& data, int lastBar, int& choruses)
         return false;
     }
     for (int P = 4; P <= std::min(64, total / 2); ++P) {
-        std::vector<QString> form(size_t(P));
+        std::vector<QString> form(static_cast<size_t>(P));
         int matches = 0;
         for (int p = 0; p < P; ++p) {
             std::map<QString, int> votes;
