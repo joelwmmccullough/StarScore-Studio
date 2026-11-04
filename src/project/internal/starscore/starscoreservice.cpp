@@ -25,6 +25,7 @@
 #include <set>
 
 #include <QCryptographicHash>
+#include <QPointer>
 #include <QSet>
 #include <QDir>
 #include <QElapsedTimer>
@@ -130,6 +131,17 @@ void StarScoreService::init()
         pickReferenceForCurrentScore();
     });
     listenReferencePanel();
+
+    // (1.24.0) Saving during the audit listen-through stops it first: the instruments it hid shown again, so the file
+    // keeps the song's own visibility (it kept the listen-only one, also on closing the song). (The guard: no call
+    // once the service is gone.)
+    QPointer<QObject> alive(&m_timerGuard);
+    starscore::setBeforeSaveHook([this, alive](const void* project) {
+        if (alive && m_listening && m_mainProject && project == static_cast<const void*>(m_mainProject.get())) {
+            LOGI() << "[starscore] saving: the listen-through stopped first";
+            stopListening();
+        }
+    });
 
     // Audit listen-through: stop at the end of the rehearsal section
     playbackController()->currentPlaybackPositionChanged().onReceive(this, [this](muse::audio::secs_t, muse::midi::tick_t tick) {
@@ -741,6 +753,16 @@ mu::engraving::MasterScore* StarScoreService::masterScore() const
 {
     IMasterNotationPtr master = globalContext()->currentMasterNotation();
     return master ? master->masterScore() : nullptr;
+}
+
+std::function<bool()> StarScoreService::currentSongCheck() const
+{
+    const std::weak_ptr<IMasterNotation> master = globalContext()->currentMasterNotation();
+    const engraving::MasterScore* ms = masterScore();
+    return [this, master, ms]() {
+        const IMasterNotationPtr now = globalContext()->currentMasterNotation();
+        return ms && now && now == master.lock() && masterScore() == ms;
+    };
 }
 
 StarScoreService::Data StarScoreService::load() const
@@ -2403,7 +2425,11 @@ RetVal<QString> StarScoreService::createSection(const QString& templateKey, cons
     // have any chord symbols.
     const QStringList newIds = section.partIds;
     const bool muteChords = section.templateKey != "rhythm" && section.templateKey != "lead-sheet";
-    auto mixer = [this, newIds, muteChords]() {
+    // (1.24.0) only in this song: another one may be open by then
+    auto mixer = [this, newIds, muteChords, sameSong = currentSongCheck()]() {
+        if (!sameSong()) {
+            return;
+        }
         applyMixerDefaults(newIds);
         if (muteChords) {
             muteChordSymbolTracks(newIds);
@@ -4677,6 +4703,7 @@ void StarScoreService::onCurrentProjectChanged()
 
     INotationProjectPtr current = globalContext()->currentProject();
     if (!current) {
+        stopListening();   // (1.24.0) the instruments the listen-through hid shown again in the song it was in
         clearSolos();
         return;
     }
@@ -4685,6 +4712,7 @@ void StarScoreService::onCurrentProjectChanged()
         return;
     }
 
+    stopListening();   // (1.24.0) as above, before the old song's state goes
     clearSolos();
     m_mainProject = current;
     if (m_listening) {
@@ -4701,6 +4729,27 @@ void StarScoreService::onCurrentProjectChanged()
                 Ret ret = injectSolos(path);
                 if (!ret) {
                     LOGE() << "[starscore] could not store solos in " << path << ": " << ret.toString();
+                }
+                if (mode != SaveMode::SaveCopy) {
+                    // (1.24.0) The solos and reference PDFs are only in the working folder until they are in the
+                    // file: the song stays unsaved, closing it keeps that folder, and Joel is told (it was only logged,
+                    // and closing the song deleted them)
+                    m_soloInjectFailed = !ret;
+                    if (!ret) {
+                        if (m_mainProject) {
+                            m_mainProject->markAsUnsaved();
+                        }
+                        const QString message = muse::qtrc("starscore", "The song was saved, but its solo transcriptions "
+                                                                        "and reference PDFs couldn't be put into “%1” (%2). "
+                                                                        "Save the song again before closing it. Until a save "
+                                                                        "works, they are kept in:\n\n%3")
+                                                .arg(QFileInfo(path.toQString()).fileName(),
+                                                     QString::fromStdString(ret.toString()), m_workDir);
+                        // (a moment later: closing the song closes every dialog right after saving it)
+                        QTimer::singleShot(500, &m_timerGuard, [this, message]() {
+                            interactive()->error(muse::trc("starscore", "Solos not saved"), message.toStdString());
+                        });
+                    }
                 }
             }
         }
@@ -4723,9 +4772,15 @@ void StarScoreService::clearSolos()
     m_soloProjects.clear();
     m_mainProject.reset();
     if (!m_workDir.isEmpty()) {
-        QDir(m_workDir).removeRecursively();
+        if (m_soloInjectFailed) {
+            // (1.24.0) the last save couldn't put the solos into the file: this folder is the only copy
+            LOGW() << "[starscore] the solos and reference PDFs that couldn't be saved are kept in " << m_workDir.toStdString();
+        } else {
+            QDir(m_workDir).removeRecursively();
+        }
         m_workDir.clear();
     }
+    m_soloInjectFailed = false;
 }
 
 io::path_t StarScoreService::soloWorkPath(const QString& soloId) const

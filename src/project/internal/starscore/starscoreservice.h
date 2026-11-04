@@ -5,6 +5,7 @@
  */
 #pragma once
 
+#include <functional>
 #include <map>
 #include <optional>
 #include <set>
@@ -470,6 +471,8 @@ private:
                              const QStringList& onDisk) const;
 
     mu::engraving::MasterScore* masterScore() const;
+    //! (1.24.0) For a step done a moment later (a timer): true while the song current now is still the current one
+    std::function<bool()> currentSongCheck() const;
     void listenCurrentProject();
     Data load() const;
     void store(const Data& data);
@@ -519,6 +522,9 @@ private:
     muse::RetVal<std::shared_ptr<INotationProject> > loadSoloProject(const QString& soloId);
     muse::Ret buildSoloBand(const std::shared_ptr<INotationProject>& soloProject, const StarScoreSolo& solo);
     muse::Ret injectSolos(const muse::io::path_t& starscorePath);
+    //! (1.24.0) The last save of the song couldn't put its solos and reference PDFs into the file: the working folder
+    //! is kept when the song closes
+    bool m_soloInjectFailed = false;
     mu::engraving::Measure* mainMeasureByNumber(int barNumber) const;
     std::shared_ptr<INotationProject> exportSourceProject() const;
     muse::Ret writePdf(const notation::INotationPtr& notation, const QString& path) const;

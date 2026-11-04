@@ -1593,8 +1593,18 @@ RetVal<QStringList> StarScoreService::createLowAlternates(const QString& section
     }
 
     const QStringList newIds = made.partIds;
-    QTimer::singleShot(1500, &m_timerGuard, [this, newIds]() { applyMixerDefaults(newIds); });
-    QTimer::singleShot(4000, &m_timerGuard, [this, newIds]() { applyMixerDefaults(newIds); });
+    // (1.24.0) only in this song: another one may be open by then
+    const std::function<bool()> sameSong = currentSongCheck();
+    QTimer::singleShot(1500, &m_timerGuard, [this, newIds, sameSong]() {
+        if (sameSong()) {
+            applyMixerDefaults(newIds);
+        }
+    });
+    QTimer::singleShot(4000, &m_timerGuard, [this, newIds, sameSong]() {
+        if (sameSong()) {
+            applyMixerDefaults(newIds);
+        }
+    });
 
     master->notation()->notationChanged().notify();
     scheduleChanged();
@@ -1871,7 +1881,12 @@ RetVal<QString> StarScoreService::makeFlexibleSheetPart(const QString& sectionId
     open(ms->partById(ID(pid)));
 
     const QStringList ids { pid };
-    QTimer::singleShot(1500, &m_timerGuard, [this, ids]() { applyMixerDefaults(ids); });
+    // (1.24.0) only in this song: another one may be open by then
+    QTimer::singleShot(1500, &m_timerGuard, [this, ids, sameSong = currentSongCheck()]() {
+        if (sameSong()) {
+            applyMixerDefaults(ids);
+        }
+    });
     master->notation()->notationChanged().notify();
     scheduleChanged();
     return RetVal<QString>::make_ok(pid);

@@ -33,6 +33,7 @@ class ChangeMetaTags : public UndoCommand
 
     Score* score = nullptr;
     std::map<String, String> metaTags;
+    bool flipped = false;   // StarScore: undone or redone at least once (see flip)
 
     void flip(EditData*) override;
 

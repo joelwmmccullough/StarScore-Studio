@@ -232,7 +232,9 @@ private:
 
     bool m_isProjectSaving = false;
     bool m_isProjectClosing = false;
-    bool m_keepDialogsOnClose = false;   // StarScore: a practice exercise replacing the score keeps the practice runner open
+    int m_keepDialogsOnClose = 0;   // StarScore: practice opens in progress (they keep the practice runner open)
+    int m_practiceOpenSerial = 0;   // StarScore: bumped by each practice open (a delayed play is for its own open only)
+    QObject m_practiceTimerGuard;   // StarScore: the delayed play's context (it goes with this controller)
     bool m_isProjectProcessing = false;
     bool m_isProjectPublishing = false;
     bool m_isProjectUploading = false;

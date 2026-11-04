@@ -362,8 +362,14 @@ Ret InteractiveProvider::closeSync(const UriQuery& uri)
 
 Ret InteractiveProvider::closeAllDialogsSync()
 {
+    // StarScore Studio: the practice runner is a floating window beside the score that opens scores itself (one after
+    // another, hands free): closing a score mustn't close it, least of all while it's the one opening the next score
+    static const Uri PRACTICE_RUNNER_URI("musescore://starscore/practicerunner");
     std::vector<ObjectInfo> objs = collectOpenObjects([this](const ObjectInfo& obj) {
         if (muse::diagnostics::isDiagnosticsUri(obj.query.uri())) {
+            return false;
+        }
+        if (obj.query.uri() == PRACTICE_RUNNER_URI) {
             return false;
         }
         ContainerMeta meta = uriRegister()->meta(obj.query.uri());

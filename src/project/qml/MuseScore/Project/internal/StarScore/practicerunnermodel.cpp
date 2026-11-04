@@ -925,12 +925,14 @@ void PracticeRunnerModel::rate(int index, int stage)
     }
     if (blockIndex >= 0) {
         recordDone(blockIndex, p.minutes, p.tempo, std::clamp(stage, 1, 4), QString());
+        emit changed();   // (the block shown may be the one rated: its progress)
     }
     emit handsFreeChanged();
 }
 
 void PracticeRunnerModel::keepUnrated()
 {
+    const bool any = !m_toRate.empty();
     while (!m_toRate.empty()) {
         const Pending p = m_toRate.front();
         m_toRate.erase(m_toRate.begin());
@@ -941,6 +943,9 @@ void PracticeRunnerModel::keepUnrated()
                 break;
             }
         }
+    }
+    if (any) {
+        emit changed();
     }
     emit handsFreeChanged();
 }

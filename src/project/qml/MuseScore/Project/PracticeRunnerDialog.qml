@@ -227,12 +227,16 @@ StyledDialogView {
         }
         Repeater {
             model: run.toRate
-            delegate: RowLayout {
+            // (compact: the song and item on a line of their own, the four ratings under it)
+            delegate: GridLayout {
                 id: rateRow
                 required property var modelData
                 Layout.fillWidth: true
-                spacing: 6
+                columns: root.compact ? 4 : 5
+                columnSpacing: 6
+                rowSpacing: 4
                 Text {
+                    Layout.columnSpan: root.compact ? 4 : 1
                     Layout.fillWidth: true
                     text: rateRow.modelData.song + " · " + rateRow.modelData.title
                     color: root.ink
@@ -449,29 +453,44 @@ StyledDialogView {
             visible: !root.hf
 
             // ---------------- day, sizes, hands free ----------------
-            RowLayout {
+            // (compact: the plan and day on a line of their own, wrapping, with the sizes and the count under them)
+            GridLayout {
                 Layout.fillWidth: true
-                spacing: 8
+                columns: root.compact ? 3 : 4
+                columnSpacing: 8
+                rowSpacing: 4
                 Text {
+                    Layout.row: 0
+                    Layout.column: 0
+                    Layout.columnSpan: root.compact ? 3 : 1
                     Layout.fillWidth: true
                     text: run.planName + "  ·  " + run.dayTitle
                     color: root.soft
                     font.pixelSize: root.px(13)
+                    wrapMode: root.compact ? Text.WordWrap : Text.NoWrap
+                    maximumLineCount: root.compact ? 2 : 1
                     elide: Text.ElideRight
                 }
                 SizeControl {
+                    Layout.row: root.compact ? 1 : 0
+                    Layout.column: root.compact ? 0 : 1
                     label: qsTrc("starscore", "Text")
                     value: run.textScale
                     minimum: 0.7; maximum: 2.0
                     onStep: function(delta) { run.textScale = run.textScale + delta }
                 }
                 SizeControl {
+                    Layout.row: root.compact ? 1 : 0
+                    Layout.column: root.compact ? 1 : 2
                     label: qsTrc("starscore", "Score")
                     value: run.scoreScale
                     minimum: 0.6; maximum: 2.0
                     onStep: function(delta) { run.scoreScale = run.scoreScale + delta }
                 }
                 Text {
+                    Layout.row: root.compact ? 1 : 0
+                    Layout.column: root.compact ? 2 : 3
+                    Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
                     text: qsTrc("starscore", "%1 of %2 done").arg(run.doneCount).arg(run.blockCount)
                     color: run.blockCount > 0 && run.doneCount === run.blockCount ? root.doneColor : root.soft
                     font.pixelSize: root.px(13)
@@ -618,8 +637,11 @@ StyledDialogView {
                             minWidth: 70
                             onClicked: run.resetTimer()
                         }
-                        Item { Layout.fillWidth: true }
+                        // (it takes the rest of the line, on the right, and wraps when the window is narrow)
                         Text {
+                            Layout.fillWidth: true
+                            horizontalAlignment: Text.AlignRight
+                            wrapMode: Text.WordWrap
                             text: root.passText() !== "" ? root.passText()
                                   : (root.blk.tempo || 0) > 0 ? qsTrc("starscore", "Today ♩ = %1").arg(root.blk.tempo)
                                     + ((root.blk.tempoGoal || 0) > (root.blk.tempo || 0) ? qsTrc("starscore", ", up to %1").arg(root.blk.tempoGoal) : "")
@@ -640,49 +662,65 @@ StyledDialogView {
                             color: modelData.current ? "#2A241C" : "transparent"
                             border.color: modelData.current ? root.gold : root.line
                             border.width: 1
-                            RowLayout {
+                            // wide: number, label, time, the two buttons on one line; compact: the buttons go under
+                            // the label, so the label keeps its room
+                            GridLayout {
                                 id: partRow
                                 anchors.left: parent.left
                                 anchors.right: parent.right
                                 anchors.verticalCenter: parent.verticalCenter
                                 anchors.leftMargin: 10
                                 anchors.rightMargin: 6
-                                spacing: 8
+                                columns: root.compact ? 3 : 4
+                                columnSpacing: 8
+                                rowSpacing: 4
                                 Text {
+                                    Layout.row: 0
+                                    Layout.column: 0
                                     text: modelData.finished ? "✓" : (modelData.index + 1) + "."
                                     color: modelData.finished ? root.doneColor : root.gold
                                     font.pixelSize: root.px(14)
                                     Layout.preferredWidth: root.px(20)
                                 }
                                 Text {
+                                    Layout.row: 0
+                                    Layout.column: 1
                                     Layout.fillWidth: true
                                     text: modelData.label
                                     color: root.ink
                                     font.pixelSize: root.px(14)
-                                    elide: Text.ElideRight
+                                    wrapMode: root.compact ? Text.WordWrap : Text.NoWrap
+                                    elide: root.compact ? Text.ElideNone : Text.ElideRight
                                     MouseArea { anchors.fill: parent; onClicked: run.goPart(modelData.index) }
                                 }
                                 Text {
+                                    Layout.row: 0
+                                    Layout.column: 2
                                     text: modelData.time
                                     color: root.soft
                                     font.pixelSize: root.px(13)
                                     font.family: "Menlo"
                                 }
-                                FlatButton {
+                                RowLayout {
+                                    Layout.row: root.compact ? 1 : 0
+                                    Layout.column: root.compact ? 1 : 3
+                                    Layout.columnSpan: root.compact ? 2 : 1
                                     visible: modelData.hasNotation
-                                    text: qsTrc("starscore", "Play example")
-                                    minWidth: 100
-                                    toolTipTitle: qsTrc("starscore", "Hear it as written, at today's tempo")
-                                    onClicked: run.playExample(modelData.index)
-                                }
-                                FlatButton {
-                                    visible: modelData.hasNotation
-                                    text: qsTrc("starscore", "Play along")
-                                    accentButton: true
-                                    minWidth: 100
-                                    toolTipTitle: qsTrc("starscore", "The backing for you to play over, and the timer")
-                                    toolTipDescription: qsTrc("starscore", "It loops for the part's minutes and steps up from today's tempo toward the goal.")
-                                    onClicked: run.playAlong(modelData.index)
+                                    spacing: 8
+                                    FlatButton {
+                                        text: qsTrc("starscore", "Play example")
+                                        minWidth: root.compact ? 90 : 100
+                                        toolTipTitle: qsTrc("starscore", "Hear it as written, at today's tempo")
+                                        onClicked: run.playExample(modelData.index)
+                                    }
+                                    FlatButton {
+                                        text: qsTrc("starscore", "Play along")
+                                        accentButton: true
+                                        minWidth: root.compact ? 90 : 100
+                                        toolTipTitle: qsTrc("starscore", "The backing for you to play over, and the timer")
+                                        toolTipDescription: qsTrc("starscore", "It loops for the part's minutes and steps up from today's tempo toward the goal.")
+                                        onClicked: run.playAlong(modelData.index)
+                                    }
                                 }
                             }
                         }
@@ -723,10 +761,14 @@ StyledDialogView {
                         color: root.teal
                         font.pixelSize: root.px(13)
                     }
-                    RowLayout {
+                    // (a Flow: the buttons go on to the next line in a narrow window)
+                    Flow {
+                        Layout.fillWidth: true
                         visible: run.blockCount > 0 && run.doneCount === run.blockCount
                         spacing: 8
                         Text {
+                            height: 30
+                            verticalAlignment: Text.AlignVCenter
                             text: qsTrc("starscore", "All done. Keep going? Add")
                             color: root.ink
                             font.pixelSize: root.px(14)
@@ -811,25 +853,36 @@ StyledDialogView {
             Rectangle { Layout.fillWidth: true; height: 1; color: root.gold; opacity: 0.6 }
 
             // ---------------- done ----------------
-            RowLayout {
+            // wide: [tempo] [stage] [note ...] [Done] [Not done]; compact (beside the score), two lines:
+            // [tempo] [stage] [Done] / [note ...] [Not done], so the note field keeps its room
+            GridLayout {
                 Layout.fillWidth: true
-                spacing: 8
+                columns: root.compact ? 3 : 5
+                columnSpacing: 8
+                rowSpacing: 6
                 visible: run.blockCount > 0
-                Text {
-                    text: qsTrc("starscore", "Tempo reached")
-                    color: root.soft
-                    font.pixelSize: root.px(13)
+                RowLayout {
+                    Layout.row: 0
+                    Layout.column: 0
+                    spacing: 8
                     visible: (root.blk.tempo || 0) > 0
-                }
-                IncrementalPropertyControl {
-                    Layout.preferredWidth: 90
-                    visible: (root.blk.tempo || 0) > 0
-                    currentValue: root.tempoReached
-                    step: 2; decimals: 0; minValue: 0; maxValue: 400
-                    onValueEdited: function(v) { root.tempoReached = v }
+                    Text {
+                        text: root.compact ? qsTrc("starscore", "Tempo") : qsTrc("starscore", "Tempo reached")
+                        color: root.soft
+                        font.pixelSize: root.px(13)
+                    }
+                    IncrementalPropertyControl {
+                        Layout.preferredWidth: 90
+                        currentValue: root.tempoReached
+                        step: 2; decimals: 0; minValue: 0; maxValue: 400
+                        onValueEdited: function(v) { root.tempoReached = v }
+                    }
                 }
                 StyledDropdown {
-                    Layout.preferredWidth: 150
+                    Layout.row: 0
+                    Layout.column: 1
+                    Layout.preferredWidth: root.compact ? 130 : 150
+                    Layout.fillWidth: root.compact
                     model: [ { "text": qsTrc("starscore", "Started"), "value": 1 },
                              { "text": qsTrc("starscore", "Getting there"), "value": 2 },
                              { "text": qsTrc("starscore", "Solid"), "value": 3 },
@@ -839,12 +892,18 @@ StyledDialogView {
                 }
                 TextInputField {
                     id: noteField
+                    Layout.row: root.compact ? 1 : 0
+                    Layout.column: root.compact ? 0 : 2
+                    Layout.columnSpan: root.compact ? 2 : 1
                     Layout.fillWidth: true
+                    Layout.minimumWidth: 120
                     hint: qsTrc("starscore", "A note for next time (optional)")
                     currentText: root.noteText
                     onTextChanged: function(t) { root.noteText = t }
                 }
                 FlatButton {
+                    Layout.row: 0
+                    Layout.column: root.compact ? 2 : 3
                     text: root.blk.done ? qsTrc("starscore", "Done again") : qsTrc("starscore", "Done")
                     accentButton: true
                     minWidth: 90
@@ -854,6 +913,8 @@ StyledDialogView {
                     }
                 }
                 FlatButton {
+                    Layout.row: root.compact ? 1 : 0
+                    Layout.column: root.compact ? 2 : 4
                     visible: root.blk.done === true
                     text: qsTrc("starscore", "Not done")
                     minWidth: 80
