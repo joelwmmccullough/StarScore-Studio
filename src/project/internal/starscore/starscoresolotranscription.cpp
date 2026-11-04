@@ -904,7 +904,30 @@ void StarScoreService::respellSoloKey(engraving::Score* es, const engraving::Int
             n->setTpc2(tpc2);
         }
     });
-    // key signatures in this key
+    // the key signatures in this key: the part score's staves keep the main score's keys and no others, each in this
+    // key (Joel, 4 Nov 2026: the F sheet of Pinetop's Boogie Woogie had G♭ key changes scattered through it)
+    for (staff_idx_t si = 0; si < es->nstaves() && si < ms->nstaves(); ++si) {
+        KeyList* kl = es->staff(si)->keyList();
+        const KeyList* mkl = ms->staff(si)->keyList();
+        KeyList rebuilt;
+        for (const auto& [tick, ev] : *mkl) {
+            KeySigEvent ke = ev;
+            if (!ke.isAtonal() && !ke.custom()) {
+                ke.setKey(iv.isZero() ? ke.concertKey() : Transpose::transposeKey(ke.concertKey(), written, PreferSharpFlat::NONE));
+            }
+            rebuilt.setKey(tick, ke);
+        }
+        bool same = kl->size() == rebuilt.size();
+        for (auto a = kl->begin(), b = rebuilt.begin(); same && a != kl->end(); ++a, ++b) {
+            same = a->first == b->first && a->second == b->second;
+        }
+        if (!same) {
+            kl->clear();
+            for (const auto& [tick, ev] : rebuilt) {
+                kl->setKey(tick, ev);
+            }
+        }
+    }
     for (Segment* s = es->firstSegment(SegmentType::KeySig); s; s = s->next1(SegmentType::KeySig)) {
         for (staff_idx_t si = 0; si < es->nstaves(); ++si) {
             EngravingItem* e = s->element(si * VOICES);
@@ -912,6 +935,21 @@ void StarScoreService::respellSoloKey(engraving::Score* es, const engraving::Int
                 continue;
             }
             KeySig* ks = toKeySig(e);
+            // one the main score doesn't have (no linked copy there) isn't printed: the part score's key goes on as before
+            bool inMain = false;
+            for (EngravingObject* o : ks->linkList()) {
+                inMain |= o != ks && o->score() == ms;
+            }
+            if (!inMain && !ks->generated() && s->tick().isNotZero()) {
+                if (ks->visible()) {
+                    ks->setVisible(false);
+                }
+                const KeySigEvent now = es->staff(si)->keyList()->key(s->tick().ticks());
+                if (!(ks->keySigEvent() == now)) {
+                    ks->setKeySigEvent(now);
+                }
+                continue;
+            }
             KeySigEvent ke = ks->keySigEvent();
             if (ke.isAtonal() || ke.custom()) {
                 continue;
@@ -920,9 +958,6 @@ void StarScoreService::respellSoloKey(engraving::Score* es, const engraving::Int
             if (ke.key() != want) {
                 ke.setKey(want);
                 ks->setKeySigEvent(ke);
-                if (Staff* st = es->staff(si)) {
-                    st->setKey(s->tick(), ke);
-                }
             }
         }
     }
@@ -2019,6 +2054,38 @@ bool StarScoreService::autotestSoloStep(const QString& step)
         soloTestLog("  " + (r.ret ? r.val : QString::fromStdString(r.ret.toString())));
         for (const QJsonValue& v : scoreAudioFiles(project ? project->path().toQString() : QString())) {
             soloTestLog("    audio: " + v.toObject().value("name").toString());
+        }
+        return true;
+    }
+    if (step.startsWith("soloappend:")) {
+        // soloappend:<n>: n bars added at the end of the main score (as Add › Measures › Append)
+        INotationUndoStackPtr stack = master->notation()->undoStack();
+        stack->prepareChanges(TranslatableString::untranslatable("Test bars"));
+        ms->appendMeasures(std::max(1, step.mid(11).toInt()));
+        stack->commitChanges();
+        soloTestLog(QString("  %1 bars").arg(ms->nmeasures()));
+        return true;
+    }
+    if (step == "solokeys") {
+        // solokeys: each score's key list and key signature elements (bar: concert/shown, visible, linked)
+        refreshSoloTranscription(master, false);
+        auto dump = [&](Score* sc, const QString& name) {
+            QStringList list, elems;
+            for (const auto& [tick, ev] : *sc->staff(0)->keyList()) {
+                list << QString("%1:%2/%3").arg(sc->tick2measure(Fraction::fromTicks(tick)) ? sc->tick2measure(Fraction::fromTicks(tick))->no() + 1 : -1)
+                        .arg(int(ev.concertKey())).arg(int(ev.key()));
+            }
+            for (Segment* sg = sc->firstSegment(SegmentType::KeySig); sg; sg = sg->next1(SegmentType::KeySig)) {
+                if (EngravingItem* e = sg->element(0); e && e->isKeySig()) {
+                    elems << QString("%1:%2/%3%4%5").arg(sg->measure()->no() + 1).arg(int(toKeySig(e)->keySigEvent().concertKey()))
+                             .arg(int(toKeySig(e)->key())).arg(e->visible() ? "" : " hidden").arg(e->generated() ? " gen" : "");
+                }
+            }
+            soloTestLog(QString("  %1: list %2 | elements %3").arg(name, list.join(" "), elems.join(" ")));
+        };
+        dump(ms, "main");
+        for (const SoloKeyScore& k : soloKeyScores(master)) {
+            dump(k.score, k.name);
         }
         return true;
     }
