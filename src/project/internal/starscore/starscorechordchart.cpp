@@ -2417,6 +2417,7 @@ ChordChartResult writeChordCharts(const MasterScore* ms, const QString& folder, 
         result.written << rel;
     }
     return result;
+}
 
 namespace {
 //! "Eb" -> its tonal pitch class (F 13, C 14 … B 19; a sharp +7, a flat -7)
