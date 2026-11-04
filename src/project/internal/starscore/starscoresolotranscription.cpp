@@ -1178,7 +1178,7 @@ bool StarScoreService::autotestSoloStep(const QString& step)
         };
         soloTestLog(QString("  main: %1 | chord %2 | fingerings %3 | breaks %4 | key %5 | clef %6 | concert %7 | undo steps %8")
                     .arg(soloTestNotes(ms)).arg(firstChord(ms)).arg(fingerings(ms)).arg(breaks(ms)).arg(keyOf(ms)).arg(clefOf(ms))
-                    .arg(ms->style().styleB(Sid::concertPitch)).arg(master->notation()->undoStack()->currentStateIndex()));
+                    .arg(int(ms->style().styleB(Sid::concertPitch))).arg(master->notation()->undoStack()->currentStateIndex()));
         const QJsonArray keys = load().solo.value("keys").toArray();
         for (const SoloKeyScore& k : soloKeyScores(master)) {
             int shift = 0;
@@ -1196,7 +1196,7 @@ bool StarScoreService::autotestSoloStep(const QString& step)
     }
     if (step == "solosave") {
         const bool ok = projectFilesController()->saveProject();
-        soloTestLog(QString("  saved: %1 (%2)").arg(ok).arg(project ? project->path().toQString() : QString()));
+        soloTestLog(QString("  saved: %1 (%2)").arg(int(ok)).arg(project ? project->path().toQString() : QString()));
         return true;
     }
     if (step == "soloload") {
