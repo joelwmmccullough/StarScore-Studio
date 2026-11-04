@@ -268,8 +268,6 @@ bool NewStarScoreModel::addArrangement(const QString& arrangementKey, const QStr
 
 // --- Solo Transcription (1.24.0) ---
 
-static const char* SETTING_SOLO_INSTRUMENT = "StarScore/newSoloInstrument";
-
 QVariantList NewStarScoreModel::songsForTying(const QString& wanted) const
 {
     QVariantList list;
@@ -288,13 +286,15 @@ QVariantList NewStarScoreModel::songsForTying(const QString& wanted) const
 
 QVariantList NewStarScoreModel::soloInstruments() const
 {
+    // (Joel, 4 Nov 2026: Piano first and the one picked to start with; the B3 and a church organ are two instruments)
     static const std::vector<std::pair<const char*, const char*> > INSTRUMENTS = {
+        { "piano", "Piano" }, { "electric-piano", "Electric Piano" },
+        { "hammond-organ", "B3 Organ (Hammond)" }, { "pipe-organ", "Pipe Organ (church organ)" },
         { "tenor-saxophone", "Tenor Saxophone" }, { "alto-saxophone", "Alto Saxophone" },
         { "soprano-saxophone", "Soprano Saxophone" }, { "baritone-saxophone", "Baritone Saxophone" },
         { "bb-trumpet", "Trumpet" }, { "flugelhorn", "Flugelhorn" }, { "trombone", "Trombone" },
-        { "flute", "Flute" }, { "bb-clarinet", "Clarinet" }, { "piano", "Piano" }, { "electric-piano", "Electric Piano" },
-        { "organ", "Organ" }, { "vibraphone", "Vibraphone" }, { "electric-guitar", "Electric Guitar" },
-        { "bass-guitar", "Bass Guitar" }, { "voice", "Voice" },
+        { "flute", "Flute" }, { "bb-clarinet", "Clarinet" }, { "vibraphone", "Vibraphone" },
+        { "electric-guitar", "Electric Guitar" }, { "bass-guitar", "Bass Guitar" }, { "voice", "Voice" },
     };
     QVariantList list;
     for (const auto& [id, name] : INSTRUMENTS) {
@@ -305,7 +305,8 @@ QVariantList NewStarScoreModel::soloInstruments() const
 
 QString NewStarScoreModel::lastSoloInstrumentId() const
 {
-    return QSettings().value(SETTING_SOLO_INSTRUMENT, "tenor-saxophone").toString();
+    // always Piano to start with (Joel, 4 Nov 2026), not the one picked last time
+    return QString("piano");
 }
 
 QString NewStarScoreModel::openTitle() const
@@ -343,9 +344,7 @@ bool NewStarScoreModel::createSolo(const QVariantMap& o, bool convert)
                              ret.text().empty() ? ret.toString() : ret.text());
         return false;
     }
-    if (!convert) {
-        QSettings().setValue(SETTING_SOLO_INSTRUMENT, options.instrumentId);
-    } else {
+    if (convert) {
         interactive()->info(muse::trc("starscore", "Solo transcription made"),
                             muse::qtrc("starscore", "Saved in Projects and Sheets/8 Solo Transcriptions/%1 - %2, and opened. The "
                                                     "solo in the song is as it was: remove it from the song when you're happy with "
