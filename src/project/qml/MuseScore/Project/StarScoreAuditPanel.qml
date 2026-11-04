@@ -427,7 +427,8 @@ Item {
                 text: qsTrc("starscore", "Every horn section has been listened to at every rehearsal mark.")
             }
 
-            RowLayout {
+            // wraps in a narrow panel (the two boxes need ~390 px; the panel can be 280)
+            Flow {
                 Layout.fillWidth: true
                 visible: auditModel.hasListenSteps
                 spacing: 12

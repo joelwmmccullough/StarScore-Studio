@@ -194,7 +194,10 @@ QString md5OfFile(const QString& path)
         return QString();
     }
     QCryptographicHash h(QCryptographicHash::Md5);
-    h.addData(&f);
+    if (!h.addData(&f)) {
+        // a read that failed part-way (cloud-only placeholder, I/O error) must not pass for the file's hash
+        return QString();
+    }
     return QString::fromLatin1(h.result().toHex());
 }
 

@@ -135,5 +135,5 @@ QString StarScoreStylesModel::applyNow()
         return muse::qtrc("starscore", "Saved. Open a score to apply the styles.");
     }
     const int n = starScore()->applyStyles();
-    return muse::qtrc("starscore", "Saved. Restyled %1 score(s) and part book(s).").arg(n);
+    return muse::qtrc("starscore", "Saved. Restyled %1 score(s) and part score(s).").arg(n);
 }

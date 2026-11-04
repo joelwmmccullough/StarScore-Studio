@@ -25,6 +25,7 @@
 #pragma once
 
 #include <map>
+#include <set>
 #include <vector>
 
 #include <QJsonObject>
@@ -34,8 +35,10 @@
 #include "orgscan.h"
 
 namespace mu::project::starscore::org {
-//! Every song's sheet record, by code
-std::map<QString, QJsonObject> loadSheetRecords(const Paths& paths);
+//! Every song's sheet record, by code. A record that is there but can't be read (cloud-only, broken JSON) goes into
+//! `unreadable` by its file's code ("AMPL" for sheets/AMPL.json): its song's colours are left as they are this run
+//! rather than cleared as if it had no record.
+std::map<QString, QJsonObject> loadSheetRecords(const Paths& paths, std::set<QString>* unreadable = nullptr);
 
 struct SongColours {
     QString song;                                          // "Green" …, or "Gray"

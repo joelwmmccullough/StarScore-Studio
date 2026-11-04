@@ -6,7 +6,9 @@
  */
 #pragma once
 
+#include <atomic>
 #include <functional>
+#include <vector>
 
 #include <QString>
 #include <QStringList>
@@ -43,8 +45,9 @@ struct RenderJob {
     bool pageHeightFromHtml = false;
 };
 bool canRenderPdf();
+//! stop (optional): once it is set, the jobs not started yet are skipped (eachDone(i, false)) and allDone follows
 void renderPdfs(const std::vector<RenderJob>& jobs, std::function<void(int index, bool ok)> eachDone,
-                std::function<void()> allDone);
+                std::function<void()> allDone, const std::atomic_bool* stop = nullptr);
 
 //! GET a web page the way Safari would. Main thread; done() on the main thread with the body ("" on failure).
 //! useBrowser: load it in a hidden web view instead and return the page's HTML after its scripts ran.

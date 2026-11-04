@@ -435,8 +435,19 @@ Rectangle {
                         }
                     }
                     StyledTextLabel {
+                        visible: pm.days.length > 0
                         text: qsTrc("starscore", "In all: %1").arg(root.minutesText(pm.totalMinutes))
                         opacity: 0.7
+                    }
+                    // (why "Make a plan" can't be pressed: no days left before the show)
+                    StyledTextLabel {
+                        Layout.fillWidth: true
+                        Layout.preferredWidth: 60
+                        visible: pm.days.length === 0 && pm.showDate !== ""
+                        wrapMode: Text.WordWrap
+                        horizontalAlignment: Text.AlignLeft
+                        color: root.missingColor
+                        text: qsTrc("starscore", "The show date has passed: set the next show's date, or make a new setlist for it.")
                     }
                     FlatButton {
                         Layout.fillWidth: true
@@ -606,6 +617,9 @@ Rectangle {
                         id: skillColumn
                         width: parent.width
                         spacing: 4
+                        // (narrow, as the plans column is beside the setlist: the level and "items · last" go on a
+                        // second line instead of off the right edge)
+                        readonly property bool narrow: width < 520
                         StyledTextLabel {
                             Layout.fillWidth: true
                             Layout.preferredWidth: 60
@@ -632,11 +646,17 @@ Rectangle {
                                     font: ui.theme.bodyBoldFont
                                     color: root.goldColor
                                 }
-                                RowLayout {
+                                // wide: name, bar, level, trend, items · last on one line; narrow: name, bar, trend,
+                                // then the level and items · last under them
+                                GridLayout {
                                     Layout.fillWidth: true
                                     Layout.preferredWidth: 60
-                                    spacing: 10
+                                    columns: skillColumn.narrow ? 3 : 5
+                                    columnSpacing: 10
+                                    rowSpacing: 0
                                     StyledTextLabel {
+                                        Layout.row: 0
+                                        Layout.column: 0
                                         Layout.fillWidth: true
                                         Layout.preferredWidth: 60
                                         horizontalAlignment: Text.AlignLeft
@@ -644,7 +664,9 @@ Rectangle {
                                         text: skillDelegate.modelData.name
                                     }
                                     Rectangle {
-                                        Layout.preferredWidth: 120
+                                        Layout.row: 0
+                                        Layout.column: 1
+                                        Layout.preferredWidth: skillColumn.narrow ? 90 : 120
                                         Layout.preferredHeight: 8
                                         radius: 4
                                         color: ui.theme.buttonColor
@@ -656,20 +678,30 @@ Rectangle {
                                         }
                                     }
                                     StyledTextLabel {
-                                        Layout.preferredWidth: 150
+                                        Layout.row: skillColumn.narrow ? 1 : 0
+                                        Layout.column: skillColumn.narrow ? 0 : 2
+                                        Layout.preferredWidth: skillColumn.narrow ? 60 : 150
+                                        Layout.fillWidth: skillColumn.narrow
                                         horizontalAlignment: Text.AlignLeft
+                                        wrapMode: Text.WordWrap
                                         text: skillDelegate.modelData.levelText
                                         opacity: 0.8
                                     }
                                     StyledTextLabel {
-                                        Layout.preferredWidth: 40
+                                        Layout.row: 0
+                                        Layout.column: skillColumn.narrow ? 2 : 3
+                                        Layout.preferredWidth: skillColumn.narrow ? 16 : 40
                                         horizontalAlignment: Text.AlignRight
                                         text: skillDelegate.modelData.trend > 0.05 ? "▲" : ""
                                         color: root.doneColor
                                     }
                                     StyledTextLabel {
+                                        Layout.row: skillColumn.narrow ? 1 : 0
+                                        Layout.column: skillColumn.narrow ? 1 : 4
+                                        Layout.columnSpan: skillColumn.narrow ? 2 : 1
                                         Layout.preferredWidth: 110
                                         horizontalAlignment: Text.AlignRight
+                                        wrapMode: Text.WordWrap
                                         text: qsTrc("starscore", "%1 items · %2").arg(skillDelegate.modelData.items).arg(skillDelegate.modelData.last)
                                         opacity: 0.6
                                     }

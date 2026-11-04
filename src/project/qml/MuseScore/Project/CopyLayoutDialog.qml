@@ -153,7 +153,7 @@ StyledDialogView {
         }
 
         CheckBox {
-            text: qsTrc("starscore", "Line breaks")
+            text: qsTrc("starscore", "System breaks")
             checked: layoutModel.lineBreaks
             onClicked: layoutModel.lineBreaks = !checked
         }
@@ -195,8 +195,12 @@ StyledDialogView {
             navigationPanel.order: 2
 
             FlatButton {
-                text: qsTrc("starscore", "Copy breaks")
+                text: qsTrc("starscore", "Copy formatting")
                 accentButton: true
+                // something to copy from, into, and something ticked to copy
+                enabled: layoutModel.sourceIndex >= 0
+                         && layoutModel.targets.some(function(t) { return t.checked && t.enabled !== false })
+                         && (layoutModel.lineBreaks || layoutModel.pageBreaks || layoutModel.keepTogether || layoutModel.systemLocks)
                 buttonRole: ButtonBoxModel.ApplyRole
                 buttonId: ButtonBoxModel.CustomButton + 1
 

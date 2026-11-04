@@ -584,6 +584,68 @@ void Progress::record(const QString& code, const QString& itemId, int minutes, i
     m_log.append(entry);
 }
 
+bool Progress::undoLast(const QString& code, const QString& itemId, const QDate& date)
+{
+    int at = -1;
+    for (int i = int(m_log.size()) - 1; i >= 0; --i) {
+        const QJsonObject o = m_log.at(i).toObject();
+        if (o.value("song").toString() == code && o.value("item").toString() == itemId
+            && QDate::fromString(o.value("date").toString(), Qt::ISODate) == date) {
+            at = i;
+            break;
+        }
+    }
+    if (at < 0) {
+        return false;
+    }
+    m_log.removeAt(at);
+
+    // the item's progress again, as record() would have made it from the entries left (the log has every session)
+    const QString k = code + "/" + itemId;
+    const ItemProgress old = get(code, itemId);
+    ItemProgress p;
+    p.level = old.level;     // (kept when no entry says: entries from before levels were logged)
+    p.skills = old.skills;
+    bool any = false;
+    const QJsonArray log = m_log;
+    for (const QJsonValue& v : log) {
+        const QJsonObject o = v.toObject();
+        if (o.value("song").toString() != code || o.value("item").toString() != itemId) {
+            continue;
+        }
+        any = true;
+        const int level = o.value("level").toInt();
+        if (level > 0) {
+            p.level = level;
+            p.skills.clear();
+            for (const QJsonValue& sv : o.value("skills").toArray()) {
+                p.skills << sv.toString();
+            }
+        }
+        p.sessions += 1;
+        p.minutes += o.value("minutes").toInt();
+        p.bestTempo = std::max(p.bestTempo, o.value("tempo").toInt());
+        const int stage = o.value("stage").toInt(-1);
+        if (stage >= 0) {
+            p.stage = stage;
+        }
+        const QDate d = QDate::fromString(o.value("date").toString(), Qt::ISODate);
+        if (d.isValid()) {
+            p.last = d;
+        }
+        const QString note = o.value("note").toString();
+        if (!note.isEmpty()) {
+            p.note = note;
+        }
+    }
+    if (any) {
+        m_items[k] = p;
+    } else {
+        m_items.erase(k);   // (never done, then: new again)
+    }
+    return true;
+}
+
 // ---------------------------------------------------------------- plans (JSON)
 QJsonObject Plan::toJson() const
 {
@@ -1017,12 +1079,21 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
     if (totalWeight <= 0) {
         return plan;
     }
+    // the first day planned (planned again: the first from fromDate on, not the plan's first day): the day
+    // `alreadyToday` belongs to, and where "lately" is counted from
+    QDate firstPlanned;
+    for (const auto& [d, m] : req.days) {
+        if (!fromDate.isValid() || d >= fromDate) {
+            firstPlanned = d;
+            break;
+        }
+    }
     std::map<QString, double> debt;   // minutes owed to each song
     // what each song has had lately (the progress log, and the kept days of a plan planned again), so a routine made
     // today or a plan planned again doesn't start over with the same songs: owed more the longer since it was played,
     // less the more it had in the last two weeks
     {
-        const QDate start = req.days.empty() ? QDate::currentDate() : req.days.front().first;
+        const QDate start = firstPlanned.isValid() ? firstPlanned : QDate::currentDate();
         std::map<QString, int> recent;
         std::map<QString, QDate> lastPlayed;
         for (const QJsonValue& v : progress.log()) {
@@ -1113,8 +1184,12 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
         int left = dayMinutes;
         std::set<QString> today;
         std::map<QString, std::map<QString, int> > areaUsed;
-        if (di == 0) {
+        // (the day already started: its blocks are `alreadyToday`; it had its warm-up, and its jam if it has one)
+        const bool startedDay = date == firstPlanned && !req.alreadyToday.empty();
+        bool hadJam = false;
+        if (date == firstPlanned) {
             for (const Block& b : req.alreadyToday) {
+                hadJam = hadJam || b.kind == "jam";
                 today.insert(key(b.code, b.itemId));
                 auto lib = libs.find(b.code);
                 const Item* bi = lib == libs.end() ? nullptr : lib->second.item(b.itemId);
@@ -1140,6 +1215,7 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
             s.lastDay = date;
             today.insert(key(code, it.id));
             left -= minutes;
+            debt[code] -= minutes;   // (a warm-up, jam, or run-through is the song's time too)
         };
         auto prereqsMet = [&](const QString& code, const Item& it) {
             const Library* lib = libs.count(code) ? &libs.at(code) : nullptr;
@@ -1172,7 +1248,7 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
 
         // warm-up: a short played harmony, technique, or voicing item (scales, arpeggios, voicings in time), from the
         // songs in turn, the least practised first
-        if (left >= 45 && !isShow && !req.noWarmup && !ordered.empty()) {
+        if (left >= 45 && !isShow && !req.noWarmup && !startedDay && !ordered.empty()) {
             const int n = int(ordered.size());
             for (int k = 0; k < n; ++k) {
                 const PlanSong& ps = ordered[size_t((date.toJulianDay() + k) % n)];   // (by the date: a new song each day)
@@ -1210,7 +1286,7 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
 
         // a jam: improvising over one of the songs' changes in some groove (Joel, 24 Oct 2026: "build up tons of
         // vocabulary without getting bored"), a different song and groove from the last one, the least played first
-        if (!isShow && !runThrough && !req.noJam && left >= 30) {
+        if (!isShow && !runThrough && !req.noJam && !hadJam && left >= 30) {
             if (const auto [code, jam] = pickJam(libs, req.songs, sim, today, date, lastJamGroove, lastJamSong); jam) {
                 schedule(code, *jam, left >= 90 ? 15 : 10, "jam");
                 lastJamGroove = jam->groove;
@@ -1351,9 +1427,8 @@ Plan mu::project::practice::makePlan(const PlanRequest& req, const std::map<QStr
                     today.insert(key(pick, it->id));   // too long for what's left: another item, or another song
                     continue;
                 }
-                schedule(pick, *it, m, "item");
+                schedule(pick, *it, m, "item");   // (which takes it off what the song is owed)
                 areaUsed[pick][areaOf(*it)] += 1;
-                debt[pick] -= m;
             }
         }
         // the day in set order, warm-up first; within a song, in learning order (the form, then the harmony and

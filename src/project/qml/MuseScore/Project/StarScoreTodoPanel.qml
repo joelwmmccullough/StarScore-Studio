@@ -123,16 +123,26 @@ Item {
                             border.color: row.modelData.missing ? ui.theme.fontSecondaryColor : "transparent"
                             border.width: 1
                         }
-                        StyledTextLabel {
+                        // the title wraps and the status sits under it: in the 300 px panel a long title used to
+                        // paint over the status ("Written, unformatted")
+                        ColumnLayout {
                             Layout.fillWidth: true
-                            horizontalAlignment: Text.AlignLeft
-                            font: ui.theme.bodyBoldFont
-                            text: row.modelData.title + (row.modelData.done ? "  ✓" : "")
-                        }
-                        StyledTextLabel {
-                            horizontalAlignment: Text.AlignRight
-                            color: ui.theme.fontSecondaryColor
-                            text: row.modelData.statusText
+                            spacing: 0
+                            StyledTextLabel {
+                                Layout.fillWidth: true
+                                horizontalAlignment: Text.AlignLeft
+                                wrapMode: Text.WordWrap
+                                font: ui.theme.bodyBoldFont
+                                text: row.modelData.title + (row.modelData.done ? "  ✓" : "")
+                            }
+                            StyledTextLabel {
+                                Layout.fillWidth: true
+                                horizontalAlignment: Text.AlignLeft
+                                wrapMode: Text.WordWrap
+                                visible: text !== ""
+                                color: ui.theme.fontSecondaryColor
+                                text: row.modelData.statusText
+                            }
                         }
                     }
 

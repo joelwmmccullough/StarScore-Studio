@@ -470,6 +470,17 @@ void DashboardModel::openTask(int index)
     openSong(m_taskPaths[index], m_taskAudit[index]);
 }
 
+int DashboardModel::auditTaskCount() const
+{
+    QStringList paths;
+    for (size_t i = 0; i < m_taskPaths.size() && i < m_taskAudit.size(); ++i) {
+        if (m_taskAudit[i] && !paths.contains(m_taskPaths[i])) {
+            paths << m_taskPaths[i];
+        }
+    }
+    return int(paths.size());
+}
+
 void DashboardModel::auditInOrder()
 {
     QStringList paths;

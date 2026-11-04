@@ -5,6 +5,8 @@
  */
 #include "recordingsmodel.h"
 
+#include <algorithm>
+
 #include <QDate>
 #include <QDateTime>
 #include <QJsonDocument>
@@ -135,7 +137,11 @@ void RecordingsModel::touch(QJsonArray& list, const QString& id, const std::func
     for (int i = 0; i < list.size(); ++i) {
         QJsonObject o = list[i].toObject();
         if (o.value("id").toString() == id) {
+            const QJsonObject before = o;
             edit(o);
+            if (o == before) {
+                return;    // nothing changed (a field left as it was): not stamped, so it can't win a merge it shouldn't
+            }
             o["modified"] = QDateTime::currentDateTime().toString(Qt::ISODate);
             list[i] = o;
             m_dirty = true;
@@ -235,13 +241,30 @@ QString RecordingsModel::addPerformance(const QString& showIdIn, const QString& 
         }
     }
     QJsonArray perfs = m_all.value("performances").toArray();
-    perfs.append(QJsonObject { { "id", org::newRecordingId(m_all, "p") }, { "song", m_code }, { "show", showId }, { "seconds", seconds },
+    perfs.append(QJsonObject { { "id", newId("p") }, { "song", m_code }, { "show", showId }, { "seconds", seconds },
                                { "variant", variant.trimmed().isEmpty() ? QJsonValue() : QJsonValue(variant.trimmed()) },
                                { "rating", QJsonValue() }, { "modified", QDateTime::currentDateTime().toString(Qt::ISODate) } });
     m_all["performances"] = perfs;
     m_dirty = true;
     emit changed();
     return QString();
+}
+
+QString RecordingsModel::newId(const QString& prefix) const
+{
+    // past every id in recordings.json as it is now, not only in this window's copy: that was read when the window
+    // opened (or is empty when Sheets and Demos wasn't there), and the organizer or another song's window may have
+    // given out ids since. (Ids stay "p0042": the numbers are read back by nextRecordingNumber. One that still
+    // clashes, the file being out of reach, gets a fresh id when it's merged.)
+    int n = org::nextRecordingNumber(m_all, prefix);
+    const QString file = recordingsFile();
+    if (!file.isEmpty()) {
+        const org::JsonRead read = org::readJsonChecked(file);
+        if (read.ok) {
+            n = std::max(n, org::nextRecordingNumber(read.doc.object(), prefix));
+        }
+    }
+    return QString("%1%2").arg(prefix).arg(n, 4, 10, QChar('0'));
 }
 
 RecordingsModel::~RecordingsModel()
@@ -398,11 +421,11 @@ void RecordingsModel::addRelease()
         return;
     }
     QJsonArray rels = m_all.value("releases").toArray();
-    const QString newId = org::newRecordingId(m_all, "r");
+    const QString id = newId("r");
     // its album / who and date are placeholders until the YouTube link fills them in
-    m_autoLabel.insert(newId);
-    m_autoDate.insert(newId);
-    rels.append(QJsonObject { { "id", newId }, { "song", m_code }, { "kind", "session" }, { "label", "Live session" },
+    m_autoLabel.insert(id);
+    m_autoDate.insert(id);
+    rels.append(QJsonObject { { "id", id }, { "song", m_code }, { "kind", "session" }, { "label", "Live session" },
                               { "date", QDate::currentDate().toString(Qt::ISODate) }, { "video", "" },
                               { "modified", QDateTime::currentDateTime().toString(Qt::ISODate) } });
     m_all["releases"] = rels;
@@ -434,6 +457,10 @@ bool RecordingsModel::save()
             ok = org::writeJson(file, QJsonDocument(current));
             if (ok) {
                 m_all = current;
+                // the .starscore's copy as merged: a take that clashed with another song's id keeps its new id there
+                QJsonObject merged = org::songRecordings(current, m_code);
+                merged["deleted"] = current.value("deleted");
+                starScore()->setSongRecordings(merged);
             }
         }
     }
@@ -443,4 +470,26 @@ bool RecordingsModel::save()
     m_dirty = !ok;
     emit changed();
     return ok;
+}
+
+bool RecordingsModel::confirmClose()
+{
+    if (!m_dirty) {
+        return true;
+    }
+    constexpr int Save = static_cast<int>(muse::IInteractive::Button::CustomButton) + 1;
+    constexpr int Discard = static_cast<int>(muse::IInteractive::Button::CustomButton) + 2;
+    constexpr int Cancel = static_cast<int>(muse::IInteractive::Button::CustomButton) + 3;
+    const muse::IInteractive::Result answer = interactive()->questionSync(
+        muse::trc("starscore", "Save the recordings?"),
+        muse::trc("starscore", "The changes to this song's recordings haven't been saved."), {
+        muse::IInteractive::ButtonData(Cancel, muse::trc("starscore", "Cancel")),
+        muse::IInteractive::ButtonData(Discard, muse::trc("starscore", "Don't Save")),
+        muse::IInteractive::ButtonData(Save, muse::trc("starscore", "Save"), true),
+    }, Save);
+    if (answer.button() == Save) {
+        // a save that didn't work keeps the window open, its status saying why
+        return save();
+    }
+    return answer.button() == Discard;
 }

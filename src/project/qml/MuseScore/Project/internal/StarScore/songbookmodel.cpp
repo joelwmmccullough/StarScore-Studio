@@ -848,13 +848,28 @@ void SongbookModel::finishBuild()
         }
     }
 
+    // written beside it first (a hidden name the organizer leaves alone); only a finished book moves the old one to
+    // Deprecated and takes its place, so a failed write no longer leaves the folder without a songbook
     QDir().mkpath(QFileInfo(m_outFile).absolutePath());
-    deprecate(outputFolder(), m_outFile);
-    const bool ok = starscore::mergePdfs(inputs, numbered, m_outFile, m_album + " Songbook – " + b.instrument);
+    const QString partial = QFileInfo(m_outFile).absolutePath() + "/." + QFileInfo(m_outFile).fileName() + ".writing";
+    QFile::remove(partial);    // (our own leftover from a write cut short)
+    bool ok = starscore::mergePdfs(inputs, numbered, partial, m_album + " Songbook – " + b.instrument) && QFileInfo(partial).size() > 0;
+    bool notMoved = false;
+    if (!ok) {
+        QFile::remove(partial);
+    } else {
+        deprecate(outputFolder(), m_outFile);
+        if (!QDir().rename(partial, m_outFile)) {
+            ok = false;
+            notMoved = true;    // the finished book is kept under its temporary name, not removed
+        }
+    }
     QDir(m_workDir).removeRecursively();
 
     m_busy = false;
-    if (!ok) {
+    if (notMoved) {
+        m_status = muse::qtrc("starscore", "The songbook was written but couldn't be given its name: it is %1.").arg(partial);
+    } else if (!ok) {
         m_status = muse::qtrc("starscore", "Couldn't write the songbook PDF.");
     } else {
         m_lastOutput = m_outFile;

@@ -384,14 +384,18 @@ QString BandExportModel::exportNow()
     }
 
     // The version printed on these sheets (and kept in the score for next time)
-    const QString version = exportVersion();
+    // Only when sheets are made: exporting just the audio demos used to raise the song's version too, so the next
+    // real export skipped a number and the footers claimed a version no sheet had
     const QString versionBefore = starScore()->scoreVersion();
+    const QString version = paths.isEmpty() ? versionBefore : exportVersion();
     const int bumpBefore = m_bump;
-    starScore()->setScoreVersion(version);
-    m_version = version;
-    m_bump = 0;
-    emit loaded();
-    emit bumpChanged();
+    if (!paths.isEmpty()) {
+        starScore()->setScoreVersion(version);
+        m_version = version;
+        m_bump = 0;
+        emit loaded();
+        emit bumpChanged();
+    }
 
     m_exportRan = true;
     QString text;

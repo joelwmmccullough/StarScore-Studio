@@ -295,11 +295,20 @@ void ProjectActionsController::init()
             return;
         }
         const muse::io::path_t path = fileSystem()->absoluteFilePath(muse::io::path_t(url.toLocalFile()));
+        // (a newer open: a play still waiting from an earlier one is for a score that's going)
+        const int serial = ++m_practiceOpenSerial;
+        // the runner's clock can ask for the next exercise while a close or save is still in its prompt (the event
+        // loop running there): it waits for the next time, rather than closing what's being closed
+        if (m_isProjectClosing || m_isProjectSaving) {
+            LOGW() << "[starscore] practice open ignored: the score is being closed or saved";
+            return;
+        }
         // the practice runner opens these, and stays open: closing the score closed every dialog, the runner too,
-        // while it was still running (Joel, 24 Oct 2026: StarScore crashed when hands free moved on to the next item)
-        m_keepDialogsOnClose = true;
+        // while it was still running (Joel, 24 Oct 2026: StarScore crashed when hands free moved on to the next item).
+        // A count, not a flag: an open inside another's prompt mustn't end the outer one's keeping.
+        ++m_keepDialogsOnClose;
         DEFER {
-            m_keepDialogsOnClose = false;
+            --m_keepDialogsOnClose;
         };
         if (multiwindowsProvider()->isProjectAlreadyOpened(path) && !isProjectOpened(path)) {
             multiwindowsProvider()->activateWindowWithProject(path);
@@ -319,7 +328,14 @@ void ProjectActionsController::init()
             return;
         }
         if (play) {
-            QTimer::singleShot(1500, [this]() { dispatcher()->dispatch("play"); });   // (once the playback has loaded)
+            // once the playback has loaded; "play" toggles, so only when this exercise is still the score open, no
+            // newer open came since, and it isn't playing already
+            QTimer::singleShot(1500, &m_practiceTimerGuard, [this, serial, path]() {
+                if (serial != m_practiceOpenSerial || !isProjectOpened(path) || playbackController()->isPlaying()) {
+                    return;
+                }
+                dispatcher()->dispatch("play");
+            });
         }
     });
 
@@ -1128,7 +1144,7 @@ bool ProjectActionsController::closeOpenedProject(bool goToHome)
     }
 
     if (result) {
-        if (!m_keepDialogsOnClose) {
+        if (m_keepDialogsOnClose == 0) {
             interactive()->closeAllDialogsSync();
         }
         globalContext()->setCurrentProject(nullptr);

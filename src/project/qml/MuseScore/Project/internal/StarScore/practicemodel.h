@@ -9,6 +9,7 @@
 #include <QJsonObject>
 #include <QObject>
 #include <QStringList>
+#include <QTimer>
 #include <QVariantList>
 #include <QVariantMap>
 #include <qqmlintegration.h>
@@ -149,6 +150,9 @@ private:
     void saveSettings() const;
     void loadSettings();
     void reloadPlans();
+    //! The selected plan as the page shows it (made once per change: a dozen bindings read it)
+    void rebuildPlanMap();
+    void armMidnight();
     std::map<QString, practice::Library> librariesFor(const std::vector<practice::PlanSong>& songs) const;
     std::vector<practice::PlanSong> planSongs() const;
     std::map<QString, int> needsFor(const QString& code) const;
@@ -172,6 +176,10 @@ private:
     QString m_status;
     QString m_lastOutput;
     QFileSystemWatcher* m_watcher = nullptr;
+    QTimer m_reloadTimer;     // the watcher's signals, a save's several, as one reload
+    QTimer m_midnightTimer;   // a page left open past midnight plans from the new day
+    QDate m_today;
+    QVariantMap m_planMap;
     std::vector<SavedSetlist> m_setlists;
     QString m_setlistId;
     int m_breakEvery = 0;

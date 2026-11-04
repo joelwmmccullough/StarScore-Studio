@@ -11,6 +11,7 @@
 #include <QDesktopServices>
 #include <QDir>
 #include <QFile>
+#include <QPointer>
 #include <QRegularExpression>
 #include <QSettings>
 #include <QStandardPaths>
@@ -173,9 +174,26 @@ QVariantList PracticeRunnerModel::blocks() const
 
 QVariantMap PracticeRunnerModel::block() const
 {
+    return m_block;
+}
+
+QString PracticeRunnerModel::blockKey() const
+{
+    if (m_blockIndex < 0 || m_blockIndex >= blockCount()) {
+        return QString();
+    }
+    const practice::Block& b = m_plan.days[m_dayIndex].blocks[m_blockIndex];
+    return QString("%1|%2|%3").arg(m_plan.days[m_dayIndex].date.toString(Qt::ISODate), b.code, b.itemId);
+}
+
+// (the page reads the block's fields some 45 times, one of them every second in hands free: each read used to load
+// progress.json and unpack the exercise)
+void PracticeRunnerModel::rebuildBlock()
+{
+    m_block.clear();
     const practice::Library* lib = currentLibrary();
-    if (!lib && blockCount() == 0) {
-        return {};
+    if (m_blockIndex < 0 || m_blockIndex >= blockCount()) {
+        return;
     }
     const practice::Block& b = m_plan.days[m_dayIndex].blocks[m_blockIndex];
     const practice::Item* it = lib ? lib->item(b.itemId) : nullptr;
@@ -188,7 +206,8 @@ QVariantMap PracticeRunnerModel::block() const
                     { "lastNote", p.note }, { "missing", it == nullptr } };
     if (!it) {
         m["title"] = b.itemId;
-        return m;
+        m_block = m;
+        return;
     }
     m["title"] = practice::prettyText(it->title);
     m["category"] = it->category;
@@ -217,7 +236,7 @@ QVariantMap PracticeRunnerModel::block() const
     m["hasIreal"] = !it->irealProg.isEmpty();
     m["groove"] = it->groove;
     m["kindName"] = b.kind == "warmup" ? QString("Warm-up") : b.kind == "runthrough" ? QString("Run-through") : QString();
-    return m;
+    m_block = m;
 }
 
 QStringList PracticeRunnerModel::images() const
@@ -243,11 +262,22 @@ bool PracticeRunnerModel::running() const
 // ---------------------------------------------------------------- loading
 void PracticeRunnerModel::load(const QString& planId, int dayIndex, int blockIndex)
 {
+    if (!m_playbackSubscribed && playbackController()) {
+        m_playbackSubscribed = true;
+        // paused just as an opened exercise was about to play (it starts a moment after it opens): it pauses again
+        playbackController()->isPlayingChanged().onNotify(this, [this]() {
+            if (m_pauseWhenPlays && m_handsFree == "paused" && playbackController()->isPlaying()) {
+                m_pauseWhenPlays = false;
+                dispatcher()->dispatch("pause");
+            }
+        });
+    }
     m_plan = practice::loadPlan(planId);
     m_libs.clear();
     m_paths.clear();
     if (m_plan.id.isEmpty()) {
         m_message = QStringLiteral("This plan couldn't be read.");
+        rebuildBlock();
         emit changed();
         return;
     }
@@ -270,6 +300,7 @@ void PracticeRunnerModel::go(int index)
     const int n = blockCount();
     if (n == 0) {
         m_blockIndex = 0;
+        rebuildBlock();
         emit changed();
         return;
     }
@@ -278,7 +309,15 @@ void PracticeRunnerModel::go(int index)
     if (m_handsFree.isEmpty()) {
         m_timer.stop();
     }
+    // another block: what's played of it counts from nothing (the same block again keeps what it had)
+    const QString key = blockKey();
+    if (key != m_elapsedKey) {
+        m_elapsedKey = key;
+        m_blockElapsed = 0;
+        m_topTempo = 0;
+    }
     setupParts();
+    rebuildBlock();
     emit changed();
     emit partChanged();
     emit timerChanged();
@@ -467,31 +506,38 @@ void PracticeRunnerModel::playExample(int index)
 {
     const practice::Item* it = currentItem();
     const practice::Library* lib = currentLibrary();
-    if (!it || !it->hasXml() || !lib || index < 0 || index >= int(m_parts.size())) {
+    if (m_opening || !it || !it->hasXml() || !lib || index < 0 || index >= int(m_parts.size())) {
         return;
     }
     const RunPart& p = m_parts[index];
     const QString xml = practice::sliceExercise(it->xml(), p.from, p.to);
+    const QString title = QString("%1 - %2 - example").arg(lib->title, p.label);
     const int tempo = m_plan.days[m_dayIndex].blocks[m_blockIndex].tempo;
     m_playingAlong = false;
     emit partChanged();
-    starScore()->openPracticeExercise(xml, QString("%1 - %2 - example").arg(lib->title, p.label), tempo, true);
+    runOpen([this, xml, title, tempo]() { starScore()->openPracticeExercise(xml, title, tempo, true); });
 }
 
 void PracticeRunnerModel::playAlong(int index)
 {
+    startPlayAlong(index);
+}
+
+bool PracticeRunnerModel::startPlayAlong(int index)
+{
     const practice::Item* it = currentItem();
     const practice::Library* lib = currentLibrary();
-    if (!it || !it->hasXml() || !lib || index < 0 || index >= int(m_parts.size())) {
-        return;
+    if (m_opening || !it || !it->hasXml() || !lib || index < 0 || index >= int(m_parts.size())) {
+        return true;
     }
     if (index != m_partIndex) {
         goPart(index);
     }
-    const RunPart& p = m_parts[index];
+    const RunPart p = m_parts[index];
     const practice::Block& b = m_plan.days[m_dayIndex].blocks[m_blockIndex];
+    // (for the whole part: the part's clock starts again with the music, even when pressed partway through)
     const practice::PlayAlong pa = practice::playAlong(it->xml(), p.from, p.to, b.tempo > 0 ? b.tempo : it->tempoStart,
-                                                       it->tempoGoal, m_partSecondsLeft + 5);
+                                                       it->tempoGoal, p.seconds + 5);
     if (pa.xml.isEmpty()) {
         m_message = QStringLiteral("This one has no backing track: play it with the timer.");
         emit changed();
@@ -499,18 +545,22 @@ void PracticeRunnerModel::playAlong(int index)
             m_timer.start();
             emit timerChanged();
         }
-        return;
+        return true;
     }
     m_passTempos = pa.passTempos;
     m_passStarts = pa.passStarts;
     // (the passes count from now: the part's clock restarts with the music)
-    m_partSecondsLeft = m_parts[index].seconds;
+    m_partSecondsLeft = p.seconds;
     m_playingAlong = true;
     emit partChanged();
     // (the automatic tests can leave the score open: the tests' steps run on the open song)
     static const bool noPlayback = qEnvironmentVariableIsSet("STARSCORE_AUTOTEST_NO_PLAYBACK");
     if (!noPlayback) {
-        starScore()->openPracticeExercise(pa.xml, QString("%1 - %2 - play along").arg(lib->title, p.label), 0, true);
+        const QString xml = pa.xml;
+        const QString title = QString("%1 - %2 - play along").arg(lib->title, p.label);
+        if (!runOpen([this, xml, title]() { starScore()->openPracticeExercise(xml, title, 0, true); })) {
+            return false;   // (closed meanwhile: nothing here is ours to touch)
+        }
     } else {
         LOGI() << "[starscore] play along: " << p.label << ", " << pa.seconds << " s, passes " << pa.passTempos.size();
         QFile dump(QStandardPaths::writableLocation(QStandardPaths::TempLocation) + "/StarScore Practice/playalong-test.musicxml");
@@ -522,6 +572,24 @@ void PracticeRunnerModel::playAlong(int index)
         m_timer.start();
     }
     emit timerChanged();
+    return true;
+}
+
+bool PracticeRunnerModel::runOpen(const std::function<void()>& open)
+{
+    // the open closes the score first, and a score with changes asks to save them: the event loop runs in the prompt,
+    // the clock ticks, and the runner can even be closed. No second open meanwhile, and nothing touched after this
+    // runner has gone.
+    QPointer<PracticeRunnerModel> self(this);
+    m_opening = true;
+    m_openedClock.start();
+    open();
+    if (!self) {
+        return false;
+    }
+    m_opening = false;
+    m_openedClock.start();   // (the exercise plays a moment after it opens)
+    return true;
 }
 
 void PracticeRunnerModel::stopPlaying()
@@ -584,15 +652,25 @@ void PracticeRunnerModel::renderImages()
 // ---------------------------------------------------------------- timer
 void PracticeRunnerModel::tick()
 {
+    if (m_opening) {
+        return;   // (an exercise opening, waiting in a save prompt: nothing moves on, nothing else opens)
+    }
     if (m_handsFree == "break") {
         if (--m_breakSecondsLeft <= 0) {
             m_breakSecondsLeft = 0;
             m_handsFree = "practice";
             emit handsFreeChanged();
-            startBlockHandsFree();
+            if (!startBlockHandsFree()) {
+                return;
+            }
         }
         emit timerChanged();
         return;
+    }
+    // what's really played of the block (logged, not the minutes planned)
+    ++m_blockElapsed;
+    if (m_playingAlong) {
+        m_topTempo = std::max(m_topTempo, currentPassTempo());
     }
     if (m_partSecondsLeft > 0) {
         --m_partSecondsLeft;
@@ -601,12 +679,14 @@ void PracticeRunnerModel::tick()
         --m_secondsLeft;
     }
     if (m_partSecondsLeft <= 0) {
-        partFinished();
+        if (!partFinished()) {
+            return;
+        }
     }
     emit timerChanged();
 }
 
-void PracticeRunnerModel::partFinished()
+bool PracticeRunnerModel::partFinished()
 {
     if (m_partIndex < int(m_parts.size())) {
         m_parts[m_partIndex].finished = true;
@@ -617,17 +697,16 @@ void PracticeRunnerModel::partFinished()
         const bool along = m_playingAlong || !m_handsFree.isEmpty();
         goPart(m_partIndex + 1);
         if (along && m_parts[m_partIndex].notation) {
-            playAlong(m_partIndex);
+            return startPlayAlong(m_partIndex);
         } else if (along) {
             dispatcher()->dispatch("stop");   // (a part with nothing to play along to)
         }
-        return;
+        return true;
     }
     // the block's time is up
     m_secondsLeft = 0;
     if (!m_handsFree.isEmpty()) {
-        blockFinishedHandsFree();
-        return;
+        return blockFinishedHandsFree();
     }
     m_timer.stop();
     if (m_playingAlong) {
@@ -635,10 +714,12 @@ void PracticeRunnerModel::partFinished()
     }
     emit timeUp();
     emit partChanged();
+    return true;
 }
 
 void PracticeRunnerModel::startTimer()
 {
+    // (after the time's up this starts the block's clock again; what was played so far still counts: m_blockElapsed)
     if (m_partSecondsLeft <= 0) {
         setupParts();
         emit partChanged();
@@ -683,42 +764,54 @@ void PracticeRunnerModel::startHandsFree()
     startBlockHandsFree();
 }
 
-void PracticeRunnerModel::startBlockHandsFree()
+bool PracticeRunnerModel::startBlockHandsFree()
 {
     go(m_blockIndex);
     m_timer.start();
     if (!m_parts.empty() && m_parts.front().notation) {
-        playAlong(0);
+        if (!startPlayAlong(0)) {
+            return false;
+        }
     }
     emit handsFreeChanged();
     emit timerChanged();
+    return true;
 }
 
-void PracticeRunnerModel::blockFinishedHandsFree()
+bool PracticeRunnerModel::blockFinishedHandsFree()
 {
-    const practice::Block& b = m_plan.days[m_dayIndex].blocks[m_blockIndex];
+    // (copies: savePlan() puts in the plan as saved, and a reference into the old one would dangle)
+    const practice::Block b = m_plan.days[m_dayIndex].blocks[m_blockIndex];
     const practice::Item* it = currentItem();
     const practice::Library* lib = currentLibrary();
-    Pending p;
-    p.code = b.code;
-    p.itemId = b.itemId;
-    p.minutes = b.minutes;
-    p.tempo = m_passTempos.isEmpty() ? b.tempo : m_passTempos.back();
-    p.song = lib ? lib->title : b.code;
-    p.title = it ? practice::prettyText(it->title) : b.itemId;
-    {
-        practice::Progress progress;
-        progress.load();
-        p.stage = progress.get(b.code, b.itemId).stage;
+    // what was really played: a block skipped after a few seconds isn't done, and isn't logged as its planned minutes
+    // at the goal tempo
+    const int played = m_blockElapsed;
+    const int topTempo = m_topTempo;
+    m_blockElapsed = 0;
+    m_topTempo = 0;
+    if (played >= 30) {
+        Pending p;
+        p.code = b.code;
+        p.itemId = b.itemId;
+        p.minutes = std::max(1, int(std::lround(played / 60.0)));
+        p.tempo = topTempo;
+        p.song = lib ? lib->title : b.code;
+        p.title = it ? practice::prettyText(it->title) : b.itemId;
+        {
+            practice::Progress progress;
+            progress.load();
+            p.stage = progress.get(b.code, b.itemId).stage;
+        }
+        m_toRate.push_back(p);
+        // done in the plan now; kept in the progress when rated (or kept unrated)
+        practice::Block done = b;
+        done.done = true;
+        done.tempoReached = p.tempo;
+        m_plan.days[m_dayIndex].blocks[m_blockIndex] = done;
+        savePlan(done);
+        m_minutesSinceBreak += p.minutes;
     }
-    m_toRate.push_back(p);
-    // done in the plan now; kept in the progress when rated (or kept unrated)
-    practice::Block done = b;
-    done.done = true;
-    done.tempoReached = p.tempo;
-    m_plan.days[m_dayIndex].blocks[m_blockIndex] = done;
-    savePlan(done);
-    m_minutesSinceBreak += b.minutes;
 
     const int n = nextOpenBlock(m_blockIndex);
     if (n < 0) {
@@ -727,10 +820,11 @@ void PracticeRunnerModel::blockFinishedHandsFree()
         m_timer.stop();
         m_handsFree = "done";
         m_message = QStringLiteral("That's the day done.");
+        rebuildBlock();
         emit changed();
         emit partChanged();
         emit handsFreeChanged();
-        return;
+        return true;
     }
     m_blockIndex = n;
     if (m_plan.breakEvery > 0 && m_minutesSinceBreak >= m_plan.breakEvery) {
@@ -742,21 +836,26 @@ void PracticeRunnerModel::blockFinishedHandsFree()
         go(n);   // (the next block on screen, its music not started)
         m_timer.start();
         emit handsFreeChanged();
-        return;
+        return true;
     }
-    startBlockHandsFree();
+    return startBlockHandsFree();
 }
 
 void PracticeRunnerModel::pauseHandsFree()
 {
-    if (m_handsFree.isEmpty() || m_handsFree == "done") {
+    if (m_handsFree.isEmpty() || m_handsFree == "done" || m_handsFree == "paused") {
         return;
     }
     m_pausedPhase = m_handsFree;
     m_handsFree = "paused";
     m_timer.stop();
     if (m_playingAlong) {
-        dispatcher()->dispatch("play");   // (toggles: pauses where it is)
+        // ("play" toggles: only a playing score is paused, and one about to start is paused when it does)
+        if (playbackController() && playbackController()->isPlaying()) {
+            dispatcher()->dispatch("pause");
+        } else {
+            m_pauseWhenPlays = m_opening || (m_openedClock.isValid() && m_openedClock.elapsed() < 4000);
+        }
     }
     emit handsFreeChanged();
     emit timerChanged();
@@ -767,9 +866,10 @@ void PracticeRunnerModel::resumeHandsFree()
     if (m_handsFree != "paused") {
         return;
     }
+    m_pauseWhenPlays = false;
     m_handsFree = m_pausedPhase.isEmpty() ? QStringLiteral("practice") : m_pausedPhase;
     m_timer.start();
-    if (m_playingAlong && m_handsFree == "practice") {
+    if (m_playingAlong && m_handsFree == "practice" && playbackController() && !playbackController()->isPlaying()) {
         dispatcher()->dispatch("play");   // (on from where it paused)
     }
     emit handsFreeChanged();
@@ -799,8 +899,13 @@ void PracticeRunnerModel::skipBreak()
 
 void PracticeRunnerModel::skipPart()
 {
+    if (m_opening) {
+        return;
+    }
     m_partSecondsLeft = 0;
-    partFinished();
+    if (!partFinished()) {
+        return;
+    }
     emit timerChanged();
 }
 
@@ -820,12 +925,14 @@ void PracticeRunnerModel::rate(int index, int stage)
     }
     if (blockIndex >= 0) {
         recordDone(blockIndex, p.minutes, p.tempo, std::clamp(stage, 1, 4), QString());
+        emit changed();   // (the block shown may be the one rated: its progress)
     }
     emit handsFreeChanged();
 }
 
 void PracticeRunnerModel::keepUnrated()
 {
+    const bool any = !m_toRate.empty();
     while (!m_toRate.empty()) {
         const Pending p = m_toRate.front();
         m_toRate.erase(m_toRate.begin());
@@ -836,6 +943,9 @@ void PracticeRunnerModel::keepUnrated()
                 break;
             }
         }
+    }
+    if (any) {
+        emit changed();
     }
     emit handsFreeChanged();
 }
@@ -892,25 +1002,28 @@ void PracticeRunnerModel::openExercise(int tempo, bool play)
 {
     const practice::Item* it = currentItem();
     const practice::Library* lib = currentLibrary();
-    if (!it || !it->hasXml() || !lib) {
+    if (m_opening || !it || !it->hasXml() || !lib) {
         return;
     }
     const QString title = QString("%1 - %2").arg(lib->title, it->title);
-    starScore()->openPracticeExercise(it->xml(), title, tempo, play);
+    const QString xml = it->xml();
+    runOpen([this, xml, title, tempo, play]() { starScore()->openPracticeExercise(xml, title, tempo, play); });
 }
 
 void PracticeRunnerModel::openSong()
 {
     const practice::Library* lib = currentLibrary();
-    if (!lib) {
+    if (m_opening || !lib) {
         return;
     }
     auto p = m_paths.find(lib->code);
     if (p == m_paths.end()) {
         return;
     }
-    dispatcher()->dispatch("starscore-practice-open",
-                           muse::actions::ActionData::make_arg2<QUrl, bool>(QUrl::fromLocalFile(p->second), false));
+    const QUrl url = QUrl::fromLocalFile(p->second);
+    runOpen([this, url]() {
+        dispatcher()->dispatch("starscore-practice-open", muse::actions::ActionData::make_arg2<QUrl, bool>(url, false));
+    });
 }
 
 void PracticeRunnerModel::togglePlay()
@@ -952,6 +1065,7 @@ void PracticeRunnerModel::savePlan(const practice::Block& changed)
     // the plan as it is on disk
     practice::Plan latest = practice::loadPlan(m_plan.id);
     if (latest.id.isEmpty()) {
+        rebuildBlock();
         return;   // deleted meanwhile: not brought back
     }
     const QDate day = m_plan.days[m_dayIndex].date;
@@ -990,6 +1104,17 @@ void PracticeRunnerModel::savePlan(const practice::Block& changed)
         }
     }
     m_blockIndex = std::clamp(m_blockIndex, 0, std::max(0, n - 1));
+    rebuildBlock();
+}
+
+int PracticeRunnerModel::pendingFor(const QString& code, const QString& itemId) const
+{
+    for (int i = 0; i < int(m_toRate.size()); ++i) {
+        if (m_toRate[i].code == code && m_toRate[i].itemId == itemId) {
+            return i;
+        }
+    }
+    return -1;
 }
 
 void PracticeRunnerModel::recordDone(int blockIndex, int minutes, int tempoReached, int stage, const QString& note)
@@ -1015,6 +1140,7 @@ void PracticeRunnerModel::recordDone(int blockIndex, int minutes, int tempoReach
     if (blockIndex != keep) {
         m_blockIndex = std::clamp(keep, 0, std::max(0, blockCount() - 1));   // (savePlan moved to the rated block)
     }
+    rebuildBlock();
 }
 
 void PracticeRunnerModel::markDone(int tempoReached, int stage, const QString& note)
@@ -1022,14 +1148,26 @@ void PracticeRunnerModel::markDone(int tempoReached, int stage, const QString& n
     if (blockCount() == 0) {
         return;
     }
-    const practice::Block& b = m_plan.days[m_dayIndex].blocks[m_blockIndex];
-    const int practised = std::max(1, (b.minutes * 60 - m_secondsLeft + 30) / 60);
-    const int minutes = m_timer.isActive() || m_secondsLeft < b.minutes * 60 ? practised : b.minutes;
+    const practice::Block b = m_plan.days[m_dayIndex].blocks[m_blockIndex];
+    // the minutes on the runner's clock (all of them: "Start" again after the time's up resets the clock, not this)
+    int minutes = m_blockElapsed > 0 ? std::max(1, int(std::lround(m_blockElapsed / 60.0))) : 0;
+    const int pending = pendingFor(b.code, b.itemId);
+    if (pending >= 0) {
+        // played hands free and not rated yet: this Done is its rating, so it isn't logged twice
+        minutes += m_toRate[pending].minutes;
+        m_toRate.erase(m_toRate.begin() + pending);
+        emit handsFreeChanged();
+    }
+    if (minutes == 0) {
+        minutes = b.minutes;   // (practised without the runner's clock: the minutes planned)
+    }
     m_timer.stop();
     if (m_playingAlong) {
         stopPlaying();
     }
     recordDone(m_blockIndex, minutes, tempoReached, stage, note);
+    m_blockElapsed = 0;   // (a "Done again" counts from here)
+    m_topTempo = 0;
     // (savePlan found our block again), then the next one not done
     const int at = m_blockIndex;
     const auto& blocks = m_plan.days[m_dayIndex].blocks;
@@ -1051,6 +1189,24 @@ void PracticeRunnerModel::markNotDone()
         return;
     }
     practice::Block& b = m_plan.days[m_dayIndex].blocks[m_blockIndex];
+    // a Done by mistake: the progress it made goes too (its sessions, stage, best tempo), or the hands-free rating it
+    // was waiting for
+    if (b.done) {
+        const int pending = pendingFor(b.code, b.itemId);
+        if (pending >= 0) {
+            m_toRate.erase(m_toRate.begin() + pending);   // (not in the progress yet)
+            emit handsFreeChanged();
+        } else {
+            practice::Progress progress;
+            progress.load();
+            const QDate today = QDate::currentDate();
+            const QDate day = m_plan.days[m_dayIndex].date;
+            if (progress.undoLast(b.code, b.itemId, today)
+                || (day.isValid() && day != today && progress.undoLast(b.code, b.itemId, day))) {
+                progress.save();
+            }
+        }
+    }
     b.done = false;
     b.stage = -1;
     b.tempoReached = 0;

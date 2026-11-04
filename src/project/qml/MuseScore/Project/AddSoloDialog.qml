@@ -19,6 +19,8 @@ StyledDialogView {
     contentHeight: 420
     margins: 20
 
+    property string addError: ""   // the last failed add, until the next edit
+
     AddSoloModel {
         id: soloModel
     }
@@ -52,7 +54,7 @@ StyledDialogView {
             Layout.fillWidth: true
             currentText: soloModel.name
             hint: qsTrc("starscore", "e.g. Christian – tenor solo")
-            onTextEdited: function(t) { soloModel.name = t }
+            onTextEdited: function(t) { soloModel.name = t; root.addError = "" }
         }
 
         RowLayout {
@@ -63,7 +65,7 @@ StyledDialogView {
                     Layout.preferredWidth: 100
                     currentValue: soloModel.startBar
                     step: 1; decimals: 0; minValue: 1; maxValue: 9999
-                    onValueEdited: function(v) { soloModel.startBar = v }
+                    onValueEdited: function(v) { soloModel.startBar = v; root.addError = "" }
                 }
             }
             ColumnLayout {
@@ -72,7 +74,7 @@ StyledDialogView {
                     Layout.preferredWidth: 100
                     currentValue: soloModel.endBar
                     step: 1; decimals: 0; minValue: 0; maxValue: 9999
-                    onValueEdited: function(v) { soloModel.endBar = v }
+                    onValueEdited: function(v) { soloModel.endBar = v; root.addError = "" }
                 }
             }
         }
@@ -89,7 +91,7 @@ StyledDialogView {
             wrapMode: Text.WordWrap
             horizontalAlignment: Text.AlignLeft
             color: "#E0463A"
-            text: soloModel.warning
+            text: root.addError !== "" ? root.addError : soloModel.warning
         }
 
         Item { Layout.fillHeight: true }
@@ -113,7 +115,7 @@ StyledDialogView {
                         root.ret = { "errcode": 0 }
                         root.hide()
                     } else {
-                        warningLabel.text = err
+                        root.addError = err   // (a binding, not an assignment: the model's warnings show again after an edit)
                     }
                 }
             }

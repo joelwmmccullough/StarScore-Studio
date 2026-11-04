@@ -29,6 +29,7 @@
 #include "playbacktypes.h"
 
 #include "engraving/dom/masterscore.h"
+#include "notation/inotationelements.h"
 #include "engraving/dom/stafftext.h"
 #include "engraving/dom/utils.h"
 #include "engraving/dom/factory.h"
@@ -1859,19 +1860,29 @@ muse::audio::secs_t PlaybackController::playedTickToSecs(int tick) const
 // lift when an instrument is shown again
 static const muse::String HIDDEN_MUTED_TAG = u"starscoreHiddenMuted";
 
-bool PlaybackController::hiddenMutesInMainScore() const
+// (1.24.0) A part score has a mixer of its own: its hidden-instrument mutes are kept in its own score's tag (they were
+// kept for the main score only, so switching tabs forgot a part score's, and showing the instrument there again left
+// it muted)
+engraving::Score* PlaybackController::hiddenMutesScore() const
 {
-    return m_notation && m_masterNotation && m_notation == m_masterNotation->notation() && m_masterNotation->masterScore();
+    if (!m_notation || !m_masterNotation || !m_masterNotation->masterScore()) {
+        return nullptr;
+    }
+    if (m_notation == m_masterNotation->notation()) {
+        return m_masterNotation->masterScore();
+    }
+    return m_notation->elements() ? m_notation->elements()->msScore() : nullptr;
 }
 
 void PlaybackController::loadHiddenAutoMuted()
 {
     m_hiddenAutoMuted.clear();
-    if (!hiddenMutesInMainScore()) {
+    const engraving::Score* score = hiddenMutesScore();
+    if (!score) {
         return;
     }
-    const engraving::MasterScore* ms = m_masterNotation->masterScore();
-    const auto& tags = ms->metaTags();
+    // (the score's own tags: Score::metaTag would give a part score the main score's)
+    const auto& tags = score->metaTags();
     auto it = tags.find(HIDDEN_MUTED_TAG);
     if (it == tags.end()) {
         // A file saved before this was kept: an instrument that is hidden and muted is taken as muted because it's
@@ -1915,7 +1926,8 @@ void PlaybackController::loadHiddenAutoMuted()
 
 void PlaybackController::saveHiddenAutoMuted()
 {
-    if (!hiddenMutesInMainScore()) {
+    engraving::Score* score = hiddenMutesScore();
+    if (!score) {
         return;
     }
     muse::StringList entries;
@@ -1923,11 +1935,10 @@ void PlaybackController::saveHiddenAutoMuted()
         entries << String::fromStdString(std::to_string(id.partId.toUint64())) + u"|" + id.instrumentId;
     }
     const String value = entries.join(u"\n");
-    engraving::MasterScore* ms = m_masterNotation->masterScore();
-    const auto& tags = ms->metaTags();
+    const auto& tags = score->metaTags();
     auto it = tags.find(HIDDEN_MUTED_TAG);
     if (it == tags.end() || it->second != value) {
-        ms->setMetaTag(HIDDEN_MUTED_TAG, value);
+        score->setMetaTag(HIDDEN_MUTED_TAG, value);
     }
 }
 

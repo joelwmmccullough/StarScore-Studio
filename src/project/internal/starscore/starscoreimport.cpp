@@ -1322,6 +1322,11 @@ void StarScoreService::removeEmptyVersions(const QStringList& partIds)
     }
     if (!ids.empty()) {
         master->parts()->removeParts(ids);
+        QStringList removed;
+        for (const muse::ID& id : ids) {
+            removed << id.toQString();
+        }
+        forgetRemovedParts(removed);   // (1.24.0) the next new part may get one of these ids
     }
 }
 
@@ -1588,8 +1593,18 @@ RetVal<QStringList> StarScoreService::createLowAlternates(const QString& section
     }
 
     const QStringList newIds = made.partIds;
-    QTimer::singleShot(1500, &m_timerGuard, [this, newIds]() { applyMixerDefaults(newIds); });
-    QTimer::singleShot(4000, &m_timerGuard, [this, newIds]() { applyMixerDefaults(newIds); });
+    // (1.24.0) only in this song: another one may be open by then
+    const std::function<bool()> sameSong = currentSongCheck();
+    QTimer::singleShot(1500, &m_timerGuard, [this, newIds, sameSong]() {
+        if (sameSong()) {
+            applyMixerDefaults(newIds);
+        }
+    });
+    QTimer::singleShot(4000, &m_timerGuard, [this, newIds, sameSong]() {
+        if (sameSong()) {
+            applyMixerDefaults(newIds);
+        }
+    });
 
     master->notation()->notationChanged().notify();
     scheduleChanged();
@@ -1866,7 +1881,12 @@ RetVal<QString> StarScoreService::makeFlexibleSheetPart(const QString& sectionId
     open(ms->partById(ID(pid)));
 
     const QStringList ids { pid };
-    QTimer::singleShot(1500, &m_timerGuard, [this, ids]() { applyMixerDefaults(ids); });
+    // (1.24.0) only in this song: another one may be open by then
+    QTimer::singleShot(1500, &m_timerGuard, [this, ids, sameSong = currentSongCheck()]() {
+        if (sameSong()) {
+            applyMixerDefaults(ids);
+        }
+    });
     master->notation()->notationChanged().notify();
     scheduleChanged();
     return RetVal<QString>::make_ok(pid);
@@ -2054,6 +2074,7 @@ QString StarScoreService::mergeBassParts(bool apply)
     d.partStatus.erase(dropId);
     d.partMutes.erase(dropId);
     d.flugelhornParts.erase(dropId);
+    d.auditPartAudited.erase(dropId);   // (1.24.0) the id may come back on the next part added
     store(d);
 
     // its part scores go with it; the kept part is "Bass Guitar"
@@ -2106,6 +2127,11 @@ QString StarScoreService::mergeBassParts(bool apply)
 //! Trombone's, horn parts named by the scheme, and the horn part scores showing their exported title
 void StarScoreService::tidyOpenedScore()
 {
+    if (m_tidying) {
+        // (1.24.0) another song opened while a tidy waits on its question: this one runs once that tidy is over
+        QTimer::singleShot(500, &m_timerGuard, [this]() { tidyOpenedScore(); });
+        return;
+    }
     if (!m_mainProject || globalContext()->currentProject() != m_mainProject) {
         return;
     }
@@ -2114,6 +2140,25 @@ void StarScoreService::tidyOpenedScore()
     if (!master || !ms || load().sections.empty()) {
         return;
     }
+    // (1.24.0) A question's dialog runs the event loop: "Update all sheets" could close this song and open the next
+    // from inside it, and the tidying then went on in a freed score. So a run (and the automatic tests) gets no
+    // questions, the run waits while the tidying lasts, and after each question the song must still be the one open.
+    m_tidying = true;
+    struct TidyingFlag {
+        bool& flag;
+        ~TidyingFlag() { flag = false; }
+    } tidyingFlag { m_tidying };
+    const bool nobodyToAsk = m_updateStatus.running || autotestRequested();
+    auto stillOpen = [this, &master, ms]() {
+        return globalContext()->currentMasterNotation() == master && masterScore() == ms;
+    };
+    StarScorePlaybackDeferred playbackDeferred(master);   // (1.24.0) one rebuild of the playback events at the end
+    // leaving early: a song closed meanwhile has no score left to rebuild them from (one still open behind a solo has)
+    auto leaveEarly = [this, &master, &playbackDeferred]() {
+        if (!m_mainProject || m_mainProject->masterNotation() != master) {
+            playbackDeferred.abandon();
+        }
+    };
     QElapsedTimer clock;   // how long the tidying takes, in the log
     clock.start();
     QElapsedTimer stepClock;   // and where it goes: each step over a tenth of a second
@@ -2132,13 +2177,19 @@ void StarScoreService::tidyOpenedScore()
     if (!ms->sanityCheck()) {
         QStringList where;
         const int count = overlappingRests(ms, false, &where);
-        if (count > 0) {
+        if (count > 0 && nobodyToAsk) {
+            LOGW() << "[starscore] the score is damaged (" << count << " rest(s) on top of notes); not asked about it now";
+        } else if (count > 0) {
             const IInteractive::Result answer = interactive()->questionSync(
                 muse::trc("starscore", "Repair the score?"),
                 muse::qtrc("starscore", "This score is damaged: %n rest(s) sit on top of notes in the same voice, which "
                                         "gives these bars too many beats:\n\n%1\n\nRemove those rests? The notes stay as they "
                                         "are. Check the bars afterwards.", "", count).arg(where.mid(0, 8).join("\n"))
                 .toStdString(), { IInteractive::Button::No, IInteractive::Button::Yes }, IInteractive::Button::Yes);
+            if (!stillOpen()) {
+                leaveEarly();
+                return;   // (1.24.0) another song is open now
+            }
             if (answer.standardButton() == IInteractive::Button::Yes) {
                 master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Repair the score"));
                 overlappingRests(ms, true, nullptr);
@@ -2194,9 +2245,14 @@ void StarScoreService::tidyOpenedScore()
     lap("credits");
     syncCopyrightNow(false);
     lap("copyright");
-    // a newer default style: asked once per style per song (not in the automatic tests, which have nobody to answer)
-    if (!autotestRequested()) {
+    // a newer default style: asked once per style per song (not in the automatic tests or a run through the library,
+    // which have nobody to answer)
+    if (!nobodyToAsk) {
         offerNewerStyle();
+        if (!stillOpen()) {
+            leaveEarly();
+            return;   // (1.24.0) another song is open now
+        }
     }
 
     // Tempo marks in the text style's font, title frames of a fixed height
@@ -2277,7 +2333,7 @@ void StarScoreService::tidyOpenedScore()
     makeLeadSheetVoiceWhenReady();
     lap("lead sheet + voice");
     labelPartBooks();
-    lap("part book labels");
+    lap("part score labels");
     // the Keys player's bass staff: always in the full score, only where it has music in the part scores
     if (starscore::applyKeysStaffRules(ms, leadSheetPartsOf(ms)) > 0) {
         if (INotationProjectPtr project = globalContext()->currentProject()) {

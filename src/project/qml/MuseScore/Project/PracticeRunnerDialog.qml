@@ -46,12 +46,24 @@ StyledDialogView {
     property string noteText: ""
     property bool fullScreen: false
     readonly property bool hf: run.handsFree !== ""
+    //! the current block, read once per change (the page reads its fields dozens of times)
+    readonly property var blk: run.block
+    //! the block the Done bar's choices are for: they're reset only when another block is shown, not on every change
+    property string shownBlock: ""
+    //! beside the score (a narrow window): the header, the parts, and the Done bar on two lines
+    readonly property bool compact: page.width < 640
 
     PracticeRunnerModel {
         id: run
         onChanged: {
-            root.tempoReached = run.block.tempo || 0
-            var s = run.block.stage !== undefined ? run.block.stage : 1
+            var b = run.block
+            var key = run.blockIndex + "|" + (b.code || "") + "|" + (b.title || "")
+            if (key === root.shownBlock) {
+                return
+            }
+            root.shownBlock = key
+            root.tempoReached = b.tempo || 0
+            var s = b.stage !== undefined ? b.stage : 1
             root.stageChoice = Math.max(1, Math.min(4, s + 1))
         }
     }
@@ -77,15 +89,15 @@ StyledDialogView {
     //! hands free: what to do, a line each, and when to move on (when there's no notation)
     function stepsText() {
         var lines = []
-        if (run.block.goal) {
-            lines.push(run.block.goal)
+        if (root.blk.goal) {
+            lines.push(root.blk.goal)
         }
-        var steps = run.block.steps || []
+        var steps = root.blk.steps || []
         for (var i = 0; i < steps.length; ++i) {
             lines.push("•  " + steps[i])
         }
-        if (run.images.length === 0 && !run.rendering && run.block.moveOnWhen) {
-            lines.push(qsTrc("starscore", "Move on when: %1").arg(run.block.moveOnWhen))
+        if (run.images.length === 0 && !run.rendering && root.blk.moveOnWhen) {
+            lines.push(qsTrc("starscore", "Move on when: %1").arg(root.blk.moveOnWhen))
         }
         return lines.join("\n")
     }
@@ -215,12 +227,16 @@ StyledDialogView {
         }
         Repeater {
             model: run.toRate
-            delegate: RowLayout {
+            // (compact: the song and item on a line of their own, the four ratings under it)
+            delegate: GridLayout {
                 id: rateRow
                 required property var modelData
                 Layout.fillWidth: true
-                spacing: 6
+                columns: root.compact ? 4 : 5
+                columnSpacing: 6
+                rowSpacing: 4
                 Text {
+                    Layout.columnSpan: root.compact ? 4 : 1
                     Layout.fillWidth: true
                     text: rateRow.modelData.song + " · " + rateRow.modelData.title
                     color: root.ink
@@ -269,7 +285,7 @@ StyledDialogView {
                     Text {
                         Layout.fillWidth: true
                         visible: run.handsFree !== "break" && run.handsFree !== "done"
-                        text: (run.block.song || "") + (run.parts.length > 1
+                        text: (root.blk.song || "") + (run.parts.length > 1
                               ? "  ·  " + qsTrc("starscore", "part %1 of %2").arg(run.partIndex + 1).arg(run.parts.length) : "")
                               + (root.passText() !== "" && run.handsFree === "practice" ? "  ·  " + root.passText() : "")
                         color: root.gold
@@ -282,7 +298,7 @@ StyledDialogView {
                         Layout.fillWidth: true
                         text: run.handsFree === "break" ? qsTrc("starscore", "Break")
                               : run.handsFree === "done" ? qsTrc("starscore", "That's the day done")
-                              : (run.parts.length > 1 ? (run.parts[run.partIndex] ? run.parts[run.partIndex].label : "") : (run.block.title || ""))
+                              : (run.parts.length > 1 ? (run.parts[run.partIndex] ? run.parts[run.partIndex].label : "") : (root.blk.title || ""))
                         color: root.ink
                         font.pixelSize: root.px(32)
                         font.bold: true
@@ -390,7 +406,7 @@ StyledDialogView {
                 spacing: 14
                 Text {
                     visible: run.handsFree === "break"
-                    text: qsTrc("starscore", "Next: %1").arg((run.block.song || "") + " · " + (run.block.title || ""))
+                    text: qsTrc("starscore", "Next: %1").arg((root.blk.song || "") + " · " + (root.blk.title || ""))
                     color: root.teal
                     font.pixelSize: root.px(22)
                 }
@@ -437,29 +453,44 @@ StyledDialogView {
             visible: !root.hf
 
             // ---------------- day, sizes, hands free ----------------
-            RowLayout {
+            // (compact: the plan and day on a line of their own, wrapping, with the sizes and the count under them)
+            GridLayout {
                 Layout.fillWidth: true
-                spacing: 8
+                columns: root.compact ? 3 : 4
+                columnSpacing: 8
+                rowSpacing: 4
                 Text {
+                    Layout.row: 0
+                    Layout.column: 0
+                    Layout.columnSpan: root.compact ? 3 : 1
                     Layout.fillWidth: true
                     text: run.planName + "  ·  " + run.dayTitle
                     color: root.soft
                     font.pixelSize: root.px(13)
+                    wrapMode: root.compact ? Text.WordWrap : Text.NoWrap
+                    maximumLineCount: root.compact ? 2 : 1
                     elide: Text.ElideRight
                 }
                 SizeControl {
+                    Layout.row: root.compact ? 1 : 0
+                    Layout.column: root.compact ? 0 : 1
                     label: qsTrc("starscore", "Text")
                     value: run.textScale
                     minimum: 0.7; maximum: 2.0
                     onStep: function(delta) { run.textScale = run.textScale + delta }
                 }
                 SizeControl {
+                    Layout.row: root.compact ? 1 : 0
+                    Layout.column: root.compact ? 1 : 2
                     label: qsTrc("starscore", "Score")
                     value: run.scoreScale
                     minimum: 0.6; maximum: 2.0
                     onStep: function(delta) { run.scoreScale = run.scoreScale + delta }
                 }
                 Text {
+                    Layout.row: root.compact ? 1 : 0
+                    Layout.column: root.compact ? 2 : 3
+                    Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
                     text: qsTrc("starscore", "%1 of %2 done").arg(run.doneCount).arg(run.blockCount)
                     color: run.blockCount > 0 && run.doneCount === run.blockCount ? root.doneColor : root.soft
                     font.pixelSize: root.px(13)
@@ -520,7 +551,7 @@ StyledDialogView {
                     spacing: 10
 
                     Text {
-                        text: (run.block.kindName ? run.block.kindName + "  ·  " : "") + (run.block.song || "")
+                        text: (root.blk.kindName ? root.blk.kindName + "  ·  " : "") + (root.blk.song || "")
                         color: root.gold
                         font.pixelSize: root.px(14)
                         font.letterSpacing: 1.5
@@ -528,7 +559,7 @@ StyledDialogView {
                     }
                     Text {
                         Layout.fillWidth: true
-                        text: run.block.title || ""
+                        text: root.blk.title || ""
                         color: root.ink
                         font.pixelSize: root.px(26)
                         font.bold: true
@@ -537,8 +568,8 @@ StyledDialogView {
                     Text {
                         Layout.fillWidth: true
                         visible: text !== ""
-                        text: [run.block.categoryName, run.block.solo, run.block.sections,
-                               run.block.level ? qsTrc("starscore", "level %1").arg(run.block.level) : ""]
+                        text: [root.blk.categoryName, root.blk.solo, root.blk.sections,
+                               root.blk.level ? qsTrc("starscore", "level %1").arg(root.blk.level) : ""]
                               .filter(function(x) { return x }).join("  ·  ")
                         color: root.teal
                         font.pixelSize: root.px(13)
@@ -546,7 +577,7 @@ StyledDialogView {
                     }
                     Text {
                         Layout.fillWidth: true
-                        visible: run.block.missing === true
+                        visible: root.blk.missing === true
                         text: qsTrc("starscore", "This item isn't in the song's practice library any more. Plan again from today on the Practice page.")
                         color: "#E0463A"
                         font.pixelSize: root.px(13)
@@ -554,14 +585,14 @@ StyledDialogView {
                     }
                     Text {
                         Layout.fillWidth: true
-                        visible: (run.block.goal || "") !== ""
-                        text: run.block.goal || ""
+                        visible: (root.blk.goal || "") !== ""
+                        text: root.blk.goal || ""
                         color: root.ink
                         font.pixelSize: root.px(16)
                         wrapMode: Text.WordWrap
                     }
                     Repeater {
-                        model: run.block.steps || []
+                        model: root.blk.steps || []
                         delegate: RowLayout {
                             required property string modelData
                             required property int index
@@ -606,11 +637,14 @@ StyledDialogView {
                             minWidth: 70
                             onClicked: run.resetTimer()
                         }
-                        Item { Layout.fillWidth: true }
+                        // (it takes the rest of the line, on the right, and wraps when the window is narrow)
                         Text {
+                            Layout.fillWidth: true
+                            horizontalAlignment: Text.AlignRight
+                            wrapMode: Text.WordWrap
                             text: root.passText() !== "" ? root.passText()
-                                  : (run.block.tempo || 0) > 0 ? qsTrc("starscore", "Today ♩ = %1").arg(run.block.tempo)
-                                    + ((run.block.tempoGoal || 0) > (run.block.tempo || 0) ? qsTrc("starscore", ", up to %1").arg(run.block.tempoGoal) : "")
+                                  : (root.blk.tempo || 0) > 0 ? qsTrc("starscore", "Today ♩ = %1").arg(root.blk.tempo)
+                                    + ((root.blk.tempoGoal || 0) > (root.blk.tempo || 0) ? qsTrc("starscore", ", up to %1").arg(root.blk.tempoGoal) : "")
                                   : ""
                             color: root.passText() !== "" ? root.teal : root.soft
                             font.pixelSize: root.px(14)
@@ -628,49 +662,65 @@ StyledDialogView {
                             color: modelData.current ? "#2A241C" : "transparent"
                             border.color: modelData.current ? root.gold : root.line
                             border.width: 1
-                            RowLayout {
+                            // wide: number, label, time, the two buttons on one line; compact: the buttons go under
+                            // the label, so the label keeps its room
+                            GridLayout {
                                 id: partRow
                                 anchors.left: parent.left
                                 anchors.right: parent.right
                                 anchors.verticalCenter: parent.verticalCenter
                                 anchors.leftMargin: 10
                                 anchors.rightMargin: 6
-                                spacing: 8
+                                columns: root.compact ? 3 : 4
+                                columnSpacing: 8
+                                rowSpacing: 4
                                 Text {
+                                    Layout.row: 0
+                                    Layout.column: 0
                                     text: modelData.finished ? "✓" : (modelData.index + 1) + "."
                                     color: modelData.finished ? root.doneColor : root.gold
                                     font.pixelSize: root.px(14)
                                     Layout.preferredWidth: root.px(20)
                                 }
                                 Text {
+                                    Layout.row: 0
+                                    Layout.column: 1
                                     Layout.fillWidth: true
                                     text: modelData.label
                                     color: root.ink
                                     font.pixelSize: root.px(14)
-                                    elide: Text.ElideRight
+                                    wrapMode: root.compact ? Text.WordWrap : Text.NoWrap
+                                    elide: root.compact ? Text.ElideNone : Text.ElideRight
                                     MouseArea { anchors.fill: parent; onClicked: run.goPart(modelData.index) }
                                 }
                                 Text {
+                                    Layout.row: 0
+                                    Layout.column: 2
                                     text: modelData.time
                                     color: root.soft
                                     font.pixelSize: root.px(13)
                                     font.family: "Menlo"
                                 }
-                                FlatButton {
+                                RowLayout {
+                                    Layout.row: root.compact ? 1 : 0
+                                    Layout.column: root.compact ? 1 : 3
+                                    Layout.columnSpan: root.compact ? 2 : 1
                                     visible: modelData.hasNotation
-                                    text: qsTrc("starscore", "Play example")
-                                    minWidth: 100
-                                    toolTipTitle: qsTrc("starscore", "Hear it as written, at today's tempo")
-                                    onClicked: run.playExample(modelData.index)
-                                }
-                                FlatButton {
-                                    visible: modelData.hasNotation
-                                    text: qsTrc("starscore", "Play along")
-                                    accentButton: true
-                                    minWidth: 100
-                                    toolTipTitle: qsTrc("starscore", "The backing for you to play over, and the timer")
-                                    toolTipDescription: qsTrc("starscore", "It loops for the part's minutes and steps up from today's tempo toward the goal.")
-                                    onClicked: run.playAlong(modelData.index)
+                                    spacing: 8
+                                    FlatButton {
+                                        text: qsTrc("starscore", "Play example")
+                                        minWidth: root.compact ? 90 : 100
+                                        toolTipTitle: qsTrc("starscore", "Hear it as written, at today's tempo")
+                                        onClicked: run.playExample(modelData.index)
+                                    }
+                                    FlatButton {
+                                        text: qsTrc("starscore", "Play along")
+                                        accentButton: true
+                                        minWidth: root.compact ? 90 : 100
+                                        toolTipTitle: qsTrc("starscore", "The backing for you to play over, and the timer")
+                                        toolTipDescription: qsTrc("starscore", "It loops for the part's minutes and steps up from today's tempo toward the goal.")
+                                        onClicked: run.playAlong(modelData.index)
+                                    }
                                 }
                             }
                         }
@@ -686,10 +736,10 @@ StyledDialogView {
                         }
                         Item { Layout.fillWidth: true }
                         FlatButton {
-                            visible: run.block.hasExercise === true
+                            visible: root.blk.hasExercise === true
                             text: qsTrc("starscore", "Open in StarScore")
                             minWidth: 110
-                            onClicked: run.openExercise(run.block.tempo || 0, false)
+                            onClicked: run.openExercise(root.blk.tempo || 0, false)
                         }
                         FlatButton {
                             text: qsTrc("starscore", "Open the song")
@@ -697,7 +747,7 @@ StyledDialogView {
                             onClicked: run.openSong()
                         }
                         FlatButton {
-                            visible: run.block.hasIreal === true
+                            visible: root.blk.hasIreal === true
                             text: qsTrc("starscore", "iReal Pro")
                             minWidth: 70
                             toolTipTitle: qsTrc("starscore", "The chart as an iReal Pro link")
@@ -711,10 +761,14 @@ StyledDialogView {
                         color: root.teal
                         font.pixelSize: root.px(13)
                     }
-                    RowLayout {
+                    // (a Flow: the buttons go on to the next line in a narrow window)
+                    Flow {
+                        Layout.fillWidth: true
                         visible: run.blockCount > 0 && run.doneCount === run.blockCount
                         spacing: 8
                         Text {
+                            height: 30
+                            verticalAlignment: Text.AlignVCenter
                             text: qsTrc("starscore", "All done. Keep going? Add")
                             color: root.ink
                             font.pixelSize: root.px(14)
@@ -762,7 +816,7 @@ StyledDialogView {
                     Rectangle {
                         Layout.fillWidth: true
                         Layout.topMargin: 6
-                        visible: (run.block.moveOnWhen || "") !== ""
+                        visible: (root.blk.moveOnWhen || "") !== ""
                         implicitHeight: moveOn.implicitHeight + 20
                         color: "transparent"
                         border.color: root.gold
@@ -774,7 +828,7 @@ StyledDialogView {
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
                             anchors.margins: 10
-                            text: "<b>" + qsTrc("starscore", "MOVE ON WHEN") + "</b>&nbsp;&nbsp;" + (run.block.moveOnWhenHtml || "")
+                            text: "<b>" + qsTrc("starscore", "MOVE ON WHEN") + "</b>&nbsp;&nbsp;" + (root.blk.moveOnWhenHtml || "")
                             textFormat: Text.StyledText
                             color: root.gold
                             font.pixelSize: root.px(14)
@@ -783,11 +837,11 @@ StyledDialogView {
                     }
                     Text {
                         Layout.fillWidth: true
-                        visible: (run.block.sessions || 0) > 0
+                        visible: (root.blk.sessions || 0) > 0
                         text: qsTrc("starscore", "So far: %1 sessions, %2%3")
-                              .arg(run.block.sessions).arg(run.block.stageName)
-                              .arg((run.block.bestTempo || 0) > 0 ? qsTrc("starscore", ", best ♩ = %1").arg(run.block.bestTempo) : "")
-                              + ((run.block.lastNote || "") !== "" ? qsTrc("starscore", ". Last note: %1").arg(run.block.lastNote) : "")
+                              .arg(root.blk.sessions).arg(root.blk.stageName)
+                              .arg((root.blk.bestTempo || 0) > 0 ? qsTrc("starscore", ", best ♩ = %1").arg(root.blk.bestTempo) : "")
+                              + ((root.blk.lastNote || "") !== "" ? qsTrc("starscore", ". Last note: %1").arg(root.blk.lastNote) : "")
                         color: root.teal
                         font.pixelSize: root.px(12)
                         wrapMode: Text.WordWrap
@@ -799,25 +853,36 @@ StyledDialogView {
             Rectangle { Layout.fillWidth: true; height: 1; color: root.gold; opacity: 0.6 }
 
             // ---------------- done ----------------
-            RowLayout {
+            // wide: [tempo] [stage] [note ...] [Done] [Not done]; compact (beside the score), two lines:
+            // [tempo] [stage] [Done] / [note ...] [Not done], so the note field keeps its room
+            GridLayout {
                 Layout.fillWidth: true
-                spacing: 8
+                columns: root.compact ? 3 : 5
+                columnSpacing: 8
+                rowSpacing: 6
                 visible: run.blockCount > 0
-                Text {
-                    text: qsTrc("starscore", "Tempo reached")
-                    color: root.soft
-                    font.pixelSize: root.px(13)
-                    visible: (run.block.tempo || 0) > 0
-                }
-                IncrementalPropertyControl {
-                    Layout.preferredWidth: 90
-                    visible: (run.block.tempo || 0) > 0
-                    currentValue: root.tempoReached
-                    step: 2; decimals: 0; minValue: 0; maxValue: 400
-                    onValueEdited: function(v) { root.tempoReached = v }
+                RowLayout {
+                    Layout.row: 0
+                    Layout.column: 0
+                    spacing: 8
+                    visible: (root.blk.tempo || 0) > 0
+                    Text {
+                        text: root.compact ? qsTrc("starscore", "Tempo") : qsTrc("starscore", "Tempo reached")
+                        color: root.soft
+                        font.pixelSize: root.px(13)
+                    }
+                    IncrementalPropertyControl {
+                        Layout.preferredWidth: 90
+                        currentValue: root.tempoReached
+                        step: 2; decimals: 0; minValue: 0; maxValue: 400
+                        onValueEdited: function(v) { root.tempoReached = v }
+                    }
                 }
                 StyledDropdown {
-                    Layout.preferredWidth: 150
+                    Layout.row: 0
+                    Layout.column: 1
+                    Layout.preferredWidth: root.compact ? 130 : 150
+                    Layout.fillWidth: root.compact
                     model: [ { "text": qsTrc("starscore", "Started"), "value": 1 },
                              { "text": qsTrc("starscore", "Getting there"), "value": 2 },
                              { "text": qsTrc("starscore", "Solid"), "value": 3 },
@@ -827,13 +892,19 @@ StyledDialogView {
                 }
                 TextInputField {
                     id: noteField
+                    Layout.row: root.compact ? 1 : 0
+                    Layout.column: root.compact ? 0 : 2
+                    Layout.columnSpan: root.compact ? 2 : 1
                     Layout.fillWidth: true
+                    Layout.minimumWidth: 120
                     hint: qsTrc("starscore", "A note for next time (optional)")
                     currentText: root.noteText
                     onTextChanged: function(t) { root.noteText = t }
                 }
                 FlatButton {
-                    text: run.block.done ? qsTrc("starscore", "Done again") : qsTrc("starscore", "Done")
+                    Layout.row: 0
+                    Layout.column: root.compact ? 2 : 3
+                    text: root.blk.done ? qsTrc("starscore", "Done again") : qsTrc("starscore", "Done")
                     accentButton: true
                     minWidth: 90
                     onClicked: {
@@ -842,7 +913,9 @@ StyledDialogView {
                     }
                 }
                 FlatButton {
-                    visible: run.block.done === true
+                    Layout.row: root.compact ? 1 : 0
+                    Layout.column: root.compact ? 2 : 4
+                    visible: root.blk.done === true
                     text: qsTrc("starscore", "Not done")
                     minWidth: 80
                     onClicked: run.markNotDone()

@@ -65,7 +65,8 @@ bool setFinderColour(const QString&, const QString&) { return false; }
 QString finderColour(const QString&) { return QString(); }
 bool canRenderPdf() { return false; }
 
-void renderPdfs(const std::vector<RenderJob>& jobs, std::function<void(int, bool)> eachDone, std::function<void()> allDone)
+void renderPdfs(const std::vector<RenderJob>& jobs, std::function<void(int, bool)> eachDone, std::function<void()> allDone,
+                const std::atomic_bool*)
 {
     for (int i = 0; i < int(jobs.size()); ++i) {
         eachDone(i, false);

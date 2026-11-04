@@ -27,6 +27,7 @@ StyledDialogView {
     property string player: ""
     property string otherName: ""
     property string noteText: ""
+    property string addError: ""   // the last failed add / mark, until the next edit
     readonly property string someoneElse: qsTrc("starscore", "Someone else…")
     readonly property string chosenPlayer: root.player === root.someoneElse ? root.otherName : root.player
 
@@ -48,7 +49,7 @@ StyledDialogView {
             root.ret = { "errcode": 0 }
             root.hide()
         } else {
-            errorLabel.text = err
+            root.addError = err
         }
     }
 
@@ -93,7 +94,7 @@ StyledDialogView {
                     Layout.preferredWidth: 180
                     hint: qsTrc("starscore", "Name")
                     currentText: root.otherName
-                    onTextEdited: function(t) { root.otherName = t }
+                    onTextEdited: function(t) { root.otherName = t; root.addError = "" }
                 }
             }
         }
@@ -110,7 +111,7 @@ StyledDialogView {
                 hint: annModel.canAdd ? qsTrc("starscore", "e.g. breathe, watch the drummer, cue: guitar")
                                       : qsTrc("starscore", "Click a note or rest on the sheet first")
                 currentText: root.noteText
-                onTextEdited: function(t) { root.noteText = t }
+                onTextEdited: function(t) { root.noteText = t; root.addError = "" }
                 onAccepted: root.applyAndClose()
             }
             StyledTextLabel {
@@ -126,6 +127,8 @@ StyledDialogView {
         StyledTextLabel {
             id: errorLabel
             Layout.fillWidth: true
+            visible: text !== ""
+            text: root.addError
             wrapMode: Text.WordWrap
             horizontalAlignment: Text.AlignLeft
             color: "#E0463A"

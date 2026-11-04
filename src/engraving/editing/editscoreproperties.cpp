@@ -34,6 +34,27 @@ using namespace mu::engraving;
 void ChangeMetaTags::flip(EditData*)
 {
     std::map<String, String> t = score->metaTags();
+    // StarScore (1.24.0): undoing or redoing Project properties swapped in every tag as it was then, StarScore's own
+    // too, which StarScore changes without undo steps: its data ("starscore…": sections, statuses, version, export
+    // records) went back with them. Those keep their live values. So does a StarScore song's "copyright", which
+    // StarScore makes from the title and composer, once the edit itself is in (its first flip applies it as made).
+    const bool starscoreSong = t.count(u"starscore") && !t.at(u"starscore").isEmpty();
+    auto keepsLiveValue = [&](const String& key) {
+        return key.startsWith(u"starscore") || (flipped && starscoreSong && key == u"copyright");
+    };
+    for (auto it = metaTags.begin(); it != metaTags.end();) {
+        if (keepsLiveValue(it->first)) {
+            it = metaTags.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    for (const auto& [key, value] : t) {
+        if (keepsLiveValue(key)) {
+            metaTags[key] = value;
+        }
+    }
+    flipped = true;
     score->setMetaTags(metaTags);
     score->setLayoutAll();
     metaTags = t;

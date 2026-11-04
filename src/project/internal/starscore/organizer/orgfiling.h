@@ -37,6 +37,9 @@ struct BandFilingReport {
     QStringList foldersMade;              // "1 Bet/Demos"
     QStringList updateNotesRedated;       // "1 Amplitudes: Update Notes 26-08-19 -> Update Notes 26-10-01"
     QStringList intoSheetMusic;           // "1 Amplitudes: 1 Lead Sheet, 1 Rhythm, 3H Tpt Alt Ten" (moved into Sheet Music)
+    //! song folders moved or renumbered by hand ("4 Works In Progress/Jeju" -> "1 Jeju"): the new folder took the
+    //! code of the old one, which is gone; what is kept by song folder (changelogs, sheet measurements) follows it
+    std::vector<Move> renamedSongs;
 };
 
 //! Joel, 14 Oct 2026: a song's sheet folders (every folder but Chord Charts, Demos, Reference PDFs, Horn Part Guides,

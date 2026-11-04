@@ -142,8 +142,23 @@ void Organizer::stop()
     m_stop = true;
 }
 
+//! One run at a time in the whole program: closing the organizer's window doesn't stop a run (its PDFs are still
+//! being made, its data files still to be saved), and a second run started meanwhile would file, measure and save the
+//! same files at the same time. Set by run(), cleared by finish() (every run ends there).
+static std::atomic_bool s_running { false };
+
 void Organizer::run(const RunRequest& request, const Progress& progress, std::function<void(RunSummary)> done)
 {
+    bool idle = false;
+    if (!s_running.compare_exchange_strong(idle, true)) {
+        RunSummary busy;
+        busy.ok = false;
+        busy.headline = "An organization is still finishing (its window may have been closed). Wait a minute, then run again.";
+        if (done) {
+            done(busy);
+        }
+        return;
+    }
     m_stop = false;
     auto r = std::make_shared<Run>();
     r->request = request;
@@ -154,7 +169,7 @@ void Organizer::run(const RunRequest& request, const Progress& progress, std::fu
     if (!QFileInfo(m_paths.band).isDir()) {
         r->summary.ok = false;
         r->summary.headline = "Sheets and Demos wasn't found, so nothing was organized.";
-        r->done(r->summary);
+        finish(r);
         return;
     }
     // A data file that is there but can't be read (broken JSON, a cloud-only placeholder, a read that failed) stops
@@ -175,12 +190,15 @@ void Organizer::run(const RunRequest& request, const Progress& progress, std::fu
     if (!m_paths.projToolkit.isEmpty()) {
         check(r->projstate.load(m_paths.projToolkit));
     }
+    // the sheet measurements too (the first run takes the old toolkit's, before prepare() retires that toolkit):
+    // found unreadable only in prepare(), it stopped the run after Joel had answered the setlist.fm questions
+    check(r->cache.load(m_paths));
     if (!unreadable.isEmpty()) {
         r->summary.ok = false;
         r->summary.headline = "Nothing was organized: one of the organizer's data files couldn't be read. "
                               "Check the file (is Google Drive still downloading it?) and run again.";
         r->summary.warnings = unreadable;
-        r->done(r->summary);
+        finish(r);
         return;
     }
     if (r->recordings.doc.isNull()) {
@@ -305,11 +323,7 @@ void Organizer::prepare(std::shared_ptr<Run> r)
         QJsonObject orgState = r->state.doc.object();
         const bool firstRun = orgState.isEmpty();
 
-        // the sheet measurements (the first run takes the old toolkit's, before that toolkit is retired)
-        r->abortReason = r->cache.load(paths);
-        if (!r->abortReason.isEmpty()) {
-            return;      // the file is there but can't be read: nothing is saved (see the continuation below)
-        }
+        // (the sheet measurements were loaded by run(), which stops when sheetcache.json can't be read)
         const bool cacheWasEmpty = r->cache.isEmpty();
         // the tune folders of Projects and Sheets, listed once for the whole run
         const bool haveProjects = !paths.projects.isEmpty() && QFileInfo(paths.projects).isDir();
@@ -390,6 +404,41 @@ void Organizer::prepare(std::shared_ptr<Run> r)
         if (!filing.registered.isEmpty()) {
             bandActions.append(action("Registered", "change", "New song folders given codes: " + esc(filing.registered.join(", ")) + "."));
             plainLines << "Registered: " + filing.registered.join(", ");
+        }
+        // a song folder moved or renumbered by hand kept its code (fileBand): its changelog history and its sheet
+        // measurements follow it, so the move isn't logged as every sheet removed and added
+        if (!filing.renamedSongs.empty()) {
+            QJsonObject changelog = r->changelog.doc.object();
+            std::map<QString, SheetEntry> entries = r->cache.entries();
+            bool cacheMoved = false;
+            for (const Move& m : filing.renamedSongs) {
+                if (changelog.contains(m.from) && !changelog.contains(m.to)) {
+                    changelog[m.to] = changelog.value(m.from);    // (the old key stays: log entries are never removed)
+                    r->changelog.changed = true;
+                }
+                std::map<QString, SheetEntry> moved;
+                for (auto it = entries.begin(); it != entries.end();) {
+                    if (it->first.startsWith(m.from + "/")) {
+                        moved[m.to + it->first.mid(m.from.size())] = it->second;
+                        it = entries.erase(it);
+                    } else {
+                        ++it;
+                    }
+                }
+                for (auto& [rel, e] : moved) {
+                    entries[rel] = e;
+                    cacheMoved = true;
+                }
+            }
+            if (r->changelog.changed) {
+                r->changelog.doc = QJsonDocument(changelog);
+            }
+            if (cacheMoved) {
+                r->cache.replace(std::move(entries));
+            }
+            bandActions.append(action("Moved", "change", "Song folders moved by hand kept their codes: " + movesHtml(filing.renamedSongs) + "."));
+            plainLines << QString("%1 moved by hand kept %2 code.").arg(plural(int(filing.renamedSongs.size()), "song folder"),
+                                                                       QString(filing.renamedSongs.size() == 1 ? "its" : "their"));
         }
         if (!filing.intoSheetMusic.isEmpty()) {
             bandActions.append(action("Sheet Music", "change", QString("Sheet folders moved into each song&rsquo;s "
@@ -485,8 +534,15 @@ void Organizer::prepare(std::shared_ptr<Run> r)
             writeJson(paths.toolkit + "/hornguides/" + r->request.exported->code + ".json", QJsonDocument(r->request.exported->hornAnalysis));
         }
 
-        // --- the library
-        Library lib = buildLibrary(scan, r->codes.band);
+        // --- the library: only songs whose folder is there (a folder moved away by hand isn't made again by the
+        //     pages written into it)
+        std::map<QString, QString> liveCodes;
+        for (const auto& [root, code] : r->codes.band) {
+            if (QFileInfo(paths.band + "/" + root).isDir()) {
+                liveCodes[root] = code;
+            }
+        }
+        Library lib = buildLibrary(scan, liveCodes);
         for (SongInfo& s : lib.songs) {
             const QStringList un = QDir(paths.band + "/" + s.root).entryList({ "Update Notes*" }, QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
             s.updateNotes = un.isEmpty() ? QString() : un.last();
@@ -541,6 +597,9 @@ void Organizer::prepare(std::shared_ptr<Run> r)
                 continue;
             }
             const QDir dir(paths.band + "/" + s.root);
+            if (!dir.exists()) {
+                continue;    // never write pages into (and so make again) a song folder that is gone
+            }
             bool missing = !dir.exists(s.code + " - What's Here.pdf") || !dir.exists(s.code + " - Recordings.pdf");
             for (const Player* p : r->roster.current()) {
                 missing |= !s.updateNotes.isEmpty() && !dir.exists(s.updateNotes + "/" + s.code + " - Changelog - " + p->name + ".pdf");
@@ -740,9 +799,15 @@ void Organizer::prepare(std::shared_ptr<Run> r)
         //     The colours come from the sheet records StarScore writes at each export (orgcolours.h); a song with
         //     no record yet has no colour.
         std::map<QString, QString> colourOfCode;
-        const std::map<QString, QJsonObject> records = loadSheetRecords(paths);
+        std::set<QString> unreadableRecords;
+        const std::map<QString, QJsonObject> records = loadSheetRecords(paths, &unreadableRecords);
         for (const SongInfo& s : lib.songs) {
             if (s.code == "????") {
+                continue;
+            }
+            if (unreadableRecords.count(s.code)) {
+                // its record is there but couldn't be read this run: its colours (and its tune's) stay as they are
+                warnings << QString("sheets/%1.json couldn't be read, so %2's Finder colours were left as they are.").arg(s.code, s.name);
                 continue;
             }
             QString c;
@@ -797,8 +862,10 @@ void Organizer::prepare(std::shared_ptr<Run> r)
         }
         if (r->stoppedEarly || self->m_stop) {
             r->summary.stopped = true;
-            // keep what was filed and registered; nothing else is half-saved
+            // keep what was filed and registered; nothing else is half-saved (the sheet measurements are saved only
+            // when they changed: a song folder moved by hand takes its measurements with it, see fileBand)
             self->saveCodesAndRecordings(r);
+            r->cache.save(self->m_paths);
             self->finish(r);
             return;
         }
@@ -876,11 +943,22 @@ void Organizer::render(std::shared_ptr<Run> r)
     r->progress.at(QString("Making %1").arg(plural(total, "PDF")), 0.7);
     renderPdfs(jobs, [r, total](int i, bool ok) {
         r->jobs[i].ok = ok;
-        if (!ok) {
+        if (!ok && !r->progress.stopped()) {
             r->progress.say("Couldn't make " + r->jobs[i].label);
         }
         r->progress.at(QString("Making PDFs (%1 of %2)").arg(i + 1).arg(total), 0.7 + 0.25 * (i + 1) / total);
-    }, [self, r]() { self->deploy(r); });
+    }, [self, r]() {
+        // Stop while printing: the PDFs not made yet are left as they were (the data files are still saved: what was
+        // filed and measured stays so)
+        if (r->progress.stopped()) {
+            const int skipped = int(std::count_if(r->jobs.begin(), r->jobs.end(), [](const Run::Job& j) { return !j.ok; }));
+            if (skipped) {
+                r->summary.warnings << QString("Stopped while making the PDFs: %1 left as they were. Rebuild everything "
+                                               "makes them all again.").arg(plural(skipped, "PDF"));
+            }
+        }
+        self->deploy(r);
+    }, &m_stop);
 }
 
 // ------------------------------------------------------------------ 4. putting things in place
@@ -906,7 +984,8 @@ void Organizer::deploy(std::shared_ptr<Run> r)
         // Nothing is written when nothing changed (sheetcache.json and codes.json used to be rewritten every run).
         const Paths& paths = self->m_paths;
         r->cache.save(paths);
-        self->saveCodesAndRecordings(r);
+        // (codes.json and recordings.json are saved in the continuation, on the main thread: the Recordings window
+        // and Add song write them there, and a read-merge-write here could interleave with theirs)
         auto saveLog = [&](JsonStore& store, const QString& folder, auto merge) {
             if (!store.changed) {
                 return;
@@ -944,6 +1023,7 @@ void Organizer::deploy(std::shared_ptr<Run> r)
         }
         QDir(r->tempDir).removeRecursively();   // our own temporary copies
     }, [self, r]() {
+        self->saveCodesAndRecordings(r);
         int recoloured = 0;
         for (const auto& [folder, colour] : r->colours) {
             if (finderColour(folder) != colour && setFinderColour(folder, colour)) {
@@ -959,6 +1039,8 @@ void Organizer::deploy(std::shared_ptr<Run> r)
 
 void Organizer::finish(std::shared_ptr<Run> r)
 {
+    // (before done(): it may start the next run)
+    s_running = false;
     RunSummary& s = r->summary;
     if (s.stopped) {
         s.headline = "Stopped. Files already filed stay filed; everything else is left for the next run.";

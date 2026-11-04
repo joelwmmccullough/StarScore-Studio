@@ -18,6 +18,7 @@
 #include <QVariantList>
 #include <qqmlintegration.h>
 
+#include "iinteractive.h"
 #include "modularity/ioc.h"
 #include "project/istarscoreservice.h"
 #include "project/internal/starscore/organizer/orgonline.h"
@@ -37,6 +38,7 @@ class RecordingsModel : public QObject, public muse::Contextable
     QML_ELEMENT
 
     muse::ContextInject<IStarScoreService> starScore = { this };
+    muse::ContextInject<muse::IInteractive> interactive = { this };
 
 public:
     explicit RecordingsModel(QObject* parent = nullptr);
@@ -65,6 +67,8 @@ public:
     Q_INVOKABLE void releaseLinkTyped(const QString& id, const QString& text);
     Q_INVOKABLE void addRelease();
     Q_INVOKABLE bool save();
+    //! Closing with unsaved changes: asks Save / Don't Save / Cancel. Whether the window may close.
+    Q_INVOKABLE bool confirmClose();
 
 signals:
     void changed();
@@ -74,6 +78,7 @@ private:
     void touch(QJsonArray& list, const QString& id, const std::function<void(QJsonObject&)>& edit);
     void lookUpRelease(const QString& id, const QString& videoId);
     void fillRelease(const QString& id);
+    QString newId(const QString& prefix) const;
 
     std::set<QString> m_autoLabel;   // releases whose album / who may still be filled from the video
     std::set<QString> m_autoDate;    // releases whose date may still be filled from the video

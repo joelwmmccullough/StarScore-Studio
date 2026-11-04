@@ -5,6 +5,7 @@
  */
 #pragma once
 
+#include <functional>
 #include <map>
 #include <optional>
 #include <set>
@@ -49,19 +50,55 @@ struct StarScorePlaybackDeferred {
         : master(m)
     {
         if (master && master->playback()) {
-            master->playback()->setScoreChangesDeferred(true);
+            // (1.24.0) nested ones (a restyle inside the tidying on opening) leave it to the outermost to end it
+            if (depths()[master.get()]++ == 0) {
+                master->playback()->setScoreChangesDeferred(true);
+            }
+        } else {
+            master.reset();
         }
     }
 
     ~StarScorePlaybackDeferred()
     {
-        if (master && master->playback()) {
+        if (master && release() && master->playback()) {
             master->playback()->setScoreChangesDeferred(false);
+        }
+    }
+
+    //! (1.24.0) The song was closed meanwhile (a question's dialog let another one open): its score is gone, so the
+    //! events aren't rebuilt from it at the end
+    void abandon()
+    {
+        if (master) {
+            release();
+            master.reset();
         }
     }
 
     StarScorePlaybackDeferred(const StarScorePlaybackDeferred&) = delete;
     StarScorePlaybackDeferred& operator=(const StarScorePlaybackDeferred&) = delete;
+
+private:
+    static std::map<const void*, int>& depths()
+    {
+        static std::map<const void*, int> d;
+        return d;
+    }
+
+    //! true when this was the outermost
+    bool release()
+    {
+        auto it = depths().find(master.get());
+        if (it == depths().end()) {
+            return true;
+        }
+        if (--it->second > 0) {
+            return false;
+        }
+        depths().erase(it);
+        return true;
+    }
 };
 
 class StarScoreService : public IStarScoreService, public muse::Contextable, public muse::async::Asyncable
@@ -379,6 +416,10 @@ public:
     };
     //! A sheet's status as the sheet record keeps it: the least finished of its parts (and a full score's own)
     static StarScoreStatus exportedSheetStatus(const Data& data, const StarScoreBandFile& f);
+    //! (1.24.0) MuseScore gives a new part the id after the highest one, so a deleted part's id comes back with the
+    //! next instrument added. Everything kept for these part ids (status, mutes, flugelhorn, audited, their place in
+    //! sections, stand-in and sheet parts) forgotten; true when anything was there.
+    static bool forgetPartIds(Data& data, const QStringList& partIds);
 
     // (de)serialisation of the "starscore" meta tag; public for tests
     static Data fromJson(const QString& json);
@@ -430,6 +471,8 @@ private:
                              const QStringList& onDisk) const;
 
     mu::engraving::MasterScore* masterScore() const;
+    //! (1.24.0) For a step done a moment later (a timer): true while the song current now is still the current one
+    std::function<bool()> currentSongCheck() const;
     void listenCurrentProject();
     Data load() const;
     void store(const Data& data);
@@ -479,6 +522,9 @@ private:
     muse::RetVal<std::shared_ptr<INotationProject> > loadSoloProject(const QString& soloId);
     muse::Ret buildSoloBand(const std::shared_ptr<INotationProject>& soloProject, const StarScoreSolo& solo);
     muse::Ret injectSolos(const muse::io::path_t& starscorePath);
+    //! (1.24.0) The last save of the song couldn't put its solos and reference PDFs into the file: the working folder
+    //! is kept when the song closes
+    bool m_soloInjectFailed = false;
     mu::engraving::Measure* mainMeasureByNumber(int barNumber) const;
     std::shared_ptr<INotationProject> exportSourceProject() const;
     muse::Ret writePdf(const notation::INotationPtr& notation, const QString& path) const;
@@ -549,6 +595,8 @@ private:
     std::optional<StarScoreSectionTemplate> sectionTemplate(const QString& key) const;
     static void autoHideLeadBassStaff(const notation::IMasterNotationPtr& master, mu::engraving::Part* part);
     void removePartsKeepingSystemObjects(const QStringList& partIdsToRemove);
+    //! (1.24.0) forgetPartIds for those of these parts that are gone from the current score, stored
+    void forgetRemovedParts(const QStringList& partIds);
     static void removePartsKeepingSystemObjects(const notation::IMasterNotationPtr& master, const QStringList& partIdsToRemove);
 
     struct StyleSettings {
@@ -593,11 +641,16 @@ private:
     int standardizeHornNames();
     //! Tidying on opening a file: older stand-in versions shown, horn names, part score titles
     void tidyOpenedScore();
+    //! (1.24.0) tidyOpenedScore is running (it may be waiting on a question): "Update all sheets" waits for it
+    bool m_tidying = false;
     //! A song's 4-string and 5-string bass guitar parts made one "Bass Guitar" part with the 4-string part's notes
     //! (Joel, 14 Oct 2026: "one single bass guitar part"). apply false: only says what it would do. Returns a line
     //! saying what was (or would be) done, empty when the song doesn't have the pair.
     QString mergeBassParts(bool apply);
     void clearComposerInCurrentScore();
+    //! (1.24.0) The part scores clearComposerInCurrentScore saw to, with the undo stack's state then (its index and
+    //! last step): looked at again only after an edit. Cleared when another song opens.
+    std::map<const mu::engraving::Score*, std::pair<size_t, const void*> > m_composerClearedAt;
     void lockFinishedScore(engraving::Score* score);
     void lockFinishedParts(const QStringList& partIds);
     void openPartBooks(const QStringList& partIds);

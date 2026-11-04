@@ -25,6 +25,7 @@
 #include <set>
 
 #include <QCryptographicHash>
+#include <QPointer>
 #include <QSet>
 #include <QDir>
 #include <QElapsedTimer>
@@ -111,6 +112,7 @@ void StarScoreService::init()
         m_projectOpenedMs = QDateTime::currentMSecsSinceEpoch();
         m_referencePanelTouched = false;
         m_auditRevealed.clear();
+        m_composerClearedAt.clear();   // (1.24.0) the scores seen to belong to the song that was open
         QTimer::singleShot(0, &m_timerGuard, [this]() { pickReferenceForCurrentScore(); });
         QTimer::singleShot(1000, &m_timerGuard, [this]() { pickReferenceForCurrentScore(); });
         QTimer::singleShot(2500, &m_timerGuard, [this]() { pickReferenceForCurrentScore(); });
@@ -130,6 +132,17 @@ void StarScoreService::init()
         pickReferenceForCurrentScore();
     });
     listenReferencePanel();
+
+    // (1.24.0) Saving during the audit listen-through stops it first: the instruments it hid shown again, so the file
+    // keeps the song's own visibility (it kept the listen-only one, also on closing the song). (The guard: no call
+    // once the service is gone.)
+    QPointer<QObject> alive(&m_timerGuard);
+    starscore::setBeforeSaveHook([this, alive](const void* project) {
+        if (alive && m_listening && m_mainProject && project == static_cast<const void*>(m_mainProject.get())) {
+            LOGI() << "[starscore] saving: the listen-through stopped first";
+            stopListening();
+        }
+    });
 
     // Audit listen-through: stop at the end of the rehearsal section
     playbackController()->currentPlaybackPositionChanged().onReceive(this, [this](muse::audio::secs_t, muse::midi::tick_t tick) {
@@ -741,6 +754,16 @@ mu::engraving::MasterScore* StarScoreService::masterScore() const
 {
     IMasterNotationPtr master = globalContext()->currentMasterNotation();
     return master ? master->masterScore() : nullptr;
+}
+
+std::function<bool()> StarScoreService::currentSongCheck() const
+{
+    const std::weak_ptr<IMasterNotation> master = globalContext()->currentMasterNotation();
+    const engraving::MasterScore* ms = masterScore();
+    return [this, master, ms]() {
+        const IMasterNotationPtr now = globalContext()->currentMasterNotation();
+        return ms && now && now == master.lock() && masterScore() == ms;
+    };
 }
 
 StarScoreService::Data StarScoreService::load() const
@@ -1550,6 +1573,11 @@ void StarScoreService::toggleDeco()
     }
 
     static const std::vector<StyleId> ids { StyleId::musicalSymbolFont, StyleId::musicalTextFont, StyleId::dynamicsFont };
+    // (1.24.0) One undo step for the whole song (every score's change was a step of its own: undoing it took one
+    // Undo per part score), and the playback events rebuilt once, not after each score
+    const StarScorePlaybackDeferred playbackDeferred(master);
+    INotationUndoStackPtr stack = master->notation()->undoStack();
+    const size_t stepsBefore = stack->currentStateIndex();
     for (const auto& [key, n] : notations) {
         auto current = [&](StyleId id) {
             return n->style()->styleValue(id).value<String>().toQString();
@@ -1583,9 +1611,12 @@ void StarScoreService::toggleDeco()
             n->undoStack()->commitChanges();
         }
     }
-    if (turnOff) {
-        data.decoRestore.clear();
+    if (stepsBefore != muse::nidx && stack->currentStateIndex() > stepsBefore + 1) {
+        stack->mergeCommands(stepsBefore);
     }
+    // (1.24.0) The fonts to go back to are kept after switching Deco off: Undo can switch it back on, and the button
+    // must then still be able to switch it off. (They were cleared, which left an undone "off" stuck on.) Switching
+    // it on again records them afresh.
     store(data);
 }
 
@@ -2185,6 +2216,20 @@ StarScoreSection StarScoreService::finishNewParts(const std::vector<engraving::P
 {
     IMasterNotationPtr master = globalContext()->currentMasterNotation();
 
+    // (1.24.0) A new part can get the id of one deleted before it (MuseScore numbers parts from the highest id):
+    // nothing kept for that id (status, mutes, flugelhorn, audited, a place in another section) passes to it
+    {
+        QStringList newIds;
+        for (const engraving::Part* p : newParts) {
+            newIds << idText(p);
+        }
+        Data stale = load();
+        if (forgetPartIds(stale, newIds)) {
+            LOGI() << "[starscore] forgot what was kept for the reused part id(s) " << newIds.join(", ").toStdString();
+            store(stale);
+        }
+    }
+
     StarScoreSection section;
     std::vector<std::pair<muse::ID, bool> > hide;
 
@@ -2389,7 +2434,11 @@ RetVal<QString> StarScoreService::createSection(const QString& templateKey, cons
     // have any chord symbols.
     const QStringList newIds = section.partIds;
     const bool muteChords = section.templateKey != "rhythm" && section.templateKey != "lead-sheet";
-    auto mixer = [this, newIds, muteChords]() {
+    // (1.24.0) only in this song: another one may be open by then
+    auto mixer = [this, newIds, muteChords, sameSong = currentSongCheck()]() {
+        if (!sameSong()) {
+            return;
+        }
         applyMixerDefaults(newIds);
         if (muteChords) {
             muteChordSymbolTracks(newIds);
@@ -3218,6 +3267,63 @@ void StarScoreService::moveSection(const QString& sectionId, int newIndex)
 void StarScoreService::removePartsKeepingSystemObjects(const QStringList& partIdsToRemove)
 {
     removePartsKeepingSystemObjects(globalContext()->currentMasterNotation(), partIdsToRemove);
+    forgetRemovedParts(partIdsToRemove);
+}
+
+bool StarScoreService::forgetPartIds(Data& data, const QStringList& partIds)
+{
+    const std::set<QString> ids(partIds.begin(), partIds.end());
+    bool changed = false;
+    for (const QString& id : ids) {
+        changed |= data.partStatus.erase(id) > 0;
+        changed |= data.partMutes.erase(id) > 0;
+        changed |= data.flugelhornParts.erase(id) > 0;
+        changed |= data.auditPartAudited.erase(id) > 0;
+    }
+    for (StarScoreSection& s : data.sections) {
+        for (const QString& id : ids) {
+            changed |= s.partIds.removeAll(id) > 0;
+            changed |= s.shownPartIds.removeAll(id) > 0;
+        }
+        for (auto it = s.alternates.begin(); it != s.alternates.end();) {
+            if (ids.count(it->first) || ids.count(it->second)) {
+                it = s.alternates.erase(it);
+                changed = true;
+            } else {
+                ++it;
+            }
+        }
+        for (auto it = s.sheetParts.begin(); it != s.sheetParts.end();) {
+            if (ids.count(it->second)) {
+                it = s.sheetParts.erase(it);
+                changed = true;
+            } else {
+                ++it;
+            }
+        }
+    }
+    return changed;
+}
+
+void StarScoreService::forgetRemovedParts(const QStringList& partIds)
+{
+    engraving::MasterScore* ms = masterScore();
+    if (!ms || partIds.isEmpty()) {
+        return;
+    }
+    QStringList gone;
+    for (const QString& id : partIds) {
+        if (!ms->partById(ID(id))) {
+            gone << id;   // (a part the removal kept, the last instruments, keeps what it had)
+        }
+    }
+    if (gone.isEmpty()) {
+        return;
+    }
+    // (stored even when only their places in sections went: load() leaves those out, the tag still had them)
+    Data data = load();
+    forgetPartIds(data, gone);
+    store(data);
 }
 
 void StarScoreService::removePartsKeepingSystemObjects(const IMasterNotationPtr& master, const QStringList& partIdsToRemove)
@@ -3431,6 +3537,55 @@ void StarScoreService::moveArrangement(const QString& arrangementId, int newInde
     store(data);
 }
 
+namespace {
+//! (1.24.0) An arrangement taken out of the StarScore data, undoably. Undo puts that one arrangement back at its place
+//! in the data as it is then, and Redo takes it out again; everything else in the tag stays as it is. (Until 1.24.0
+//! the step held a copy of the whole "starscore" tag, so Undo also took back every StarScore change made after it:
+//! statuses, the version, the export records.)
+class StarScoreRemoveArrangement : public engraving::UndoCommand
+{
+    engraving::MasterScore* m_score = nullptr;
+    QString m_arrangementId;
+    StarScoreArrangement m_arrangement;   // as it was when last taken out
+    int m_index = -1;                     // and where it was
+    bool m_removed = false;
+
+    void flip(engraving::EditData*) override
+    {
+        StarScoreService::Data data = StarScoreService::fromJson(m_score->metaTag(STARSCORE_META_TAG).toQString());
+        if (data.unreadable) {
+            m_removed = !m_removed;   // (the tag isn't StarScore's to rewrite: left as it is)
+            return;
+        }
+        auto it = std::find_if(data.arrangements.begin(), data.arrangements.end(),
+                               [&](const StarScoreArrangement& a) { return a.id == m_arrangementId; });
+        if (!m_removed) {
+            if (it != data.arrangements.end()) {
+                m_index = int(it - data.arrangements.begin());
+                m_arrangement = *it;
+                data.arrangements.erase(it);
+            }
+        } else if (it == data.arrangements.end() && m_index >= 0) {
+            const int at = std::clamp(m_index, 0, int(data.arrangements.size()));
+            data.arrangements.insert(data.arrangements.begin() + at, m_arrangement);
+        }
+        m_removed = !m_removed;
+        const String json = String::fromQString(StarScoreService::toJson(data));
+        if (m_score->metaTag(STARSCORE_META_TAG) != json) {
+            m_score->setMetaTag(STARSCORE_META_TAG, json);
+        }
+    }
+
+public:
+    StarScoreRemoveArrangement(engraving::MasterScore* score, const QString& arrangementId)
+        : m_score(score), m_arrangementId(arrangementId) {}
+
+    const char* name() const override { return "StarScoreRemoveArrangement"; }
+    engraving::CommandType type() const override { return engraving::CommandType::ChangeMetaInfo; }
+    std::vector<engraving::EngravingObject*> objectItems() const override { return { m_score }; }
+};
+}
+
 void StarScoreService::removeArrangement(const QString& arrangementId)
 {
     Data data = load();
@@ -3459,7 +3614,7 @@ void StarScoreService::removeArrangement(const QString& arrangementId)
     if (ms && !data.unreadable) {
         INotationUndoStackPtr stack = master->notation()->undoStack();
         stack->prepareChanges(TranslatableString("undoableAction", "Remove arrangement"));
-        ms->undo(new engraving::ChangeMetaText(ms, STARSCORE_META_TAG, String::fromQString(toJson(data))));
+        ms->undo(new StarScoreRemoveArrangement(ms, arrangementId));
         stack->commitChanges();
         if (stack->currentStateIndex() == stepsBefore + 2) {
             stack->mergeCommands(stepsBefore);
@@ -3952,6 +4107,7 @@ void StarScoreService::offerNewerStyle()
     }
     LOGI() << "[starscore] the main score differs from the default style in: " << differ.join(", ").toStdString();
     const QString styleName = QFileInfo(loadStyleSettings().defaultStyle).completeBaseName();
+    const IMasterNotationPtr askedFor = globalContext()->currentMasterNotation();
     const IInteractive::Result answer = interactive()->questionSync(
         muse::trc("starscore", "A newer style is available"),
         muse::qtrc("starscore", "This song was styled with an older version of the default style. “%1” has %n setting(s) "
@@ -3959,6 +4115,9 @@ void StarScoreService::offerNewerStyle()
                                 "You can undo it. If you choose No, you won't be asked again for this song until there's "
                                 "an even newer style.", "", int(differ.size())).arg(styleName).toStdString(),
         { IInteractive::Button::No, IInteractive::Button::Yes }, IInteractive::Button::Yes);
+    if (globalContext()->currentMasterNotation() != askedFor) {
+        return;   // (1.24.0) another song opened while the question was up: the answer isn't for it
+    }
     if (answer.standardButton() == IInteractive::Button::Yes) {
         applyStyles({});
         if (INotationProjectPtr project = globalContext()->currentProject()) {
@@ -3972,6 +4131,14 @@ void StarScoreService::offerNewerStyle()
 
 int StarScoreService::applyStyles(const QStringList& partIds)
 {
+    // (1.24.0) The whole restyle one undo step ("You can undo it", says the question offering a newer style; it was
+    // three steps per score, and more for the labels and the lead sheet's bass staff). The steps it makes (each style
+    // file loaded is a command of its own) are merged into one at the end; all the scores of a song share the main
+    // score's undo stack.
+    IMasterNotationPtr undoMaster = globalContext()->currentMasterNotation();
+    INotationUndoStackPtr stack = undoMaster ? undoMaster->notation()->undoStack() : nullptr;
+    const size_t stepsBefore = stack ? stack->currentStateIndex() : muse::nidx;
+
     const Data data = load();
     const int restyled = applyStylesOnly(partIds, data);
     if (partIds.isEmpty()) {
@@ -3999,6 +4166,9 @@ int StarScoreService::applyStyles(const QStringList& partIds)
             }
         }
     }
+    if (stack && stepsBefore != muse::nidx && stack->currentStateIndex() > stepsBefore + 1) {
+        stack->mergeCommands(stepsBefore);
+    }
     return restyled;
 }
 
@@ -4020,7 +4190,7 @@ int StarScoreService::applyStylesOnly(const QStringList& partIds, const Data& da
         return !path.isEmpty() && QFileInfo::exists(path);
     };
 
-    // Style file(s), then the house settings a style file can't hold, in one undo step per score
+    // Style file(s), then the house settings a style file can't hold (applyStyles merges every score's steps into one)
     auto restyle = [&](INotationPtr n, const QString& ruleStyle, bool partBook) {
         if (!n) {
             return false;
@@ -4556,6 +4726,7 @@ void StarScoreService::onCurrentProjectChanged()
 
     INotationProjectPtr current = globalContext()->currentProject();
     if (!current) {
+        stopListening();   // (1.24.0) the instruments the listen-through hid shown again in the song it was in
         clearSolos();
         return;
     }
@@ -4564,6 +4735,7 @@ void StarScoreService::onCurrentProjectChanged()
         return;
     }
 
+    stopListening();   // (1.24.0) as above, before the old song's state goes
     clearSolos();
     m_mainProject = current;
     if (m_listening) {
@@ -4580,6 +4752,27 @@ void StarScoreService::onCurrentProjectChanged()
                 Ret ret = injectSolos(path);
                 if (!ret) {
                     LOGE() << "[starscore] could not store solos in " << path << ": " << ret.toString();
+                }
+                if (mode != SaveMode::SaveCopy) {
+                    // (1.24.0) The solos and reference PDFs are only in the working folder until they are in the
+                    // file: the song stays unsaved, closing it keeps that folder, and Joel is told (it was only logged,
+                    // and closing the song deleted them)
+                    m_soloInjectFailed = !ret;
+                    if (!ret) {
+                        if (m_mainProject) {
+                            m_mainProject->markAsUnsaved();
+                        }
+                        const QString message = muse::qtrc("starscore", "The song was saved, but its solo transcriptions "
+                                                                        "and reference PDFs couldn't be put into “%1” (%2). "
+                                                                        "Save the song again before closing it. Until a save "
+                                                                        "works, they are kept in:\n\n%3")
+                                                .arg(QFileInfo(path.toQString()).fileName(),
+                                                     QString::fromStdString(ret.toString()), m_workDir);
+                        // (a moment later: closing the song closes every dialog right after saving it)
+                        QTimer::singleShot(500, &m_timerGuard, [this, message]() {
+                            interactive()->error(muse::trc("starscore", "Solos not saved"), message.toStdString());
+                        });
+                    }
                 }
             }
         }
@@ -4602,9 +4795,15 @@ void StarScoreService::clearSolos()
     m_soloProjects.clear();
     m_mainProject.reset();
     if (!m_workDir.isEmpty()) {
-        QDir(m_workDir).removeRecursively();
+        if (m_soloInjectFailed) {
+            // (1.24.0) the last save couldn't put the solos into the file: this folder is the only copy
+            LOGW() << "[starscore] the solos and reference PDFs that couldn't be saved are kept in " << m_workDir.toStdString();
+        } else {
+            QDir(m_workDir).removeRecursively();
+        }
         m_workDir.clear();
     }
+    m_soloInjectFailed = false;
 }
 
 io::path_t StarScoreService::soloWorkPath(const QString& soloId) const
@@ -5541,7 +5740,18 @@ void StarScoreService::clearComposerInCurrentScore()
         return;
     }
     engraving::Score* score = n->elements() ? n->elements()->msScore() : nullptr;
-    if (!score || load().sections.empty()) {
+    if (!score || !score->undoStack() || load().sections.empty()) {
+        return;
+    }
+    // (1.24.0) A score already seen to since the song's last edit is left alone: every tab switch opened and closed
+    // an edit here, which refreshed everything (and was an undo step that made the song unsaved when a credit moved).
+    // Forgotten when another song opens.
+    engraving::UndoStack* undo = score->undoStack();
+    auto undoState = [undo]() {
+        return std::make_pair(undo->currentIndex(), static_cast<const void*>(undo->last()));
+    };
+    auto seen = m_composerClearedAt.find(score);
+    if (seen != m_composerClearedAt.end() && seen->second == undoState()) {
         return;
     }
     // part scores with a sheet title (instrument name top left; horn sheets also an arrangement label)
@@ -5554,6 +5764,7 @@ void StarScoreService::clearComposerInCurrentScore()
         }
     }
     if (!hasTitle) {
+        m_composerClearedAt[score] = undoState();
         return;
     }
     // The texts measured are in the title frame, on the first page: that page is laid out again (as MuseScore lays out
@@ -5570,8 +5781,15 @@ void StarScoreService::clearComposerInCurrentScore()
     // the label on the instrument name's line (an export could leave it moved), then the credit clear of it
     starscore::levelArrangementLabel(score);
     starscore::clearComposerCredit(score);
-    n->undoStack()->commitChanges();
-    n->notationChanged().notify();
+    // (1.24.0) nothing moved: no edit to finish, nothing to refresh
+    const engraving::UndoMacro* edit = undo->activeCommand();
+    if (edit && !edit->empty()) {
+        n->undoStack()->commitChanges();
+        n->notationChanged().notify();
+    } else {
+        n->undoStack()->rollbackChanges();
+    }
+    m_composerClearedAt[score] = undoState();
 }
 
 //! Opens the part scores of these parts (one instrument each), the first one showing

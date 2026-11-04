@@ -137,6 +137,7 @@ using mu::project::starscore::org::RenderJob;
     std::vector<RenderJob> _jobs;
     std::function<void(int, bool)> _eachDone;
     std::function<void()> _allDone;
+    const std::atomic_bool* _stop;     // Stop: the jobs not started yet are skipped
 }
 @property (nonatomic) int index;
 @property (nonatomic) int generation;
@@ -158,6 +159,15 @@ using mu::project::starscore::org::RenderJob;
 - (void)next
 {
     self.index += 1;
+    if (_stop && _stop->load()) {
+        // Stop pressed: the rest aren't made (each reported not ok), then done as usual
+        for (int i = self.index; i < int(_jobs.size()); ++i) {
+            if (_eachDone) {
+                _eachDone(i, false);
+            }
+        }
+        self.index = int(_jobs.size());
+    }
     if (self.index >= int(_jobs.size())) {
         auto done = _allDone;
         self.keepAlive = nil;
@@ -371,12 +381,14 @@ bool canRenderPdf()
     return true;
 }
 
-void renderPdfs(const std::vector<RenderJob>& jobs, std::function<void(int, bool)> eachDone, std::function<void()> allDone)
+void renderPdfs(const std::vector<RenderJob>& jobs, std::function<void(int, bool)> eachDone, std::function<void()> allDone,
+                const std::atomic_bool* stop)
 {
     StarScoreOrgPrinter* p = [StarScoreOrgPrinter new];
     p->_jobs = jobs;
     p->_eachDone = eachDone;
     p->_allDone = allDone;
+    p->_stop = stop;
     [p start];
 }
 

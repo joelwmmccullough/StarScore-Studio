@@ -12,6 +12,7 @@
 #include <QString>
 #include <QStringList>
 
+#include <functional>
 #include <vector>
 
 namespace mu::project::starscore {
@@ -24,6 +25,12 @@ bool autosaveArchiveEnabled();
 //! background. Returns the copy's path, or nothing.
 //! (background false: not packed now; for tests)
 QString archiveBeforeSave(const QString& songPath, const QDateTime& now = QDateTime::currentDateTime(), bool background = true);
+
+//! (1.24.0) Called by NotationProject::save just before a project is saved to a file (not an autosave), with the
+//! project (as const INotationProject*): StarScore first puts back what it shows only for the moment (the audit
+//! listen-through's instruments), so the file doesn't keep that. One hook; an empty function removes it.
+void setBeforeSaveHook(std::function<void(const void* project)> hook);
+void notifyBeforeSave(const void* project);
 
 //! Packs every copy waiting in Incoming into its song's history file and thins the history. Runs on the calling
 //! thread (one run at a time); returns how many copies it packed.

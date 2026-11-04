@@ -206,6 +206,7 @@ StyledDialogView {
                             Layout.fillWidth: true
                             spacing: 8
                             TextInputField {
+                                id: linkField
                                 Layout.fillWidth: true
                                 hint: qsTrc("starscore", "YouTube link")
                                 enabled: !notFilmed.checked
@@ -216,7 +217,9 @@ StyledDialogView {
                                 text: qsTrc("starscore", "Not filmed")
                                 onClicked: {
                                     checked = !checked
-                                    root.setAnswer(showRow.modelData.url, checked ? "notfilmed" : "later", "")
+                                    // unticked: the link still in the field counts again (it used to be dropped for "later")
+                                    root.setAnswer(showRow.modelData.url, checked ? "notfilmed" : "link",
+                                                   checked ? "" : linkField.inputField.text)
                                 }
                             }
                         }

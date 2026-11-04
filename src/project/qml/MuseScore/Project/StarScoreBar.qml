@@ -65,7 +65,7 @@ Rectangle {
                 visible: chip.showCheck
                 anchors.verticalCenter: parent.verticalCenter
                 iconCode: chip.active ? IconCode.EYE_OPEN : IconCode.EYE_CLOSED
-                color: chip.active ? "#ffffff" : ui.theme.fontSecondaryColor
+                color: chip.active ? ui.theme.fontPrimaryColor : ui.theme.fontSecondaryColor
             }
 
             Rectangle {
@@ -76,14 +76,14 @@ Rectangle {
                 radius: 4.5
                 color: chip.dotColor
                 border.width: 1
-                border.color: chip.active ? "#ffffff" : Qt.darker(chip.dotColor, 1.3)
+                border.color: chip.active ? ui.theme.fontPrimaryColor : Qt.darker(chip.dotColor, 1.3)
             }
 
             StyledTextLabel {
                 anchors.verticalCenter: parent.verticalCenter
                 text: chip.text
                 font: chip.active ? ui.theme.bodyBoldFont : ui.theme.bodyFont
-                color: chip.active ? "#ffffff" : (chip.dashed ? ui.theme.fontSecondaryColor : ui.theme.fontPrimaryColor)
+                color: chip.active ? ui.theme.fontPrimaryColor : (chip.dashed ? ui.theme.fontSecondaryColor : ui.theme.fontPrimaryColor)
             }
         }
 
@@ -225,7 +225,7 @@ Rectangle {
                 Layout.alignment: Qt.AlignTop
                 icon: root.collapsed ? IconCode.SMALL_ARROW_DOWN : IconCode.SMALL_ARROW_UP
                 transparent: true
-                toolTipTitle: root.collapsed ? qsTrc("starscore", "Show sections") : qsTrc("starscore", "Hide sections")
+                toolTipTitle: root.collapsed ? qsTrc("starscore", "Show the section, progress and solo rows") : qsTrc("starscore", "Hide the section, progress and solo rows")
 
                 onClicked: {
                     root.collapsed = !root.collapsed

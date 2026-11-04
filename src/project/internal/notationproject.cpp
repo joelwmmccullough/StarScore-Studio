@@ -532,6 +532,10 @@ Ret NotationProject::save(const muse::io::path_t& path, SaveMode saveMode, bool 
 
         std::string suffix = io::suffix(savePath);
 
+        // StarScore (1.24.0): what StarScore shows only for the moment (the audit listen-through's instruments) put
+        // back first, so the file doesn't keep it
+        mu::project::starscore::notifyBeforeSave(static_cast<const INotationProject*>(this));
+
         // StarScore: the version being replaced goes to the autosave archive (at most every 10 minutes; see
         // starscore/starscoreautoarchive.cpp). Not for copies (exports, temporary files).
         if (saveMode != SaveMode::SaveCopy) {
@@ -1221,8 +1225,9 @@ ProjectMeta NotationProject::metaInfo() const
             continue;
         }
 
-        // StarScore Studio: the arrangements/sections data is managed by the StarScore bar, not Project properties
-        if (tag == muse::String(u"starscore")) {
+        // StarScore Studio: the arrangements/sections data is managed by the StarScore bar, not Project properties;
+        // so are StarScore's other tags ("starscoreAnnotations", "starscoreMinMaj", …), not shown as editable (1.24.0)
+        if (tag.startsWith(u"starscore")) {
             continue;
         }
 
@@ -1258,10 +1263,12 @@ void NotationProject::setMetaInfo(const ProjectMeta& meta, bool undoable)
 
     MasterScore* score = m_masterNotation->masterScore();
 
-    // StarScore Studio: keep the arrangements/sections data, which Project properties doesn't show
-    const String starScoreData = score->metaTag(u"starscore");
-    if (!starScoreData.isEmpty()) {
-        tags[u"starscore"] = starScoreData;
+    // StarScore Studio: keep the arrangements/sections data and StarScore's other tags, which Project properties
+    // doesn't show (1.24.0: all of them, as none is in additionalTags now)
+    for (const auto& [tag, value] : score->metaTags()) {
+        if (tag.startsWith(u"starscore") && !value.isEmpty()) {
+            tags[tag] = value;
+        }
     }
 
     if (undoable) {

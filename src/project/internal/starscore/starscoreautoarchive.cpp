@@ -45,6 +45,7 @@
 #include <algorithm>
 #include <map>
 #include <set>
+#include <utility>
 
 #include "global/serialization/zipreader.h"
 #include "global/serialization/zipwriter.h"
@@ -585,6 +586,11 @@ static void adoptHistoryOfRenamedSong(const QString& base)
         return;
     }
     const QString oldName = m.captured(1);
+    // (1.24.0) the usual case, a song whose history is under its coded name already: settled without the lock, which
+    // a background pack holds for as long as it runs (every save of the song waited for it on the UI thread)
+    if (QFile::exists(historyPath(base))) {
+        return;
+    }
     QMutexLocker lock(&s_packMutex);
     const auto waiting = waitingCopies();
     if (QFile::exists(historyPath(base)) || waiting.count(base)) {
@@ -608,6 +614,24 @@ static void adoptHistoryOfRenamedSong(const QString& base)
         }
     }
     LOGI() << "autosave archive: " << oldName.toStdString() << "'s history is now " << base.toStdString() << "'s";
+}
+
+static std::function<void(const void*)>& beforeSaveHook()
+{
+    static std::function<void(const void*)> hook;
+    return hook;
+}
+
+void setBeforeSaveHook(std::function<void(const void* project)> hook)
+{
+    beforeSaveHook() = std::move(hook);
+}
+
+void notifyBeforeSave(const void* project)
+{
+    if (beforeSaveHook()) {
+        beforeSaveHook()(project);
+    }
 }
 
 QString archiveBeforeSave(const QString& songPath, const QDateTime& now, bool background)

@@ -82,8 +82,8 @@ StyledDialogView {
             wrapMode: Text.WordWrap
             color: ui.theme.fontSecondaryColor
             visible: root.listMode
-            text: qsTrc("starscore", "Sheets that already exist are moved to Version History/<today> Superseded first. "
-                        + "Your ticks are remembered for this song.")
+            text: qsTrc("starscore", "A sheet that comes out differently replaces the old file, which moves to Version History/<today> Superseded; "
+                        + "one that comes out the same is left as it is. Your ticks are remembered for this song.")
         }
 
         // Version: keep it, or raise one of the three numbers for this export. StarScore ticks the one it suggests
@@ -307,7 +307,7 @@ StyledDialogView {
             wrapMode: Text.WordWrap
             color: ui.theme.fontSecondaryColor
             text: qsTrc("starscore", "The ticked sheets are also made with every note half as long (half-time) or twice as long "
-                        + "(double-time), into a \"Half-Time\" or \"Double-Time\" subfolder of each part folder. Remembered for this song.")
+                        + "(double-time), into \"Sheet Music (Half-Time)\" or \"Sheet Music (Double-Time)\" beside Sheet Music. Remembered for this song.")
         }
 
         CheckBox {
