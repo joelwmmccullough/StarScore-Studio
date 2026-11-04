@@ -137,7 +137,7 @@ struct SoloChartKey {
     int fifths = 0;      // its key signature
 };
 ChordChartResult writeSoloChordCharts(const mu::engraving::MasterScore* ms, const QString& folder, const QString& base,
-                                      const QString& title, const QString& player, bool minor,
+                                      const QString& title, const QString& song, const QString& player, bool minor,
                                       const std::vector<SoloChartKey>& keys, QStringList& irealSongs, QStringList& problems);
 
 //! (1.25.0) One iReal Pro page holding `songs` (chordChartIRealSongs' form) as one playlist called `name`: opening it

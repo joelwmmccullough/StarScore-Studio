@@ -270,8 +270,9 @@ double soloShiftCost(const std::vector<SoloPitch>& pitches, int shift, bool writ
     return cost;
 }
 
-//! Up or down for a key `keyIndex` semitones above the original: the shift (keyIndex or keyIndex - 12) that keeps
-//! the notes nearest their staves; with no notes yet, the nearer one. A shift that's nearly as good as the one in
+//! Up or down for a key `keyIndex` semitones above the original (keyIndex or keyIndex - 12): the smaller move, unless
+//! the other keeps the notes clearly nearer their staves (25% less off them); a tritone either way, the one nearer
+//! the staves; with no notes yet, the nearer one. A shift that's nearly as good as the one in
 //! use is kept, so a key doesn't jump octaves back and forth while the solo is written.
 int soloPickShift(const std::vector<SoloPitch>& pitches, int keyIndex, int current, bool written = false, int offset = 0)
 {
@@ -286,7 +287,14 @@ int soloPickShift(const std::vector<SoloPitch>& pitches, int keyIndex, int curre
     const double costUp = soloShiftCost(pitches, up, written, offset);
     const double costDown = soloShiftCost(pitches, down, written, offset);
     int best = costUp < costDown ? up : down;
-    if (costUp == costDown) {
+    if (up != -down) {
+        // (Joel, 4 Nov 2026) the smaller move, unless the bigger one has at least 25% fewer notes off the staves (B
+        // in a solo in C: down a half step, not up a major 7th, unless up reads clearly better)
+        const bool upSmaller = up < -down;
+        const double costSmall = upSmaller ? costUp : costDown;
+        const double costBig = upSmaller ? costDown : costUp;
+        best = costBig <= costSmall * 0.75 ? (upSmaller ? down : up) : (upSmaller ? up : down);
+    } else if (costUp == costDown) {
         // a tie: toward the middle of the piano
         double mean = 0.0;
         for (const SoloPitch& p : pitches) {
@@ -1651,7 +1659,7 @@ int StarScoreService::exportSoloChordCharts(QStringList& irealSongs, QStringList
     const QString base = safe(player) + " - " + safe(song);
     const QString title = player.isEmpty() ? song : QString("%1 (%2)").arg(song, player);
     const starscore::ChordChartResult r = starscore::writeSoloChordCharts(ms, QFileInfo(project->path().toQString()).absolutePath(), base, title,
-                                                    player, soloMinor(data.solo), keys, irealSongs, problems);
+                                                    song, player, soloMinor(data.solo), keys, irealSongs, problems);
     return int(r.written.size());
 }
 

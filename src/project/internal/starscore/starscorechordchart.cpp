@@ -2496,7 +2496,7 @@ QString irealPlaylistSong(const QString& irealbookUrl)
 }
 
 ChordChartResult writeSoloChordCharts(const MasterScore* ms, const QString& folder, const QString& base, const QString& title,
-                                      const QString& player, bool minor, const std::vector<SoloChartKey>& keys,
+                                      const QString& song, const QString& player, bool minor, const std::vector<SoloChartKey>& keys,
                                       QStringList& irealSongs, QStringList& problems)
 {
     ChordChartResult result;
@@ -2543,7 +2543,7 @@ ChordChartResult writeSoloChordCharts(const MasterScore* ms, const QString& fold
             }
         }
         data.key = k.fifths;
-        const QString chartHtml = chordChartHtml(data, QString("%1 (%2)").arg(title, k.label), chordChartEmbeddedFonts(),
+        const QString chartHtml = chordChartHtml(data, QString("%1 (%2)").arg(song.isEmpty() ? title : song, k.label), chordChartEmbeddedFonts(),
                                                  QString());
         const QString rel = stem + " - " + k.fileKey + " - Chord Chart" + (pdf ? ".pdf" : ".html");
         if (!pdf) {

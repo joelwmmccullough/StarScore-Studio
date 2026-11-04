@@ -24,6 +24,7 @@ Version numbers: the first number changes when files stop being compatible, the 
 - **Chords muted on every key at once.** In a solo transcription, muting (or unmuting) the chord symbols in the mixer on one key's part score, or on the main score, does the same on all of them.
 - **Empty treble staves hidden on the key part scores.** On a solo's twelve key part scores, the treble staff of a two-staff instrument is now set to "Hide when empty: Always", as the bass staff was, so a system where it has no notes leaves it out. The main score's staves are left as they are. (Set when a solo is made, and when one is opened.)
 - **Intervals kept in every key.** Each key's notes are now spelled so their intervals look as they do in the original, using a double sharp or flat when a note beside it is sharpened or flattened too: an A♯–C♯ grace-note pair (a third) in C major is F𝄪–A♯ in A major, not G–A♯ (which looks like a second). A double sharp or flat with no such neighbour is still written as the plain note (G, not F𝄪), and tied notes keep one spelling.
+- **Smaller moves between keys.** Each key now moves the smaller way from the original (B in a solo in C: down a half step), and goes the long way round only when that puts clearly fewer notes off the staves: at least 25% less. (A tritone away, it takes whichever reads better.)
 
 ## 1.24.0
 
