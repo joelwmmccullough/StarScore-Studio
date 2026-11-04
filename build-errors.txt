@@ -1,0 +1,163 @@
+run 348 commit d7e5bcc1cb10fb92854b0427012a26116c17460d
+1853:FAILED: [code=1] src/playback/CMakeFiles/playback.dir/Unity/unity_0_cxx.cxx.o 
+1856:/Users/runner/work/StarScore-Studio/StarScore-Studio/src/playback/internal/playbackcontroller.cpp:1866:1: error: use of undeclared identifier 'engraving'; did you mean 'mu::engraving'?
+2861:FAILED: [code=1] src/project/CMakeFiles/project.dir/Unity/unity_2_cxx.cxx.o 
+2870:/Users/runner/work/StarScore-Studio/StarScore-Studio/src/project/internal/starscore/starscoreservice.cpp:3545:43: error: use of undeclared identifier 'engraving'; did you mean 'mu::engraving'?
+2878:/Users/runner/work/StarScore-Studio/StarScore-Studio/src/project/internal/starscore/starscoreservice.cpp:3547:5: error: use of undeclared identifier 'engraving'; did you mean 'mu::engraving'?
+2886:/Users/runner/work/StarScore-Studio/StarScore-Studio/src/project/internal/starscore/starscoreservice.cpp:3553:15: error: use of undeclared identifier 'engraving'; did you mean 'mu::engraving'?
+2894:/Users/runner/work/StarScore-Studio/StarScore-Studio/src/project/internal/starscore/starscoreservice.cpp:3580:32: error: use of undeclared identifier 'engraving'; did you mean 'mu::engraving'?
+2902:/Users/runner/work/StarScore-Studio/StarScore-Studio/src/project/internal/starscore/starscoreservice.cpp:3584:5: error: use of undeclared identifier 'engraving'; did you mean 'mu::engraving'?
+2910:/Users/runner/work/StarScore-Studio/StarScore-Studio/src/project/internal/starscore/starscoreservice.cpp:3585:17: error: use of undeclared identifier 'engraving'; did you mean 'mu::engraving'?
+2918:/Users/runner/work/StarScore-Studio/StarScore-Studio/src/project/internal/starscore/starscoreservice.cpp:3584:59: error: use of undeclared identifier 'engraving'; did you mean 'mu::engraving'?
+
+---- tail ----
+[2462/2885] Automatic MOC and UIC for target muse_tours_qmlplugin
+[2463/2885] Automatic MOC and UIC for target muse_workspace_qmlplugin
+[2464/2885] Automatic MOC and UIC for target muse_extensions_qmlplugin
+[2465/2885] Automatic MOC and UIC for target muse_learn_qmlplugin
+[2466/2885] Automatic MOC and UIC for target muse_vst_qmlplugin
+[2467/2885] Automatic MOC and UIC for target braille_qmlplugin
+[2468/2885] Automatic MOC and UIC for target muse_update_qmlplugin
+[2469/2885] Building CXX object src/converter/CMakeFiles/converter.dir/Unity/unity_0_cxx.cxx.o
+[2470/2885] Automatic MOC and UIC for target engraving_qmlplugin
+[2471/2885] Building CXX object src/importexport/bb/CMakeFiles/iex_bb.dir/Unity/unity_0_cxx.cxx.o
+[2472/2885] Building CXX object src/importexport/bww/CMakeFiles/iex_bww.dir/Unity/unity_0_cxx.cxx.o
+[2473/2885] Building CXX object src/context/CMakeFiles/context.dir/Unity/unity_0_cxx.cxx.o
+[2474/2885] Building CXX object src/importexport/capella/CMakeFiles/iex_capella.dir/Unity/unity_0_cxx.cxx.o
+[2475/2885] Building CXX object src/importexport/guitarpro/CMakeFiles/iex_guitarpro.dir/Unity/unity_2_cxx.cxx.o
+[2476/2885] Building CXX object src/importexport/guitarpro/CMakeFiles/iex_guitarpro.dir/Unity/unity_1_cxx.cxx.o
+[2477/2885] Building CXX object src/importexport/audioexport/CMakeFiles/iex_audioexport.dir/Unity/unity_0_cxx.cxx.o
+[2478/2885] Building CXX object src/importexport/guitarpro/CMakeFiles/iex_guitarpro.dir/Unity/unity_0_cxx.cxx.o
+[2479/2885] Building CXX object src/importexport/mei/CMakeFiles/iex_mei.dir/Unity/unity_2_cxx.cxx.o
+[2480/2885] Building CXX object src/importexport/mei/CMakeFiles/iex_mei.dir/Unity/unity_1_cxx.cxx.o
+[2481/2885] Building CXX object src/importexport/imagesexport/CMakeFiles/iex_imagesexport.dir/Unity/unity_0_cxx.cxx.o
+[2482/2885] Building CXX object src/importexport/lyricsexport/CMakeFiles/iex_lyricsexport.dir/Unity/unity_0_cxx.cxx.o
+[2483/2885] Building CXX object src/importexport/midi/CMakeFiles/iex_midi.dir/Unity/unity_1_cxx.cxx.o
+[2484/2885] Building CXX object src/importexport/midi/CMakeFiles/iex_midi.dir/Unity/unity_0_cxx.cxx.o
+[2485/2885] Building CXX object src/importexport/mnx/CMakeFiles/iex_mnx.dir/Unity/unity_1_cxx.cxx.o
+[2486/2885] Building CXX object src/importexport/mei/CMakeFiles/iex_mei.dir/Unity/unity_0_cxx.cxx.o
+[2487/2885] Building CXX object src/importexport/musedata/CMakeFiles/iex_musedata.dir/Unity/unity_0_cxx.cxx.o
+[2488/2885] Building CXX object src/importexport/midi/CMakeFiles/iex_midi.dir/Unity/unity_2_cxx.cxx.o
+[2489/2885] Building CXX object src/importexport/musicxml/CMakeFiles/iex_musicxml.dir/Unity/unity_0_cxx.cxx.o
+[2490/2885] Building CXX object src/importexport/mnx/CMakeFiles/iex_mnx.dir/Unity/unity_0_cxx.cxx.o
+[2491/2885] Building CXX object src/importexport/musicxml/CMakeFiles/iex_musicxml.dir/Unity/unity_1_cxx.cxx.o
+[2492/2885] Building CXX object src/importexport/musicxml/CMakeFiles/iex_musicxml.dir/.qt/rcc/qrc_iexmusicxml_resources.cpp.o
+[2493/2885] Building CXX object src/importexport/tabledit/CMakeFiles/iex_tabledit.dir/Unity/unity_0_cxx.cxx.o
+[2494/2885] Building CXX object src/importexport/ove/CMakeFiles/iex_ove.dir/Unity/unity_0_cxx.cxx.o
+[2495/2885] Building CXX object src/importexport/videoexport/CMakeFiles/iex_videoexport.dir/Unity/unity_0_cxx.cxx.o
+[2496/2885] Automatic MOC and UIC for target instrumentsscene_qmlplugin
+[2497/2885] Automatic MOC and UIC for target musesounds_qmlplugin
+[2498/2885] Automatic MOC and UIC for target palette_qmlplugin
+[2499/2885] Building CXX object src/print/CMakeFiles/print.dir/Unity/unity_0_cxx.cxx.o
+[2500/2885] Building CXX object src/framework/uicomponents/qml/Muse/UiComponents/LegacyTreeView/CMakeFiles/muse_legacytreeview_qmlplugin.dir/muse_legacytreeview_qmlplugin_autogen/mocs_compilation.cpp.o
+[2501/2885] Building CXX object src/framework/uicomponents/qml/Muse/UiComponents/LegacyTreeView/CMakeFiles/muse_legacytreeview_qmlplugin.dir/muse_legacytreeview_qmlplugin_Muse_UiComponents_LegacyTreeViewPlugin.cpp.o
+[2502/2885] Building CXX object src/framework/uicomponents/qml/Muse/GraphicalEffects/CMakeFiles/muse_graphicaleffects_qmlplugin.dir/muse_graphicaleffects_qmlplugin_autogen/mocs_compilation.cpp.o
+[2503/2885] Building CXX object src/framework/uicomponents/qml/Muse/GraphicalEffects/CMakeFiles/muse_graphicaleffects_qmlplugin.dir/muse_graphicaleffects_qmlplugin_Muse_GraphicalEffectsPlugin.cpp.o
+[2504/2885] Automatic MOC and UIC for target preferences_qmlplugin
+[2505/2885] Building CXX object src/framework/uicomponents/api/MuseApi/Controls/CMakeFiles/muse_uicomponents_qmlapiplugin.dir/muse_uicomponents_qmlapiplugin_autogen/mocs_compilation.cpp.o
+[2506/2885] Building CXX object src/framework/ui/qml/Muse/Ui/Dialogs/CMakeFiles/muse_ui_dialogs_qmlplugin.dir/muse_ui_dialogs_qmlplugin_autogen/mocs_compilation.cpp.o
+[2507/2885] Building CXX object src/framework/uicomponents/api/MuseApi/Controls/CMakeFiles/muse_uicomponents_qmlapiplugin.dir/muse_uicomponents_qmlapiplugin_MuseApi_ControlsPlugin.cpp.o
+[2508/2885] Building CXX object src/framework/ui/qml/Muse/Ui/Dialogs/CMakeFiles/muse_ui_dialogs_qmlplugin.dir/muse_ui_dialogs_qmlplugin_Muse_Ui_DialogsPlugin.cpp.o
+[2509/2885] Building CXX object src/framework/dockwindow/qml/Muse/Dock/CMakeFiles/muse_dockwindow_qmlplugin.dir/muse_dockwindow_qmlplugin_autogen/mocs_compilation.cpp.o
+[2510/2885] Building CXX object src/framework/dockwindow/qml/Muse/Dock/CMakeFiles/muse_dockwindow_qmlplugin.dir/muse_dockwindow_qmlplugin_Muse_DockPlugin.cpp.o
+[2511/2885] Linking CXX static library src/framework/accessibility/libmuse_accessibility.a
+[2512/2885] Linking CXX static library src/framework/actions/libmuse_actions.a
+[2513/2885] Linking CXX static library src/framework/audio/libmuse_audio.a
+[2514/2885] Building CXX object src/framework/autobot/qml/Muse/Autobot/CMakeFiles/muse_autobot_qmlplugin.dir/muse_autobot_qmlplugin_autogen/mocs_compilation.cpp.o
+[2515/2885] Linking CXX static library src/framework/audioplugins/libmuse_audioplugins.a
+[2516/2885] Building CXX object src/framework/autobot/qml/Muse/Autobot/CMakeFiles/muse_autobot_qmlplugin.dir/muse_autobot_qmlplugin_Muse_AutobotPlugin.cpp.o
+[2517/2885] Building CXX object src/framework/cloud/qml/Muse/Cloud/CMakeFiles/muse_cloud_qmlplugin.dir/muse_cloud_qmlplugin_autogen/mocs_compilation.cpp.o
+[2518/2885] Building CXX object src/framework/cloud/qml/Muse/Cloud/CMakeFiles/muse_cloud_qmlplugin.dir/muse_cloud_qmlplugin_Muse_CloudPlugin.cpp.o
+[2519/2885] Building CXX object src/framework/diagnostics/qml/Muse/Diagnostics/CMakeFiles/muse_diagnostics_qmlplugin.dir/muse_diagnostics_qmlplugin_autogen/mocs_compilation.cpp.o
+[2520/2885] Building CXX object src/framework/diagnostics/qml/Muse/Diagnostics/CMakeFiles/muse_diagnostics_qmlplugin.dir/muse_diagnostics_qmlplugin_Muse_DiagnosticsPlugin.cpp.o
+[2521/2885] Building CXX object src/framework/midiremote/qml/Muse/MidiRemote/CMakeFiles/muse_midiremote_qmlplugin.dir/muse_midiremote_qmlplugin_autogen/mocs_compilation.cpp.o
+[2522/2885] Linking CXX static library src/framework/midi/libmuse_midi.a
+[2523/2885] Building CXX object src/framework/midiremote/qml/Muse/MidiRemote/CMakeFiles/muse_midiremote_qmlplugin.dir/muse_midiremote_qmlplugin_Muse_MidiRemotePlugin.cpp.o
+[2524/2885] Building CXX object src/framework/mpe/qml/Muse/Mpe/CMakeFiles/muse_mpe_qmlplugin.dir/muse_mpe_qmlplugin_autogen/mocs_compilation.cpp.o
+[2525/2885] Building CXX object src/importexport/videoexport/CMakeFiles/iex_videoexport.dir/.qt/rcc/qrc_iex_videoexport_resources.cpp.o
+[2526/2885] Building CXX object src/framework/mpe/qml/Muse/Mpe/CMakeFiles/muse_mpe_qmlplugin.dir/muse_mpe_qmlplugin_Muse_MpePlugin.cpp.o
+[2527/2885] Building CXX object src/framework/shortcuts/qml/Muse/Shortcuts/CMakeFiles/muse_shortcuts_qmlplugin.dir/muse_shortcuts_qmlplugin_autogen/mocs_compilation.cpp.o
+[2528/2885] Linking CXX static library src/framework/musesampler/libmuse_musesampler.a
+[2529/2885] Building CXX object src/framework/shortcuts/qml/Muse/Shortcuts/CMakeFiles/muse_shortcuts_qmlplugin.dir/muse_shortcuts_qmlplugin_Muse_ShortcutsPlugin.cpp.o
+[2530/2885] Building CXX object src/framework/toast/qml/Muse/Toast/CMakeFiles/muse_toast_qmlplugin.dir/muse_toast_qmlplugin_autogen/mocs_compilation.cpp.o
+[2531/2885] Linking CXX static library src/framework/network/libmuse_network.a
+[2532/2885] Building CXX object src/framework/tours/qml/Muse/Tours/CMakeFiles/muse_tours_qmlplugin.dir/muse_tours_qmlplugin_autogen/mocs_compilation.cpp.o
+[2533/2885] Building CXX object src/framework/toast/qml/Muse/Toast/CMakeFiles/muse_toast_qmlplugin.dir/muse_toast_qmlplugin_Muse_ToastPlugin.cpp.o
+[2534/2885] Building CXX object src/framework/multiwindows/qml/Muse/MultiWindows/CMakeFiles/muse_multiwindows_qmlplugin.dir/muse_multiwindows_qmlplugin_autogen/mocs_compilation.cpp.o
+[2535/2885] Building CXX object src/framework/tours/qml/Muse/Tours/CMakeFiles/muse_tours_qmlplugin.dir/muse_tours_qmlplugin_Muse_ToursPlugin.cpp.o
+[2536/2885] Building CXX object src/framework/learn/qml/Muse/Learn/CMakeFiles/muse_learn_qmlplugin.dir/muse_learn_qmlplugin_autogen/mocs_compilation.cpp.o
+[2537/2885] Building CXX object src/framework/multiwindows/qml/Muse/MultiWindows/CMakeFiles/muse_multiwindows_qmlplugin.dir/muse_multiwindows_qmlplugin_Muse_MultiWindowsPlugin.cpp.o
+[2538/2885] Building CXX object src/framework/extensions/qml/Muse/Extensions/CMakeFiles/muse_extensions_qmlplugin.dir/muse_extensions_qmlplugin_autogen/mocs_compilation.cpp.o
+[2539/2885] Linking CXX static library src/framework/languages/libmuse_languages.a
+[2540/2885] Building CXX object src/framework/learn/qml/Muse/Learn/CMakeFiles/muse_learn_qmlplugin.dir/muse_learn_qmlplugin_Muse_LearnPlugin.cpp.o
+[2541/2885] Building CXX object src/framework/workspace/qml/Muse/Workspace/CMakeFiles/muse_workspace_qmlplugin.dir/muse_workspace_qmlplugin_autogen/mocs_compilation.cpp.o
+[2542/2885] Building CXX object src/framework/extensions/qml/Muse/Extensions/CMakeFiles/muse_extensions_qmlplugin.dir/muse_extensions_qmlplugin_Muse_ExtensionsPlugin.cpp.o
+[2543/2885] Building CXX object src/framework/workspace/qml/Muse/Workspace/CMakeFiles/muse_workspace_qmlplugin.dir/muse_workspace_qmlplugin_Muse_WorkspacePlugin.cpp.o
+[2544/2885] Building CXX object src/framework/vst/qml/Muse/Vst/CMakeFiles/muse_vst_qmlplugin.dir/muse_vst_qmlplugin_autogen/mocs_compilation.cpp.o
+[2545/2885] Building CXX object src/framework/update/qml/Muse/Update/CMakeFiles/muse_update_qmlplugin.dir/muse_update_qmlplugin_autogen/mocs_compilation.cpp.o
+[2546/2885] Building CXX object src/framework/vst/qml/Muse/Vst/CMakeFiles/muse_vst_qmlplugin.dir/muse_vst_qmlplugin_Muse_VstPlugin.cpp.o
+[2547/2885] Building CXX object src/braille/qml/MuseScore/Braille/CMakeFiles/braille_qmlplugin.dir/braille_qmlplugin_autogen/mocs_compilation.cpp.o
+[2548/2885] Building CXX object src/framework/update/qml/Muse/Update/CMakeFiles/muse_update_qmlplugin.dir/muse_update_qmlplugin_Muse_UpdatePlugin.cpp.o
+[2549/2885] Building CXX object src/braille/qml/MuseScore/Braille/CMakeFiles/braille_qmlplugin.dir/braille_qmlplugin_MuseScore_BraillePlugin.cpp.o
+[2550/2885] Building CXX object src/engraving/qml/MuseScore/Engraving/CMakeFiles/engraving_qmlplugin.dir/engraving_qmlplugin_autogen/mocs_compilation.cpp.o
+[2551/2885] Linking CXX static library src/context/libcontext.a
+[2552/2885] Building CXX object src/engraving/qml/MuseScore/Engraving/CMakeFiles/engraving_qmlplugin.dir/engraving_qmlplugin_MuseScore_EngravingPlugin.cpp.o
+[2553/2885] Linking CXX static library src/converter/libconverter.a
+[2554/2885] Linking CXX static library src/importexport/audioexport/libiex_audioexport.a
+[2555/2885] Linking CXX static library src/importexport/bb/libiex_bb.a
+[2556/2885] Linking CXX static library src/importexport/bww/libiex_bww.a
+[2557/2885] Linking CXX static library src/importexport/capella/libiex_capella.a
+[2558/2885] Linking CXX static library src/importexport/guitarpro/libiex_guitarpro.a
+[2559/2885] Linking CXX static library src/importexport/imagesexport/libiex_imagesexport.a
+[2560/2885] Linking CXX static library src/importexport/lyricsexport/libiex_lyricsexport.a
+[2561/2885] Linking CXX static library src/importexport/mei/libiex_mei.a
+[2562/2885] Linking CXX static library src/importexport/midi/libiex_midi.a
+[2563/2885] Linking CXX static library src/importexport/musedata/libiex_musedata.a
+[2564/2885] Linking CXX static library src/importexport/mnx/libiex_mnx.a
+[2565/2885] Linking CXX static library src/importexport/musicxml/libiex_musicxml.a
+[2566/2885] Linking CXX static library src/importexport/tabledit/libiex_tabledit.a
+[2567/2885] Linking CXX static library src/importexport/ove/libiex_ove.a
+[2568/2885] Building CXX object src/instrumentsscene/qml/MuseScore/InstrumentsScene/CMakeFiles/instrumentsscene_qmlplugin.dir/instrumentsscene_qmlplugin_autogen/mocs_compilation.cpp.o
+[2569/2885] Linking CXX static library src/importexport/videoexport/libiex_videoexport.a
+[2570/2885] Building CXX object src/musesounds/qml/MuseScore/MuseSounds/CMakeFiles/musesounds_qmlplugin.dir/musesounds_qmlplugin_autogen/mocs_compilation.cpp.o
+[2571/2885] Building CXX object src/instrumentsscene/qml/MuseScore/InstrumentsScene/CMakeFiles/instrumentsscene_qmlplugin.dir/instrumentsscene_qmlplugin_MuseScore_InstrumentsScenePlugin.cpp.o
+[2572/2885] Building CXX object src/palette/qml/MuseScore/Palette/CMakeFiles/palette_qmlplugin.dir/palette_qmlplugin_autogen/mocs_compilation.cpp.o
+[2573/2885] Building CXX object src/musesounds/qml/MuseScore/MuseSounds/CMakeFiles/musesounds_qmlplugin.dir/musesounds_qmlplugin_MuseScore_MuseSoundsPlugin.cpp.o
+[2574/2885] Building CXX object src/palette/qml/MuseScore/Palette/CMakeFiles/palette_qmlplugin.dir/palette_qmlplugin_MuseScore_PalettePlugin.cpp.o
+[2575/2885] Building CXX object src/preferences/qml/MuseScore/Preferences/CMakeFiles/preferences_qmlplugin.dir/preferences_qmlplugin_autogen/mocs_compilation.cpp.o
+[2576/2885] Building CXX object src/preferences/qml/MuseScore/Preferences/CMakeFiles/preferences_qmlplugin.dir/preferences_qmlplugin_MuseScore_PreferencesPlugin.cpp.o
+[2577/2885] Linking CXX static library src/print/libprint.a
+[2578/2885] Linking CXX static library src/framework/uicomponents/qml/Muse/UiComponents/LegacyTreeView/libmuse_legacytreeview_qmlplugin.a
+[2579/2885] Linking CXX static library src/framework/uicomponents/qml/Muse/GraphicalEffects/libmuse_graphicaleffects_qmlplugin.a
+[2580/2885] Linking CXX static library src/framework/uicomponents/api/MuseApi/Controls/libmuse_uicomponents_qmlapiplugin.a
+[2581/2885] Linking CXX static library src/framework/ui/qml/Muse/Ui/Dialogs/libmuse_ui_dialogs_qmlplugin.a
+[2582/2885] Linking CXX static library src/framework/dockwindow/qml/Muse/Dock/libmuse_dockwindow_qmlplugin.a
+[2583/2885] Linking CXX static library src/framework/autobot/qml/Muse/Autobot/libmuse_autobot_qmlplugin.a
+[2584/2885] Linking CXX static library src/framework/cloud/qml/Muse/Cloud/libmuse_cloud_qmlplugin.a
+[2585/2885] Linking CXX static library src/framework/diagnostics/qml/Muse/Diagnostics/libmuse_diagnostics_qmlplugin.a
+[2586/2885] Linking CXX static library src/framework/midiremote/qml/Muse/MidiRemote/libmuse_midiremote_qmlplugin.a
+[2587/2885] Linking CXX static library src/framework/mpe/qml/Muse/Mpe/libmuse_mpe_qmlplugin.a
+[2588/2885] Linking CXX static library src/framework/shortcuts/qml/Muse/Shortcuts/libmuse_shortcuts_qmlplugin.a
+[2589/2885] Linking CXX static library src/framework/toast/qml/Muse/Toast/libmuse_toast_qmlplugin.a
+[2590/2885] Linking CXX static library src/framework/tours/qml/Muse/Tours/libmuse_tours_qmlplugin.a
+[2591/2885] Linking CXX static library src/framework/multiwindows/qml/Muse/MultiWindows/libmuse_multiwindows_qmlplugin.a
+[2592/2885] Linking CXX static library src/framework/learn/qml/Muse/Learn/libmuse_learn_qmlplugin.a
+[2593/2885] Linking CXX static library src/framework/extensions/qml/Muse/Extensions/libmuse_extensions_qmlplugin.a
+[2594/2885] Linking CXX static library src/framework/workspace/qml/Muse/Workspace/libmuse_workspace_qmlplugin.a
+[2595/2885] Linking CXX static library src/framework/vst/qml/Muse/Vst/libmuse_vst_qmlplugin.a
+[2596/2885] Linking CXX static library src/framework/update/qml/Muse/Update/libmuse_update_qmlplugin.a
+[2597/2885] Linking CXX static library src/braille/qml/MuseScore/Braille/libbraille_qmlplugin.a
+[2598/2885] Linking CXX static library src/engraving/qml/MuseScore/Engraving/libengraving_qmlplugin.a
+[2599/2885] Linking CXX static library src/instrumentsscene/qml/MuseScore/InstrumentsScene/libinstrumentsscene_qmlplugin.a
+[2600/2885] Linking CXX static library src/musesounds/qml/MuseScore/MuseSounds/libmusesounds_qmlplugin.a
+[2601/2885] Linking CXX static library src/palette/qml/MuseScore/Palette/libpalette_qmlplugin.a
+[2602/2885] Linking CXX static library src/preferences/qml/MuseScore/Preferences/libpreferences_qmlplugin.a
+[2603/2885] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_7_cxx.cxx.o
+[2604/2885] Linking CXX static library src/inspector/qml/MuseScore/Inspector/libinspector_qml.a
+[2605/2885] Automatic MOC and UIC for target inspector_qmlplugin
+[2606/2885] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qmlplugin.dir/inspector_qmlplugin_autogen/mocs_compilation.cpp.o
+[2607/2885] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qmlplugin.dir/inspector_qmlplugin_MuseScore_InspectorPlugin.cpp.o
+[2608/2885] Linking CXX static library src/inspector/qml/MuseScore/Inspector/libinspector_qmlplugin.a
+ninja: build stopped: cannot make progress due to previous errors.
+Build failed
+Build failed
