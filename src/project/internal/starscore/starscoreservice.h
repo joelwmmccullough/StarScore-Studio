@@ -574,6 +574,7 @@ private:
     int exportSoloChordCharts(QStringList& irealSongs, QStringList& problems);
     void writeSoloIRealPlaylist(const QString& folder, const QJsonObject& solos);
     void watchSoloChordMutes();
+    void hideSoloKeyStaves(const notation::IMasterNotationPtr& master);
     void syncSoloChordMute(const mu::engraving::InstrumentTrackId& trackId, bool mute);
     muse::async::Notification m_soloLearningChanged;
     muse::RetVal<QString> copyScoreAudio(const QString& soloPath, const QString& sourcePath, const QString& base);

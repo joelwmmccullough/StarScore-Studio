@@ -572,6 +572,7 @@ Ret StarScoreService::setUpSoloTranscription(const INotationProjectPtr& project,
         applySoloStyles();
         watchSoloChordMutes();
     }
+    hideSoloKeyStaves(master);
 
     m_soloLayoutSig.clear();
     soloRememberStyle(ms);
@@ -1195,7 +1196,49 @@ void StarScoreService::onSoloTranscriptionOpened()
     // (opened: the keys spelled again, the formatting left as it was saved)
     m_soloLayoutSig = soloLayoutSignature(masterScore());
     soloRememberStyle(masterScore());
+    hideSoloKeyStaves(globalContext()->currentMasterNotation());
     refreshSoloTranscription(globalContext()->currentMasterNotation(), false);
+}
+
+//! (1.25.0, Joel) On the twelve keys' part scores, every staff of a two-staff instrument (the treble staff too, as
+//! the bass staff already was) is set to "Hide when empty: Always". The main score's staves are left as they are.
+void StarScoreService::hideSoloKeyStaves(const IMasterNotationPtr& master)
+{
+    int changed = 0;
+    for (const SoloKeyScore& k : soloKeyScores(master)) {
+        if (!k.score) {
+            continue;
+        }
+        bool multi = false;
+        for (engraving::Part* p : k.score->parts()) {
+            if (p->nstaves() < 2) {
+                continue;
+            }
+            multi = true;
+            for (engraving::Staff* st : p->staves()) {
+                if (st->hideWhenEmpty() != engraving::AutoOnOff::ON) {
+                    st->setHideWhenEmpty(engraving::AutoOnOff::ON);
+                    ++changed;
+                }
+            }
+        }
+        if (multi) {
+            if (!k.score->style().styleB(engraving::Sid::hideEmptyStaves)) {
+                k.score->style().set(engraving::Sid::hideEmptyStaves, true);
+                ++changed;
+            }
+            if (k.score->style().styleB(engraving::Sid::dontHideStavesInFirstSystem)) {
+                k.score->style().set(engraving::Sid::dontHideStavesInFirstSystem, false);
+                ++changed;
+            }
+        }
+        if (changed) {
+            k.score->setLayoutAll();
+        }
+    }
+    if (changed) {
+        LOGI() << "[starscore] solo: " << changed << " part-score staff settings set to hide when empty";
+    }
 }
 
 void StarScoreService::watchSoloChordMutes()
@@ -2111,11 +2154,23 @@ bool StarScoreService::autotestSoloStep(const QString& step)
         auto clefOf = [](Score* s) {
             return s->staff(0) ? int(s->staff(0)->clef(Fraction(0, 1))) : -1;
         };
+        auto hiding = [](Score* s) {
+            QStringList h;
+            for (size_t i = 0; i < s->nstaves(); ++i) {
+                const AutoOnOff a = s->staff(i)->hideWhenEmpty();
+                h << (a == AutoOnOff::ON ? "always" : a == AutoOnOff::OFF ? "never" : "auto");
+            }
+            return h.join("/") + (s->style().styleB(Sid::hideEmptyStaves) ? " (hide empty on)" : " (hide empty off)");
+        };
         soloTestLog(QString("  credits: composer \"%1\" | copyright \"%2\" | composer text \"%3\" | spatium %4 | needsStyle %5")
                     .arg(ms->metaTag(u"composer").toQString().replace('\n', " / "), ms->metaTag(u"copyright").toQString(),
                          ms->getText(TextStyleType::COMPOSER) ? ms->getText(TextStyleType::COMPOSER)->plainText().toQString().replace('\n', " / ")
                                                               : QString("-"))
                     .arg(ms->style().spatium()).arg(int(load().solo.value("needsStyle").toBool())));
+        soloTestLog("  main staves hide: " + hiding(ms));
+        for (const SoloKeyScore& k : soloKeyScores(master)) {
+            soloTestLog(QString("  %1 staves hide: %2").arg(k.index).arg(hiding(k.score)));
+        }
         soloTestLog(QString("  main: %1 | chord %2 | fingerings %3 | breaks %4 | key %5 | clef %6 | concert %7 | undo steps %8")
                     .arg(soloTestNotes(ms)).arg(firstChord(ms)).arg(fingerings(ms)).arg(breaks(ms)).arg(keyOf(ms)).arg(clefOf(ms))
                     .arg(int(ms->style().styleB(Sid::concertPitch))).arg(master->notation()->undoStack()->currentStateIndex()));
