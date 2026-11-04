@@ -81,6 +81,11 @@ StyledDialogView {
     property string soloLink: ""
     property string soloInstrument: newModel.lastSoloInstrumentId
     property string soloTiedCode: ""
+    // the copyright line: made from the fields above until it's typed in (1.25.0)
+    property string soloCopyright: ""
+    property bool soloCopyrightTyped: false
+    readonly property string soloAutoCopyright: newModel.autoCopyright({ "song": root.soloSong, "player": root.soloPlayer,
+                                                                         "band": root.soloBand, "recording": root.soloRecording })
     // opened for a solo (the StarScore bar): "new" (a new one, tied to the song), "convert" (the open score, an old solo
     // kept in a song, made into a Solo Transcription file: no instrument, key or bars to ask)
     property string soloMode: ""
@@ -116,6 +121,7 @@ StyledDialogView {
             "link": root.soloLink,
             "instrumentId": root.soloInstrument,
             "tiedSongCode": root.soloTiedCode,
+            "copyright": root.soloCopyrightTyped ? root.soloCopyright : "",
             "keyFifths": root.keyFifths,
             "timeSigNumerator": root.timeNum,
             "timeSigDenominator": root.timeDen,
@@ -458,6 +464,18 @@ StyledDialogView {
                 Layout.fillWidth: true
                 hint: qsTrc("starscore", "YouTube or other link (optional)")
                 onTextEdited: function(t) { root.soloLink = t }
+                onAccepted: root.createSolo()
+            }
+
+            StyledTextLabel { text: qsTrc("starscore", "Copyright"); font: ui.theme.bodyBoldFont }
+            TextInputField {
+                Layout.fillWidth: true
+                hint: root.soloAutoCopyright
+                currentText: root.soloCopyrightTyped ? root.soloCopyright : root.soloAutoCopyright
+                onTextEdited: function(t) {
+                    root.soloCopyright = t
+                    root.soloCopyrightTyped = t.trim() !== ""
+                }
                 onAccepted: root.createSolo()
             }
 

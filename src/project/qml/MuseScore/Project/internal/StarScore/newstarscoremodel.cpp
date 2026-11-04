@@ -321,9 +321,20 @@ QString NewStarScoreModel::openSongCode() const
     return starScore()->songCode();
 }
 
+QString NewStarScoreModel::autoCopyright(const QVariantMap& o) const
+{
+    StarScoreSoloTranscriptionOptions options;
+    options.song = o.value("song").toString();
+    options.player = o.value("player").toString();
+    options.band = o.value("band").toString();
+    options.recording = o.value("recording").toString();
+    return starScore()->soloAutoCopyright(options);
+}
+
 bool NewStarScoreModel::createSolo(const QVariantMap& o, bool convert)
 {
     StarScoreSoloTranscriptionOptions options;
+    options.copyright = o.value("copyright").toString();
     options.song = o.value("song").toString();
     options.player = o.value("player").toString();
     options.band = o.value("band").toString();

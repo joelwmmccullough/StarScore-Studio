@@ -52,12 +52,14 @@
 #include "engraving/editing/transpose.h"
 #include "engraving/style/style.h"
 #include "engraving/style/defaultstyle.h"
+#include "engraving/types/propertyvalue.h"
 #include "engraving/dom/systemlock.h"
 #include "engraving/dom/clef.h"
 #include "engraving/dom/accidental.h"
 #include "engraving/dom/notedot.h"
 #include "engraving/dom/factory.h"
 #include "engraving/dom/fingering.h"
+#include "engraving/dom/text.h"
 
 #include "log.h"
 #include "translation.h"
@@ -121,6 +123,22 @@ int soloKeyAbove(int fifths, int semitones)
 {
     int f = ((fifths + 7 * semitones) % 12 + 12) % 12;
     return f > 5 ? f - 12 : f;
+}
+
+//! Each open solo's main-score style as last copied into its twelve keys: only settings changed since then are copied
+std::map<const mu::engraving::MasterScore*, std::vector<mu::engraving::PropertyValue> > s_soloStyleBase;
+
+void soloRememberStyle(mu::engraving::MasterScore* ms)
+{
+    using namespace mu::engraving;
+    if (!ms) {
+        return;
+    }
+    std::vector<PropertyValue>& base = s_soloStyleBase[ms];
+    base.resize(size_t(Sid::STYLES));
+    for (int i = 0; i < int(Sid::STYLES); ++i) {
+        base[i] = ms->style().styleV(static_cast<Sid>(i));
+    }
 }
 
 //! The pitch in the middle of a staff with this clef (written)
@@ -343,7 +361,8 @@ Ret StarScoreService::newSoloTranscription(const StarScoreSoloTranscriptionOptio
     ProjectCreateOptions projectOptions;
     projectOptions.title = options.song.trimmed();
     projectOptions.subtitle = soloSubtitle(options);
-    projectOptions.composer = options.band.trimmed();
+    projectOptions.composer = soloComposer(options);
+    projectOptions.copyright = options.copyright.trimmed().isEmpty() ? soloAutoCopyright(options) : options.copyright.trimmed();
 
     ScoreCreateOptions& score = projectOptions.scoreOptions;
     score.withTempo = options.tempoBpm > 0;
@@ -393,6 +412,30 @@ Ret StarScoreService::newSoloTranscription(const StarScoreSoloTranscriptionOptio
         dispatcher()->dispatch("file-open", muse::actions::ActionData::make_arg1<QUrl>(QUrl::fromLocalFile(path)));
     }
     return make_ok();
+}
+
+QString StarScoreService::soloAutoCopyright(const StarScoreSoloTranscriptionOptions& options) const
+{
+    QString who = options.player.trimmed();
+    if (!options.band.trimmed().isEmpty() && options.band.trimmed() != who) {
+        who += " (" + options.band.trimmed() + ")";
+    }
+    QString line = muse::qtrc("starscore", "Transcription © %1 Joel McCullough.").arg(QDate::currentDate().year());
+    if (!options.song.trimmed().isEmpty() && !who.isEmpty()) {
+        line += " " + muse::qtrc("starscore", "%1 as played by %2").arg(options.song.trimmed(), who);
+        if (!options.recording.trimmed().isEmpty()) {
+            line += muse::qtrc("starscore", ", from %1").arg(options.recording.trimmed());
+        }
+        line += ".";
+    }
+    return line;
+}
+
+QString StarScoreService::soloComposer(const StarScoreSoloTranscriptionOptions& options)
+{
+    // top right (Joel, 4 Nov 2026): the band, else the soloist, and under it "trans. Joel McCullough"
+    const QString who = options.band.trimmed().isEmpty() ? options.player.trimmed() : options.band.trimmed();
+    return who + "\n" + muse::qtrc("starscore", "trans. Joel McCullough");
 }
 
 QString StarScoreService::soloSubtitle(const StarScoreSoloTranscriptionOptions& options)
@@ -461,11 +504,44 @@ Ret StarScoreService::setUpSoloTranscription(const INotationProjectPtr& project,
         { "instrumentName", instrumentName }, { "tiedSongCode", options.tiedSongCode.trimmed() }, { "fifths", fifths },
         { "keys", keys },
     };
+    // the default Starsign style settings (Joel, 4 Nov 2026): now when it's this window's score, else when it's
+    // first opened
+    const bool here = globalContext()->currentProject() == project;
+    if (!here) {
+        data.solo["needsStyle"] = true;
+    }
     storeTo(ms, data, project);
+    if (here) {
+        applySoloStyles();
+    }
 
     m_soloLayoutSig.clear();
+    soloRememberStyle(ms);
     refreshSoloTranscription(master, true);
     return make_ok();
+}
+
+void StarScoreService::applySoloStyles()
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    engraving::MasterScore* ms = masterScore();
+    if (!master || !ms || !isSoloTranscription()) {
+        return;
+    }
+    applyStylesOnly({}, load());
+    // (a style file can switch concert pitch off: the main score stays in concert pitch, chord symbols with it)
+    if (!ms->style().styleB(engraving::Sid::concertPitch)) {
+        master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Concert pitch"));
+        master->notation()->style()->setStyleValue(StyleId::concertPitch, true);
+        master->notation()->undoStack()->commitChanges();
+    }
+    Data data = load();
+    if (data.solo.contains("needsStyle")) {
+        data.solo.remove("needsStyle");
+        store(data);
+    }
+    soloRememberStyle(ms);
+    LOGI() << "[starscore] solo transcription: default style settings applied";
 }
 
 Ret StarScoreService::convertToSoloTranscription(const StarScoreSoloTranscriptionOptions& options)
@@ -539,6 +615,15 @@ Ret StarScoreService::convertToSoloTranscription(const StarScoreSoloTranscriptio
     copy->masterNotation()->setExcerpts({});
     if (!others.isEmpty()) {
         removePartsKeepingSystemObjects(copy->masterNotation(), others);
+    }
+    // its copyright line (1.25.0)
+    cms->setMetaTag(u"copyright", String::fromQString(options.copyright.trimmed().isEmpty() ? soloAutoCopyright(options)
+                                                      : options.copyright.trimmed()));
+    // the band (else the soloist) and "trans. Joel McCullough" top right
+    const QString composer = soloComposer(options);
+    cms->setMetaTag(u"composer", String::fromQString(composer));
+    if (engraving::TextBase* t = cms->getText(engraving::TextStyleType::COMPOSER)) {
+        t->setPlainText(String::fromQString(composer));
     }
     // (an old solo's own StarScore data isn't a solo transcription's)
     cms->metaTags().erase(u"starscore");
@@ -900,6 +985,16 @@ void StarScoreService::refreshSoloTranscription(const IMasterNotationPtr& master
     // the main score's formatting in all twelve, in one undo step with the edit that changed it (not after an undo
     // or redo: that would clear what can be redone), and only when it changed
     const QString sig = soloLayoutSignature(ms);
+    std::vector<PropertyValue>& styleBase = s_soloStyleBase[ms];
+    std::vector<Sid> changedStyles;
+    if (styleBase.size() == size_t(Sid::STYLES)) {
+        for (int i = 0; i < int(Sid::STYLES); ++i) {
+            const Sid sid = static_cast<Sid>(i);
+            if (sid != Sid::concertPitch && !(ms->style().styleV(sid) == styleBase[i])) {
+                changedStyles.push_back(sid);
+            }
+        }
+    }
     if (syncLayout && !scores.empty() && sig != m_soloLayoutSig) {
         std::vector<engraving::Score*> targets;
         for (const SoloKeyScore& k : scores) {
@@ -917,9 +1012,10 @@ void StarScoreService::refreshSoloTranscription(const IMasterNotationPtr& master
                     em->undoChangeProperty(Pid::USER_STRETCH, m->userStretch());
                 }
             }
-            for (int i = 0; i < int(Sid::STYLES); ++i) {
-                const Sid sid = static_cast<Sid>(i);
-                if (sid != Sid::concertPitch && !(ms->style().styleV(sid) == es->style().styleV(sid))) {
+            // the style settings changed in the main score since the last copy (each key's part score keeps the
+            // house style it got as a part, 1.25.0: copying every setting gave them the main score's)
+            for (const Sid sid : changedStyles) {
+                if (!(ms->style().styleV(sid) == es->style().styleV(sid))) {
                     es->undoChangeStyleVal(sid, ms->style().styleV(sid));
                 }
             }
@@ -931,6 +1027,7 @@ void StarScoreService::refreshSoloTranscription(const IMasterNotationPtr& master
     }
     if (m_soloLayoutSig.isEmpty() || syncLayout) {
         m_soloLayoutSig = sig;
+        soloRememberStyle(ms);
     }
     for (const SoloKeyScore& k : scores) {
         if (k.notation) {
@@ -946,8 +1043,13 @@ void StarScoreService::onSoloTranscriptionOpened()
     if (!isSoloTranscription()) {
         return;
     }
+    // made from a song's bar (off-screen): the default style settings on its first opening
+    if (load().solo.value("needsStyle").toBool()) {
+        applySoloStyles();
+    }
     // (opened: the keys spelled again, the formatting left as it was saved)
     m_soloLayoutSig = soloLayoutSignature(masterScore());
+    soloRememberStyle(masterScore());
     refreshSoloTranscription(globalContext()->currentMasterNotation(), false);
 }
 
@@ -1594,6 +1696,11 @@ bool StarScoreService::autotestSoloStep(const QString& step)
         auto clefOf = [](Score* s) {
             return s->staff(0) ? int(s->staff(0)->clef(Fraction(0, 1))) : -1;
         };
+        soloTestLog(QString("  credits: composer \"%1\" | copyright \"%2\" | composer text \"%3\" | spatium %4 | needsStyle %5")
+                    .arg(ms->metaTag(u"composer").toQString().replace('\n', " / "), ms->metaTag(u"copyright").toQString(),
+                         ms->getText(TextStyleType::COMPOSER) ? ms->getText(TextStyleType::COMPOSER)->plainText().toQString().replace('\n', " / ")
+                                                              : QString("-"))
+                    .arg(ms->style().spatium()).arg(int(load().solo.value("needsStyle").toBool())));
         soloTestLog(QString("  main: %1 | chord %2 | fingerings %3 | breaks %4 | key %5 | clef %6 | concert %7 | undo steps %8")
                     .arg(soloTestNotes(ms)).arg(firstChord(ms)).arg(fingerings(ms)).arg(breaks(ms)).arg(keyOf(ms)).arg(clefOf(ms))
                     .arg(int(ms->style().styleB(Sid::concertPitch))).arg(master->notation()->undoStack()->currentStateIndex()));

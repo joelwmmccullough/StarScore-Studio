@@ -153,6 +153,9 @@ public:
     QStringList soloTranscriptionsTiedTo(const QString& songCode) const override;
     muse::RetVal<QString> exportSoloSheets() override;
     muse::Ret convertToSoloTranscription(const StarScoreSoloTranscriptionOptions& options) override;
+    QString soloAutoCopyright(const StarScoreSoloTranscriptionOptions& options) const override;
+    //! The default Starsign style settings on the open solo transcription (its main score kept in concert pitch)
+    void applySoloStyles();
     QJsonArray soloLearningList() const override;
     muse::Ret setSoloKeyState(const QString& id, int keyIndex, const QString& state) override;
     muse::async::Notification soloLearningChanged() const override;
@@ -543,6 +546,7 @@ private:
     std::vector<SoloKeyScore> soloKeyScores(const notation::IMasterNotationPtr& master) const;
     QString soloTranscriptionPath(const StarScoreSoloTranscriptionOptions& options) const;
     static QString soloSubtitle(const StarScoreSoloTranscriptionOptions& options);
+    static QString soloComposer(const StarScoreSoloTranscriptionOptions& options);
     //! The solo's tag, its twelve key part scores and its data on the (main score of the) project
     muse::Ret setUpSoloTranscription(const INotationProjectPtr& project, const StarScoreSoloTranscriptionOptions& options);
     //! One key's part score: its instrument transposed by `iv`, its notes, key signatures and chord symbols spelled for

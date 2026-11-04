@@ -233,6 +233,7 @@ struct StarScoreSoloTranscriptionOptions
     QString link;                // a YouTube (or other) link to the recording
     QString instrumentId;        // MuseScore instrument id ("tenor-saxophone")
     QString tiedSongCode;        // the Starsign song it belongs to ("AMPL"), or ""
+    QString copyright;           // the sheets' copyright line ("" = soloAutoCopyright's)
     int keyFifths = 0;           // concert key signature
     int timeSigNumerator = 4;
     int timeSigDenominator = 4;
@@ -596,6 +597,9 @@ public:
     virtual muse::RetVal<QString> exportSoloSheets() = 0;
     //! The open score (one instrument: an old solo kept in a song) copied into a new Solo Transcription file
     virtual muse::Ret convertToSoloTranscription(const StarScoreSoloTranscriptionOptions& options) = 0;
+    //! (1.25.0) The copyright line a solo transcription gets unless another is typed: "Transcription © <year> Joel
+    //! McCullough. <Song> as played by <Player> (<Band>), from <Recording>."
+    virtual QString soloAutoCopyright(const StarScoreSoloTranscriptionOptions& options) const = 0;
     //! (1.25.0) The solo transcriptions whose sheets have been exported, for Home's learning list: each with "id"
     //! (its file, relative to 8 Solo Transcriptions), "path", "player", "song", "instrument", "exported" (date) and
     //! "keys" [{ "name", "short", "state": "" | "learned" | "memorized" }], the original key first

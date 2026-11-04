@@ -71,6 +71,8 @@ public:
     Q_INVOKABLE bool create(const QVariantMap& options);
     //! A new Solo Transcription (convert: made from the open score, an old solo kept in a song)
     Q_INVOKABLE bool createSolo(const QVariantMap& options, bool convert = false);
+    //! The copyright line a solo gets unless another is typed (from its song, player, band and recording)
+    Q_INVOKABLE QString autoCopyright(const QVariantMap& options) const;
 
     // --- Add arrangement (the StarScore bar's menu, in an open score): the same doubler / 7th horn questions ---
     //! The arrangement template's name ("3-Horn Standard")
