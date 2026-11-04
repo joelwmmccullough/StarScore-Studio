@@ -83,7 +83,9 @@ Rectangle {
                 anchors.verticalCenter: parent.verticalCenter
                 text: chip.text
                 font: chip.active ? ui.theme.bodyBoldFont : ui.theme.bodyFont
-                color: chip.active ? ui.theme.fontPrimaryColor : (chip.dashed ? ui.theme.fontSecondaryColor : ui.theme.fontPrimaryColor)
+                // (1.24.0) the dashed "+ New …" chips' text was too faint to read: the main text colour, a little lighter
+                color: ui.theme.fontPrimaryColor
+                opacity: chip.dashed && !chip.active ? 0.7 : 1.0
             }
         }
 
