@@ -4,6 +4,66 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.24.0
+
+### Solo Transcriptions
+
+- **File › New › Solo Transcription.** The New Score window has a third choice beside Starsign Score and Non-Starsign Score. You fill in the song, the player, the band, the album or recording, a link to it, the instrument, and (optionally) the Starsign song the solo belongs to, plus the key, time signature, tempo and number of bars. The file is saved in Projects and Sheets/8 Solo Transcriptions/<Player> - <Song>/, a folder made just for solos.
+- **All twelve keys.** A solo transcription has its main score and twelve part scores: the original key first, then every other key a semitone apart. Whatever you write in the main score (notes, chord symbols, articulations, page and system breaks, bar widths, style settings) shows in all twelve, each transposed into its own key with its own key signature and chord symbols spelled for it. Fingerings are the exception: a fingering stays in the part score you write it in, so each key can have its own.
+- **Each key up or down, toward the middle.** Each key is transposed up or down, whichever keeps the notes nearest the staff (fewest ledger lines) and inside the piano's 88 keys. A key keeps its octave while you write unless the other way becomes clearly better, so it doesn't jump around.
+- **Formatting from the main score.** A break or style change in the main score goes into the twelve keys in the same undo step. A break you put into one key's part score by hand stays there until the main score's formatting changes again.
+- **The twelve keys' sheets.** "Export the 12 keys" (on the StarScore bar of a solo transcription, and in its ⋯ menu) writes every key's sheet into the solo's Sheets folder, with the notes in the 12-note colours of the notes as written on that sheet. For an instrument that transposes (a tenor sax, a trumpet), there are two sets: one in concert pitch (Sheets/Concert) and one written for the instrument (Sheets/<Instrument>), 24 sheets in all.
+- **Tied to a song.** A solo tied to a Starsign song shows on that song's StarScore bar under Solos; click it to open it. "+ New solo transcription" on a song's bar makes one already tied to that song (it opens in a window of its own; the song stays open).
+- **Old solos.** A solo kept inside a song (the old "Add solo transcription", still there on the right-click menu of "+ New solo transcription") can be copied into a Solo Transcription file: right-click its chip › "Make a Solo Transcription file from this solo…". Only the soloist's part is copied; the solo in the song stays as it is until you remove it.
+
+### Fixes and clean-up (overnight audit)
+
+**Export and Update all sheets**
+- Update all sheets no longer skips a song because its plan had a note in it (a note such as a sheet moving folders was counted as a problem, so the dry run failed and the song was never updated). The plan now lists notes separately, under "Notes:".
+- The Update all sheets window can be run again after it finishes (it stayed on "Done"), and says that the song that's open is saved first.
+- Exporting only the audio demos doesn't raise the song's version number.
+- A sheet that only moved folders no longer counts as a new sheet when the version number is suggested.
+- The strings sheets' folder name is made safe for a file name, and a file that couldn't be written is reported instead of being taken as written.
+- Clearer wording in the export window (half-time and double-time folders, superseded sheets).
+- Chord charts find their fonts once per export instead of once per chart.
+
+**Organizer and Recordings**
+- A new recording can't take another song's recording's id any more (two songs' takes could overwrite each other).
+- If codes.json can't be read, registering a new song stops instead of writing a codes.json with only the new song in it.
+- A song folder that was moved or renumbered keeps its code, and a missing folder isn't made again.
+- When the same sheet or .starscore turns up twice, the newer file is kept.
+- Two organizer runs can't run at once, and Stop also stops PDF rendering.
+- A failed setlist fetch keeps the play counts it had instead of clearing them.
+- The Recordings and Roster windows ask before closing with unsaved changes.
+- The Songbook is written to a temporary file first, so a failed write doesn't lose the old one.
+- Smaller fixes: a file that can't be read isn't taken as changed, a sheet record that can't be read doesn't clear its Finder colour, the "not filmed" box keeps a pasted link, roster keys are kept with their chairs, and an inbox file only matches a song whose title its name starts with.
+
+**Practice**
+- Opening a practice item while the save question is up no longer closes the runner from under itself.
+- Hands free logs the time actually played and the tempo actually reached (it logged the planned minutes and the goal tempo even for skipped items).
+- "Not done" takes back the progress the item added; play-along plays the whole part; Plan again keeps today's routine marks; an item done hands-free isn't counted twice.
+- The practice page reads its files far less often (it re-read progress.json for every binding, every second in hands-free), and plans the new day after midnight.
+- The runner and the skill rows fit a narrow window.
+
+**Songs, sections and undo**
+- A new instrument no longer inherits the status, mutes or section of a deleted one that had the same id.
+- Undoing "remove arrangement" and undoing a Project Properties change no longer put back an old copy of the song's StarScore data.
+- If the solos and reference PDFs can't be put into the file when you save, you're told, the song stays unsaved, and they're kept (they were lost when the song closed).
+- StarScore Deco and restyling are one undo step instead of one per part score.
+- Saving during an audit listen-through stops it first, so the file keeps the song's own instrument visibility.
+- Mixer changes from one song no longer reach another song opened right after it; hidden mutes in part scores are kept after switching tabs.
+- Opening a song does less (fewer layout rounds), and switching tabs no longer adds an undo step.
+
+**StarScore bar and windows**
+- The ⋯ menu is grouped into Song, Sections, This part, Formatting, Check and Reference PDFs (it was one list of 33 entries).
+- Removing a reference PDF from the ⋯ menu asks first, as the Reference panel does.
+- Move left and Move right are only offered where a section can move.
+- Copy part formatting: one window, a "Copy formatting" button that's only on when there's something to copy, and "System breaks" instead of "Line breaks".
+- The default styles window shows what Apply now did and stays open.
+- New Score: Create stays off until there's a title, and a failure is shown instead of nothing happening.
+- Dashboard: the Every song grid fits a half-width window (narrower cells, column tooltips), and text on coloured cells is readable in both themes.
+- The To-do panel's titles wrap, the Audit listen row wraps, and "part book" is now "part score" everywhere.
+
 ## 1.23.2
 
 - **A warning when a cover has no recordings.** Export to Sheets and Demos on a cover (a song in "2 …" or "3 …" in Sheets and Demos) whose Recordings window is empty (no live takes, albums, sessions, or original) shows "You haven't added any recordings for this cover yet, not even the original." above the export button, with an "Add recordings…" button that opens the Recordings window. The warning goes away once you add one. It doesn't stop the export.
