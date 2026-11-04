@@ -841,11 +841,8 @@ int soloColorNotes(mu::engraving::Score* score, bool dark)
             }
             return false;
         };
-        bool any = apply(n);   // (not its accidental: Joel, 4 Nov 2026, accidentals stay black)
-        for (NoteDot* dot : n->dots()) {
-            any |= apply(dot);
-        }
-        changed += any ? 1 : 0;
+        // the note head only (Joel, 4 Nov 2026): its accidental and its dots stay in the page's ink colour
+        changed += apply(n) ? 1 : 0;
     });
     return changed;
 }
