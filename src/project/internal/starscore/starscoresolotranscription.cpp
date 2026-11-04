@@ -62,6 +62,7 @@
 #include "engraving/dom/fingering.h"
 #include "engraving/dom/text.h"
 #include "engraving/dom/starscoreplayback.h"
+#include "engraving/dom/tie.h"
 
 #include "log.h"
 #include "translation.h"
@@ -843,6 +844,84 @@ int soloColorNotes(mu::engraving::Score* score, bool dark)
 }
 }
 
+namespace {
+//! (Joel, 4 Nov 2026) Each note of a key spelled by the key's interval exactly, double sharps and flats included, so
+//! its intervals look as they do in the original: A♯–C♯ (a third) in C major is F𝄪–A♯ in A major, not G–A♯ (a
+//! second). A double sharp (flat) is kept when a note beside it is sharpened (flattened) too: another note of its
+//! chord, or the note before or after it in its voice, grace notes included. Otherwise it's written as its plain
+//! enharmonic (G for an F𝄪 on its own). A tied note keeps the spelling of the note it's tied from.
+void soloSpellNotes(mu::engraving::Score* es, const mu::engraving::Interval& written)
+{
+    using namespace mu::engraving;
+    std::map<const Note*, int> spelled;
+    for (track_idx_t t = 0; t < es->ntracks(); ++t) {
+        // this voice's chords in order (a rest ends a run)
+        std::vector<Chord*> seq;
+        for (Segment* s = es->firstSegment(SegmentType::ChordRest); s; s = s->next1(SegmentType::ChordRest)) {
+            EngravingItem* e = s->element(t);
+            if (!e) {
+                continue;
+            }
+            if (!e->isChord()) {
+                seq.push_back(nullptr);
+                continue;
+            }
+            Chord* c = toChord(e);
+            for (Chord* g : c->graceNotesBefore()) {
+                seq.push_back(g);
+            }
+            seq.push_back(c);
+            for (Chord* g : c->graceNotesAfter()) {
+                seq.push_back(g);
+            }
+        }
+        std::map<const Note*, int> raw;
+        for (Chord* c : seq) {
+            for (Note* n : c ? c->notes() : std::vector<Note*>()) {
+                raw[n] = Transpose::transposeTpc(n->tpc1(), written, true);
+            }
+        }
+        const auto sideOf = [](int tpc) { return tpc >= TPC_F_S ? 1 : tpc <= TPC_B_B ? -1 : 0; };
+        for (size_t i = 0; i < seq.size(); ++i) {
+            if (!seq[i]) {
+                continue;
+            }
+            for (Note* n : seq[i]->notes()) {
+                int tpc = raw[n];
+                if (Tie* tb = n->tieBack(); tb && tb->startNote() && spelled.count(tb->startNote())) {
+                    tpc = spelled[tb->startNote()];
+                } else if (tpc < TPC_F_B || tpc > TPC_B_S) {
+                    const int dir = tpc > TPC_B_S ? 1 : -1;
+                    bool keep = false;
+                    std::vector<const Chord*> near { seq[i] };
+                    if (i > 0 && seq[i - 1]) {
+                        near.push_back(seq[i - 1]);
+                    }
+                    if (i + 1 < seq.size() && seq[i + 1]) {
+                        near.push_back(seq[i + 1]);
+                    }
+                    for (const Chord* c : near) {
+                        for (const Note* m : c->notes()) {
+                            keep = keep || (m != n && raw.count(m) && sideOf(raw[m]) == dir);
+                        }
+                    }
+                    if (!keep) {
+                        tpc -= dir * 12;   // (the plain enharmonic: F𝄪 -> G, B𝄫 -> A)
+                    }
+                    tpc = std::clamp(tpc, int(TPC_F_BB), int(TPC_B_SS));
+                }
+                spelled[n] = tpc;
+            }
+        }
+    }
+    for (const auto& [n, tpc] : spelled) {
+        if (n->tpc2() != tpc) {
+            const_cast<Note*>(n)->setTpc2(tpc);
+        }
+    }
+}
+}
+
 void StarScoreService::respellSoloKey(engraving::Score* es, const engraving::Interval& iv, bool writtenClefs)
 {
     using namespace mu::engraving;
@@ -902,12 +981,15 @@ void StarScoreService::respellSoloKey(engraving::Score* es, const engraving::Int
         }
     }
     // the notes spelled for this key (tpc2: what's written), as Note::setTpcFromPitch does
-    forEachSoloNote(es, [&](Note* n) {
-        const int tpc2 = iv.isZero() ? n->tpc1() : Transpose::transposeTpc(n->tpc1(), written, false);
-        if (n->tpc2() != tpc2) {
-            n->setTpc2(tpc2);
-        }
-    });
+    if (iv.isZero()) {
+        forEachSoloNote(es, [&](Note* n) {
+            if (n->tpc2() != n->tpc1()) {
+                n->setTpc2(n->tpc1());
+            }
+        });
+    } else {
+        soloSpellNotes(es, written);
+    }
     // the key signatures in this key: the part score's staves keep the main score's keys and no others, each in this
     // key (Joel, 4 Nov 2026: the F sheet of Pinetop's Boogie Woogie had G♭ key changes scattered through it)
     for (staff_idx_t si = 0; si < es->nstaves() && si < ms->nstaves(); ++si) {
@@ -1973,6 +2055,7 @@ QString StarScoreService::soloFileKeyName(int keyIndex, bool written) const
 //    soloload                      the saved file read back on its own: each key's first notes as written
 //    soloexport                    the twelve keys' sheets (and a list of what was written)
 //    soloshow:<name>               an old solo kept in the song shown
+//    solobar:<bar>                 each score's notes in that bar as written, grace notes in brackets
 //    solomute:<key index|main>[|0]  the chord symbols muted (|0 unmuted) there; each score's mute state after
 //    sololist, solomark:<key>|<learned|memorized|->   Home's learning list (and a key marked on its first solo)
 //    soloaudioadd:<file>|<name>    a recording copied into the open solo's Audio folder
@@ -2251,6 +2334,59 @@ bool StarScoreService::autotestSoloStep(const QString& step)
                 soloTestLog(QString("  playlist: %1 bytes; link starts %2").arg(html.size()).arg(html.mid(a, 160)));
             } else {
                 soloTestLog("  playlist: none at " + playlist);
+            }
+        }
+        return true;
+    }
+    if (step.startsWith("solobar:")) {
+        // solobar:<bar>: each score's notes in that bar as written (grace notes in brackets), in order, per staff
+        IMasterNotationPtr master = globalContext()->currentMasterNotation();
+        const int bar = step.mid(8).toInt();
+        auto name = [](int tpc) {
+            static const QString L = "FCGDAEB";
+            const int k = tpc - 13;
+            const int letter = ((k % 7) + 7) % 7;
+            const int acc = (k - letter) / 7;
+            return QString(L.at(letter)) + (acc == 2 ? "x" : acc > 0 ? QString(acc, '#') : QString(-acc, 'b'));
+        };
+        auto barNotes = [&](Score* sc, bool concert) {
+            Measure* m = sc->firstMeasure();
+            for (int i = 1; m && i < bar; ++i) {
+                m = m->nextMeasure();
+            }
+            QStringList out;
+            if (!m) {
+                return QString("-");
+            }
+            for (track_idx_t t = 0; t < sc->ntracks(); ++t) {
+                QStringList v;
+                for (Segment* seg = m->first(SegmentType::ChordRest); seg; seg = seg->next(SegmentType::ChordRest)) {
+                    EngravingItem* e = seg->element(t);
+                    if (!e || !e->isChord()) {
+                        continue;
+                    }
+                    auto chordText = [&](const Chord* c) {
+                        QStringList ns;
+                        for (const Note* n : c->notes()) {
+                            ns << name(concert ? n->tpc1() : n->tpc2());
+                        }
+                        return ns.join('+');
+                    };
+                    for (const Chord* g : toChord(e)->graceNotesBefore()) {
+                        v << "(" + chordText(g) + ")";
+                    }
+                    v << chordText(toChord(e));
+                }
+                if (!v.isEmpty()) {
+                    out << QString("t%1: %2").arg(t).arg(v.join(' '));
+                }
+            }
+            return out.join(" | ");
+        };
+        if (master) {
+            soloTestLog(QString("  bar %1 main: %2").arg(bar).arg(barNotes(master->masterScore(), true)));
+            for (const SoloKeyScore& k : soloKeyScores(master)) {
+                soloTestLog(QString("  bar %1 %2: %3").arg(bar).arg(k.name, barNotes(k.score, false)));
             }
         }
         return true;
