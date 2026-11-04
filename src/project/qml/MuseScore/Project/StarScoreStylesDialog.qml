@@ -38,7 +38,7 @@ StyledDialogView {
             horizontalAlignment: Text.AlignLeft
             text: qsTrc("starscore", "Styles are MuseScore style files (.mss, made with Format → Style → Save style). "
                         + "They cover page size, margins, staff size and spacing, fonts and text styles. "
-                        + "The default style is applied to the main score, each arrangement score and every part book; then the matching rule below is applied on top, and then the built-in house settings (staff size, chord symbols, title frame, version footer). "
+                        + "The default style is applied to the main score, each arrangement score and every part score; then the matching rule below is applied on top, and then the built-in house settings (staff size, chord symbols, title frame, version footer). "
                         + "Styles are applied when a section is created, when a new StarScore is made, and when you click Apply.")
         }
 
@@ -65,7 +65,7 @@ StyledDialogView {
             StyledTextLabel {
                 Layout.fillWidth: true
                 horizontalAlignment: Text.AlignLeft
-                text: qsTrc("starscore", "Part book rules (a later rule wins when several match)")
+                text: qsTrc("starscore", "Part score rules (a later rule wins when several match)")
                 font: ui.theme.bodyBoldFont
             }
             FlatButton { text: qsTrc("starscore", "+ Add rule"); onClicked: stylesModel.addRule() }
@@ -115,6 +115,7 @@ StyledDialogView {
                 FlatButton {
                     icon: IconCode.DELETE_TANK
                     transparent: true
+                    toolTipTitle: qsTrc("starscore", "Delete this rule")
                     onClicked: stylesModel.removeRule(index)
                 }
             }
@@ -124,6 +125,7 @@ StyledDialogView {
             id: resultLabel
             Layout.fillWidth: true
             horizontalAlignment: Text.AlignLeft
+            wrapMode: Text.WordWrap
             color: ui.theme.fontSecondaryColor
         }
 
@@ -142,8 +144,8 @@ StyledDialogView {
                 buttonId: ButtonBoxModel.CustomButton + 1
                 onClicked: {
                     stylesModel.save()
-                    stylesModel.applyNow()
-                    root.hide()
+                    // what it did ("Restyled 12 score(s)…", or "Open a score…") stays shown; Close closes
+                    resultLabel.text = stylesModel.applyNow()
                 }
             }
 

@@ -128,6 +128,9 @@ public:
     ItemProgress get(const QString& code, const QString& itemId) const;
     void record(const QString& code, const QString& itemId, int minutes, int tempo, int stage, const QString& note,
                 const QDate& date = QDate::currentDate(), int level = 0, const QStringList& skills = {});
+    //! Takes back the item's newest log entry on `date` (a Done marked by mistake) and works out the item's progress
+    //! again from the entries left. False: it has no entry that day.
+    bool undoLast(const QString& code, const QString& itemId, const QDate& date);
     QJsonArray log() const { return m_log; }
     QString file() const { return m_file; }
 

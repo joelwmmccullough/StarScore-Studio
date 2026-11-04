@@ -340,6 +340,22 @@ struct BandFiler {
             report.unrecognised << srcRel + " (couldn't move it)";
             return;
         }
+        // an older (or same-age) loose file doesn't replace the one in place: it goes to Version History itself, as
+        // mergeInto does with two files of one name (an old copy dropped back into the song used to replace the
+        // current sheet)
+        const QFileInfo there(abs(dst));
+        if (there.exists() && !(QFileInfo(abs(srcRel)).lastModified() > there.lastModified())) {
+            const QString rel = relativeTo(abs(song), abs(dst));
+            // (one filed into Version History already goes beside the one there)
+            const QString tgt = rel.startsWith("Version History/") ? freeName(abs(dst))
+                                : freeName(abs(song + "/Version History/" + paths.todayIso() + " Superseded/" + rel));
+            if (moveItem(abs(srcRel), tgt)) {
+                report.superseded.push_back({ srcRel, relativeTo(paths.band, tgt) });
+            } else {
+                report.unrecognised << srcRel + " (couldn't move it)";
+            }
+            return;
+        }
         const QString archived = supersede(dst, song);
         if (moveItem(abs(srcRel), abs(dst))) {
             report.filed.push_back({ srcRel, dst });
@@ -562,22 +578,46 @@ BandFilingReport fileBand(const Paths& paths, Codes& codes, const Roster& roster
             }
         }
         const QStringList taken = codes.allCodes();
+        // a code held by a song folder that is no longer there is free for this one: the song was moved or renumbered
+        // by hand ("4 Works In Progress/Jeju" -> "1 Jeju"), and used to get a new code while the old folder was
+        // made again for the old one
+        auto vanishedHolder = [&](const QString& c) -> QString {
+            for (const auto& [r, rc] : codes.band) {
+                if (rc == c) {
+                    return QFileInfo(base.filePath(r)).isDir() ? QString() : r;
+                }
+            }
+            return QString();
+        };
         int best = 0;
+        QString from;
         for (const auto& [c, n] : seen) {
-            if (n > best && !taken.contains(c)) {
+            if (n <= best) {
+                continue;
+            }
+            if (!taken.contains(c)) {
                 best = n;
                 code = c;
+                from.clear();
+            } else if (const QString gone = vanishedHolder(c); !gone.isEmpty()) {
+                best = n;
+                code = c;
+                from = gone;
             }
         }
         if (code.isEmpty()) {
             code = suggestCode(songTitleOf(root), taken);
+        }
+        if (!from.isEmpty()) {
+            codes.band.erase(from);
+            report.renamedSongs.push_back({ from, root });
         }
         codes.band[root] = code;
         codes.bandChanged = true;
         if (!aliases.contains(songTitleOf(root))) {
             aliases[songTitleOf(root)] = code;
         }
-        report.registered << root + " → " + code;
+        report.registered << (from.isEmpty() ? root + " → " + code : root + " → " + code + " (moved from " + from + ")");
     }
 
     // --- song folders laid out before 14 Oct 2026: their sheet folders into Sheet Music
@@ -1127,7 +1167,19 @@ ProjectsFilingReport fileProjects(const Paths& paths, const std::vector<ProjectT
             archive = tune + "/MuseScore Files/Deprecated/" + paths.todayIso() + " Superseded/" + fi.fileName();
         }
         QString old;
-        if (QFileInfo::exists(base + "/" + dst)) {
+        // the incoming file replaces the one in the tune only when it is newer; an older (or same-age) one goes to
+        // Version History (or MuseScore Files/Deprecated) itself, so an old copy dropped in can't push out the live file
+        const QFileInfo there(base + "/" + dst);
+        if (there.exists() && !(fi.lastModified() > there.lastModified())) {
+            const QString to = freeName(base + "/" + archive);
+            if (moveItem(base + "/" + rel, to)) {
+                report.superseded.push_back({ rel, relativeTo(base, to) });
+            } else {
+                report.unmatched << rel + " (couldn't move it)";
+            }
+            continue;
+        }
+        if (there.exists()) {
             old = freeName(base + "/" + archive);
             if (!moveItem(base + "/" + dst, old)) {
                 report.unmatched << rel + " (couldn't move the file it replaces)";

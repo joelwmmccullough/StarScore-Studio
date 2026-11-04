@@ -2257,6 +2257,13 @@ QByteArray fontFile(const QStringList& paths, const QStringList& namePatterns)
 
 ChordChartFonts chordChartEmbeddedFonts()
 {
+    // worked out once per run of the app: every export used to search the font folders again (twice for Modernoir)
+    // and base64 the three fonts again. Kept only when Modernoir was found, so installing it takes effect at once.
+    static ChordChartFonts cached;
+    static bool haveCached = false;
+    if (haveCached) {
+        return cached;
+    }
     ChordChartFonts fonts;
     const QString appFonts = QCoreApplication::applicationDirPath() + "/../Resources/fonts/";   // the macOS bundle
     // the two fonts StarScore ships: its resources, else the bundle's copies, else an installed copy
@@ -2271,6 +2278,8 @@ ChordChartFonts chordChartEmbeddedFonts()
     }
     if (!modernoir.isEmpty()) {
         fonts.modernoir = dataUrl(modernoir, "font/ttf");
+        cached = fonts;
+        haveCached = true;
     } else {
         // no file found: the page's "src: url('…')" is completed into a list that falls back to the installed family
         fonts.modernoir = "data:,') format('truetype'), local('TT Modernoir Trial'), local('TT Modernoir";

@@ -22,6 +22,21 @@ StyledDialogView {
 
     RosterModel { id: roster }
 
+    // unsaved edits aren't lost on Close (or the window's close button): asked Save / Don't Save / Cancel. The
+    // question comes after this close is turned down, not from inside it; a yes closes the window again.
+    property bool closeConfirmed: false
+    onAboutToClose: function(closeEvent) {
+        if (roster.dirty && !root.closeConfirmed) {
+            closeEvent.accepted = false
+            Qt.callLater(function() {
+                if (roster.confirmClose()) {
+                    root.closeConfirmed = true
+                    root.hide()
+                }
+            })
+        }
+    }
+
     Component.onCompleted: roster.load()
 
     readonly property var keyChoices: [

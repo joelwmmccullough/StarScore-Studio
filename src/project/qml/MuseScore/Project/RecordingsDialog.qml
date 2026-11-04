@@ -29,6 +29,21 @@ StyledDialogView {
 
     RecordingsModel { id: rec }
 
+    // unsaved edits aren't lost on Close (or the window's close button): asked Save / Don't Save / Cancel. The
+    // question comes after this close is turned down, not from inside it; a yes closes the window again.
+    property bool closeConfirmed: false
+    onAboutToClose: function(closeEvent) {
+        if (rec.dirty && !root.closeConfirmed) {
+            closeEvent.accepted = false
+            Qt.callLater(function() {
+                if (rec.confirmClose()) {
+                    root.closeConfirmed = true
+                    root.hide()
+                }
+            })
+        }
+    }
+
     Component.onCompleted: rec.load()
 
     readonly property var kindChoices: [

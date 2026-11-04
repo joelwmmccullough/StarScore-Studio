@@ -88,7 +88,9 @@ void RosterModel::setField(int index, const QString& key, const QVariant& value)
         } else {
             c.instrument = value.toString().toLower();
         }
-        if (c.chair <= 0) {
+        // only setting the chair itself to "—" removes the entry: a key picked before the chair is kept (a chair-0
+        // entry isn't saved)
+        if (key.startsWith("chair") && c.chair <= 0) {
             p.chairs.erase(n);
         } else if (c.instrument.isEmpty() && !p.instruments.isEmpty()) {
             c.instrument = p.instruments.first().toLower();
@@ -125,4 +127,26 @@ bool RosterModel::save()
     m_dirty = !ok;
     emit changed();
     return ok;
+}
+
+bool RosterModel::confirmClose()
+{
+    if (!m_dirty) {
+        return true;
+    }
+    constexpr int Save = static_cast<int>(muse::IInteractive::Button::CustomButton) + 1;
+    constexpr int Discard = static_cast<int>(muse::IInteractive::Button::CustomButton) + 2;
+    constexpr int Cancel = static_cast<int>(muse::IInteractive::Button::CustomButton) + 3;
+    const muse::IInteractive::Result answer = interactive()->questionSync(
+        muse::trc("starscore", "Save the roster?"),
+        muse::trc("starscore", "The changes to the band roster haven't been saved."), {
+        muse::IInteractive::ButtonData(Cancel, muse::trc("starscore", "Cancel")),
+        muse::IInteractive::ButtonData(Discard, muse::trc("starscore", "Don't Save")),
+        muse::IInteractive::ButtonData(Save, muse::trc("starscore", "Save"), true),
+    }, Save);
+    if (answer.button() == Save) {
+        // a save that didn't work keeps the window open, its status saying why
+        return save();
+    }
+    return answer.button() == Discard;
 }

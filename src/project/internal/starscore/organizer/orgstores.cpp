@@ -22,6 +22,9 @@ QJsonObject Player::toJson() const
     o["horn"] = horn;
     QJsonObject ch;
     for (const auto& [n, c] : chairs) {
+        if (c.chair <= 0) {
+            continue;    // a key picked before the chair (the Band roster window keeps it until a chair is chosen)
+        }
         ch[QString::number(n)] = QJsonObject { { "chair", c.chair }, { "key", c.key }, { "instrument", c.instrument } };
     }
     if (!ch.isEmpty()) {

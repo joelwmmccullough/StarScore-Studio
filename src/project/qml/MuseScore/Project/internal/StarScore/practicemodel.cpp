@@ -52,6 +52,32 @@ static QString practiceNormalized(const QString& s)
 PracticeModel::PracticeModel(QObject* parent)
     : QObject(parent), muse::Contextable(muse::iocCtxForQmlObject(this))
 {
+    m_reloadTimer.setSingleShot(true);
+    m_reloadTimer.setInterval(250);
+    connect(&m_reloadTimer, &QTimer::timeout, this, [this]() { reloadPlans(); });
+
+    m_midnightTimer.setSingleShot(true);
+    connect(&m_midnightTimer, &QTimer::timeout, this, [this]() {
+        // a new day: the days to plan start today, and the plan's "today" moves on
+        const QDate today = QDate::currentDate();
+        if (today != m_today) {
+            m_today = today;
+            if (!m_startDate.isValid() || m_startDate < today) {
+                m_startDate = today;
+            }
+            emit changed();
+            reloadPlans();
+        }
+        armMidnight();
+    });
+}
+
+void PracticeModel::armMidnight()
+{
+    const QDateTime now = QDateTime::currentDateTime();
+    const QDateTime next(now.date().addDays(1), QTime(0, 0, 1));
+    // (at most an hour at a time: a laptop asleep over midnight, or a clock change, doesn't leave it a day behind)
+    m_midnightTimer.start(int(std::clamp<qint64>(now.msecsTo(next), 1000, 3600 * 1000)));
 }
 
 // ---------------------------------------------------------------- properties
@@ -118,10 +144,13 @@ int PracticeModel::routineMinutes() const
 QVariantList PracticeModel::days() const
 {
     QVariantList out;
-    if (!m_startDate.isValid() || !m_showDate.isValid() || m_showDate < m_startDate) {
+    // never from a day gone by (the page left open past midnight)
+    const QDate today = QDate::currentDate();
+    const QDate start = m_startDate.isValid() && m_startDate > today ? m_startDate : today;
+    if (!m_showDate.isValid() || m_showDate < start) {
         return out;
     }
-    for (QDate d = m_startDate; d <= m_showDate && out.size() < 120; d = d.addDays(1)) {
+    for (QDate d = start; d <= m_showDate && out.size() < 120; d = d.addDays(1)) {
         auto it = m_dayMinutes.find(d);
         const int m = it != m_dayMinutes.end() ? it->second : m_defaultMinutes;
         out << QVariantMap { { "date", d.toString(Qt::ISODate) }, { "label", d.toString("ddd d MMM") }, { "minutes", m },
@@ -173,6 +202,12 @@ QString PracticeModel::planId() const
 
 QVariantMap PracticeModel::plan() const
 {
+    return m_planMap;
+}
+
+void PracticeModel::rebuildPlanMap()
+{
+    m_planMap.clear();
     const practice::Plan* p = nullptr;
     for (const practice::Plan& x : m_plans) {
         if (x.id == m_planId) {
@@ -180,7 +215,7 @@ QVariantMap PracticeModel::plan() const
         }
     }
     if (!p) {
-        return {};
+        return;
     }
     const std::map<QString, practice::Library> libs = librariesFor(p->songs);
     const QDate today = QDate::currentDate();
@@ -231,8 +266,8 @@ QVariantMap PracticeModel::plan() const
     if (todayIndex < 0) {
         todayIndex = p->days.empty() ? -1 : 0;
     }
-    return QVariantMap { { "id", p->id }, { "name", p->name }, { "kind", p->kind }, { "showDate", p->showDate.toString(Qt::ISODate) },
-                         { "days", days }, { "todayIndex", todayIndex }, { "done", doneAll }, { "total", totalAll } };
+    m_planMap = QVariantMap { { "id", p->id }, { "name", p->name }, { "kind", p->kind }, { "showDate", p->showDate.toString(Qt::ISODate) },
+                              { "days", days }, { "todayIndex", todayIndex }, { "done", doneAll }, { "total", totalAll } };
 }
 
 bool PracticeModel::busy() const
@@ -255,6 +290,8 @@ void PracticeModel::load()
 {
     m_root = practice::libraryRoot(starScore()->auditLibraryFolder());
     loadSettings();
+    m_today = QDate::currentDate();
+    armMidnight();
     m_busy = true;
     setStatus(QStringLiteral("Reading the song libraries…"));
     QTimer::singleShot(30, this, [this]() {
@@ -284,8 +321,9 @@ void PracticeModel::watchPlans()
 {
     if (!m_watcher) {
         m_watcher = new QFileSystemWatcher(this);
-        connect(m_watcher, &QFileSystemWatcher::directoryChanged, this, [this]() { reloadPlans(); });
-        connect(m_watcher, &QFileSystemWatcher::fileChanged, this, [this]() { reloadPlans(); });
+        // (a save is a directory change and a file change, and more: one reload for them all)
+        connect(m_watcher, &QFileSystemWatcher::directoryChanged, this, [this]() { m_reloadTimer.start(); });
+        connect(m_watcher, &QFileSystemWatcher::fileChanged, this, [this]() { m_reloadTimer.start(); });
     }
     const QString dir = practice::practiceFolder() + "/plans";
     if (!m_watcher->directories().contains(dir)) {
@@ -322,6 +360,7 @@ void PracticeModel::reloadPlans()
     if (m_watcher) {
         watchPlans();
     }
+    rebuildPlanMap();
     emit plansChanged();
 }
 
@@ -848,14 +887,30 @@ void PracticeModel::makeRoutine()
     req.name = QString("Routine · %1 · %2").arg(QDate::currentDate().toString("ddd d MMM"), practice::formatMinutes(m_routineMinutes));
     req.songs = songs;
     req.days = { { QDate::currentDate(), m_routineMinutes } };
-    practice::Plan p = practice::makePlan(req, librariesFor(songs), progress);
+    // a routine made today and not started yet is made again in its place (each press made another plan file)
+    const practice::Plan* unstarted = nullptr;
+    for (const practice::Plan& old : m_plans) {   // (newest first)
+        if (old.kind != "routine" || old.created != QDate::currentDate() || old.days.empty()
+            || old.days.front().date != QDate::currentDate()) {
+            continue;
+        }
+        const bool started = std::any_of(old.days.front().blocks.begin(), old.days.front().blocks.end(),
+                                          [](const practice::Block& b) { return b.done; });
+        if (!started) {
+            unstarted = &old;
+            break;
+        }
+    }
+    const practice::Plan replaced = unstarted ? *unstarted : practice::Plan();
+    practice::Plan p = practice::makePlan(req, librariesFor(songs), progress, unstarted ? &replaced : nullptr);
     p.setlistId = m_setlistId;
     p.breakEvery = m_breakEvery;
     p.breakMinutes = m_breakMinutes;
     practice::savePlan(p);
     m_planId = p.id;
     reloadPlans();
-    setStatus(QStringLiteral("Made “%1”.").arg(p.name));
+    setStatus(unstarted ? muse::qtrc("starscore", "Made “%1” in place of today's routine (it wasn't started).").arg(p.name)
+                        : QStringLiteral("Made “%1”.").arg(p.name));
 }
 
 void PracticeModel::makePlan()
@@ -875,7 +930,7 @@ void PracticeModel::makePlan()
         req.days.push_back({ QDate::fromString(d.value("date").toString(), Qt::ISODate), d.value("minutes").toInt() });
     }
     if (req.days.empty()) {
-        setStatus(QStringLiteral("The show date is before the first day."));
+        setStatus(muse::qtrc("starscore", "The show date has passed: set the next show's date, or make a new setlist for it."));
         return;
     }
     practice::Progress progress;
@@ -893,6 +948,7 @@ void PracticeModel::makePlan()
 void PracticeModel::selectPlan(const QString& id)
 {
     m_planId = id;
+    rebuildPlanMap();
     emit plansChanged();
 }
 

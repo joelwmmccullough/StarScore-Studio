@@ -94,12 +94,19 @@ QStringList strings(const QJsonValue& v)
 }
 }
 
-std::map<QString, QJsonObject> loadSheetRecords(const Paths& paths)
+std::map<QString, QJsonObject> loadSheetRecords(const Paths& paths, std::set<QString>* unreadable)
 {
     std::map<QString, QJsonObject> out;
     const QDir dir(paths.toolkit + "/sheets");
     for (const QString& f : dir.entryList({ "*.json" }, QDir::Files, QDir::Name)) {
-        const QJsonObject o = readJsonObject(dir.filePath(f));
+        const JsonRead read = readJsonChecked(dir.filePath(f));
+        if (!read.ok) {
+            if (unreadable) {
+                unreadable->insert(QFileInfo(f).completeBaseName());
+            }
+            continue;
+        }
+        const QJsonObject o = read.doc.object();
         const QString code = o.value("code").toString();
         if (!code.isEmpty()) {
             out[code] = o;

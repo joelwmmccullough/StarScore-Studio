@@ -5,9 +5,11 @@
  */
 #include "orgrecordings.h"
 
+#include <algorithm>
 #include <memory>
 #include <set>
 
+#include <QDateTime>
 #include <QJsonArray>
 #include <QJsonDocument>
 
@@ -328,6 +330,8 @@ QStringList applyShows(QJsonObject& recordings, const std::vector<NewShow>& offe
         skipNorm.insert(normalizeName(v.toString()));
     }
     const QString todayIso = today.toString(Qt::ISODate);
+    // "modified" as the Recordings window writes it (date and time), so the newer edit wins a merge fairly
+    const QString modifiedIso = QDateTime(today, QTime::currentTime()).toString(Qt::ISODate);
     std::set<QString> takenShowIds = showIds(shows);
     // the performance numbers run on from everything that exists, has existed ("deleted") or is a release
     int nextPerf = nextRecordingNumber(recordings, "p");
@@ -373,7 +377,7 @@ QStringList applyShows(QJsonObject& recordings, const std::vector<NewShow>& offe
             }
             QJsonObject p { { "id", QString("p%1").arg(nextPerf++, 4, 10, QChar('0')) }, { "song", m.code }, { "show", showId },
                             { "seconds", m.seconds }, { "variant", m.variant.isEmpty() ? QJsonValue() : QJsonValue(m.variant) },
-                            { "name", m.name }, { "rating", QJsonValue() }, { "modified", todayIso } };
+                            { "name", m.name }, { "rating", QJsonValue() }, { "modified", modifiedIso } };
             perfs.append(p);
             if (!changedCodes.contains(m.code)) {
                 changedCodes << m.code;
@@ -439,9 +443,20 @@ void storePlayCounts(QJsonObject& recordings, const OnlineResult& r, const QDate
         }
         return o;
     };
+    // a stats page that couldn't be fetched comes back empty: keep the counts stored before instead of wiping them
     QJsonObject pc = recordings.value("playCounts").toObject();
-    pc[QString::number(r.year)] = toObj(r.thisYear);
-    pc[QString::number(r.year - 1)] = toObj(r.lastYear);
+    bool stored = false;
+    if (!r.thisYear.isEmpty()) {
+        pc[QString::number(r.year)] = toObj(r.thisYear);
+        stored = true;
+    }
+    if (!r.lastYear.isEmpty()) {
+        pc[QString::number(r.year - 1)] = toObj(r.lastYear);
+        stored = true;
+    }
+    if (!stored) {
+        return;
+    }
     pc["fetched"] = today.toString(Qt::ISODate);
     recordings["playCounts"] = pc;
 }
@@ -473,6 +488,110 @@ QJsonObject songRecordings(const QJsonObject& recordings, const QString& code)
     return QJsonObject { { "code", code }, { "performances", perfs }, { "releases", rels }, { "shows", shows } };
 }
 
+// --- ids given out from a stale list (the Recordings window's copy loaded earlier, or none when Sheets and Demos
+//     wasn't there; a run's copy loaded at its start) can be an id another song's take already has. Matching by id
+//     alone then overwrote that take, so an entry whose id is taken by a different recording is a clash: it gets a
+//     fresh id and goes in beside it.
+
+//! "p", "r": the letters before an id's number
+static QString idPrefix(const QString& id, bool performance)
+{
+    int i = 0;
+    while (i < id.size() && !id.at(i).isDigit()) {
+        ++i;
+    }
+    return i > 0 ? id.left(i) : QString(performance ? "p" : "r");
+}
+
+//! Whether an incoming entry with an id the list already has is a different recording than the one there
+static bool clashes(bool performance, const QJsonObject& incoming, const QJsonObject& existing)
+{
+    if (incoming.value("song").toString() != existing.value("song").toString()) {
+        return true;
+    }
+    return performance && incoming.value("show").toString() != existing.value("show").toString();
+}
+
+//! Whether two entries with different ids are the same recording: a clash given a fresh id by an earlier merge,
+//! arriving again from a copy (a .starscore) that still has the old id
+static bool sameRecording(bool performance, const QJsonObject& a, const QJsonObject& b)
+{
+    if (a.value("song").toString() != b.value("song").toString()) {
+        return false;
+    }
+    if (performance) {
+        return a.value("show").toString() == b.value("show").toString() && a.value("seconds").toInt() == b.value("seconds").toInt();
+    }
+    const QString va = a.value("video").toString();
+    const QString vb = b.value("video").toString();
+    if (!va.isEmpty() || !vb.isEmpty()) {
+        return va == vb && a.value("kind").toString() == b.value("kind").toString();
+    }
+    QJsonObject x = a;
+    QJsonObject y = b;
+    for (const char* k : { "id", "modified" }) {
+        x.remove(k);
+        y.remove(k);
+    }
+    return x == y;
+}
+
+//! An entry's place in the list (by id), or, for a clash, where it went under a fresh id before (-1: not there)
+static int findSame(bool performance, const QJsonArray& master, const QJsonObject& e, const QString& skipId)
+{
+    for (int i = 0; i < master.size(); ++i) {
+        const QJsonObject o = master.at(i).toObject();
+        if (o.value("id").toString() != skipId && sameRecording(performance, e, o)) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+//! An id no entry has: above every id in the merged list so far, in the rest of `base`, and in `incoming` (so that
+//! an incoming entry still to come can't be matched to it)
+static QString freshRecordingId(const QString& prefix, const QJsonObject& base, const char* key, const QJsonArray& master,
+                                const QJsonObject& incoming)
+{
+    QJsonObject probe = base;
+    probe[key] = master;
+    const int n = std::max(nextRecordingNumber(probe, prefix), nextRecordingNumber(incoming, prefix));
+    return QString("%1%2").arg(prefix).arg(n, 4, 10, QChar('0'));
+}
+
+//! Put an incoming entry into the list: by id; a clash with another recording's id goes in under a fresh id (or
+//! onto the entry it became last time). Newer "modified" wins (ties keep the list's). Returns whether it changed.
+static bool mergeEntry(const char* key, QJsonArray& master, std::map<QString, int>& index, QJsonObject e, const QJsonObject& base,
+                       const QJsonObject& incoming)
+{
+    const bool performance = QLatin1String(key) == QLatin1String("performances");
+    const QString id = e.value("id").toString();
+    int at = -1;
+    auto it = index.find(id);
+    if (it != index.end()) {
+        at = it->second;
+        if (clashes(performance, e, master.at(at).toObject())) {
+            at = findSame(performance, master, e, id);
+            if (at < 0) {
+                e["id"] = freshRecordingId(idPrefix(id, performance), base, key, master, incoming);
+            } else {
+                e["id"] = master.at(at).toObject().value("id");
+            }
+        }
+    }
+    if (at < 0) {
+        index[e.value("id").toString()] = int(master.size());
+        master.append(e);
+        return true;
+    }
+    const QJsonObject have = master.at(at).toObject();
+    if (e != have && e.value("modified").toString() > have.value("modified").toString()) {
+        master[at] = e;
+        return true;
+    }
+    return false;
+}
+
 bool mergeSongRecordings(QJsonObject& recordings, const QString& code, const QJsonObject& copy)
 {
     bool changed = false;
@@ -481,7 +600,19 @@ bool mergeSongRecordings(QJsonObject& recordings, const QString& code, const QJs
     for (const QJsonValue& v : deleted) {
         gone.insert(v.toString());
     }
+    // a copy only removes its own song's entries: an id it deleted that another song's entry has (a clash) leaves
+    // that entry alone
+    std::map<QString, QString> songOfId;
+    for (const char* key : { "performances", "releases" }) {
+        for (const QJsonValue& v : recordings.value(key).toArray()) {
+            songOfId[v.toObject().value("id").toString()] = v.toObject().value("song").toString();
+        }
+    }
     for (const QJsonValue& v : copy.value("deleted").toArray()) {
+        const auto owner = songOfId.find(v.toString());
+        if (owner != songOfId.end() && owner->second != code) {
+            continue;
+        }
         if (!gone.contains(v.toString())) {
             gone.insert(v.toString());
             deleted.append(v);
@@ -501,14 +632,7 @@ bool mergeSongRecordings(QJsonObject& recordings, const QString& code, const QJs
                 continue;
             }
             e["song"] = code;
-            auto it = index.find(id);
-            if (it == index.end()) {
-                master.append(e);
-                changed = true;
-            } else if (e.value("modified").toString() > master[it->second].toObject().value("modified").toString()) {
-                master[it->second] = e;
-                changed = true;
-            }
+            changed |= mergeEntry(key, master, index, e, recordings, copy);
         }
         QJsonArray kept;
         for (const QJsonValue& v : master) {
@@ -556,7 +680,8 @@ bool mergeRecordingsFiles(QJsonObject& current, const QJsonObject& ours)
             changed = true;
         }
     }
-    // performances and releases: by id, the newer "modified" wins (a tie keeps the file's: it is the later write)
+    // performances and releases: by id, the newer "modified" wins (a tie keeps the file's: it is the later write);
+    // an id the file gives a different recording is a clash (mergeEntry)
     for (const char* key : { "performances", "releases" }) {
         QJsonArray master = current.value(key).toArray();
         std::map<QString, int> index;
@@ -569,16 +694,8 @@ bool mergeRecordingsFiles(QJsonObject& current, const QJsonObject& ours)
             if (id.isEmpty() || gone.contains(id)) {
                 continue;
             }
-            auto it = index.find(id);
-            if (it == index.end()) {
-                index[id] = master.size();
-                master.append(e);
-                changed = true;
-            } else if (e != master[it->second].toObject()
-                       && e.value("modified").toString() > master[it->second].toObject().value("modified").toString()) {
-                master[it->second] = e;
-                changed = true;
-            }
+            // (a take the run added under an id the Recordings window gave another take meanwhile gets a fresh id)
+            changed |= mergeEntry(key, master, index, e, current, ours);
         }
         QJsonArray kept;
         for (const QJsonValue& v : master) {

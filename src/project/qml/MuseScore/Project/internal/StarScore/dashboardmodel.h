@@ -33,6 +33,7 @@ class DashboardModel : public QObject, public muse::Contextable, public muse::as
     Q_PROPERTY(int doneCount READ doneCount NOTIFY changed)
     Q_PROPERTY(int totalCount READ totalCount NOTIFY changed)
     Q_PROPERTY(int unscanned READ unscanned NOTIFY changed)
+    Q_PROPERTY(int auditTaskCount READ auditTaskCount NOTIFY changed)   // the Next up songs "Audit these in order" would open
 
     QML_ELEMENT
 
@@ -54,6 +55,7 @@ public:
     QVariantList songs() const;
     int doneCount() const;
     int totalCount() const;
+    int auditTaskCount() const;
     int unscanned() const;
 
     Q_INVOKABLE void load();

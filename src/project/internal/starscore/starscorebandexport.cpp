@@ -460,12 +460,19 @@ static QString starscoreSongTitle(const INotationProjectPtr& project)
     return starscoreIsUntitled(title) ? QString() : title;
 }
 
-static std::map<QString, QString> starscoreReadCodes(const QString& bandFolder)
+//! codes.json ("1 Amplitudes" -> "AMPL"). A file that is there but can't be read (cloud-only, empty, broken JSON)
+//! reads as no codes; `unreadable` (when given) then says why, so that nothing writes the file back from that.
+static std::map<QString, QString> starscoreReadCodes(const QString& bandFolder, QString* unreadable = nullptr)
 {
     std::map<QString, QString> folderToCode;
-    QFile f(bandFolder + "/6 Inbox/.organizer/codes.json");
-    if (f.open(QIODevice::ReadOnly)) {
-        const QJsonObject o = QJsonDocument::fromJson(f.readAll()).object();
+    const mu::project::starscore::org::JsonRead read
+        = mu::project::starscore::org::readJsonChecked(bandFolder + "/6 Inbox/.organizer/codes.json");
+    if (unreadable) {
+        *unreadable = read.unreadable() ? read.error
+                      : read.ok && !read.doc.isObject() ? QStringLiteral("it isn't a list of codes") : QString();
+    }
+    if (read.ok && read.doc.isObject()) {
+        const QJsonObject o = read.doc.object();
         for (auto it = o.begin(); it != o.end(); ++it) {
             folderToCode[it.key()] = it.value().toString();
         }
@@ -1131,7 +1138,12 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExportFor(bool titlesO
 
         // Strings (String Duo … Quintet): a folder each, a sheet per instrument (without the "Trio: " in front) and a Score
         if (sec.templateKey.startsWith("string-")) {
-            const QString folder = sec.name;
+            // the section's name as a folder name ("/" or ":" would make folders of their own), never one of the
+            // song folder's own (a section called "Demos" would put its sheets there)
+            QString folder = starscoreSafeFileName(sec.name);
+            if (folder.isEmpty() || starscore::org::staysAtSongTop(folder)) {
+                folder = "Strings " + folder;
+            }
             QStringList scoreParts;
             for (const QString& pid : sec.partIds) {
                 engraving::Part* p = partById(pid);
@@ -1655,10 +1667,18 @@ int StarScoreService::labelPartBooks()
     if (!ms || loadFrom(ms).sections.empty()) {
         return 0;
     }
+    QElapsedTimer labelClock;
+    labelClock.start();
     const RetVal<StarScoreBandExportPlan> plan = planBandExportFor(true);
     if (!plan.ret) {
         return 0;
     }
+    const qint64 planMs = labelClock.elapsed();
+    struct LabelTimes {
+        QElapsedTimer* clock;
+        qint64 planMs;
+        ~LabelTimes() { LOGI() << "[starscore] part score labels: plan " << planMs << " ms, all " << clock->elapsed() << " ms"; }
+    } labelTimes { &labelClock, planMs };
 
     // part score by part: one instrument, preferably the one named like the part
     std::map<QString, IExcerptNotationPtr> bookForPart;
@@ -3690,12 +3710,12 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         const engraving::Part* part = p->masterNotation()->masterScore()->partById(ID(file.partIds.value(0)));
         IExcerptNotationPtr book = part ? starscorePotentialBook(p->masterNotation(), { part->partName().toQString() }) : nullptr;
         if (!book) {
-            return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "no part book for this instrument"));
+            return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "no part score for this instrument"));
         }
         p->masterNotation()->initExcerpts({ book });
         INotationPtr n = book->notation();
         if (!n) {
-            return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "no part book for this instrument"));
+            return make_ret(Ret::Code::UnknownError, muse::trc("starscore", "no part score for this instrument"));
         }
         n->undoStack()->prepareChanges(TranslatableString::untranslatable("Sheet title"));
         const Ret ret = starscorePrintSheet(writer, n, file.sheetLeft, file.sheetRight, true, pdf, false, annotatedOut);
@@ -4177,7 +4197,11 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     };
 
     QStringList archivedPaths;
-    QStringList problems = plan.notes;
+    // sheets that couldn't be made; the plan's notes ("Solo transcriptions are not exported…") are said apart from
+    // them: until 1.24.0 they counted as problems, so a dry run of Update all sheets failed for every song with a solo
+    // and the song was never updated
+    QStringList problems;
+    const QStringList planNotes = plan.notes;
     // The file already at `rel` goes to Version History (never deleted). Returns false, with the file left where
     // it is, when it can't be moved there: a rename Drive refuses is retried as a copy and a remove.
     auto supersede = [&](const QString& rel, QString* archivedTo = nullptr) -> bool {
@@ -5024,12 +5048,14 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
 
     QString renumberNote;
     if (renumbered > 0) {
-        renumberNote = muse::qtrc("starscore", "%1 part book(s) numbered their bars differently from the score (a bar excluded from "
+        renumberNote = muse::qtrc("starscore", "%1 part score(s) numbered their bars differently from the score (a bar excluded from "
                                                "the measure count in the score but counted in the part); they now match the score. "
                                                "Save the file to keep this.").arg(renumbered);
     }
     QString summary = written.isEmpty() && !unchanged.isEmpty()
-                      ? muse::qtrc("starscore", "Nothing to write: every sheet is the same as the file already in %1.")
+                      ? (problems.isEmpty()
+                         ? muse::qtrc("starscore", "Nothing to write: every sheet is the same as the file already in %1.")
+                         : muse::qtrc("starscore", "Nothing to write: every sheet that could be made is the same as the file already in %1."))
                       .arg(plan.songFolder)
                       : muse::qtrc("starscore", "Wrote %1 PDF(s) to %2.").arg(written.size()).arg(plan.songFolder);
     if (!written.isEmpty() && !unchanged.isEmpty()) {
@@ -5074,6 +5100,9 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     }
     if (!problems.isEmpty()) {
         summary += "\n\n" + muse::qtrc("starscore", "Skipped:") + "\n• " + problems.join("\n• ");
+    }
+    if (!planNotes.isEmpty()) {
+        summary += "\n\n" + muse::qtrc("starscore", "Notes:") + "\n• " + planNotes.join("\n• ");
     }
     if (m_lastExport) {
         m_lastExport->summary = summary;
@@ -5197,9 +5226,8 @@ int StarScoreService::moveSheetsToCurrentPaths(const StarScoreBandExportPlan& pl
         }
         if (!QJsonDocument::fromJson(text.toUtf8()).isNull()) {
             QSaveFile out(recordPath);
-            if (out.open(QIODevice::WriteOnly)) {
-                out.write(text.toUtf8());
-                out.commit();
+            if (!out.open(QIODevice::WriteOnly) || out.write(text.toUtf8()) < 0 || !out.commit()) {
+                LOGW() << "[starscore] couldn't rewrite the sheet record with the moved sheets' paths: " << recordPath;
             }
         }
     }
@@ -5449,7 +5477,13 @@ Ret StarScoreService::registerBandSong(const QString& titleIn, int category, con
         return make_ret(Ret::Code::UnknownError,
                         muse::qtrc("starscore", "Couldn't find %1. Is the Sheets and Demos folder right?").arg(codesPath).toStdString());
     }
-    std::map<QString, QString> codes = starscoreReadCodes(band);
+    // an unreadable codes.json read as empty would be written back with only this song: every code lost
+    QString unreadable;
+    std::map<QString, QString> codes = starscoreReadCodes(band, &unreadable);
+    if (!unreadable.isEmpty()) {
+        return make_ret(Ret::Code::UnknownError,
+                        muse::qtrc("starscore", "codes.json can't be read (%1). Nothing was changed.").arg(unreadable).toStdString());
+    }
 
     const QString folder = category == 4 ? "4 Works In Progress/" + title : QString("%1 %2").arg(category).arg(title);
     for (const auto& [f, c] : codes) {

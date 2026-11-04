@@ -158,9 +158,8 @@ RetVal<QString> StarScoreService::updateCurrentSongSheets()
         r["exportedWith"] = QString::fromUtf8(STARSCORE_VERSION_STR);
 #endif
         QSaveFile out(recordPath);
-        if (out.open(QIODevice::WriteOnly)) {
-            out.write(QJsonDocument(r).toJson(QJsonDocument::Indented));
-            out.commit();
+        if (!out.open(QIODevice::WriteOnly) || out.write(QJsonDocument(r).toJson(QJsonDocument::Indented)) < 0 || !out.commit()) {
+            LOGW() << "[starscore] couldn't mark the sheet record current: " << recordPath;
         }
     };
     const QString renamedNote = renamed > 0 ? muse::qtrc("starscore", " %1 sheet(s) moved or renamed.").arg(renamed) : QString();
@@ -377,7 +376,7 @@ void StarScoreService::updateAllWhenOpen(const QString& path)
     if (m_bulkStyles) {
         m_updateStatus.phase = muse::qtrc("starscore", "Applying part styles");
         const int n = applyStyles();
-        line = muse::qtrc("starscore", "%1: part styles applied to %2 score(s) and part book(s).").arg(m_updateStatus.song).arg(n);
+        line = muse::qtrc("starscore", "%1: part styles applied to %2 score(s) and part score(s).").arg(m_updateStatus.song).arg(n);
     } else {
         m_updateStatus.phase = muse::qtrc("starscore", "Comparing");
         const RetVal<QString> result = updateCurrentSongSheets();

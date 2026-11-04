@@ -180,6 +180,9 @@ bool NewStarScoreModel::create(const QVariantMap& o)
     muse::Ret ret = starScore()->newStarScore(options);
     if (!ret) {
         LOGE() << ret.toString();
+        // said, not only logged: before, Create just did nothing
+        interactive()->error(muse::trc("starscore", "The new score couldn't be made"),
+                             ret.text().empty() ? ret.toString() : ret.text());
         return false;
     }
 

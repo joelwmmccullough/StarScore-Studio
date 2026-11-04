@@ -78,6 +78,9 @@ StyledDialogView {
     }
 
     function create() {
+        if (root.scoreTitle.trim() === "") {   // (Enter in a field with no title yet)
+            return
+        }
         if (newModel.create({
             "title": root.scoreTitle,
             "subtitle": root.subtitle,
@@ -317,6 +320,7 @@ StyledDialogView {
             FlatButton {
                 text: qsTrc("starscore", "Create")
                 accentButton: true
+                enabled: root.scoreTitle.trim() !== ""
                 buttonRole: ButtonBoxModel.ApplyRole
                 buttonId: ButtonBoxModel.CustomButton + 1
                 onClicked: root.create()

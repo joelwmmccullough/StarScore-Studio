@@ -10,6 +10,7 @@
 #include <QVariantList>
 #include <qqmlintegration.h>
 
+#include "iinteractive.h"
 #include "modularity/ioc.h"
 #include "project/istarscoreservice.h"
 #include "project/internal/starscore/organizer/orgstores.h"
@@ -26,6 +27,7 @@ class RosterModel : public QObject, public muse::Contextable
     QML_ELEMENT
 
     muse::ContextInject<IStarScoreService> starScore = { this };
+    muse::ContextInject<muse::IInteractive> interactive = { this };
 
 public:
     explicit RosterModel(QObject* parent = nullptr);
@@ -39,6 +41,8 @@ public:
     Q_INVOKABLE void setField(int index, const QString& key, const QVariant& value);
     Q_INVOKABLE void addPlayer();
     Q_INVOKABLE bool save();
+    //! Closing with unsaved changes: asks Save / Don't Save / Cancel. Whether the window may close.
+    Q_INVOKABLE bool confirmClose();
 
 signals:
     void changed();

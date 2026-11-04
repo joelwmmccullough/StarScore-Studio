@@ -27,6 +27,10 @@ StyledDialogView {
 
     property var state: ({ "running": false, "finished": false, "songIndex": 0, "songCount": 0, "song": "", "phase": "", "results": "" })
     readonly property bool busy: root.state.running
+    // a run finished earlier (from this window or the other one) isn't shown as this window's result: until 1.24.0
+    // the window opened at "Done." with the last run's results and no Update button until StarScore restarted
+    property bool startedHere: false
+    readonly property bool done: root.state.finished && root.startedHere
 
     closeOnEscape: !root.busy
     onAboutToClose: function(closeEvent) {
@@ -60,7 +64,7 @@ StyledDialogView {
             wrapMode: Text.WordWrap
             text: root.styles
                   ? qsTrc("starscore", "Each song below is opened in turn, gets Format › Apply default style settings › Apply to open score now, "
-                          + "and is saved. Save the song that's open now first.")
+                          + "and is saved. The song that's open now is saved first.")
                   : qsTrc("starscore", "For after a StarScore update that changes how sheets are made. Each song below is "
                         + "opened in turn and its sheets that were exported while Finished, and are still Finished, are "
                         + "made again. Only the ones that come out differently are written: the old file goes to Version "
@@ -72,7 +76,7 @@ StyledDialogView {
             Layout.fillWidth: true
             horizontalAlignment: Text.AlignLeft
             font: ui.theme.bodyBoldFont
-            visible: !root.busy && !root.state.finished
+            visible: !root.busy && !root.done
             text: root.styles ? qsTrc("starscore", "%1 song(s):").arg(model.songs.length)
                   : model.songs.length === 0 ? qsTrc("starscore", "Every song's sheets are up to date.")
                   : qsTrc("starscore", "%1 song(s), %2 Finished sheet(s) to check:").arg(model.songs.length).arg(model.sheetCount)
@@ -81,7 +85,7 @@ StyledDialogView {
         StyledListView {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            visible: !root.busy && !root.state.finished
+            visible: !root.busy && !root.done
             model: model.songs
             delegate: StyledTextLabel {
                 width: ListView.view ? ListView.view.width : 0
@@ -95,14 +99,14 @@ StyledDialogView {
         // while running, and after
         ColumnLayout {
             Layout.fillWidth: true
-            visible: root.busy || root.state.finished
+            visible: root.busy || root.done
             spacing: 6
 
             StyledTextLabel {
                 Layout.fillWidth: true
                 horizontalAlignment: Text.AlignLeft
                 font: ui.theme.bodyBoldFont
-                text: root.state.finished ? qsTrc("starscore", "Done.")
+                text: root.done ? qsTrc("starscore", "Done.")
                       : qsTrc("starscore", "Song %1 of %2: %3").arg(root.state.songIndex + 1).arg(root.state.songCount).arg(root.state.song)
             }
             ProgressBar {
@@ -110,7 +114,7 @@ StyledDialogView {
                 Layout.preferredHeight: 24
                 from: 0
                 to: Math.max(1, root.state.songCount)
-                value: root.state.finished ? root.state.songCount : root.state.songIndex
+                value: root.done ? root.state.songCount : root.state.songIndex
             }
             StyledTextLabel {
                 Layout.fillWidth: true
@@ -124,7 +128,7 @@ StyledDialogView {
         StyledTextLabel {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            visible: root.state.results !== ""
+            visible: root.state.results !== "" && (root.startedHere || root.busy)
             horizontalAlignment: Text.AlignLeft
             verticalAlignment: Text.AlignTop
             wrapMode: Text.WordWrap
@@ -143,9 +147,13 @@ StyledDialogView {
                 text: root.styles ? qsTrc("starscore", "Apply to %n song(s)", "", model.songs.length)
                       : qsTrc("starscore", "Update %n song(s)", "", model.songs.length)
                 accentButton: true
-                visible: !root.busy && !root.state.finished
+                visible: !root.busy && !root.done
                 enabled: model.songs.length > 0
-                onClicked: model.start()
+                onClicked: {
+                    root.startedHere = true
+                    root.state = Object.assign({}, root.state, { "finished": false, "running": true, "results": "" })   // until the next poll
+                    model.start()
+                }
             }
             FlatButton {
                 text: qsTrc("global", "Close")

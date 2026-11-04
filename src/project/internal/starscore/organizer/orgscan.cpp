@@ -210,9 +210,19 @@ ScanResult scanBand(const Paths& paths, SheetCache& cache, const Progress& progr
             e.mtime = f->mtime;
         } else {
             const QString abs = base + "/" + f->rel;
+            const QString md5 = md5OfFile(abs);
+            if (md5.isEmpty() && o != old.end()) {
+                // couldn't be read this time (cloud-only, I/O error): keep what we knew, with its old size and date
+                // so the next run reads it again, and don't call it changed
+                now[f->rel] = o->second;
+                if (++done % 50 == 0) {
+                    progress.at(QString("Reading sheets (%1 of %2)").arg(done).arg(sheets.size()), double(done) / sheets.size());
+                }
+                continue;
+            }
             e.size = f->size;
             e.mtime = f->mtime;
-            e.md5 = md5OfFile(abs);
+            e.md5 = md5;
             if (o != old.end() && o->second.md5 == e.md5 && o->second.measured) {
                 e.pages = o->second.pages;
                 e.glyphs = o->second.glyphs;

@@ -24,6 +24,22 @@ Rectangle {
     readonly property color auditColor: "#8E7CF0"
     readonly property var statusColors: dash.statusColors   // (starscorestatus.h: the one table of the status colours)
 
+    // "Every song" in a narrow Dashboard (it's half of Home, beside the recent scores): a narrower song column, no
+    // Plays / Audit preview columns (the cells' tooltips say the rest), and cells that shrink to fit (down to 30 px),
+    // instead of the last columns being cut off (1.24.0)
+    readonly property bool narrowGrid: flick.width < 1000
+    readonly property int songColumnWidth: root.narrowGrid ? 140 : 220
+    readonly property int cellWidth: root.narrowGrid
+                                     ? Math.max(30, Math.min(56, Math.floor((content.width - 40 - root.songColumnWidth)
+                                                                            / Math.max(1, dash.columns.length)) - 6))
+                                     : 56
+
+    // dark or light text on a cell, whichever reads (white on the yellow "Written, unformatted" didn't)
+    function textOn(c) {
+        var k = Qt.lighter(c, 1.0)
+        return (0.299 * k.r + 0.587 * k.g + 0.114 * k.b) > 0.6 ? "#000000" : "#FFFFFF"
+    }
+
     function cellColor(cell) {
         if (cell.state === "done") {
             return root.doneColor
@@ -223,8 +239,10 @@ Rectangle {
                             FlatButton {
                                 text: qsTrc("starscore", "Audit these in order")
                                 toolTipTitle: qsTrc("starscore", "Audit these in order")
-                                toolTipDescription: qsTrc("starscore", "Opens the songs that need auditing one at a time, in this order, with the Audit panel (Next song moves on)")
-                                enabled: dash.tasks.length > 0
+                                toolTipDescription: dash.auditTaskCount > 0
+                                                    ? qsTrc("starscore", "Opens the songs that need auditing one at a time, in this order, with the Audit panel (Next song moves on)")
+                                                    : qsTrc("starscore", "Nothing in Next up needs auditing")
+                                enabled: dash.auditTaskCount > 0
                                 onClicked: dash.auditInOrder()
                             }
                         }
@@ -487,30 +505,50 @@ Rectangle {
                         Layout.topMargin: 8
                         spacing: 6
                         StyledTextLabel {
-                            Layout.preferredWidth: 220
+                            Layout.preferredWidth: root.songColumnWidth
                             horizontalAlignment: Text.AlignLeft
                             text: qsTrc("starscore", "Song")
                             opacity: 0.7
                         }
                         StyledTextLabel {
                             Layout.preferredWidth: 50
+                            visible: !root.narrowGrid
                             text: qsTrc("starscore", "Plays")
                             opacity: 0.7
                         }
                         Repeater {
                             model: dash.columns
                             delegate: StyledTextLabel {
+                                id: columnHeader
                                 required property var modelData
-                                Layout.preferredWidth: 56
+                                Layout.preferredWidth: root.cellWidth
                                 text: modelData.short
                                 opacity: 0.7
+                                // the full name ("4T" isn't explained anywhere else)
+                                MouseArea {
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    acceptedButtons: Qt.NoButton
+                                    onContainsMouseChanged: {
+                                        if (containsMouse && columnHeader.modelData.title) {
+                                            ui.tooltip.show(columnHeader, columnHeader.modelData.title, "")
+                                        } else {
+                                            ui.tooltip.hide(columnHeader)
+                                        }
+                                    }
+                                }
                             }
                         }
                         StyledTextLabel {
                             Layout.fillWidth: true
+                            visible: !root.narrowGrid
                             horizontalAlignment: Text.AlignLeft
                             text: qsTrc("starscore", "Audit preview")
                             opacity: 0.7
+                        }
+                        Item {   // (keeps the header's columns over the rows' when the preview is hidden)
+                            Layout.fillWidth: true
+                            visible: root.narrowGrid
                         }
                     }
 
@@ -539,7 +577,8 @@ Rectangle {
                                 spacing: 6
 
                                 ColumnLayout {
-                                    Layout.preferredWidth: 220
+                                    Layout.preferredWidth: root.songColumnWidth
+                                    Layout.maximumWidth: root.songColumnWidth
                                     spacing: 0
                                     StyledTextLabel {
                                         Layout.fillWidth: true
@@ -559,6 +598,7 @@ Rectangle {
                                 }
                                 StyledTextLabel {
                                     Layout.preferredWidth: 50
+                                    visible: !root.narrowGrid
                                     text: songRow.modelData.plays > 0 ? songRow.modelData.plays : "–"
                                     opacity: 0.8
                                 }
@@ -567,7 +607,7 @@ Rectangle {
                                     delegate: Item {
                                         id: cellItem
                                         required property var modelData
-                                        Layout.preferredWidth: 56
+                                        Layout.preferredWidth: root.cellWidth
                                         Layout.preferredHeight: 26
 
                                         Rectangle {
@@ -585,7 +625,7 @@ Rectangle {
                                                 elide: Text.ElideRight
                                                 text: cellItem.modelData.text
                                                 color: cellItem.modelData.state === "done" || cellItem.modelData.state === "todo"
-                                                       ? "#FFFFFF" : ui.theme.fontSecondaryColor
+                                                       ? root.textOn(root.cellColor(cellItem.modelData)) : ui.theme.fontSecondaryColor
                                                 font: ui.theme.bodyBoldFont
                                             }
                                         }
@@ -605,8 +645,13 @@ Rectangle {
                                         }
                                     }
                                 }
+                                Item {
+                                    Layout.fillWidth: true
+                                    visible: root.narrowGrid
+                                }
                                 StyledTextLabel {
                                     Layout.fillWidth: true
+                                    visible: !root.narrowGrid
                                     horizontalAlignment: Text.AlignLeft
                                     elide: Text.ElideRight
                                     text: !songRow.modelData.scanned ? qsTrc("starscore", "not read yet")
