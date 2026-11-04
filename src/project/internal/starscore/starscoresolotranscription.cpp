@@ -72,6 +72,14 @@ using namespace mu::notation;
 using namespace muse;
 
 namespace {
+//! (Joel, 4 Nov 2026) A transcription of every solo on the recording: "All Solos" (or "All", "All soloists",
+//! "Various") as the player
+bool soloIsAllSolos(const QString& player)
+{
+    static const QStringList ALL { "all solos", "all", "all soloists", "all the solos", "various", "everyone" };
+    return ALL.contains(player.trimmed().toLower());
+}
+
 //! The metaTag that marks a Solo Transcription (read by the engraving code too: fingerings stay local)
 const char16_t* SOLO_TAG = u"starscoreSoloTranscription";
 
@@ -483,6 +491,20 @@ Ret StarScoreService::newSoloTranscription(const StarScoreSoloTranscriptionOptio
 
 QString StarScoreService::soloAutoCopyright(const StarScoreSoloTranscriptionOptions& options) const
 {
+    if (soloIsAllSolos(options.player)) {
+        // "Lester Leaps In, all solos as played by Count Basie and His Orchestra, from …"
+        QString line = muse::qtrc("starscore", "Transcription © %1 Joel McCullough.").arg(QDate::currentDate().year());
+        if (!options.song.trimmed().isEmpty()) {
+            line += " " + (options.band.trimmed().isEmpty()
+                           ? muse::qtrc("starscore", "%1, all solos").arg(options.song.trimmed())
+                           : muse::qtrc("starscore", "%1, all solos as played by %2").arg(options.song.trimmed(), options.band.trimmed()));
+            if (!options.recording.trimmed().isEmpty()) {
+                line += muse::qtrc("starscore", ", from %1").arg(options.recording.trimmed());
+            }
+            line += ".";
+        }
+        return line;
+    }
     QString who = options.player.trimmed();
     if (!options.band.trimmed().isEmpty() && options.band.trimmed() != who) {
         who += " (" + options.band.trimmed() + ")";
@@ -501,14 +523,18 @@ QString StarScoreService::soloAutoCopyright(const StarScoreSoloTranscriptionOpti
 QString StarScoreService::soloComposer(const StarScoreSoloTranscriptionOptions& options)
 {
     // top right (Joel, 4 Nov 2026): the band, else the soloist, and under it "trans. Joel McCullough"
-    const QString who = options.band.trimmed().isEmpty() ? options.player.trimmed() : options.band.trimmed();
-    return who + "\n" + muse::qtrc("starscore", "trans. Joel McCullough");
+    const QString who = !options.band.trimmed().isEmpty() ? options.band.trimmed()
+                        : soloIsAllSolos(options.player) ? QString() : options.player.trimmed();
+    const QString trans = muse::qtrc("starscore", "trans. Joel McCullough");
+    return who.isEmpty() ? trans : who + "\n" + trans;
 }
 
 QString StarScoreService::soloSubtitle(const StarScoreSoloTranscriptionOptions& options)
 {
     // "Michael Brecker's solo · Heavy Metal Be-Bop"
-    QString sub = muse::qtrc("starscore", "%1's solo").arg(options.player.trimmed());
+    // (every solo on the recording: "All solos · Lester Young with Count Basie")
+    QString sub = soloIsAllSolos(options.player) ? muse::qtrc("starscore", "All solos")
+                  : muse::qtrc("starscore", "%1's solo").arg(options.player.trimmed());
     if (!options.recording.trimmed().isEmpty()) {
         sub += " · " + options.recording.trimmed();
     }
@@ -1279,6 +1305,47 @@ void StarScoreService::onSoloTranscriptionOpened()
     if (load().solo.value("needsStyle").toBool()) {
         applySoloStyles();
     }
+    // (1.25.0) every solo on the recording ("All Solos" as the player): an older file's "All Solos's solo" subtitle,
+    // "All Solos" credit and "as played by All Solos" copyright put right
+    const QJsonObject info = load().solo;
+    if (soloIsAllSolos(info.value("player").toString()) && globalContext()->currentMasterNotation()) {
+        engraving::MasterScore* ms = masterScore();
+        StarScoreSoloTranscriptionOptions o;
+        o.song = info.value("song").toString();
+        o.player = info.value("player").toString();
+        o.band = info.value("band").toString();
+        o.recording = info.value("recording").toString();
+        const QString player = o.player.trimmed();
+        INotationUndoStackPtr stack = globalContext()->currentMasterNotation()->notation()->undoStack();
+        bool open = false;
+        auto setText = [&](engraving::TextStyleType type, const QString& wrong, const QString& right) {
+            engraving::TextBase* t = ms ? ms->getText(type) : nullptr;
+            const QString plain = t ? t->plainText().toQString() : QString();
+            if (!t || !plain.contains(wrong)) {
+                return;
+            }
+            if (!open) {
+                stack->prepareChanges(TranslatableString::untranslatable("All solos credits"));
+                open = true;
+            }
+            QString fixed = plain;
+            fixed.replace(wrong, right);
+            t->undoChangeProperty(engraving::Pid::TEXT, String::fromQString(fixed.trimmed().toHtmlEscaped().replace('\n', "<br/>")));
+        };
+        setText(engraving::TextStyleType::SUBTITLE, muse::qtrc("starscore", "%1's solo").arg(player), muse::qtrc("starscore", "All solos"));
+        if (o.band.trimmed().isEmpty()) {
+            setText(engraving::TextStyleType::COMPOSER, player + "\n", QString());
+        }
+        if (open) {
+            stack->commitChanges();
+        }
+        if (ms && ms->metaTag(u"copyright").toQString().contains("as played by " + player)) {
+            ms->setMetaTag(u"copyright", String::fromQString(soloAutoCopyright(o)));
+        }
+        if (ms && ms->metaTag(u"composer").toQString().startsWith(player + "\n")) {
+            ms->setMetaTag(u"composer", String::fromQString(soloComposer(o)));
+        }
+    }
     // (opened: the keys spelled again, the formatting left as it was saved)
     m_soloLayoutSig = soloLayoutSignature(masterScore());
     soloRememberStyle(masterScore());
@@ -1653,9 +1720,12 @@ int StarScoreService::exportSoloChordCharts(QStringList& irealSongs, QStringList
         return n.replace(unsafe, "-").trimmed();
     };
     const QString base = safe(player) + " - " + safe(song);
-    const QString title = player.isEmpty() ? song : QString("%1 (%2)").arg(song, player);
+    const QString title = player.isEmpty() ? song
+                          : soloIsAllSolos(player) ? muse::qtrc("starscore", "%1 (all solos)").arg(song)
+                          : QString("%1 (%2)").arg(song, player);
+    const QString ireal = soloIsAllSolos(player) ? data.solo.value("band").toString() : player;   // (iReal's composer)
     const starscore::ChordChartResult r = starscore::writeSoloChordCharts(ms, QFileInfo(project->path().toQString()).absolutePath(), base, title,
-                                                    song, player, soloMinor(data.solo), keys, irealSongs, problems);
+                                                    song, ireal, soloMinor(data.solo), keys, irealSongs, problems);
     return int(r.written.size());
 }
 

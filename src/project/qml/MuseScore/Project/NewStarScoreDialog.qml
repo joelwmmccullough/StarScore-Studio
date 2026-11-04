@@ -76,6 +76,8 @@ StyledDialogView {
     // --- the Solo Transcription form
     property string soloSong: ""
     property string soloPlayer: ""
+    property string soloPlayerTyped: ""
+    property bool soloAllSolos: false
     property string soloBand: ""
     property string soloRecording: ""
     property string soloLink: ""
@@ -458,11 +460,27 @@ StyledDialogView {
             }
 
             StyledTextLabel { text: qsTrc("starscore", "Player"); font: ui.theme.bodyBoldFont }
-            TextInputField {
+            ColumnLayout {
                 Layout.fillWidth: true
-                hint: qsTrc("starscore", "Who plays the solo")
-                onTextEdited: function(t) { root.soloPlayer = t }
-                onAccepted: root.createSolo()
+                spacing: 6
+                TextInputField {
+                    id: soloPlayerField
+                    Layout.fillWidth: true
+                    enabled: !root.soloAllSolos
+                    hint: qsTrc("starscore", "Who plays the solo")
+                    onTextEdited: function(t) { root.soloPlayerTyped = t; root.soloPlayer = t }
+                    onAccepted: root.createSolo()
+                }
+                // (Joel, 4 Nov 2026: Lester Leaps In, every solo in one transcription)
+                CheckBox {
+                    text: qsTrc("starscore", "All the solos on the recording")
+                    checked: root.soloAllSolos
+                    onClicked: {
+                        root.soloAllSolos = !root.soloAllSolos
+                        root.soloPlayer = root.soloAllSolos ? "All Solos" : root.soloPlayerTyped
+                        soloPlayerField.currentText = root.soloPlayer
+                    }
+                }
             }
 
             StyledTextLabel { text: qsTrc("starscore", "Band"); font: ui.theme.bodyBoldFont }
