@@ -424,7 +424,7 @@ StyledDialogView {
             StyledTextLabel { text: qsTrc("starscore", "Tied to a Starsign song"); font: ui.theme.bodyBoldFont }
             StyledDropdown {
                 Layout.fillWidth: true
-                model: newModel.songsForTying
+                model: newModel.songsForTying(root.soloTiedCode)
                 currentIndex: Math.max(0, indexOfValue(root.soloTiedCode))
                 onActivated: function(index, value) { root.soloTiedCode = value }
             }

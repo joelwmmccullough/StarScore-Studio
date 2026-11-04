@@ -28,7 +28,6 @@ class NewStarScoreModel : public QObject, public muse::Contextable
     Q_PROPERTY(QString lastLowHornId READ lastLowHornId CONSTANT)
     //! Solo Transcription (1.24.0): the Starsign songs a solo can be tied to ("Not tied" first), the instruments, and the
     //! instrument picked last time
-    Q_PROPERTY(QVariantList songsForTying READ songsForTying CONSTANT)
     Q_PROPERTY(QVariantList soloInstruments READ soloInstruments CONSTANT)
     Q_PROPERTY(QString lastSoloInstrumentId READ lastSoloInstrumentId CONSTANT)
     //! The open score's title and song code (to start the form with when making a solo from an old one, or for a song)
@@ -49,7 +48,8 @@ public:
     QString lastArrangementKey() const;
     QString lastDoublerId() const;
     QString lastLowHornId() const;
-    QVariantList songsForTying() const;
+    //! The songs a solo can be tied to ("Not tied" first), with `code` in the list even when its song isn't found
+    Q_INVOKABLE QVariantList songsForTying(const QString& code = QString()) const;
     QVariantList soloInstruments() const;
     QString lastSoloInstrumentId() const;
     QString openTitle() const;

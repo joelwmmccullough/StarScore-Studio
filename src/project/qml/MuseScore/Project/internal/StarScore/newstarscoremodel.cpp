@@ -270,13 +270,18 @@ bool NewStarScoreModel::addArrangement(const QString& arrangementKey, const QStr
 
 static const char* SETTING_SOLO_INSTRUMENT = "StarScore/newSoloInstrument";
 
-QVariantList NewStarScoreModel::songsForTying() const
+QVariantList NewStarScoreModel::songsForTying(const QString& wanted) const
 {
     QVariantList list;
     list << QVariantMap { { "text", muse::qtrc("starscore", "Not tied to a song") }, { "value", QString() } };
+    bool found = wanted.isEmpty();
     for (const auto& [code, title, path] : starScore()->soloTiableSongs()) {
         (void)path;
         list << QVariantMap { { "text", QString("%1 (%2)").arg(title, code) }, { "value", code } };
+        found = found || code == wanted;
+    }
+    if (!found) {
+        list << QVariantMap { { "text", wanted }, { "value", wanted } };
     }
     return list;
 }

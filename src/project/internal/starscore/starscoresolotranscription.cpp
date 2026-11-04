@@ -443,6 +443,14 @@ Ret StarScoreService::setUpSoloTranscription(const INotationProjectPtr& project,
                                   { "shift", k == 0 ? 0 : (k <= 6 ? k : k - 12) } });
     }
     master->setExcerpts(excerpts);
+    // the twelve keys' tabs open, the original first
+    for (const IExcerptNotationPtr& e : master->excerpts()) {
+        for (const QJsonValue& v : keys) {
+            if (e && e->notation() && e->name() == v.toObject().value("name").toString()) {
+                master->setExcerptIsOpen(e->notation(), true);
+            }
+        }
+    }
 
     data.solo = QJsonObject {
         { "song", options.song.trimmed() }, { "player", options.player.trimmed() }, { "band", options.band.trimmed() },
