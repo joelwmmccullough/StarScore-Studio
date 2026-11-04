@@ -1863,7 +1863,7 @@ static const muse::String HIDDEN_MUTED_TAG = u"starscoreHiddenMuted";
 // (1.24.0) A part score has a mixer of its own: its hidden-instrument mutes are kept in its own score's tag (they were
 // kept for the main score only, so switching tabs forgot a part score's, and showing the instrument there again left
 // it muted)
-engraving::Score* PlaybackController::hiddenMutesScore() const
+mu::engraving::Score* PlaybackController::hiddenMutesScore() const
 {
     if (!m_notation || !m_masterNotation || !m_masterNotation->masterScore()) {
         return nullptr;

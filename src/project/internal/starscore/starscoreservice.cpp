@@ -3542,15 +3542,15 @@ namespace {
 //! in the data as it is then, and Redo takes it out again; everything else in the tag stays as it is. (Until 1.24.0
 //! the step held a copy of the whole "starscore" tag, so Undo also took back every StarScore change made after it:
 //! statuses, the version, the export records.)
-class StarScoreRemoveArrangement : public engraving::UndoCommand
+class StarScoreRemoveArrangement : public mu::engraving::UndoCommand
 {
-    engraving::MasterScore* m_score = nullptr;
+    mu::engraving::MasterScore* m_score = nullptr;
     QString m_arrangementId;
     StarScoreArrangement m_arrangement;   // as it was when last taken out
     int m_index = -1;                     // and where it was
     bool m_removed = false;
 
-    void flip(engraving::EditData*) override
+    void flip(mu::engraving::EditData*) override
     {
         StarScoreService::Data data = StarScoreService::fromJson(m_score->metaTag(STARSCORE_META_TAG).toQString());
         if (data.unreadable) {
@@ -3577,12 +3577,12 @@ class StarScoreRemoveArrangement : public engraving::UndoCommand
     }
 
 public:
-    StarScoreRemoveArrangement(engraving::MasterScore* score, const QString& arrangementId)
+    StarScoreRemoveArrangement(mu::engraving::MasterScore* score, const QString& arrangementId)
         : m_score(score), m_arrangementId(arrangementId) {}
 
     const char* name() const override { return "StarScoreRemoveArrangement"; }
-    engraving::CommandType type() const override { return engraving::CommandType::ChangeMetaInfo; }
-    std::vector<engraving::EngravingObject*> objectItems() const override { return { m_score }; }
+    mu::engraving::CommandType type() const override { return mu::engraving::CommandType::ChangeMetaInfo; }
+    std::vector<mu::engraving::EngravingObject*> objectItems() const override { return { m_score }; }
 };
 }
 
