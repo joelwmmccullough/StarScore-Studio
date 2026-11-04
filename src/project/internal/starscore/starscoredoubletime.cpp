@@ -38,6 +38,8 @@
 #include "engraving/dom/select.h"
 #include "engraving/dom/mscore.h"
 #include "engraving/dom/system.h"
+#include "engraving/editing/undo.h"
+#include "notation/imasternotation.h"
 #include "engraving/dom/chord.h"
 #include "engraving/dom/note.h"
 #include "engraving/dom/linkedobjects.h"
@@ -192,12 +194,12 @@ static int staleSpannerSegments(MasterScore* ms)
 RetVal<QString> StarScoreService::convertTimeOf(const INotationProjectPtr& project, bool toDouble, bool keepBarNumbers,
                                                 bool throwawayCopy)
 {
-    IMasterNotationPtr master = project ? project->masterNotation() : nullptr;
+    mu::notation::IMasterNotationPtr master = project ? project->masterNotation() : nullptr;
     MasterScore* ms = master ? master->masterScore() : nullptr;
     if (!ms || !ms->firstMeasure()) {
         return RetVal<QString>::make_ret(Ret::Code::UnknownError, muse::trc("starscore", "no score open"));
     }
-    INotationPtr n = master->notation();
+    mu::notation::INotationPtr n = master->notation();
     const size_t nstaves = ms->nstaves();
     n->undoStack()->prepareChanges(TranslatableString::untranslatable(toDouble ? "Convert to double time" : "Convert from double time"));
     // multimeasure rests off while the bars are copied and rebuilt (put back at the end)
