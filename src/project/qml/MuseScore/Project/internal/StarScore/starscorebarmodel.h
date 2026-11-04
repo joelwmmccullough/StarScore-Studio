@@ -43,6 +43,9 @@ class StarScoreBarModel : public QObject, public muse::Contextable, public muse:
     Q_PROPERTY(QVariantMap soloInfo READ soloInfo NOTIFY changed)
     //! A song's Solo Transcriptions (tied to it): name and file
     Q_PROPERTY(QVariantList tiedSolos READ tiedSolos NOTIFY changed)
+    //! (1.25.0) The score's audio and Transcribe! files (the Audio folder beside the .starscore): [{ name, path, kind }]
+    Q_PROPERTY(QVariantList audioFiles READ audioFiles NOTIFY changed)
+    Q_PROPERTY(bool canAddAudio READ canAddAudio NOTIFY changed)
 
     QML_ELEMENT
 
@@ -66,8 +69,10 @@ public:
     bool isSoloTranscription() const;
     QVariantMap soloInfo() const;
     QVariantList tiedSolos() const;
-    //! (1.25.0) The open solo's recordings: each opens in the Mac's player; Add / Show in Finder / Remove
-    Q_INVOKABLE QVariantList soloAudioMenu() const;
+    QVariantList audioFiles() const;
+    bool canAddAudio() const;
+    //! One audio or Transcribe! file's menu: Play (Open in Transcribe!) / Show in Finder / Remove
+    Q_INVOKABLE QVariantList audioFileMenu(const QString& path) const;
 
     Q_INVOKABLE void showSolo(const QString& id);
     Q_INVOKABLE void showMainScore();

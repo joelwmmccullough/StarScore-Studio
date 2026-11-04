@@ -1164,7 +1164,7 @@ QJsonArray StarScoreService::soloLearningList() const
         e["keys"] = keys;
         e["id"] = it.key();
         e["path"] = path;
-        e["audio"] = soloAudioFiles(path);
+        e["audio"] = scoreAudioFiles(path);
         list.push_back(e);
     }
     std::sort(list.begin(), list.end(), [](const QJsonObject& a, const QJsonObject& b) {
@@ -1228,39 +1228,79 @@ muse::async::Notification StarScoreService::soloLearningChanged() const
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-//  A solo's recordings (1.25.0, Joel 4 Nov 2026): the original recording, a stem-separated copy that makes the solo
-//  clearer, … copied into "<solo folder>/Audio/" so they go with the solo (Google Drive); opened in the Mac's own
-//  player from the StarScore bar or Home
+//  Audio and Transcribe! files with a score (1.25.0, Joel 4 Nov 2026), any .starscore (a song or a solo): the original
+//  recording, a stem-separated copy that makes the parts easier to hear, Transcribe! files (.xsc)… copied into the
+//  "Audio" folder beside the .starscore, so they go with it (Google Drive); opened in the Mac's own apps (a .xsc in
+//  Transcribe!) from the StarScore bar, and from Home for solos
 // ---------------------------------------------------------------------------------------------------------------------
 
-static const QStringList SOLO_AUDIO_TYPES { "*.mp3", "*.m4a", "*.aac", "*.wav", "*.aif", "*.aiff", "*.flac", "*.ogg", "*.opus",
-                                            "*.mp4", "*.mov", "*.m4v" };
+static const QStringList SCORE_AUDIO_TYPES { "*.mp3", "*.m4a", "*.aac", "*.wav", "*.aif", "*.aiff", "*.flac", "*.ogg", "*.opus",
+                                             "*.mp4", "*.mov", "*.m4v", "*.xsc" };
 
-QJsonArray StarScoreService::soloAudioFiles(const QString& soloPath) const
+QJsonArray StarScoreService::scoreAudioFiles(const QString& scorePath) const
 {
     QJsonArray out;
-    if (soloPath.isEmpty()) {
+    if (scorePath.isEmpty() || !QFileInfo::exists(scorePath)) {
         return out;
     }
-    const QDir audio(QFileInfo(soloPath).absolutePath() + "/Audio");
-    for (const QFileInfo& f : audio.entryInfoList(SOLO_AUDIO_TYPES, QDir::Files, QDir::Name | QDir::IgnoreCase)) {
-        out.append(QJsonObject { { "name", f.completeBaseName() }, { "path", f.absoluteFilePath() } });
+    const QDir audio(QFileInfo(scorePath).absolutePath() + "/Audio");
+    for (const QFileInfo& f : audio.entryInfoList(SCORE_AUDIO_TYPES, QDir::Files, QDir::Name | QDir::IgnoreCase)) {
+        out.append(QJsonObject { { "name", f.completeBaseName() }, { "path", f.absoluteFilePath() },
+                                 { "kind", f.suffix().toLower() == "xsc" ? "transcribe" : "audio" } });
     }
     return out;
 }
 
-RetVal<QString> StarScoreService::addSoloAudio(const QString& soloPath)
+//! The audio file a Transcribe! document is for: the first path in it to an existing file with an audio ending
+//! (Transcribe! keeps it as a full path; it can sit in the .xsc anywhere, so every line is looked at)
+static QString scoreTranscribeSoundFile(const QString& xscPath)
 {
-    if (soloPath.isEmpty() || !QFileInfo::exists(soloPath)) {
-        return RetVal<QString>::make_ret(Ret::Code::UnknownError, muse::trc("starscore", "Save the solo transcription first."));
+    QFile f(xscPath);
+    if (!f.open(QIODevice::ReadOnly)) {
+        return QString();
+    }
+    static const QRegularExpression pathRe("(/[^,\\r\\n\\t]+\\.(mp3|m4a|aac|wav|aif|aiff|flac|ogg|opus|mp4|mov|m4v))",
+                                           QRegularExpression::CaseInsensitiveOption);
+    const QString text = QString::fromUtf8(f.read(4 * 1024 * 1024));
+    QRegularExpressionMatchIterator it = pathRe.globalMatch(text);
+    while (it.hasNext()) {
+        const QString p = it.next().captured(1).trimmed();
+        if (QFileInfo(p).isFile()) {
+            return p;
+        }
+    }
+    return QString();
+}
+
+RetVal<QString> StarScoreService::addScoreAudio(const QString& scorePath)
+{
+    if (scorePath.isEmpty() || !QFileInfo::exists(scorePath)) {
+        return RetVal<QString>::make_ret(Ret::Code::UnknownError, muse::trc("starscore", "Save the score first."));
     }
     const io::path_t picked = interactive()->selectOpeningFileSync(
-        muse::trc("starscore", "Choose a recording of the solo"), io::path_t(QDir::homePath() + "/Downloads"),
-        { muse::trc("starscore", "Audio and video files") + " (" + SOLO_AUDIO_TYPES.join(' ').toStdString() + ")" });
+        muse::trc("starscore", "Choose an audio file or a Transcribe! file"), io::path_t(QDir::homePath() + "/Downloads"),
+        { muse::trc("starscore", "Audio, video and Transcribe! files") + " (" + SCORE_AUDIO_TYPES.join(' ').toStdString() + ")" });
     if (picked.empty()) {
         return RetVal<QString>::make_ok(QString());
     }
     const QFileInfo source(picked.toQString());
+
+    // a Transcribe! file keeps its name, and its audio file comes along under its own name (so it's beside it)
+    if (source.suffix().toLower() == "xsc") {
+        const RetVal<QString> copied = copyScoreAudio(scorePath, source.absoluteFilePath(), source.completeBaseName());
+        if (!copied.ret) {
+            return copied;
+        }
+        const QString sound = scoreTranscribeSoundFile(source.absoluteFilePath());
+        const QString dir = QFileInfo(scorePath).absolutePath() + "/Audio";
+        if (!sound.isEmpty() && !QFileInfo::exists(dir + "/" + QFileInfo(sound).fileName())) {
+            const RetVal<QString> audio = copyScoreAudio(scorePath, sound, QFileInfo(sound).completeBaseName());
+            if (!audio.ret) {
+                LOGW() << "[starscore] the Transcribe! file's audio wasn't copied: " << audio.ret.toString();
+            }
+        }
+        return copied;
+    }
 
     constexpr int Original = static_cast<int>(IInteractive::Button::CustomButton) + 1;
     constexpr int Stems = static_cast<int>(IInteractive::Button::CustomButton) + 2;
@@ -1268,7 +1308,8 @@ RetVal<QString> StarScoreService::addSoloAudio(const QString& soloPath)
     constexpr int Cancel = static_cast<int>(IInteractive::Button::CustomButton) + 4;
     const IInteractive::Result answer = interactive()->questionSync(
         muse::trc("starscore", "What is this recording?"),
-        muse::qtrc("starscore", "“%1” is copied into the solo's Audio folder under the name you pick.").arg(source.fileName()).toStdString(),
+        muse::qtrc("starscore", "“%1” is copied into the Audio folder beside the score, under the name you pick.")
+        .arg(source.fileName()).toStdString(),
         { IInteractive::ButtonData(Original, muse::trc("starscore", "The original recording")),
           IInteractive::ButtonData(Stems, muse::trc("starscore", "Stem-separated")),
           IInteractive::ButtonData(OwnName, muse::trc("starscore", "Keep its file name")),
@@ -1284,16 +1325,16 @@ RetVal<QString> StarScoreService::addSoloAudio(const QString& soloPath)
     default:
         return RetVal<QString>::make_ok(QString());
     }
-    return copySoloAudio(soloPath, source.absoluteFilePath(), base);
+    return copyScoreAudio(scorePath, source.absoluteFilePath(), base);
 }
 
-//! The file copied into the solo's Audio folder as "<base>.<ext>" ("<base> 2.<ext>" when that's taken)
-static RetVal<QString> soloCopyAudio(const QString& soloPath, const QString& sourcePath, QString base)
+//! The file copied into the score's Audio folder as "<base>.<ext>" ("<base> 2.<ext>" when that's taken)
+static RetVal<QString> scoreCopyAudio(const QString& scorePath, const QString& sourcePath, QString base)
 {
     const QFileInfo source(sourcePath);
     static const QRegularExpression unsafe("[/:\\\\]");
     base.replace(unsafe, "-");
-    const QString dir = QFileInfo(soloPath).absolutePath() + "/Audio";
+    const QString dir = QFileInfo(scorePath).absolutePath() + "/Audio";
     QDir().mkpath(dir);
     const QString ext = source.suffix().isEmpty() ? QString() : "." + source.suffix().toLower();
     QString target = dir + "/" + base + ext;
@@ -1304,13 +1345,13 @@ static RetVal<QString> soloCopyAudio(const QString& soloPath, const QString& sou
         return RetVal<QString>::make_ret(Ret::Code::UnknownError,
                                          muse::qtrc("starscore", "Couldn't copy it to %1.").arg(target).toStdString());
     }
-    LOGI() << "[starscore] solo recording added: " << target.toStdString();
+    LOGI() << "[starscore] audio file added: " << target.toStdString();
     return RetVal<QString>::make_ok(target);
 }
 
-RetVal<QString> StarScoreService::copySoloAudio(const QString& soloPath, const QString& sourcePath, const QString& base)
+RetVal<QString> StarScoreService::copyScoreAudio(const QString& scorePath, const QString& sourcePath, const QString& base)
 {
-    const RetVal<QString> r = soloCopyAudio(soloPath, sourcePath, base);
+    const RetVal<QString> r = scoreCopyAudio(scorePath, sourcePath, base);
     if (r.ret) {
         m_soloLearningChanged.notify();
         scheduleChanged();
@@ -1318,15 +1359,15 @@ RetVal<QString> StarScoreService::copySoloAudio(const QString& soloPath, const Q
     return r;
 }
 
-Ret StarScoreService::removeSoloAudio(const QString& audioPath)
+Ret StarScoreService::removeScoreAudio(const QString& audioPath)
 {
     const QFileInfo f(audioPath);
     if (!f.exists() || f.dir().dirName() != "Audio") {
         return make_ret(Ret::Code::UnknownError);
     }
     const IInteractive::Result answer = interactive()->questionSync(
-        muse::trc("starscore", "Remove this recording from the solo?"),
-        muse::qtrc("starscore", "“%1” goes into the solo's Version History folder (it isn't deleted).").arg(f.fileName()).toStdString(),
+        muse::trc("starscore", "Remove this file from the score?"),
+        muse::qtrc("starscore", "“%1” goes into the Version History folder beside the score (it isn't deleted).").arg(f.fileName()).toStdString(),
         { IInteractive::Button::Cancel, IInteractive::Button::Ok }, IInteractive::Button::Ok);
     if (answer.standardButton() != IInteractive::Button::Ok) {
         return make_ok();
@@ -1660,10 +1701,10 @@ bool StarScoreService::autotestSoloStep(const QString& step)
     }
     if (step.startsWith("soloaudioadd:")) {
         // soloaudioadd:<file>|<name>: a recording copied into the open solo's Audio folder
-        const RetVal<QString> r = copySoloAudio(project ? project->path().toQString() : QString(), step.mid(13).section('|', 0, 0),
+        const RetVal<QString> r = copyScoreAudio(project ? project->path().toQString() : QString(), step.mid(13).section('|', 0, 0),
                                                 step.mid(13).section('|', 1));
         soloTestLog("  " + (r.ret ? r.val : QString::fromStdString(r.ret.toString())));
-        for (const QJsonValue& v : soloAudioFiles(project ? project->path().toQString() : QString())) {
+        for (const QJsonValue& v : scoreAudioFiles(project ? project->path().toQString() : QString())) {
             soloTestLog("    audio: " + v.toObject().value("name").toString());
         }
         return true;

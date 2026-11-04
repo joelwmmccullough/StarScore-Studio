@@ -101,9 +101,9 @@ void SoloLearningModel::playAudio(const QString& path)
 
 void SoloLearningModel::addAudio(const QString& soloPath)
 {
-    const muse::RetVal<QString> added = starScore()->addSoloAudio(soloPath);
+    const muse::RetVal<QString> added = starScore()->addScoreAudio(soloPath);
     if (!added.ret) {
-        interactive()->error(muse::trc("starscore", "Couldn't add the recording"),
+        interactive()->error(muse::trc("starscore", "Couldn't add the file"),
                              added.ret.text().empty() ? added.ret.toString() : added.ret.text());
     }
     // (the service's notification reloads the list)

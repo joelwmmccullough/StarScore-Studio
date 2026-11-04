@@ -512,7 +512,7 @@ Rectangle {
                                 }
                             }
 
-                            // its recordings (1.25.0): click to play in the Mac's player
+                            // its audio and Transcribe! files (1.25.0): click to play (or open in Transcribe!)
                             Flow {
                                 Layout.fillWidth: true
                                 spacing: 4
@@ -522,15 +522,16 @@ Rectangle {
 
                                     delegate: FlatButton {
                                         required property var modelData
-                                        text: "♪ " + modelData.name
+                                        text: (modelData.kind === "transcribe" ? "T! " : "♪ ") + modelData.name
                                         onClicked: solosModel.playAudio(modelData.path)
                                     }
                                 }
                                 FlatButton {
-                                    text: qsTrc("starscore", "+ Recording…")
+                                    text: qsTrc("starscore", "+ Audio or Transcribe! file")
                                     transparent: true
-                                    toolTipTitle: qsTrc("starscore", "Add a recording of the solo")
-                                    toolTipDescription: qsTrc("starscore", "The original, a stem-separated copy…: copied into the solo's Audio folder")
+                                    toolTipTitle: qsTrc("starscore", "Add an audio or Transcribe! file to the solo")
+                                    toolTipDescription: qsTrc("starscore", "The original recording, a stem-separated copy, a .xsc…: copied into "
+                                                              + "the Audio folder beside the solo")
                                     onClicked: solosModel.addAudio(soloRow.modelData.path)
                                 }
                             }

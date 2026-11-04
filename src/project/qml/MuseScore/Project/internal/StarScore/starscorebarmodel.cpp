@@ -206,7 +206,6 @@ QVariantMap StarScoreBarModel::soloInfo() const
         return QVariantMap();
     }
     QVariantMap map = info.toVariantMap();
-    map["audio"] = starScore()->soloAudioFiles(starScore()->mainProjectPath().toQString()).toVariantList();
     // the song it's tied to, by name
     const QString code = info.value("tiedSongCode").toString();
     if (!code.isEmpty()) {
@@ -220,30 +219,28 @@ QVariantMap StarScoreBarModel::soloInfo() const
     return map;
 }
 
-QVariantList StarScoreBarModel::soloAudioMenu() const
+QVariantList StarScoreBarModel::audioFiles() const
 {
-    QVariantList items;
-    const QString solo = starScore()->mainProjectPath().toQString();
-    for (const QJsonValue& v : starScore()->soloAudioFiles(solo)) {
-        const QJsonObject a = v.toObject();
-        const QString path = a.value("path").toString();
-        items << QVariantMap {
-            { "title", a.value("name").toString() }, { "enabled", true },
-            { "subitems", QVariantList {
-                  QVariantMap { { "id", "solo-audio-open:" + path }, { "title", muse::qtrc("starscore", "Play") }, { "enabled", true } },
-                  QVariantMap { { "id", "solo-audio-show:" + path }, { "title", muse::qtrc("starscore", "Show in Finder") },
-                                { "enabled", true } },
-                  QVariantMap { { "id", "solo-audio-remove:" + path }, { "title", muse::qtrc("starscore", "Remove from this solo…") },
-                                { "enabled", true } },
-              } }
-        };
-    }
-    if (!items.isEmpty()) {
-        items << QVariantMap {};
-    }
-    items << QVariantMap { { "id", "solo-audio-add" }, { "title", muse::qtrc("starscore", "Add a recording…") },
-                           { "enabled", QFileInfo::exists(solo) } };
-    return items;
+    return starScore()->scoreAudioFiles(starScore()->mainProjectPath().toQString()).toVariantList();
+}
+
+bool StarScoreBarModel::canAddAudio() const
+{
+    return QFileInfo::exists(starScore()->mainProjectPath().toQString());
+}
+
+QVariantList StarScoreBarModel::audioFileMenu(const QString& path) const
+{
+    const bool transcribe = path.endsWith(".xsc", Qt::CaseInsensitive);
+    return {
+        QVariantMap { { "id", "audio-open:" + path },
+                      { "title", transcribe ? muse::qtrc("starscore", "Open in Transcribe!") : muse::qtrc("starscore", "Play") },
+                      { "enabled", true } },
+        QVariantMap { { "id", "audio-show:" + path }, { "title", muse::qtrc("starscore", "Show in Finder") }, { "enabled", true } },
+        QVariantMap {},
+        QVariantMap { { "id", "audio-remove:" + path }, { "title", muse::qtrc("starscore", "Remove from this score…") },
+                      { "enabled", true } },
+    };
 }
 
 QVariantList StarScoreBarModel::tiedSolos() const
@@ -1243,21 +1240,21 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
         if (!link.isEmpty()) {
             QDesktopServices::openUrl(QUrl::fromUserInput(link));
         }
-    } else if (action == "solo-audio-add") {
-        const RetVal<QString> added = starScore()->addSoloAudio(starScore()->mainProjectPath().toQString());
+    } else if (action == "audio-add") {
+        const RetVal<QString> added = starScore()->addScoreAudio(starScore()->mainProjectPath().toQString());
         if (!added.ret) {
-            interactive()->error(muse::trc("starscore", "Couldn't add the recording"),
+            interactive()->error(muse::trc("starscore", "Couldn't add the file"),
                                  added.ret.text().empty() ? added.ret.toString() : added.ret.text());
         }
         refresh();
-    } else if (action == "solo-audio-open") {
+    } else if (action == "audio-open") {
         QDesktopServices::openUrl(QUrl::fromLocalFile(arg));
-    } else if (action == "solo-audio-show") {
+    } else if (action == "audio-show") {
         interactive()->revealInFileBrowser(io::path_t(arg));
-    } else if (action == "solo-audio-remove") {
-        const Ret removed = starScore()->removeSoloAudio(arg);
+    } else if (action == "audio-remove") {
+        const Ret removed = starScore()->removeScoreAudio(arg);
         if (!removed) {
-            interactive()->error(muse::trc("starscore", "Couldn't remove the recording"),
+            interactive()->error(muse::trc("starscore", "Couldn't remove the file"),
                                  removed.text().empty() ? removed.toString() : removed.text());
         }
         refresh();

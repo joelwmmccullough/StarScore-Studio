@@ -603,14 +603,15 @@ public:
     //! A key of a solo marked as learned or memorized ("" = not yet); kept in 8 Solo Transcriptions/.solo-progress.json
     virtual muse::Ret setSoloKeyState(const QString& id, int keyIndex, const QString& state) = 0;
     virtual muse::async::Notification soloLearningChanged() const = 0;
-    //! (1.25.0) A solo transcription's recordings (the original, a stem-separated copy…): the audio files in its folder's
-    //! "Audio" folder, [{ "name", "path" }]
-    virtual QJsonArray soloAudioFiles(const QString& soloPath) const = 0;
-    //! Asks for an audio file and what it is, and copies it into the solo's Audio folder. Returns its new path ("" when
-    //! cancelled).
-    virtual muse::RetVal<QString> addSoloAudio(const QString& soloPath) = 0;
-    //! Asks first, then moves the file into the solo's Version History ("<date> Removed audio")
-    virtual muse::Ret removeSoloAudio(const QString& audioPath) = 0;
+    //! (1.25.0) A score's audio files and Transcribe! files (the original recording, a stem-separated copy, a .xsc…),
+    //! any .starscore, song or solo: the files in the "Audio" folder beside it, [{ "name", "path", "kind": "audio" |
+    //! "transcribe" }]
+    virtual QJsonArray scoreAudioFiles(const QString& scorePath) const = 0;
+    //! Asks for a file (and, for audio, what it is), and copies it into the score's Audio folder (a Transcribe! file's
+    //! audio file too, under its own name). Returns the new path ("" when cancelled).
+    virtual muse::RetVal<QString> addScoreAudio(const QString& scorePath) = 0;
+    //! Asks first, then moves the file into the score's Version History ("<date> Removed audio")
+    virtual muse::Ret removeScoreAudio(const QString& audioPath) = 0;
     //! New StarScore dialog: the instruments the woodwind doubler can play (Soprano Sax … Flute), in menu order
     virtual std::vector<StarScoreHornChoice> doublerChoices() const = 0;
     //! New StarScore dialog: the low horns the 7-Horn section's 7th chair can be (Bass Trombone first), in menu order
