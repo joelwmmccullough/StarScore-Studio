@@ -659,7 +659,7 @@ QVariantList StarScoreBarModel::moreMenu() const
     if (starScore()->isSoloTranscription()) {
         const QVariantMap info = soloInfo();
         return {
-            item("solo-export-sheets", muse::qtrc("starscore", "Export the twelve keys' sheets")),
+            item("export-band", muse::qtrc("starscore", "Export and Organize… (the twelve keys' sheets)")),
             item("solo-open-tied", info.value("tiedSongTitle").toString().isEmpty()
                  ? muse::qtrc("starscore", "Open the song it's tied to (none)")
                  : muse::qtrc("starscore", "Open %1").arg(info.value("tiedSongTitle").toString()),
@@ -736,7 +736,7 @@ QVariantList StarScoreBarModel::moreMenu() const
         submenu(refs.empty() ? muse::qtrc("starscore", "Reference PDFs") : muse::qtrc("starscore", "Reference PDFs (%1)").arg(refs.size()),
                 refItems),
         QVariantMap {},
-        item("export-band", muse::qtrc("starscore", "Export to Sheets and Demos…")),
+        item("export-band", muse::qtrc("starscore", "Export and Organize…")),
         item("export-arrangements", muse::qtrc("starscore", "Export arrangements as MuseScore files…"), !starScore()->arrangements().empty()),
         item("organize", muse::qtrc("starscore", "Run folder organization…")),
     };
@@ -1259,12 +1259,8 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
         }
         refresh();
     } else if (action == "solo-export-sheets") {
-        const RetVal<QString> ret = starScore()->exportSoloSheets();
-        if (ret.ret) {
-            interactive()->info(muse::trc("starscore", "Solo sheets"), ret.val.toStdString());
-        } else {
-            interactive()->error(muse::trc("starscore", "Solo sheets"), ret.ret.text().empty() ? ret.ret.toString() : ret.ret.text());
-        }
+        // (as Export and Organize: saved first)
+        dispatcher()->dispatch("starscore-export-band");
     } else if (action == "part-styles") {
         dispatcher()->dispatch("starscore-part-styles");
     } else if (action == "apply-styles") {

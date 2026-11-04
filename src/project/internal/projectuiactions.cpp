@@ -90,8 +90,9 @@ const UiActionList ProjectUiActions::m_actions = {
     UiAction("starscore-export-band",
              mu::context::UiCtxProjectOpened,
              mu::context::CTX_ANY,
-             TranslatableString("action", "Export to Sheets and Demos…"),
-             TranslatableString("action", "Export every sheet to the band's Sheets and Demos folder")
+             TranslatableString("action", "Export and Organize…"),
+             TranslatableString("action", "Export the sheets where they belong: a Starsign song's to Sheets and Demos (then the "
+                                          "folders are organized), a solo transcription's into its own folder")
              ),
     UiAction("starscore-export-arrangements",
              mu::context::UiCtxProjectOpened,

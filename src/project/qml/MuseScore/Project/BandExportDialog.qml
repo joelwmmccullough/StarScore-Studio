@@ -14,7 +14,7 @@ import MuseScore.Project
 StyledDialogView {
     id: root
 
-    title: qsTrc("starscore", "Export to Sheets and Demos")
+    title: qsTrc("starscore", "Export and Organize")
 
     contentWidth: 700
     contentHeight: 620

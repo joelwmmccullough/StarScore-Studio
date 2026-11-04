@@ -982,6 +982,24 @@ bool ProjectActionsController::isAnyProjectOpened() const
 
 void ProjectActionsController::exportToBandFolder()
 {
+    // "Export and Organize" (1.25.0, Joel 4 Nov 2026): a solo transcription's twelve keys' sheets go into its own
+    // folder in 8 Solo Transcriptions; a Starsign song's sheets to Sheets and Demos, then the folders are organized
+    if (starScoreService()->isSoloTranscription()) {
+        INotationProjectPtr project = globalContext()->currentProject();
+        if (project && (project->needSave().val || !QFileInfo::exists(project->path().toQString()))) {
+            if (!saveProject()) {
+                return;
+            }
+        }
+        const muse::RetVal<QString> ret = starScoreService()->exportSoloSheets();
+        if (ret.ret) {
+            interactive()->info(muse::trc("starscore", "Export and Organize"), ret.val.toStdString());
+        } else {
+            interactive()->error(muse::trc("starscore", "Export and Organize"),
+                                 ret.ret.text().empty() ? ret.ret.toString() : ret.ret.text());
+        }
+        return;
+    }
     if (starScoreService()->bandFolder().isEmpty()) {
         const muse::io::path_t dir = interactive()->selectDirectory(
             muse::trc("starscore", "Choose the band's “Sheets and Demos” folder"), muse::io::path_t(QDir::homePath()));
