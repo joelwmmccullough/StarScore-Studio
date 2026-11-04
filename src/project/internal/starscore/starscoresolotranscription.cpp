@@ -1016,6 +1016,7 @@ QString StarScoreService::soloFileKeyName(int keyIndex, bool written) const
 //    soloload                      the saved file read back on its own: each key's first notes as written
 //    soloexport                    the twelve keys' sheets (and a list of what was written)
 //    soloshow:<name>               an old solo kept in the song shown
+//    solountag                     the open solo transcription made a plain one-instrument score (for soloconvert)
 //    soloconvert:<player>|<song>   the open score made into a Solo Transcription file
 // ---------------------------------------------------------------------------------------------------------------------
 
@@ -1270,7 +1271,23 @@ bool StarScoreService::autotestSoloStep(const QString& step)
         soloTestLog("  no such solo");
         return true;
     }
+    if (step == "solountag") {
+        // solountag: the open Solo Transcription made a plain score of one instrument again (no tag, data or part
+        // scores), to try soloconvert on
+        master->setExcerpts({});
+        ms->metaTags().erase(String(SOLO_TAG));
+        ms->metaTags().erase(u"starscore");
+        m_loadCache.erase(ms);
+        soloTestLog(QString("  plain score: %1 part(s), %2 part score(s), solo %3").arg(ms->parts().size())
+                    .arg(master->excerpts().size()).arg(int(isSoloTranscription())));
+        return true;
+    }
     if (step.startsWith("soloconvert:")) {
+        if (const QString projects = qEnvironmentVariable("STARSCORE_AUTOTEST_PROJECTS",
+                                                          qEnvironmentVariable("STARSCORE_AUTOTEST") + "/projects"); !projects.isEmpty()) {
+            QDir().mkpath(projects);
+            setProjectsFolder(projects);
+        }
         const QStringList a = step.mid(12).split('|');
         StarScoreSoloTranscriptionOptions o;
         o.player = a.value(0);
