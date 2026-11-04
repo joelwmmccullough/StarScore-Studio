@@ -94,9 +94,9 @@ int soloLetterSteps(int fromFifths, int toFifths)
 //! The instrument transposition that shows concert pitch `shift` semitones higher (lower when negative), spelled
 //! in the target key: written = concert + shift, so the instrument sounds `shift` below what's written. The letter
 //! steps are the ones nearest the shift's size (C♯ up 11 to C: 7 steps; C♭ up 1 to C: none).
-mu::engraving::Interval soloInterval(int originalFifths, int keyIndex, int shift)
+mu::engraving::Interval soloIntervalTo(int originalFifths, int targetFifths, int shift)
 {
-    const int s = soloLetterSteps(originalFifths, soloKeyAfter(originalFifths, keyIndex));
+    const int s = soloLetterSteps(originalFifths, targetFifths);
     const double size = shift * 7.0 / 12.0;
     int steps = s;
     for (int c : { s - 7, s + 7, s - 14, s + 14 }) {
@@ -105,6 +105,19 @@ mu::engraving::Interval soloInterval(int originalFifths, int keyIndex, int shift
         }
     }
     return mu::engraving::Interval(-steps, -shift);
+}
+
+mu::engraving::Interval soloInterval(int originalFifths, int keyIndex, int shift)
+{
+    return soloIntervalTo(originalFifths, soloKeyAfter(originalFifths, keyIndex), shift);
+}
+
+//! The key `semitones` above a key, as a key signature of at most 6 flats or 5 sharps (G♭ rather than F♯, D♭ rather
+//! than C♯): a tenor sax's written key for concert B is D♭, not C♯
+int soloKeyAbove(int fifths, int semitones)
+{
+    int f = ((fifths + 7 * semitones) % 12 + 12) % 12;
+    return f > 5 ? f - 12 : f;
 }
 
 //! The pitch in the middle of a staff with this clef (written)
@@ -951,14 +964,11 @@ QString StarScoreService::prepareSoloKeyForSheet(const SoloKeyScore& k, bool wri
                     : muse::qtrc("starscore", "in %1").arg(soloKeyName(keyFifths));
     if (written) {
         // for the instrument: its own transposition on top, the octave picked again for its own clef
+        // (the written key as a key signature of at most 6 flats or 5 sharps, the letters counted from the original)
         const Interval own = soloInstrumentInterval();
         const int writtenShift = soloPickShift(soloPitches(ms), k.index, shift, true, -own.chromatic);
-        iv = soloInterval(fifths, k.index, writtenShift);
-        iv.diatonic += own.diatonic;
-        iv.chromatic += own.chromatic;
-        Interval up = own;
-        up.flip();
-        const int writtenFifths = int(Transpose::transposeKey(Key(keyFifths), up, PreferSharpFlat::NONE));
+        const int writtenFifths = soloKeyAbove(keyFifths, -own.chromatic);
+        iv = soloIntervalTo(fifths, writtenFifths, writtenShift - own.chromatic);
         label = k.index == 0
                 ? muse::qtrc("starscore", "in %1 (concert %2, original key)").arg(soloKeyName(writtenFifths), soloKeyName(keyFifths))
                 : muse::qtrc("starscore", "in %1 (concert %2)").arg(soloKeyName(writtenFifths), soloKeyName(keyFifths));
@@ -979,9 +989,7 @@ QString StarScoreService::soloFileKeyName(int keyIndex, bool written) const
     const int fifths = data.solo.value("fifths").toInt();
     int keyFifths = soloKeyAfter(fifths, keyIndex);
     if (written) {
-        engraving::Interval up = soloInstrumentInterval();
-        up.flip();
-        keyFifths = int(engraving::Transpose::transposeKey(engraving::Key(keyFifths), up, engraving::PreferSharpFlat::NONE));
+        keyFifths = soloKeyAbove(keyFifths, -soloInstrumentInterval().chromatic);
     }
     return soloKeyName(keyFifths).replace(QString::fromUtf8("♭"), "b").replace(QString::fromUtf8("♯"), "#");
 }
@@ -999,6 +1007,7 @@ QString StarScoreService::soloFileKeyName(int keyIndex, bool written) const
 //    solosave                      saves the solo transcription
 //    soloload                      the saved file read back on its own: each key's first notes as written
 //    soloexport                    the twelve keys' sheets (and a list of what was written)
+//    soloshow:<name>               an old solo kept in the song shown
 //    soloconvert:<player>|<song>   the open score made into a Solo Transcription file
 // ---------------------------------------------------------------------------------------------------------------------
 
@@ -1239,6 +1248,18 @@ bool StarScoreService::autotestSoloStep(const QString& step)
                 soloTestLog("    " + f);
             }
         }
+        return true;
+    }
+    if (step.startsWith("soloshow:")) {
+        // soloshow:<name>: an old solo kept in the song shown (as clicking its chip)
+        for (const StarScoreSolo& solo : solos()) {
+            if (solo.name == step.mid(9)) {
+                const Ret ret = showSolo(solo.id);
+                soloTestLog("  " + (ret ? QString("shown") : QString::fromStdString(ret.toString())));
+                return true;
+            }
+        }
+        soloTestLog("  no such solo");
         return true;
     }
     if (step.startsWith("soloconvert:")) {
