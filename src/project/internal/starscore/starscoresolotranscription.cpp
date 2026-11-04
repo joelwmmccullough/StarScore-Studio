@@ -60,6 +60,7 @@
 #include "engraving/dom/factory.h"
 #include "engraving/dom/fingering.h"
 #include "engraving/dom/text.h"
+#include "engraving/dom/starscoreplayback.h"
 
 #include "log.h"
 #include "translation.h"
@@ -1119,6 +1120,9 @@ void StarScoreService::refreshSoloTranscription(const IMasterNotationPtr& master
     if (renamed) {
         updateSoloRegistryNames();
     }
+    if (master == globalContext()->currentMasterNotation()) {
+        updateSoloPlaybackTranspose();
+    }
 
     // the main score's formatting in all twelve, in one undo step with the edit that changed it (not after an undo
     // or redo: that would clear what can be redone), and only when it changed
@@ -1189,6 +1193,43 @@ void StarScoreService::onSoloTranscriptionOpened()
     m_soloLayoutSig = soloLayoutSignature(masterScore());
     soloRememberStyle(masterScore());
     refreshSoloTranscription(globalContext()->currentMasterNotation(), false);
+}
+
+void StarScoreService::updateSoloPlaybackTranspose()
+{
+    // (Joel, 4 Nov 2026) Only a key's own part score plays transposed, and only while it's the one showing: the main
+    // score, and every other score, plays as written
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    engraving::MasterScore* ms = master ? master->masterScore() : nullptr;
+    if (!ms) {
+        return;
+    }
+    engraving::Interval iv;
+    if (soloTagged(ms)) {
+        const INotationPtr current = globalContext()->currentNotation();
+        const Data data = load();
+        for (const SoloKeyScore& k : soloKeyScores(master)) {
+            if (k.index == 0 || !current || k.notation != current) {
+                continue;
+            }
+            int shift = 0;
+            for (const QJsonValue& v : data.solo.value("keys").toArray()) {
+                if (v.toObject().value("index").toInt() == k.index) {
+                    shift = v.toObject().value("shift").toInt();
+                }
+            }
+            iv = soloIntervalTo(data.solo.value("fifths").toInt(), soloTargetFifths(data.solo, k.index), shift);
+            iv.flip();   // (concert -> this key)
+        }
+    }
+    if (engraving::starscore::playbackTranspose(ms) == iv) {
+        return;
+    }
+    engraving::starscore::setPlaybackTranspose(ms, iv);
+    if (master->playback()) {
+        master->playback()->reload();
+    }
+    LOGI() << "[starscore] solo playback transposed by " << int(iv.chromatic) << " semitone(s)";
 }
 
 mu::engraving::Interval StarScoreService::soloInstrumentInterval() const
@@ -2058,6 +2099,31 @@ bool StarScoreService::autotestSoloStep(const QString& step)
         for (const QJsonValue& v : scoreAudioFiles(project ? project->path().toQString() : QString())) {
             soloTestLog("    audio: " + v.toObject().value("name").toString());
         }
+        return true;
+    }
+    if (step.startsWith("soloplay:")) {
+        // soloplay:<key index | main>: that score showing; the playback transposition and the first notes' playing pitch
+        const QString which = step.mid(9);
+        if (which == "main") {
+            globalContext()->setCurrentNotation(master->notation());
+        } else {
+            for (const SoloKeyScore& k : soloKeyScores(master)) {
+                if (k.index == which.toInt()) {
+                    master->setExcerptIsOpen(k.notation, true);
+                    globalContext()->setCurrentNotation(k.notation);
+                }
+            }
+        }
+        updateSoloPlaybackTranspose();
+        QStringList notes;
+        forEachSoloNote(ms, [&](Note* n) {
+            if (notes.size() < 6) {
+                notes << QString("%1->%2 (%3)").arg(n->pitch()).arg(n->ppitch())
+                         .arg(tpc2name(n->playingTpc(), NoteSpellingType::STANDARD, NoteCaseType::AUTO).toQString());
+            }
+        });
+        soloTestLog(QString("  playback transposition %1 semitone(s) | %2").arg(int(engraving::starscore::playbackTranspose(ms).chromatic))
+                    .arg(notes.join(" ")));
         return true;
     }
     if (step.startsWith("soloappend:")) {

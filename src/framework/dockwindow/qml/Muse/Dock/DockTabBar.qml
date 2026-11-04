@@ -116,15 +116,40 @@ Rectangle {
             }
 
             const enoughSpace = implicitWidthOfAllTabsTogether <= availableWidth;
+            // StarScore Studio (1.25.0): every tab keeps at least a sliver (MIN_TAB) of its name, so it can still be seen
+            // and clicked. In a narrow window the other tabs got (available - active) / … of their width, which went to
+            // nothing or below once the current tab took most of the bar: only the current tab (To-do) was left, and
+            // Palettes, Layout and Properties vanished (Joel, 4 Nov 2026). When even that doesn't fit, every tab,
+            // the current one too, gets an equal share.
+            const MIN_TAB = 28
+            let others = 0
             for (let tab of contentItem.children) {
-                if (tab.isCurrent || enoughSpace) {
+                if (tab && !tab.isCurrent && (tab.implicitWidth ?? 0) > 0) {
+                    ++others
+                }
+            }
+            const roomForOthers = availableWidth - implicitWidthOfActiveTab
+            const othersFit = roomForOthers >= MIN_TAB * others
+            const count = others + (implicitWidthOfActiveTab > 0 ? 1 : 0)
+            for (let tab of contentItem.children) {
+                if (!tab || (tab.implicitWidth ?? 0) <= 0) {
+                    continue
+                }
+                if (enoughSpace) {
                     tab.width = tab.implicitWidth
                     tab.isCutOff = false
+                } else if (othersFit) {
+                    if (tab.isCurrent) {
+                        tab.width = tab.implicitWidth
+                        tab.isCutOff = false
+                    } else {
+                        tab.width = Math.max(MIN_TAB, roomForOthers / (implicitWidthOfAllTabsTogether - implicitWidthOfActiveTab)
+                                             * tab.implicitWidth)
+                        tab.isCutOff = true
+                    }
                 } else {
-                    tab.width = (availableWidth - implicitWidthOfActiveTab)
-                            / (implicitWidthOfAllTabsTogether - implicitWidthOfActiveTab)
-                            * tab.implicitWidth
-                    tab.isCutOff = true
+                    tab.width = Math.max(MIN_TAB, Math.min(tab.implicitWidth, availableWidth / Math.max(1, count)))
+                    tab.isCutOff = tab.width < tab.implicitWidth
                 }
             }
         }

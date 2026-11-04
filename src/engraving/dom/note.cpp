@@ -27,6 +27,8 @@
 
 #include "note.h"
 
+#include <map>
+
 #include <cassert>
 
 #include "translation.h"
@@ -34,6 +36,7 @@
 #include "../editing/addremoveelement.h"
 #include "../editing/editchord.h"
 #include "../editing/transpose.h"
+#include "starscoreplayback.h"
 #include "types/typesconv.h"
 #include "iengravingfont.h"
 
@@ -956,6 +959,32 @@ int Note::transposeTpc(int tpc) const
     }
 }
 
+// StarScore Studio (1.25.0): the playback transposition of a Solo Transcription's key part score (starscoreplayback.h)
+static std::map<const MasterScore*, Interval>& starscorePlaybackTransposes()
+{
+    static std::map<const MasterScore*, Interval> map;
+    return map;
+}
+
+void mu::engraving::starscore::setPlaybackTranspose(const MasterScore* ms, const Interval& iv)
+{
+    if (iv.isZero()) {
+        starscorePlaybackTransposes().erase(ms);
+    } else {
+        starscorePlaybackTransposes()[ms] = iv;
+    }
+}
+
+Interval mu::engraving::starscore::playbackTranspose(const MasterScore* ms)
+{
+    const auto& map = starscorePlaybackTransposes();
+    if (map.empty()) {
+        return Interval();
+    }
+    const auto it = map.find(ms);
+    return it == map.end() ? Interval() : it->second;
+}
+
 int Note::playingTpc() const
 {
     int result = tpc();
@@ -972,6 +1001,9 @@ int Note::playingTpc() const
     int steps = ottaveCapoFret();
     if (steps != 0) {
         result = Transpose::transposeTpc(result, Interval(steps), true);
+    }
+    if (const Interval iv = starscore::playbackTranspose(masterScore()); !iv.isZero()) {
+        result = Transpose::transposeTpc(result, iv, false);
     }
 
     return result;
@@ -2699,7 +2731,7 @@ int Note::ppitch() const
         }
     }
 
-    return m_pitch + ottaveCapoFret() + linkedOttavaPitchOffset();
+    return m_pitch + ottaveCapoFret() + linkedOttavaPitchOffset() + starscore::playbackTranspose(masterScore()).chromatic;
 }
 
 //---------------------------------------------------------
@@ -2747,7 +2779,9 @@ int Note::octave() const
 
 int Note::playingOctave() const
 {
-    return mu::engraving::playingOctave(ppitch(), tpc1());
+    // (the spelling moved with a playback transposition too, so the octave is worked out for the note that sounds)
+    const Interval iv = starscore::playbackTranspose(masterScore());
+    return mu::engraving::playingOctave(ppitch(), iv.isZero() ? tpc1() : Transpose::transposeTpc(tpc1(), iv, false));
 }
 
 double Note::playingTuning() const

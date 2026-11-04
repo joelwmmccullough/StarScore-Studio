@@ -161,6 +161,8 @@ public:
     void updateSoloRegistryNames();
     //! The default Starsign style settings on the open solo transcription (its main score kept in concert pitch)
     void applySoloStyles();
+    //! The playback in the key of the part score showing (a solo's key part score), else as written
+    void updateSoloPlaybackTranspose();
     QJsonArray soloLearningList() const override;
     muse::Ret setSoloKeyState(const QString& id, int keyIndex, const QString& state) override;
     muse::async::Notification soloLearningChanged() const override;

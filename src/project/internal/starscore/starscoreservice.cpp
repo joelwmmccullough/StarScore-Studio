@@ -124,6 +124,8 @@ void StarScoreService::init()
     // Reference PDF panel: each part score shows the reference PDF last chosen for it (or stays closed)
     globalContext()->currentNotationChanged().onNotify(this, [this]() {
         pickReferenceForCurrentScore();
+        // (1.25.0) a Solo Transcription's key part score plays in its own key while it's showing
+        QTimer::singleShot(0, &m_timerGuard, [this]() { updateSoloPlaybackTranspose(); });
         // a part score being shown is laid out: if its composer credit runs into the arrangement label, move it now
         QTimer::singleShot(0, &m_timerGuard, [this]() { clearComposerInCurrentScore(); });
     });
