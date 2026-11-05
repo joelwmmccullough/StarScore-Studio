@@ -991,7 +991,10 @@ void soloSpellNotes(mu::engraving::Score* es, const mu::engraving::Interval& wri
                     }
                     for (const Chord* c : near) {
                         for (const Note* m : c->notes()) {
-                            keep = keep || (m != n && raw.count(m) && sideOf(m, raw[m]) == dir);
+                            // (a neighbour that's a double itself doesn't count: two doubles side by side read the
+                            // same interval as their plain notes, G𝄪–A𝄪 as A–B)
+                            keep = keep || (m != n && raw.count(m) && raw[m] >= TPC_F_B && raw[m] <= TPC_B_S
+                                            && sideOf(m, raw[m]) == dir);
                         }
                     }
                     if (!keep) {
