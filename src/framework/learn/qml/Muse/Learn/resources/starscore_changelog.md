@@ -4,6 +4,12 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.25.2
+
+- **A solo's iReal Pro chart written as it is.** The one chorus of a solo's form is written out bar by bar between one pair of repeat signs ({: … :}), with no 1st and 2nd endings and no bars folded into shorter repeats. Tumba's vamp reads {: A9sus F♯9sus | A♯9sus G9sus | A9sus F♯9sus | A♯9sus G9sus :}. A form longer than one iReal Pro chart (48 bars) is still shortened.
+- **The chords of the form follow the sheet.** A bar with no chord symbol now counts as the chord still sounding in it when the choruses are compared. Pinetop's Boogie Woogie had F7 in its second bar, taken from the two choruses with a quick IV, though most choruses hold C7 there; its chart is now the blues the sheet shows: C7 for four bars, F7 for two, C7 for two, G7, F7, C7, C7.
+- **iReal Pro's style from the tempo marking.** A solo's iReal Pro chart takes its style from the words of the tempo marking at the start ("Boogie-Woogie" for Pinetop's Boogie Woogie) instead of "Medium Swing". A tempo marking with no words (just "♩. = 126") leaves the style blank.
+
 ## 1.25.1
 
 - **Slash notation left uncoloured.** On a solo's sheets, rhythmic slash notation (slash heads that show a rhythm but no pitch, like the bass staff's in bars 68–69 of Tumba) stays in the page's ink colour instead of taking a 12-note colour from the pitch hidden under it.

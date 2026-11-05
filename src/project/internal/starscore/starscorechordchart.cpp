@@ -707,6 +707,7 @@ struct Group {
 
 struct Analysis {
     std::vector<Group> groups;
+    bool soloForm = false;   // (1.25.2) ChordChartData::soloForm
     QString tempo;
     std::vector<Bar> bars;
     std::vector<int> order;
@@ -968,6 +969,7 @@ int displayedBars(const std::vector<Item>& items)
 Analysis analyse(const ChordChartData& song)
 {
     Analysis a;
+    a.soloForm = song.soloForm;
     a.bars = buildBars(song);
     a.order = playOrder(a.bars);
     std::vector<const Bar*> seq;
@@ -1974,9 +1976,32 @@ struct IRealBar {
 };
 
 //! Each group as its lines of 16 cells
-std::vector<std::pair<const Group*, QStringList> > irealSections(const Analysis& a, std::set<QString>& notes)
+std::vector<std::pair<const Group*, QStringList> > irealSections(const Analysis& a0, std::set<QString>& notes)
 {
     std::vector<std::pair<const Group*, QStringList> > out;
+    // (1.25.2, Joel 4 Nov 2026) one chorus of a solo's form: its bars as they are, between one pair of repeat signs
+    // ("{: A9sus F#9sus | A#9sus G9sus | A9sus F#9sus | A#9sus G9sus :}"), not shortened into repeats and endings;
+    // shortened only when it's longer than one iReal Pro chart (12 lines of 4 bars)
+    Analysis merged;
+    const Analysis* ap = &a0;
+    if (a0.soloForm && !a0.groups.empty()) {
+        Group g = a0.groups.front();
+        g.labels = { a0.groups.front().labels.first() };
+        g.same.reset();
+        g.keys.clear();
+        for (const Group& x : a0.groups) {
+            for (int n = 0; n < std::max(1, int(x.labels.size())); ++n) {
+                g.keys.insert(g.keys.end(), x.keys.begin(), x.keys.end());
+            }
+        }
+        if (g.keys.size() <= 48) {
+            g.items = { Item { Item::Rep, g.keys, 2, {} } };
+            merged = a0;
+            merged.groups = { g };
+            ap = &merged;
+        }
+    }
+    const Analysis& a = *ap;
     static const QStringList LETTERS { "A", "B", "C", "D" };
     int li = 0;
     QString prevTs;   // null = none yet
@@ -2102,7 +2127,7 @@ std::vector<std::pair<const Group*, QStringList> > irealSections(const Analysis&
             }
             lines << txt;
         }
-        out.push_back({ &g, lines });
+        out.push_back({ ap == &merged ? &a0.groups.front() : &g, lines });   // (never a pointer into the local copy)
     }
     return out;
 }
@@ -2149,7 +2174,7 @@ std::vector<IRealLink> irealParts(const ChordChartData& song, const Analysis& a,
     if (song.minor && KEYS_MAJOR.count(keyNo + 3)) {
         key = KEYS_MAJOR.at(keyNo + 3) + "-";   // (the relative minor: A- for no sharps or flats)
     }
-    const QString style = song.irealStyle.isEmpty() ? QString("Funk") : song.irealStyle;
+    const QString style = song.irealStyle.isEmpty() && !song.irealStyleSet ? QString("Funk") : song.irealStyle;
     std::vector<IRealLink> links;
     for (size_t n = 0; n < parts.size(); ++n) {
         QString prog;
@@ -2561,21 +2586,24 @@ bool soloOneChorus(ChordChartData& data, int lastBar, int& choruses)
         int matches = 0;
         for (int p = 0; p < P; ++p) {
             std::map<QString, int> votes;
+            // (1.25.2) every chorus votes, a bar with no chord symbol for the chord still sounding in it: Pinetop's
+            // bar 2 is C7 (held from bar 1) in most choruses, F7 in the two with a quick IV
             for (int i = p; i < total; i += P) {
-                if (explicitBar[size_t(i)]) {
+                if (!harmony[size_t(i)].isEmpty()) {
                     ++votes[harmony[size_t(i)]];
                 }
             }
             if (votes.empty()) {
-                for (int i = p; i < total && form[size_t(p)].isEmpty(); i += P) {
-                    form[size_t(p)] = harmony[size_t(i)];
-                }
                 continue;
             }
             const auto best = std::max_element(votes.begin(), votes.end(),
                                                [](const auto& a, const auto& b) { return a.second < b.second; });
             form[size_t(p)] = best->first;
-            matches += best->second;
+            for (int i = p; i < total; i += P) {
+                if (explicitBar[size_t(i)] && harmony[size_t(i)] == form[size_t(p)]) {
+                    ++matches;
+                }
+            }
         }
         if (matches < explicitCount * 0.9) {
             continue;
@@ -2587,6 +2615,15 @@ bool soloOneChorus(ChordChartData& data, int lastBar, int& choruses)
             for (int i = p; i < total && pick < 0; i += P) {
                 if (harmony[size_t(i)] == form[size_t(p)] && explicitBar[size_t(i)]) {
                     pick = i;
+                }
+            }
+            // (a bar most choruses have no chord symbol in: the chord before goes on; written out when the form's bar
+            // before ends on another chord)
+            QString held;
+            if (pick < 0 && form[size_t(p)].startsWith("0 ") && !form[size_t(p)].contains(" | ") && p > 0) {
+                const QString prevLast = form[size_t(p - 1)].section(" | ", -1).section(' ', 1);
+                if (prevLast != form[size_t(p)].mid(2)) {
+                    held = form[size_t(p)].mid(2);
                 }
             }
             ChordChartMeasure m = ms[size_t(start + (pick < 0 ? p : pick))];
@@ -2601,8 +2638,17 @@ bool soloOneChorus(ChordChartData& data, int lastBar, int& choruses)
                 m.rm.reset();
             }
             if (pick < 0) {
-                // (no chord symbol at this point of the form in any chorus: the chord before goes on)
+                // (no chord symbol at this point of the form in most choruses: the chord before goes on)
                 m.chords.clear();
+                if (!held.isEmpty()) {
+                    ChordChartChord c;
+                    c.t = "0";
+                    c.root = held.section(' ', 0, 0);
+                    const QString rest = held.section(' ', 1);
+                    c.bass = rest.contains('/') ? rest.section('/', 1) : QString();
+                    c.q = rest.section('/', 0, 0);
+                    m.chords.push_back(c);
+                }
             }
             m.texts.erase(std::remove_if(m.texts.begin(), m.texts.end(), [](const ChordChartText& t) { return t.k != "Tempo"; }),
                           m.texts.end());
@@ -2631,6 +2677,7 @@ bool soloOneChorus(ChordChartData& data, int lastBar, int& choruses)
         }
         choruses = (total + P - 1) / P;
         ms = chorus;
+        data.soloForm = true;
         return true;
     }
     return false;
@@ -2650,6 +2697,35 @@ int soloBpm(const ChordChartData& data)
         }
     }
     return 0;
+}
+
+//! The words of the first tempo marking: its text before the "=", without the note symbols and brackets
+QString soloTempoWords(const ChordChartData& data)
+{
+    for (const ChordChartMeasure& m : data.measures) {
+        for (const ChordChartText& t : m.texts) {
+            if (t.k != "Tempo") {
+                continue;
+            }
+            QString w = t.t.section('=', 0, 0);
+            QString out;
+            for (const QChar c : w) {
+                out += c.isLetterOrNumber() || c == '-' || c == '/' || c == '\'' || c == '&' || c == '.' ? c : QChar(' ');
+            }
+            out = out.simplified();
+            // a dotted note's dot left over ("Afro ." -> "Afro")
+            while (out.endsWith('.') || out.endsWith(" -")) {
+                out.chop(1);
+                out = out.trimmed();
+            }
+            if (out.startsWith('.')) {
+                out = out.mid(1).trimmed();
+            }
+            out.replace('=', '-');
+            return out;
+        }
+    }
+    return QString();
 }
 
 //! The last bar (0-based) with a note or a chord symbol in it
@@ -2691,7 +2767,10 @@ ChordChartResult writeSoloChordCharts(const MasterScore* ms, const QString& fold
     }
     concert.composer = player;     // (iReal Pro's composer: the soloist, surname first)
     concert.minor = minor;
-    concert.irealStyle = "Medium Swing";
+    // (1.25.2, Joel 4 Nov 2026) iReal Pro's style: the words of the solo's tempo marking ("Boogie-Woogie" from
+    // "Boogie-Woogie ♩ = 167"); none when it has none
+    concert.irealStyle = soloTempoWords(concert);
+    concert.irealStyleSet = true;
     const auto keep = [](const QString&, QString*) { return true; };
     const QString stem = "Chord Charts/" + base;
 

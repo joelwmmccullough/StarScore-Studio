@@ -84,6 +84,8 @@ struct ChordChartData {
     std::optional<int> key;              // concert key signature (flats negative)
     bool minor = false;                  // (1.25.0) iReal Pro's key is the relative minor ("A-")
     QString irealStyle;                  // (1.25.0) iReal Pro's style; empty = "Funk"
+    bool irealStyleSet = false;          // (1.25.2) irealStyle used as it is, even empty (a solo's tempo marking's words)
+    bool soloForm = false;               // (1.25.2) one chorus of a solo's form: iReal Pro writes it as it is, in one repeat
     QStringList chordChartHidden;        // element ids of texts left off the chart
     std::vector<ChordChartMeasure> measures;
 
