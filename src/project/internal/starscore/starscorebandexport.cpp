@@ -6369,8 +6369,7 @@ RetVal<QString> StarScoreService::exportSoloSheets()
         const QString sub = forInstrument ? starscoreSafeFileName(instrumentName) : QString("Concert");
         const QString dir = sheets + "/" + sub;
         QDir().mkpath(dir);
-        const QString left = forInstrument || !transposing ? instrumentName
-                             : muse::qtrc("starscore", "%1 (concert pitch)").arg(instrumentName);
+        const QString left = instrumentName;   // (1.25.2: "(concert pitch)" is under the key, top right)
         for (const SoloKeyScore& k : keys) {
             const QString label = prepareSoloKeyForSheet(k, forInstrument);
             const QString name = QString("%1 - %2 - %3 %4%5")

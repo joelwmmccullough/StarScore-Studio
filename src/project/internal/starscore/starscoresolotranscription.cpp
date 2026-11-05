@@ -1594,9 +1594,14 @@ QString StarScoreService::prepareSoloKeyForSheet(const SoloKeyScore& k, bool wri
         const int writtenShift = soloPickShift(soloPitches(ms), k.index, shift, true, -own.chromatic);
         const int writtenFifths = soloKeyAbove(keyFifths, -own.chromatic);
         iv = soloIntervalTo(fifths, writtenFifths, writtenShift - own.chromatic);
+        // (1.25.2) the concert key on a second, smaller line: on one line it ran into the title
         label = k.index == 0
-                ? muse::qtrc("starscore", "%1 (concert %2, original)").arg(soloKeyLabel(writtenFifths, minor), soloKeyLabel(keyFifths, minor))
-                : muse::qtrc("starscore", "%1 (concert %2)").arg(soloKeyLabel(writtenFifths, minor), soloKeyLabel(keyFifths, minor));
+                ? muse::qtrc("starscore", "%1\n(concert %2, original)").arg(soloKeyLabel(writtenFifths, minor), soloKeyLabel(keyFifths, minor))
+                : muse::qtrc("starscore", "%1\n(concert %2)").arg(soloKeyLabel(writtenFifths, minor), soloKeyLabel(keyFifths, minor));
+    } else if (!soloInstrumentInterval().isZero()) {
+        // (1.25.2) a transposing instrument's concert sheet says so under the key, not after the instrument's name
+        // ("Tenor Saxophone (concert pitch)" ran into the title)
+        label += "\n" + muse::qtrc("starscore", "(concert pitch)");
     }
     respellSoloKey(k.score, iv, written);
     return label;
