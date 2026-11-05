@@ -28,6 +28,7 @@
 #include "dom/harmony.h"
 #include "dom/note.h"
 #include "dom/sig.h"
+#include "dom/starscoreplayback.h"
 #include "dom/tempo.h"
 #include "dom/staff.h"
 #include "dom/utils.h"
@@ -156,8 +157,11 @@ void PlaybackEventsRenderer::renderChordSymbol(const Harmony* chordSymbol,
 
     double bps = score->tempomap()->multipliedTempo(positionTick).val;
 
+    // StarScore Studio (1.25.2, Joel 4 Nov 2026): a Solo Transcription's key part score plays its chord symbols in its
+    // key too, as its notes (Note::ppitch); 0 for every other score
+    const int starscoreShift = starscore::playbackTranspose(chordSymbol->masterScore()).chromatic;
     for (auto it = notes.cbegin(); it != notes.cend(); ++it) {
-        int pitch = it->first;
+        int pitch = it->first + starscoreShift;
         int tpc = pitch2tpc(pitch, key, Prefer::NEAREST);
         int octave = playingOctave(pitch, tpc);
         pitch_level_t pitchLevel = notePitchLevel(tpc, octave);
@@ -197,8 +201,11 @@ void PlaybackEventsRenderer::renderChordSymbol(const Harmony* chordSymbol, const
 
     ArticulationMap articulations = makeStandardArticulationMap(profile, actualTimestamp, actualDuration);
 
+    // StarScore Studio (1.25.2, Joel 4 Nov 2026): a Solo Transcription's key part score plays its chord symbols in its
+    // key too, as its notes (Note::ppitch); 0 for every other score
+    const int starscoreShift = starscore::playbackTranspose(chordSymbol->masterScore()).chromatic;
     for (auto it = notes.cbegin(); it != notes.cend(); ++it) {
-        int pitch = it->first;
+        int pitch = it->first + starscoreShift;
         int tpc = pitch2tpc(pitch, key, Prefer::NEAREST);
         int octave = playingOctave(pitch, tpc);
         pitch_level_t pitchLevel = notePitchLevel(tpc, octave);

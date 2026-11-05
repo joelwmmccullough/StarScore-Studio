@@ -34,6 +34,7 @@
 #include <QJsonObject>
 #include <QRegularExpression>
 #include <QTimer>
+#include <QCoreApplication>
 #include <QUuid>
 #include <QFile>
 #include <QUrl>
@@ -1443,11 +1444,21 @@ void StarScoreService::syncSoloChordMute(const engraving::InstrumentTrackId& tra
         if (!sm) {
             continue;
         }
-        INotationSoloMuteState::SoloMuteState st = sm->trackSoloMuteStateExists(trackId)
-                                                   ? sm->trackSoloMuteState(trackId) : INotationSoloMuteState::SoloMuteState();
-        if (st.mute != mute) {
-            st.mute = mute;
-            sm->setTrackSoloMuteState(trackId, st);
+        // (1.25.2) the chord track of this score's own part, which needn't have the id of the part it was set on
+        std::vector<engraving::InstrumentTrackId> ids { trackId };
+        for (const engraving::Part* p : n->parts()->partList()) {
+            const engraving::InstrumentTrackId own { p->id(), trackId.instrumentId };
+            if (own != trackId) {
+                ids.push_back(own);
+            }
+        }
+        for (const engraving::InstrumentTrackId& id : ids) {
+            INotationSoloMuteState::SoloMuteState st = sm->trackSoloMuteStateExists(id)
+                                                       ? sm->trackSoloMuteState(id) : INotationSoloMuteState::SoloMuteState();
+            if (st.mute != mute) {
+                st.mute = mute;
+                sm->setTrackSoloMuteState(id, st);
+            }
         }
     }
     m_soloMuteSyncing = false;
@@ -2502,6 +2513,46 @@ bool StarScoreService::autotestSoloStep(const QString& step)
             states << (m ? "M" : "-");
         }
         soloTestLog("  chord symbols muted (main, then each part score): " + states.join(' '));
+        return true;
+    }
+    if (step.startsWith("solomixmute:") || step == "solomutelog") {
+        // solomixmute:<1|0>: the chord symbols muted (unmuted) as the mixer does it, on the score showing (through the
+        // playback controller, with the chord track of the showing score's own part); solomutelog: each score's state
+        IMasterNotationPtr master = globalContext()->currentMasterNotation();
+        const INotationPtr current = globalContext()->currentNotation();
+        if (!master || !current || current->parts()->partList().empty()) {
+            soloTestLog("  no score");
+            return true;
+        }
+        const engraving::Part* part = current->parts()->partList().front();
+        const engraving::InstrumentTrackId id = master->playback()
+                                                ? master->playback()->chordSymbolsTrackId(part->id())
+                                                : engraving::InstrumentTrackId { part->id(), String(u"chord_symbols") };
+        if (step != "solomutelog") {
+            INotationSoloMuteState::SoloMuteState st = current->soloMuteState()->trackSoloMuteState(id);
+            st.mute = step.mid(12) != "0";
+            if (playbackController()) {
+                playbackController()->setTrackSoloMuteState(id, st);
+            } else {
+                current->soloMuteState()->setTrackSoloMuteState(id, st);
+            }
+            QCoreApplication::processEvents();
+        }
+        QStringList states;
+        std::vector<INotationPtr> all { master->notation() };
+        for (const IExcerptNotationPtr& e : master->excerpts()) {
+            all.push_back(e ? e->notation() : nullptr);
+        }
+        for (const INotationPtr& n : all) {
+            const engraving::Part* p = n && !n->parts()->partList().empty() ? n->parts()->partList().front() : nullptr;
+            const engraving::InstrumentTrackId nid { p ? p->id() : id.partId, String(u"chord_symbols") };
+            const bool m = n && n->soloMuteState() && n->soloMuteState()->trackSoloMuteStateExists(nid)
+                           && n->soloMuteState()->trackSoloMuteState(nid).mute;
+            states << QString("%1%2").arg(m ? "M" : "-").arg(nid == id ? "" : "*");
+        }
+        soloTestLog(QString("  showing %1, chord track part %2 | muted (main, then each part score; * = another part id): %3")
+                    .arg(current == master->notation() ? QString("main") : QString("a part score"),
+                         QString::fromStdString(id.partId.toStdString()), states.join(' ')));
         return true;
     }
     if (step.startsWith("soloshow:")) {
