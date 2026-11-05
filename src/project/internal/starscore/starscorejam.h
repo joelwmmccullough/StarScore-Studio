@@ -24,6 +24,7 @@
 #include "async/channel.h"
 #include "modularity/ioc.h"
 #include "audio/main/iplayback.h"
+#include "audio/main/iplayer.h"
 #include "playback/isoundprofilesrepository.h"
 #include "playback/iplaybackconfiguration.h"
 

@@ -32,7 +32,7 @@ std::vector<WatchNote> watchNotes(const mu::notation::INotationPtr& notation, QS
     }
     MasterScore* ms = score->masterScore();
     if (name) {
-        *name = score->isMaster() ? QString() : score->name();
+        *name = score->isMaster() ? QString() : score->name().toQString();
     }
     const RepeatList& repeats = ms->repeatList();
     for (const RepeatSegment* rs : repeats) {
