@@ -2763,11 +2763,22 @@ bool soloOneChorus(ChordChartData& data, int lastBar, int& choruses)
                           m.texts.end());
             chorus.push_back(m);
         }
-        // the first bar keeps the tempo and the time signature the solo starts with
-        for (const ChordChartText& t : ms.front().texts) {
-            if (t.k == "Tempo" && std::none_of(chorus.front().texts.begin(), chorus.front().texts.end(),
-                                               [](const ChordChartText& x) { return x.k == "Tempo"; })) {
-                chorus.front().texts.push_back(t);
+        // the first bar has the tempo the solo starts with, and no other bar a tempo (1.25.2: Tumba's form came from
+        // bar 30, whose "♩. = ♩" took the place of its "♩. = 126", and its iReal Pro chart lost its "126 bpm")
+        for (ChordChartMeasure& m : chorus) {
+            m.texts.erase(std::remove_if(m.texts.begin(), m.texts.end(), [](const ChordChartText& t) { return t.k == "Tempo"; }),
+                          m.texts.end());
+        }
+        bool tempoFound = false;
+        for (const ChordChartMeasure& m : ms) {
+            for (const ChordChartText& t : m.texts) {
+                if (t.k == "Tempo" && !tempoFound) {
+                    chorus.front().texts.push_back(t);
+                    tempoFound = true;
+                }
+            }
+            if (tempoFound) {
+                break;
             }
         }
         if (chorus.front().chords.empty() || chorus.front().chords.front().t != "0") {
