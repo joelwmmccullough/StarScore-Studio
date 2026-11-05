@@ -23,6 +23,8 @@
 #include "tracksequence.h"
 #include "starscorepcmsource.h"
 
+#include <atomic>
+
 #include "audio/common/audioerrors.h"
 #include "audio/common/audiosanitizer.h"
 
@@ -342,12 +344,15 @@ Channel<TrackPtr> TrackSequence::trackAboutToBeRemoved() const
 
 TrackId TrackSequence::newTrackId() const
 {
-    if (m_tracks.empty()) {
-        return 0;
+    // StarScore Studio (1.26.0): unique across every sequence. The mixer keys its channels by track id alone, so with
+    // a second sequence (Practice's backing band, its recordings) numbered from 0 again, its tracks collided with the
+    // score's: their channels were never added, and the score's tracks played in their place.
+    static std::atomic<TrackId> next { 0 };
+    TrackId id = next.fetch_add(1);
+    while (m_tracks.count(id)) {
+        id = next.fetch_add(1);
     }
-
-    auto last = m_tracks.rbegin();
-    return last->first + 1;
+    return id;
 }
 
 void TrackSequence::onShouldProcessDuringSilenceChanged(const TrackId trackId, bool shouldProcess)
