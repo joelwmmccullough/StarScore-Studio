@@ -2022,6 +2022,9 @@ std::vector<std::pair<const Group*, QStringList> > irealSections(const Analysis&
         if (g.labels.size() > 1) {
             text += QString(" (%1x)").arg(g.labels.size());
         }
+        if (a.soloForm) {
+            text.clear();   // (1.25.2: a solo's form has its section mark only; Pinetop's "A" was written under it as well)
+        }
         std::vector<Item> items = g.same ? compress(g.keys) : g.items;
         if (g.labels.size() > 1) {
             // the whole group played len(labels) times: one repeat around it when it is one plain block
