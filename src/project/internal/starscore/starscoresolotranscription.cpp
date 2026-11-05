@@ -722,6 +722,38 @@ Ret StarScoreService::convertToSoloTranscription(const StarScoreSoloTranscriptio
     if (engraving::TextBase* t = cms->getText(engraving::TextStyleType::COMPOSER)) {
         t->setPlainText(String::fromQString(composer));
     }
+    // (1.25.2) a score with no title, subtitle or credit (a MusicXML file, say) gets them, as a new solo transcription
+    // has them: the title frame made if there's none
+    {
+        const QString title = options.song.trimmed();
+        const std::vector<std::pair<engraving::TextStyleType, QString> > wanted {
+            { engraving::TextStyleType::TITLE, title }, { engraving::TextStyleType::SUBTITLE, soloSubtitle(options) },
+            { engraving::TextStyleType::COMPOSER, composer },
+        };
+        const bool missing = std::any_of(wanted.begin(), wanted.end(), [&](const auto& w) {
+            return !w.second.isEmpty() && !cms->getText(w.first);
+        });
+        if (missing && copy->masterNotation()->notation()->undoStack()) {
+            copy->masterNotation()->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("Solo credits"));
+            engraving::MeasureBase* box = cms->first();
+            if (!box || !box->isVBox()) {
+                box = cms->insertBox(engraving::ElementType::VBOX, box);
+            }
+            if (box) {
+                for (const auto& [type, text] : wanted) {
+                    if (text.isEmpty() || cms->getText(type)) {
+                        continue;
+                    }
+                    engraving::Text* t = engraving::Factory::createText(box, type);
+                    t->setParent(box);
+                    t->setTrack(0);
+                    t->setPlainText(String::fromQString(text));
+                    cms->undoAddElement(t);
+                }
+            }
+            copy->masterNotation()->notation()->undoStack()->commitChanges();
+        }
+    }
     // (an old solo's own StarScore data isn't a solo transcription's)
     cms->metaTags().erase(u"starscore");
     m_loadCache.erase(cms);
