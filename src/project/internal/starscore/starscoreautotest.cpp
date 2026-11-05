@@ -3789,6 +3789,17 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         autotestLog(QString("  %1: %2 (%3 bytes, %4 ms)").arg(step.mid(7), !player ? "no jam" : !player->isReady() ? "not ready"
                                                               : ok ? "written" : done ? "FAILED" : "timed out")
                     .arg(QFileInfo(step.mid(7)).size()).arg(wait.elapsed()));
+    } else if (step.startsWith("dispatch:")) {
+        // dispatch:<action>: a menu action, as choosing it (dispatch:toggle-starscore-practice shows the Practice panel)
+        dispatcher()->dispatch(step.mid(9).toStdString());
+        for (int i = 0; i < 30; ++i) {
+            QCoreApplication::processEvents();
+        }
+        autotestLog("  dispatched " + step.mid(9));
+    } else if (step.startsWith("settings:")) {
+        // settings:<key>=<value>: an app setting (StarScore/practice/mode=jam)
+        QSettings().setValue(step.mid(9).section('=', 0, 0), step.mid(9).section('=', 1));
+        autotestLog("  set " + step.mid(9));
     } else if (step == "watchnotes") {
         // watchnotes: the falling notes of the score showing (1.27.0): how many, the range, the first few
         QString name;
