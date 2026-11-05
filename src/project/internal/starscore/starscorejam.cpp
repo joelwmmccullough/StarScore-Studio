@@ -466,6 +466,7 @@ Jam Maker::make()
         comp(last, 0, 2.0, 80);
     }
     jam.seconds = last.start + hold + 1.5;
+    jam.electricBass = m_s.groove == "funk" || m_s.groove == "rock";
     for (JamTrack* tr : { &m_bass, &m_drums, &m_piano }) {
         if (!tr->notes.empty()) {
             jam.tracks.push_back(*tr);
@@ -917,21 +918,39 @@ void JamPlayer::addTracks(const std::function<void()>& done)
 {
     // each instrument's sound from the basic sound profile (MS Basic), found by its sound
     const mu::playback::SoundProfile& profile = profilesRepo()->profile(playbackConfiguration()->basicSoundProfileName());
-    auto findSetup = [&](const QString& id) -> std::pair<mpe::PlaybackSetupData, AudioResourceMeta> {
+    //! the sound with this id and these sub-categories ("acoustic", "plucked"…), else any with the id
+    auto findSetup = [&](const QString& id, const QStringList& subs = {}) -> std::pair<mpe::PlaybackSetupData, AudioResourceMeta> {
+        std::pair<mpe::PlaybackSetupData, AudioResourceMeta> any;
         for (const auto& [setup, meta] : profile.data) {
-            if (setup.id == muse::String::fromQString(id)) {
+            if (setup.id != muse::String::fromQString(id)) {
+                continue;
+            }
+            const bool all = std::all_of(subs.begin(), subs.end(), [&](const QString& sc) {
+                return std::find(setup.subCategories.begin(), setup.subCategories.end(), muse::String::fromQString(sc))
+                       != setup.subCategories.end();
+            });
+            if (all) {
                 return { setup, meta };
             }
+            if (!any.first.isValid()) {
+                any = { setup, meta };
+            }
         }
-        return {};
+        return any;
     };
     auto remaining = std::make_shared<int>(int(m_jam.tracks.size()));
     const int generation = m_generation;
     for (const JamTrack& track : m_jam.tracks) {
-        const QString sound = track.instrument == "drums" ? "drumset" : track.instrument == "bass" ? "contrabass" : "piano";
-        auto [setup, meta] = findSetup(sound);
+        // (the bass: an upright, General MIDI's acoustic bass, for swing, ballads and the Latin grooves; an electric
+        // one for funk and rock)
+        auto [setup, meta] = track.instrument == "drums" ? findSetup("drumset")
+                             : track.instrument == "bass" ? findSetup("bass_guitar", { m_jam.electricBass ? "electric" : "acoustic", "plucked" })
+                             : findSetup("piano", { "grand" });
         if (!setup.isValid() && track.instrument == "bass") {
-            std::tie(setup, meta) = findSetup("bass_guitar");
+            std::tie(setup, meta) = findSetup("contrabass");
+        }
+        if (!setup.isValid() && track.instrument == "piano") {
+            std::tie(setup, meta) = findSetup("piano");
         }
         if (!setup.isValid()) {
             LOGW() << "[starscore] jam: no sound for " << track.instrument.toStdString();

@@ -470,6 +470,17 @@ static std::vector<StarScoreMedia> plannedMedia(const std::vector<StarScoreMedia
                 out[i].soundId = e.id;
             }
         }
+        // (its recording under another name: 1.25.0's Audio folder renamed copies "Original recording"): the full mix
+        for (size_t k = 0; k < out.size() && out[i].soundId.isEmpty(); ++k) {
+            if (out[k].kind == "full") {
+                out[i].soundId = out[k].id;
+            }
+        }
+        for (const StarScoreMedia& e : existing) {
+            if (out[i].soundId.isEmpty() && e.kind == "full") {
+                out[i].soundId = e.id;
+            }
+        }
     }
     return out;
 }

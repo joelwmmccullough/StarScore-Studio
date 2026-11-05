@@ -105,6 +105,7 @@ struct Jam {
     std::vector<JamTrack> tracks;
     std::vector<JamBarTime> bars;   // every bar played, count-in first
     double seconds = 0;             // how long it all lasts
+    bool electricBass = false;      // funk and rock: an electric bass; the others an acoustic (upright) one
 };
 
 Jam makeJam(const JamForm& form, const JamSettings& settings);
