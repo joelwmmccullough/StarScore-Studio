@@ -920,6 +920,9 @@ namespace {
 //! second). A double sharp (flat) is kept when a note beside it is sharpened (flattened) too: another note of its
 //! chord, or the note before or after it in its voice, grace notes included. Otherwise it's written as its plain
 //! enharmonic (G for an F𝄪 on its own). A tied note keeps the spelling of the note it's tied from.
+//! (1.25.3) "Sharpened" and "flattened" are against this key's key signature: a sharp or flat the key signature
+//! already has doesn't count. In G♭ major nearly every note is flat, so Pinetop's E♭ (the 7th of F7) came out as B𝄫
+//! under a chord symbol reading B7; now it's A.
 void soloSpellNotes(mu::engraving::Score* es, const mu::engraving::Interval& written)
 {
     using namespace mu::engraving;
@@ -951,7 +954,23 @@ void soloSpellNotes(mu::engraving::Score* es, const mu::engraving::Interval& wri
                 raw[n] = Transpose::transposeTpc(n->tpc1(), written, true);
             }
         }
-        const auto sideOf = [](int tpc) { return tpc >= TPC_F_S ? 1 : tpc <= TPC_B_B ? -1 : 0; };
+        // the key signature at a note, in this key (from the main score's concert key: the part score's own keys are
+        // set after the notes)
+        const MasterScore* ms = es->masterScore();
+        std::map<const Note*, int> fifthsOf;
+        for (Chord* c : seq) {
+            for (Note* n : c ? c->notes() : std::vector<Note*>()) {
+                const staff_idx_t si = n->staffIdx();
+                const Staff* mst = ms && si < ms->nstaves() ? ms->staff(si) : nullptr;
+                const Key concert = mst ? mst->concertKey(n->tick()) : Key::C;
+                fifthsOf[n] = int(Transpose::transposeKey(concert, written, PreferSharpFlat::NONE));
+            }
+        }
+        // sharpened (1) or flattened (-1) by an accidental against the key signature, or neither (0)
+        const auto sideOf = [&](const Note* m, int tpc) {
+            const int k = fifthsOf.count(m) ? fifthsOf[m] : 0;
+            return tpc > TPC_B + k ? 1 : tpc < TPC_F + k ? -1 : 0;
+        };
         for (size_t i = 0; i < seq.size(); ++i) {
             if (!seq[i]) {
                 continue;
@@ -972,7 +991,7 @@ void soloSpellNotes(mu::engraving::Score* es, const mu::engraving::Interval& wri
                     }
                     for (const Chord* c : near) {
                         for (const Note* m : c->notes()) {
-                            keep = keep || (m != n && raw.count(m) && sideOf(raw[m]) == dir);
+                            keep = keep || (m != n && raw.count(m) && sideOf(m, raw[m]) == dir);
                         }
                     }
                     if (!keep) {
