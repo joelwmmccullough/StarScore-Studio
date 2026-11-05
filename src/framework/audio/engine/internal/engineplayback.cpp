@@ -765,7 +765,17 @@ Ret EnginePlayback::doSaveSoundTrack(const TrackSequenceId sequenceId, const io:
         }
     });
 
+    // StarScore Studio (1.26.0): only this sequence's tracks are written (Practice's backing band and recordings are
+    // sequences of their own beside the score's; the mixer otherwise plays every track it has)
+    std::set<TrackId> own;
+    for (TrackId trackId : s->trackIdList()) {
+        own.insert(trackId);
+    }
+    mixer()->setActiveTracksOnly(own);
+    s->player()->seek(0);
+
     Ret ret = writer->write();
+    mixer()->setActiveTracksOnly(std::nullopt);
     s->player()->seek(0);
 
     progressData.aborted.disconnect(this);
