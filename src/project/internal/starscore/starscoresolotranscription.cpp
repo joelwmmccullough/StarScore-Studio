@@ -927,6 +927,8 @@ void soloSpellNotes(mu::engraving::Score* es, const mu::engraving::Interval& wri
 {
     using namespace mu::engraving;
     std::map<const Note*, int> spelled;
+    std::map<const Note*, int> plainEdge;   // (B) an odd single respelled with the double it was paired with
+    const auto isEdge = [](int tpc) { return tpc == TPC_F_B || tpc == TPC_C_B || tpc == TPC_E_S || tpc == TPC_B_S; };
     for (track_idx_t t = 0; t < es->ntracks(); ++t) {
         // this voice's chords in order (a rest ends a run)
         std::vector<Chord*> seq;
@@ -989,21 +991,39 @@ void soloSpellNotes(mu::engraving::Score* es, const mu::engraving::Interval& wri
                     if (i + 1 < seq.size() && seq[i + 1]) {
                         near.push_back(seq[i + 1]);
                     }
+                    std::vector<const Note*> edgePartners;
                     for (const Chord* c : near) {
                         for (const Note* m : c->notes()) {
                             // (a neighbour that's a double itself doesn't count: two doubles side by side read the
-                            // same interval as their plain notes, G𝄪–A𝄪 as A–B)
-                            keep = keep || (m != n && raw.count(m) && raw[m] >= TPC_F_B && raw[m] <= TPC_B_S
-                                            && sideOf(m, raw[m]) == dir);
+                            // same interval as their plain notes, G𝄪–A𝄪 as A–B; nor does an odd single, F♭ C♭ E♯
+                            // B♯: the pair is respelled together, F♭+B𝄫 as E+A)
+                            if (m == n || !raw.count(m) || raw[m] < TPC_F_B || raw[m] > TPC_B_S || sideOf(m, raw[m]) != dir) {
+                                continue;
+                            }
+                            if (isEdge(raw[m])) {
+                                if (c == seq[i]) {
+                                    edgePartners.push_back(m);
+                                }
+                                continue;
+                            }
+                            keep = true;
                         }
                     }
                     if (!keep) {
                         tpc -= dir * 12;   // (the plain enharmonic: F𝄪 -> G, B𝄫 -> A)
+                        for (const Note* m : edgePartners) {
+                            plainEdge[m] = raw[m] - dir * 12;
+                        }
                     }
                     tpc = std::clamp(tpc, int(TPC_F_BB), int(TPC_B_SS));
                 }
                 spelled[n] = tpc;
             }
+        }
+    }
+    for (const auto& [m, tpc] : plainEdge) {
+        if (spelled.count(m) && isEdge(spelled[m])) {
+            spelled[m] = tpc;
         }
     }
     for (const auto& [n, tpc] : spelled) {
