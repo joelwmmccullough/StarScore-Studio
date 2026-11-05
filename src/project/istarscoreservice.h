@@ -77,23 +77,6 @@ struct StarScoreMuteTarget {
     bool flexible = false;  // a Flexible chair: shown only on its sheets for brass instruments
 };
 
-//! Run in Synthesia (1.25.5, Joel 5 Nov 2026): what's sent and how Synthesia gets it, set per song
-struct StarScoreSynthesiaTrack {
-    QString key;            // "<part name>#<staff in part>": what the choice is kept under
-    QString name;           // "Piano (upper staff)"
-    QString hand;           // "R", "L", "B" (Synthesia plays it), "X" (left out)
-    int program = 0;        // General MIDI program, 0-based (0 = Acoustic Grand Piano); one for all a part's staves
-    bool firstOfPart = true;   // the part's first staff: its sound is chosen here
-};
-struct StarScoreSynthesiaSetup {
-    QString problem;        // why nothing can be sent (no score open), or empty
-    QString song;
-    bool configured = false;   // set for this song before (else the dialog comes first)
-    bool sendShowing = true;   // the score showing (a part score, a solo's key) rather than the main score
-    QString scoreName;         // what would be sent now
-    std::vector<StarScoreSynthesiaTrack> tracks;
-};
-
 //! The selection a player annotation goes on (see IStarScoreService::annotationTarget)
 struct StarScoreAnnotationTarget {
     QString problem;          // why nothing can be added or marked here, or nothing
@@ -671,13 +654,6 @@ public:
     //! A brass part's mutes (Joel, 13 Oct 2026): printed under the instrument name top left of its sheets ("with
     //! Harmon Mute", "and Cup Mute"). Copied with the part to the same instrument in another arrangement.
     virtual QStringList partMutes(const QString& partId) const = 0;
-    //! Run in Synthesia (1.25.5): this song's setup (tracks of the score that would be sent), saving it, and
-    //! sending the score: a MIDI file without chord symbols and a .synthesia file with the hands, sounds and title,
-    //! opened in Synthesia. Returns what to tell Joel when it can't.
-    virtual StarScoreSynthesiaSetup synthesiaSetup(bool sendShowing) const = 0;
-    virtual StarScoreSynthesiaSetup synthesiaSetup() const = 0;
-    virtual void setSynthesiaSetup(const StarScoreSynthesiaSetup& setup) = 0;
-    virtual QString runInSynthesia() = 0;
     virtual void setPartMutes(const QString& partId, const QStringList& mutes) = 0;
     //! Flugelhorn part on/off (Joel, 14 Oct 2026) for the trumpet part open (or a Flexible chair): its sheets say
     //! "Flugelhorn" top left; the file names still say Trumpet. Returns what to tell Joel.

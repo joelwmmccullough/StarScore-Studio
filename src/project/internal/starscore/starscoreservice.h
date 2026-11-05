@@ -183,10 +183,6 @@ public:
     void setSectionAutoStatus(const QString& sectionId) override;
     std::map<QString, StarScoreStatus> partStatuses() const override;
     QStringList partMutes(const QString& partId) const override;
-    StarScoreSynthesiaSetup synthesiaSetup(bool sendShowing) const override;
-    StarScoreSynthesiaSetup synthesiaSetup() const override;
-    void setSynthesiaSetup(const StarScoreSynthesiaSetup& setup) override;
-    QString runInSynthesia() override;
     void setPartMutes(const QString& partId, const QStringList& mutes) override;
     QString togglePartFlugelhorn() override;
     void setPartStatus(const QString& partId, int status) override;
@@ -433,8 +429,6 @@ public:
         // a Solo Transcription (1.24.0): its song, player, band, recording, link, instrument, the song it's tied to,
         // and its twelve key part scores ("keys": [{ "shift", "name" }]); empty for a band song
         QJsonObject solo;
-        // Run in Synthesia (1.25.5): { "sendShowing": bool, "tracks": { "<part>#<staff>": { "hand", "program" } } }
-        QJsonObject synthesia;
 
         // Audit mode
         QString auditReferenceSectionId;          // section the others are compared with (empty = automatic)

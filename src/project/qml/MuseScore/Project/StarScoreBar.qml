@@ -240,22 +240,6 @@ Rectangle {
                 }
             }
 
-            // (1.25.5, Joel 5 Nov 2026) the score straight into Synthesia, set up once per song
-            FlatButton {
-                Layout.alignment: Qt.AlignTop
-                text: qsTrc("starscore", "Run in Synthesia")
-                icon: IconCode.PLAY
-                orientation: Qt.Horizontal
-                transparent: true
-                toolTipTitle: qsTrc("starscore", "Run in Synthesia")
-                toolTipDescription: qsTrc("starscore", "Opens this score in Synthesia with its hands and sounds set (chosen once per song; "
-                                                       + "change them with ⋯ › Synthesia setup for this song…)")
-
-                onClicked: {
-                    barModel.handleMenuItem("synthesia-run")
-                }
-            }
-
             FlatButton {
                 Layout.alignment: Qt.AlignTop
                 icon: IconCode.MENU_THREE_DOTS

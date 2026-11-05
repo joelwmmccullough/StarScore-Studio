@@ -48,8 +48,6 @@ public:
     bool write(QIODevice* device, bool midiExpandRepeats, bool exportRPNs);
     bool write(const QString& name, bool midiExpandRepeats, bool exportRPNs, const engraving::SynthesizerState& synthState);
     bool write(QIODevice* device, bool midiExpandRepeats, bool exportRPNs, const engraving::SynthesizerState& synthState);
-    // StarScore: no chord symbol playback in the file (Run in Synthesia: "never send chord tracks")
-    void setNoChordSymbols(bool on) { m_noChordSymbols = on; }
 
 private:
     void writeHeader(const engraving::CompatMidiRendererInternal::Context& context);
@@ -57,7 +55,6 @@ private:
     QFile m_file;
     MidiFile m_midiFile;
     engraving::Score* m_score = nullptr;
-    bool m_noChordSymbols = false;
 };
 }
 #endif // EXPORTMIDI_H
