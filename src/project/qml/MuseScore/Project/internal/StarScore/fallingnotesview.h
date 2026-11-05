@@ -35,6 +35,8 @@ class FallingNotesView : public QQuickPaintedItem, public muse::Contextable, pub
     Q_PROPERTY(int noteCount READ noteCount NOTIFY notesChanged)
     Q_PROPERTY(QString scoreName READ scoreName NOTIFY notesChanged)
     Q_PROPERTY(bool playing READ playing NOTIFY playingChanged)
+    //! (1.27.0) a time to show other than playback's (Listen: where the recording is, in the score's seconds); < 0: none
+    Q_PROPERTY(double externalTime READ externalTime WRITE setExternalTime NOTIFY playingChanged)
 
     QML_ELEMENT
 
@@ -53,6 +55,8 @@ public:
     int noteCount() const { return int(m_notes.size()); }
     QString scoreName() const { return m_scoreName; }
     bool playing() const { return m_playing; }
+    double externalTime() const { return m_externalTime; }
+    void setExternalTime(double t);
 
     Q_INVOKABLE void reload();
 
@@ -79,6 +83,7 @@ private:
     bool m_dark = true;
     bool m_playing = false;
 
+    double m_externalTime = -1;
     double m_positionSecs = 0;   // the last position playback reported
     QElapsedTimer m_sincePosition;
     QTimer m_frameTimer;

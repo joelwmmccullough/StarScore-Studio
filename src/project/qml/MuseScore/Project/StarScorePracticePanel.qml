@@ -469,7 +469,21 @@ Item {
                 text: practice.listenInfo
             }
 
-            Item { Layout.fillHeight: true }
+            // the score's notes falling in time with the recording (once there's a bar map)
+            FallingNotesView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                visible: practice.listenScoreTime >= 0
+                colors: practice.colors
+                secondsShown: practice.secondsShown
+                dark: ui.theme.isDark
+                externalTime: practice.listenScoreTime
+            }
+
+            Item {
+                Layout.fillHeight: true
+                visible: practice.listenScoreTime < 0
+            }
         }
 
         // --- Jam: where the band is, the chord now and next ---

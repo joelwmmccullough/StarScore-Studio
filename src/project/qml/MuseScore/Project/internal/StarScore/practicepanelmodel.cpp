@@ -12,6 +12,7 @@
 
 #include "engraving/dom/masterscore.h"
 #include "engraving/dom/measure.h"
+#include "engraving/dom/repeatlist.h"
 #include "engraving/dom/starscoreplayback.h"
 #include "notation/inotationinteraction.h"
 #include "notation/inotationselection.h"
@@ -524,6 +525,22 @@ void PracticePanelModel::loadListen()
 
 void PracticePanelModel::loadBarMap()
 {
+    // the score's bars as played, in its own seconds (the bar map counts bars as the recording plays them)
+    m_playedBarSeconds.clear();
+    if (const auto master = globalContext()->currentMasterNotation()) {
+        mu::engraving::MasterScore* ms = master->masterScore();
+        for (const mu::engraving::RepeatSegment* rs : ms->repeatList()) {
+            const int offset = rs->utick - rs->tick;
+            for (mu::engraving::Measure* m = ms->tick2measure(mu::engraving::Fraction::fromTicks(rs->tick));
+                 m && m->tick().ticks() < rs->tick + rs->len(); m = m->nextMeasure()) {
+                m_playedBarSeconds.push_back(ms->utick2utime(m->tick().ticks() + offset));
+            }
+        }
+        if (!m_playedBarSeconds.empty()) {
+            m_playedBarSeconds.push_back(ms->utick2utime(ms->repeatList().empty() ? 0 : ms->repeatList().back()->utick
+                                                         + ms->repeatList().back()->len()));
+        }
+    }
     m_barMap = starscore::BarMap();
     m_barMapInfo.clear();
     // tapped bars first (Joel's own), then the first Transcribe! file's measure markers
@@ -878,4 +895,21 @@ void PracticePanelModel::onListenPosition()
     if (m) {
         notation->interaction()->showItem(m);
     }
+}
+
+double PracticePanelModel::listenScoreTime() const
+{
+    if (!m_listen || m_barMap.empty() || m_playedBarSeconds.size() < 2) {
+        return -1;
+    }
+    const double t = m_listen->position();
+    const int bar = m_barMap.barAt(t);
+    if (bar < 0) {
+        return std::max(0.0, m_playedBarSeconds.front() - (m_barMap.barTimes.front() - t));
+    }
+    const double a = m_barMap.timeOfBar(bar);
+    const double b = m_barMap.timeOfBar(bar + 1);
+    const double frac = b > a ? std::clamp((t - a) / (b - a), 0.0, 1.0) : 0.0;
+    const size_t i = std::min(size_t(bar), m_playedBarSeconds.size() - 2);
+    return m_playedBarSeconds[i] + frac * (m_playedBarSeconds[i + 1] - m_playedBarSeconds[i]);
 }

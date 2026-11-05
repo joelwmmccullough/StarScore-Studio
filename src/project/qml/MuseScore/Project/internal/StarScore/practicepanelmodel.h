@@ -72,6 +72,8 @@ class PracticePanelModel : public QObject, public muse::Contextable, public muse
     Q_PROPERTY(QString barMapInfo READ barMapInfo NOTIFY listenChanged)
     Q_PROPERTY(bool tapping READ tapping NOTIFY listenChanged)
     Q_PROPERTY(QString listenInfo READ listenInfo NOTIFY listenChanged)
+    //! where the recording is, as seconds of the score's playback (for the falling notes under Listen); -1 without a bar map
+    Q_PROPERTY(double listenScoreTime READ listenScoreTime NOTIFY listenPositionChanged)
 
     QML_ELEMENT
 
@@ -133,6 +135,7 @@ public:
     QString barMapInfo() const { return m_barMapInfo; }
     bool tapping() const { return m_tapping; }
     QString listenInfo() const { return m_listenInfo; }
+    double listenScoreTime() const;
 
     QString mode() const { return m_mode; }
     void setMode(const QString& m);
@@ -211,5 +214,6 @@ private:
     bool m_tapping = false;
     std::vector<double> m_taps;
     QTimer m_videoTimer;
+    std::vector<double> m_playedBarSeconds;   // each bar as played (repeats played out): its start in the score's seconds
 };
 }

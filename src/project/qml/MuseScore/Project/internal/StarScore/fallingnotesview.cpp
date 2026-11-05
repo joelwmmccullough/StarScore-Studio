@@ -118,8 +118,19 @@ void FallingNotesView::scheduleReload()
     m_reloadTimer.start();
 }
 
+void FallingNotesView::setExternalTime(double t)
+{
+    if (t != m_externalTime) {
+        m_externalTime = t;
+        update();
+    }
+}
+
 double FallingNotesView::now() const
 {
+    if (m_externalTime >= 0) {
+        return m_externalTime;
+    }
     if (!m_playing) {
         return m_positionSecs;
     }
