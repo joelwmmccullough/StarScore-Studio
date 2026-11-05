@@ -2772,6 +2772,9 @@ QString soloTempoWords(const ChordChartData& data)
                 continue;
             }
             QString w = t.t.section('=', 0, 0);
+            // (the note symbols come through as their names: "Latin Fusion metNoteQuarterUp metAugmentationDot")
+            static const QRegularExpression symName("\\b[a-z]+[A-Z][A-Za-z0-9]*\\b");
+            w.remove(symName);
             QString out;
             for (const QChar c : w) {
                 out += c.isLetterOrNumber() || c == '-' || c == '/' || c == '\'' || c == '&' || c == '.' ? c : QChar(' ');

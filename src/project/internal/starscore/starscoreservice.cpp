@@ -126,6 +126,14 @@ void StarScoreService::init()
         pickReferenceForCurrentScore();
         // (1.25.0) a Solo Transcription's key part score plays in its own key while it's showing
         QTimer::singleShot(0, &m_timerGuard, [this]() { updateSoloPlaybackTranspose(); });
+        // (1.25.2) the chord symbols' mute of the score just left goes to every score of a Solo Transcription
+        {
+            const INotationPtr left = m_soloLastNotation.lock();
+            m_soloLastNotation = globalContext()->currentNotation();
+            if (left) {
+                reconcileSoloChordMute(left);
+            }
+        }
         // a part score being shown is laid out: if its composer credit runs into the arrangement label, move it now
         QTimer::singleShot(0, &m_timerGuard, [this]() { clearComposerInCurrentScore(); });
     });

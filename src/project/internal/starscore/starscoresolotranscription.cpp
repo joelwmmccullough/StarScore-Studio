@@ -1434,6 +1434,28 @@ void StarScoreService::watchSoloChordMutes()
     }
 }
 
+//! (1.25.2) The chord symbols' mute on `from` (a score of this Solo Transcription, just left) set on all of them: a
+//! safety net for a change whose signal the watchers missed
+void StarScoreService::reconcileSoloChordMute(const INotationPtr& from)
+{
+    if (!from || !from->soloMuteState() || !isSoloTranscription()) {
+        return;
+    }
+    bool ours = false;
+    for (const std::weak_ptr<INotation>& w : m_soloMuteWatched) {
+        ours = ours || w.lock() == from;
+    }
+    if (!ours) {
+        return;
+    }
+    for (const engraving::Part* p : from->parts()->partList()) {
+        const engraving::InstrumentTrackId id { p->id(), String(u"chord_symbols") };
+        if (from->soloMuteState()->trackSoloMuteStateExists(id)) {
+            syncSoloChordMute(id, from->soloMuteState()->trackSoloMuteState(id).mute);
+        }
+    }
+}
+
 void StarScoreService::syncSoloChordMute(const engraving::InstrumentTrackId& trackId, bool mute)
 {
     if (m_soloMuteSyncing || trackId.instrumentId != muse::String(u"chord_symbols")) {
