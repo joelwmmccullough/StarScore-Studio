@@ -52,7 +52,7 @@ SequencePlayer::SequencePlayer(IGetTracks* getTracks, IClockPtr clock, const mod
         const bool active = status == PlaybackStatus::Running;
 
         if (!m_countDownIsSet) {
-            audioEngine()->mixer()->setIsActive(active);
+            setMixerActive(active);
         } else if (!active) {
             flushAllTracks();
         }
@@ -64,9 +64,25 @@ SequencePlayer::SequencePlayer(IGetTracks* getTracks, IClockPtr clock, const mod
         m_countDownIsSet = false;
 
         audioEngine()->execOperation(OperationType::QuickOperation, [this]() {
-            audioEngine()->mixer()->setIsActive(m_clock->status() == PlaybackStatus::Running);
+            setMixerActive(m_clock->status() == PlaybackStatus::Running);
         });
     });
+}
+
+//! StarScore Studio (1.26.0): the mixer on or off for this playback, with only this sequence's tracks playing while it
+//! plays (Practice's backing band is a sequence of its own beside the score's)
+void SequencePlayer::setMixerActive(bool active)
+{
+    if (active && m_getTracks) {
+        std::set<TrackId> mine;
+        for (const auto& pair : m_getTracks->allTracks()) {
+            mine.insert(pair.first);
+        }
+        audioEngine()->mixer()->setActiveTracksOnly(mine);
+    } else {
+        audioEngine()->mixer()->setActiveTracksOnly(std::nullopt);
+    }
+    audioEngine()->mixer()->setIsActive(active);
 }
 
 SequencePlayer::~SequencePlayer()

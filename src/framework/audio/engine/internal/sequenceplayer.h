@@ -62,6 +62,7 @@ public:
     async::Channel<secs_t> playbackPositionChanged() const override;
 
 private:
+    void setMixerActive(bool active);   // (StarScore 1.26.0)
     void seekAllTracks(const msecs_t newPositionMsecs, bool flushSound);
     void flushAllTracks();
 

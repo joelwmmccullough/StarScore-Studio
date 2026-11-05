@@ -115,7 +115,7 @@ RetVal<MixerChannelPtr> Mixer::addChannel(const TrackId trackId, ITrackAudioInpu
         m_nonMutedTrackCount++;
 
         if (source) {
-            source->setIsActive(isActive());
+            source->setIsActive(isActive() && mayBeActive(channel->trackId()));
             source->seek(playbackPosition());
         }
     });
@@ -353,6 +353,18 @@ bool Mixer::useMultithreading() const
 #endif
 }
 
+bool Mixer::mayBeActive(TrackId trackId) const
+{
+    return !m_activeTracksOnly || m_activeTracksOnly->count(trackId) > 0;
+}
+
+void Mixer::setActiveTracksOnly(const std::optional<std::set<TrackId> >& tracks)
+{
+    ONLY_AUDIO_ENGINE_THREAD;
+
+    m_activeTracksOnly = tracks;
+}
+
 void Mixer::setIsActive(bool arg)
 {
     ONLY_AUDIO_ENGINE_THREAD;
@@ -361,7 +373,7 @@ void Mixer::setIsActive(bool arg)
 
     for (auto& channel : m_trackChannels) {
         if (!channel.second->muted()) {
-            channel.second->setIsActive(arg);
+            channel.second->setIsActive(arg && mayBeActive(channel.first));
         }
     }
 

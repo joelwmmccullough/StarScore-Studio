@@ -22,6 +22,9 @@
 
 #pragma once
 
+#include <optional>
+#include <set>
+
 #include <memory>
 #include <map>
 
@@ -79,6 +82,11 @@ public:
 
     void setIsActive(bool arg) override;
 
+    //! StarScore Studio (1.26.0): several playbacks can be loaded at once (the score's, and Practice's backing band).
+    //! While one plays, only its own tracks are made active (the others would otherwise play from wherever they were);
+    //! nothing: every track follows setIsActive, as before.
+    void setActiveTracksOnly(const std::optional<std::set<TrackId> >& tracks);
+
     samples_t process(float* outBuffer, samples_t samplesPerChannel) override;
 
 private:
@@ -96,6 +104,8 @@ private:
     void completeOutput(float* buffer, samples_t samplesPerChannel);
 
     bool useMultithreading() const;
+    bool mayBeActive(TrackId trackId) const;
+    std::optional<std::set<TrackId> > m_activeTracksOnly;
 
     void updateShouldProcessMasterFxDuringSilence();
 
