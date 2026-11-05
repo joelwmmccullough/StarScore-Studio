@@ -70,7 +70,7 @@ Item {
                 onClicked: practice.mode = "listen"
             }
 
-            Rectangle { width: 1; Layout.fillHeight: true; Layout.margins: 4; color: ui.theme.strokeColor }
+            Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: 24; color: ui.theme.strokeColor }
 
             // Watch
             RowLayout {
@@ -335,6 +335,8 @@ Item {
             visible: practice.mode === "watch"
             Layout.fillWidth: true
             Layout.fillHeight: true
+            Layout.minimumHeight: 80
+            Layout.preferredHeight: 400
             colors: practice.colors
             secondsShown: practice.secondsShown
             dark: ui.theme.isDark
@@ -473,6 +475,8 @@ Item {
             FallingNotesView {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                Layout.minimumHeight: 80
+                Layout.preferredHeight: 400
                 visible: practice.listenScoreTime >= 0
                 colors: practice.colors
                 secondsShown: practice.secondsShown
@@ -491,6 +495,8 @@ Item {
             visible: practice.mode === "jam"
             Layout.fillWidth: true
             Layout.fillHeight: true
+            Layout.minimumHeight: 80
+            Layout.preferredHeight: 400
             color: ui.theme.isDark ? "#15120E" : "#F4F1EA"
 
             ColumnLayout {

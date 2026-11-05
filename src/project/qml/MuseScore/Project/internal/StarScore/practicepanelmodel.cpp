@@ -50,6 +50,33 @@ void PracticePanelModel::load()
     }
     restoreSettings();
     loadForm();
+    if (m_mode == "listen") {
+        loadListen();
+    }
+    if (starScore()) {
+        // (recordings added to or taken out of the song: Listen loads them again, when not playing)
+        starScore()->changed().onNotify(this, [this]() {
+            if (m_mode != "listen" || (m_listen && m_listen->isPlaying())) {
+                return;
+            }
+            QStringList now;
+            for (const StarScoreMedia& m : starScore()->media()) {
+                if (m.kind == "full" || m.kind == "piano" || m.kind == "nopiano" || m.kind == "audio") {
+                    now << m.id;
+                }
+            }
+            QStringList loaded;
+            if (m_listen) {
+                for (const auto& st : m_listen->stems()) {
+                    loaded << st.mediaId;
+                }
+            }
+            if (now != loaded) {
+                m_listenSong.clear();
+                loadListen();
+            }
+        });
+    }
     emit changed();
 }
 
@@ -462,27 +489,6 @@ starscore::ListenPlayer* PracticePanelModel::listener()
                 m_videoTimer.stop();
             }
         });
-        if (starScore()) {
-            starScore()->changed().onNotify(this, [this]() {
-                // new stems stored in the song: loaded again (when not playing)
-                if (m_mode == "listen" && m_listen && !m_listen->isPlaying()) {
-                    QStringList now;
-                    for (const StarScoreMedia& m : starScore()->media()) {
-                        if (isStemKind(m.kind)) {
-                            now << m.id;
-                        }
-                    }
-                    QStringList loaded;
-                    for (const auto& st : m_listen->stems()) {
-                        loaded << st.mediaId;
-                    }
-                    if (now != loaded) {
-                        m_listenSong.clear();
-                        loadListen();
-                    }
-                }
-            });
-        }
     }
     return m_listen.get();
 }
