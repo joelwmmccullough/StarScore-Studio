@@ -611,6 +611,7 @@ private:
     QStringList m_mediaFolderMoves;   // Audio-folder files moved in, waiting for a save to go to Version History
     std::unique_ptr<QObject> m_mediaWatcher;
     bool m_mediaOpenedOutside = false;   // a Transcribe! file of the song was opened in Transcribe! this session
+    QObject* m_autotestJamPlayer = nullptr;   // (1.27.0) the autotest's last jam, for jamwav:
     //! The autotest's media… steps (false: not one of them)
     bool autotestMediaStep(const QString& step);
     QString soloFileKeyName(int keyIndex, bool written) const;

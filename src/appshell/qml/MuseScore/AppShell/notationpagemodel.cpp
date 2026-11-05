@@ -283,6 +283,11 @@ QString NotationPageModel::mixerPanelName() const
     return MIXER_PANEL_NAME;
 }
 
+QString NotationPageModel::starscorePracticePanelName() const
+{
+    return STARSCORE_PRACTICE_PANEL_NAME;
+}
+
 QString NotationPageModel::pianoKeyboardPanelName() const
 {
     return PIANO_KEYBOARD_PANEL_NAME;

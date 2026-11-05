@@ -4,6 +4,19 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.26.0
+
+- **Recordings, video and Transcribe! files inside the .starscore.** The Audio row's "+ Audio, video or Transcribe! file" now stores the files inside the score itself, the way reference PDFs are, so a song's .starscore holds everything: the full mix, the piano stem, everything but the piano, the players' video, and the Transcribe! file. You can pick several files at once. For each recording StarScore asks what it is (Full mix, Piano only, Everything but piano, or its own name). A video is stored at full size, untouched. A Transcribe! file brings its recording with it.
+- **Transcribe! files open in Transcribe!, pointed at the stored recording.** Clicking a Transcribe! file opens it in Transcribe! with the recording that's inside the score. What you change and save in Transcribe! is kept the next time you save the song (the song shows as changed).
+- **The Audio folder moves in.** When you open a score that still has 1.25.0's Audio folder beside it, StarScore offers to move those files into the score. Once the score is saved with them inside, the folder's copies go to Version History ("Moved into the .starscore"); nothing is deleted. "Keep the folder" stops the question for that score.
+- **Right-click a recording:** Play (or Watch, for a video), What it is…, Save a copy…, or Remove from this score… (a copy goes to Version History).
+- **Saving stays quick with big files.** Saving copies everything else in the file as it is, and streams the recordings in without packing them again. A .starscore can hold up to about 3.8 GB.
+- **The Autosave Archive keeps one copy of each recording.** A song's versions share its recordings and video: they're kept once each in Autosave Archive/Media, whatever the number of versions. Version History copies made before Standardize or the one-bass-part change leave the recordings out (they're in the song itself).
+- **Home's learning list:** a solo's recordings play from inside the file; "+ Audio, video or Transcribe! file" stores new ones in the solo's file straight away.
+- **Practice panel (View › Practice).** A panel under the score with two modes:
+  - **Watch:** the score showing (a part score, or one of a solo's twelve keys) as falling notes onto a piano keyboard, in time with playback. Right and left hand in their own colours, or the 12 note colours of the solo sheets. Play, loop (select the bars first), count-in and speed (25–150%) are playback's own. "Look ahead" sets how many seconds of music show.
+  - **Jam:** a backing band from the chord symbols: walking or style bass, drums, and piano comping. Grooves: Swing, Ballad, Bossa Nova, Latin, Samba, Funk, Rock / Pop, Jazz Waltz, Shuffle / Boogie (picked from the tempo marking's words at first). A solo plays one chorus of its form (as on its iReal Pro chart); a song plays its bars from the first chord symbol, or only the selected bars. Set the tempo, the number of choruses, a tempo that goes up each chorus, count-in bars, which instruments play, and a key change; a solo's key part score plays in its key. While it plays, the panel shows the chorus, the bar, the chord now and the next one.
+
 ## 1.25.4
 
 - **Solos have versions.** A solo transcription's sheets print a real version instead of "Version 0.0.0": its first Export and Organize makes it 1.0.0; after that the minor version goes up when its notes or chord symbols changed (1.1.0), the patch when only its layout did (1.0.1), and it stays the same when nothing changed.

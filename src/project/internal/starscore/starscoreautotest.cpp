@@ -48,6 +48,8 @@
 #include "engraving/editing/editproperty.h"
 #include "starscorehornkeys.h"
 #include "starscoreautoarchive.h"
+#include "starscorewatch.h"
+#include "starscorejam.h"
 #include "engraving/dom/layoutbreak.h"
 #include "engraving/dom/system.h"
 #include "engraving/dom/textbase.h"
@@ -3721,6 +3723,91 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             return pages;
         });
         autotestLog(QString("  book: %1, %2 exercises engraved, %3 images").arg(ok ? "written" : "FAILED").arg(rendered).arg(images));
+    } else if (step.startsWith("jam:") || step == "jam") {
+        // jam[:<groove>|<bpm>|<choruses>|<transpose>|<tempo step>]: the backing band for this score (1.27.0): its form,
+        // then what each instrument plays (empty fields: the score's own)
+        namespace ss = mu::project::starscore;
+        const QStringList a = step.mid(4).split('|');
+        const ss::JamForm form = ss::jamForm(ms, isSoloTranscription());
+        ss::JamSettings js;
+        js.bpm = a.value(1).toInt() > 0 ? a.value(1).toInt() : form.bpm;
+        int beats = form.bars.empty() ? 4 : form.bars.front().beats;
+        js.groove = !a.value(0).isEmpty() ? a.value(0) : ss::jamGrooveFor(form.style, beats);
+        js.choruses = a.value(2).toInt() > 0 ? a.value(2).toInt() : 2;
+        js.transpose = a.value(3).toInt();
+        js.tempoStep = a.value(4).toInt();
+        autotestLog(QString("  form: %1 bars%2, style \"%3\" -> %4, %5 bpm%6").arg(form.bars.size())
+                    .arg(form.soloForm ? QString(" (a solo's chorus, played %1 times)").arg(form.soloChoruses) : QString())
+                    .arg(form.style, ss::jamGrooveName(js.groove)).arg(js.bpm).arg(form.why.isEmpty() ? QString() : " (" + form.why + ")"));
+        QStringList chart;
+        for (size_t i = 0; i < form.bars.size() && i < 16; ++i) {
+            QStringList cs;
+            for (const ss::JamChord& c : form.bars[i].chords) {
+                cs << (c.at > 0 ? QString("@%1 ").arg(c.at) : QString()) + c.name;
+            }
+            chart << QString("%1/%2 %3").arg(form.bars[i].beats).arg(form.bars[i].beatType).arg(cs.join(" "));
+        }
+        autotestLog("  bars: " + chart.join(" | "));
+        const ss::Jam jam = ss::makeJam(form, js);
+        autotestLog(QString("  %1 bars played, %2 s").arg(jam.bars.size()).arg(jam.seconds, 0, 'f', 2));
+        for (const ss::JamTrack& t : jam.tracks) {
+            int low = 127, high = 0;
+            for (const ss::JamNote& n : t.notes) {
+                low = std::min(low, n.pitch);
+                high = std::max(high, n.pitch);
+            }
+            QStringList first;
+            for (size_t i = 0; i < std::min<size_t>(10, t.notes.size()); ++i) {
+                first << QString("%1@%2").arg(t.notes[i].pitch).arg(t.notes[i].start, 0, 'f', 2);
+            }
+            autotestLog(QString("  %1: %2 notes, %3-%4: %5").arg(t.instrument).arg(t.notes.size()).arg(low).arg(high).arg(first.join(" ")));
+        }
+        // kept for jamwav:
+        static std::unique_ptr<ss::JamPlayer> player;
+        player = std::make_unique<ss::JamPlayer>(iocContext());
+        player->load(jam, false);
+        m_autotestJamPlayer = player.get();
+    } else if (step.startsWith("jamwav:")) {
+        // jamwav:<file>: the last jam: rendered to a WAV file
+        namespace ss = mu::project::starscore;
+        auto* player = static_cast<ss::JamPlayer*>(m_autotestJamPlayer);
+        QElapsedTimer wait;
+        wait.start();
+        while (player && !player->isReady() && wait.elapsed() < 20000) {
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+        }
+        bool done = false, ok = false;
+        if (player && player->isReady()) {
+            player->renderWav(step.mid(7), [&](bool r) {
+                ok = r;
+                done = true;
+            });
+            while (!done && wait.elapsed() < 120000) {
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+            }
+        }
+        autotestLog(QString("  %1: %2 (%3 bytes, %4 ms)").arg(step.mid(7), !player ? "no jam" : !player->isReady() ? "not ready"
+                                                              : ok ? "written" : done ? "FAILED" : "timed out")
+                    .arg(QFileInfo(step.mid(7)).size()).arg(wait.elapsed()));
+    } else if (step == "watchnotes") {
+        // watchnotes: the falling notes of the score showing (1.27.0): how many, the range, the first few
+        QString name;
+        const std::vector<mu::project::starscore::WatchNote> notes = mu::project::starscore::watchNotes(globalContext()->currentNotation(), &name);
+        int low = 127, high = 0;
+        int hands[3] = { 0, 0, 0 };
+        for (const auto& n : notes) {
+            low = std::min(low, n.pitch);
+            high = std::max(high, n.pitch);
+            ++hands[std::clamp(n.hand, 0, 2)];
+        }
+        autotestLog(QString("  %1: %2 notes, pitches %3-%4, right %5 left %6 other %7, last ends at %8 s")
+                    .arg(name.isEmpty() ? QString("main score") : name).arg(notes.size()).arg(low).arg(high)
+                    .arg(hands[0]).arg(hands[1]).arg(hands[2]).arg(notes.empty() ? 0.0 : notes.back().end, 0, 'f', 2));
+        QStringList first;
+        for (size_t i = 0; i < std::min<size_t>(8, notes.size()); ++i) {
+            first << QString("%1@%2-%3").arg(notes[i].pitch).arg(notes[i].start, 0, 'f', 2).arg(notes[i].end, 0, 'f', 2);
+        }
+        autotestLog("  first: " + first.join(" "));
     } else if (step == "filesave") {
         // filesave: File › Save, in place (a .starscore keeps its solos and reference PDFs)
         dispatcher()->dispatch("file-save");

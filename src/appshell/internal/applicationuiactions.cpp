@@ -172,6 +172,13 @@ const UiActionList ApplicationUiActions::m_actions = {
              TranslatableString("action", "Show/hide the To-do panel: this song's work in priority order"),
              Checkable::Yes
              ),
+    UiAction("toggle-starscore-practice",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_NOTATION_OPENED,
+             TranslatableString("action", "&Practice"),
+             TranslatableString("action", "Show/hide the Practice panel: the falling notes (and soon the backing band and the recordings)"),
+             Checkable::Yes
+             ),
     UiAction("toggle-undo-history-panel",
              mu::context::UiCtxProjectOpened,
              mu::context::CTX_NOTATION_OPENED,
@@ -420,6 +427,7 @@ const QMap<ActionCode, DockName>& ApplicationUiActions::toggleDockActions()
         { "toggle-starscore-reference", STARSCORE_REFERENCE_PANEL_NAME },
         { "toggle-starscore-audit", STARSCORE_AUDIT_PANEL_NAME },
         { "toggle-starscore-todo", STARSCORE_TODO_PANEL_NAME },
+        { "toggle-starscore-practice", STARSCORE_PRACTICE_PANEL_NAME },
 
         { TOGGLE_NAVIGATOR_ACTION_CODE, NOTATION_NAVIGATOR_PANEL_NAME },
         { TOGGLE_BRAILLE_ACTION_CODE, NOTATION_BRAILLE_PANEL_NAME },

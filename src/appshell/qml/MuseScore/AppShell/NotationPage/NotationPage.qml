@@ -588,6 +588,37 @@ DockPage {
             }
         },
 
+        // StarScore (1.27.0): Practice: the falling notes over playback
+        DockPanel {
+            id: starscorePracticePanel
+
+            objectName: root.pageModel.starscorePracticePanelName()
+            title: qsTrc("starscore", "Practice")
+
+            height: 320
+            minimumHeight: root.horizontalPanelMinHeight
+            maximumHeight: root.horizontalPanelMaxHeight
+
+            minimumWidth: root.panelMinDimension
+            maximumWidth: root.panelMaxDimension
+
+            groupName: root.horizontalPanelsGroup
+
+            //! NOTE: hidden by default
+            visible: false
+
+            location: Location.Bottom
+
+            dropDestinations: root.horizontalPanelDropDestinations
+
+            navigationSection: root.navigationPanelSec(starscorePracticePanel.location)
+
+            StarScorePracticePanel {
+                navigationSection: starscorePracticePanel.navigationSection
+                navigationOrderStart: starscorePracticePanel.contentNavigationPanelOrderStart
+            }
+        },
+
         DockPanel {
             id: timelinePanel
 

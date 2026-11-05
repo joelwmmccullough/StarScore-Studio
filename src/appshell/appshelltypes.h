@@ -42,6 +42,7 @@ static const DockName UNDO_HISTORY_PANEL_NAME("undoHistoryPanel");
 static const DockName STARSCORE_REFERENCE_PANEL_NAME("starscoreReferencePanel");
 static const DockName STARSCORE_AUDIT_PANEL_NAME("starscoreAuditPanel");
 static const DockName STARSCORE_TODO_PANEL_NAME("starscoreTodoPanel");
+static const DockName STARSCORE_PRACTICE_PANEL_NAME("starscorePracticePanel");
 
 static const DockName NOTATION_NAVIGATOR_PANEL_NAME("notationNavigatorPanel");
 static const DockName NOTATION_BRAILLE_PANEL_NAME("notationBraillePanel");

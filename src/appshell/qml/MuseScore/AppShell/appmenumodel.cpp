@@ -310,6 +310,7 @@ MenuItem* AppMenuModel::makeViewMenu()
         makeMenuItem("toggle-starscore-reference"),
         makeMenuItem("toggle-starscore-audit"),
         makeMenuItem("toggle-starscore-todo"),
+        makeMenuItem("toggle-starscore-practice"),
         makeMenu(TranslatableString("appshell/menu/view", "Progress colors"), {
             makeMenuItem("starscore-progress-colors"),
             makeSeparator(),

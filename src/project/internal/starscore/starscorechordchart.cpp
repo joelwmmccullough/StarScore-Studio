@@ -8,6 +8,7 @@
  * it is kept on purpose, so that the C++ output can be diffed against it.
  */
 #include "starscorechordchart.h"
+#include "starscorejam.h"
 
 #include <algorithm>
 #include <cmath>
@@ -2995,4 +2996,87 @@ QString iRealPlaylistHtml(const QString& name, const QStringList& songs)
                                                  "App icon in the dock.</span><br/>\n</body>\n</html>\n");
 }
 
+
+// ---------------------------------------------------------------------------------------------------------------------
+//  Jam (1.27.0): the bars and chords to jam over (see starscorejam.h)
+// ---------------------------------------------------------------------------------------------------------------------
+
+static int jamPitchClass(const QString& name)
+{
+    static const QString letters = "C D EF G A B";
+    if (name.isEmpty()) {
+        return -1;
+    }
+    const int base = letters.indexOf(name.at(0).toUpper());
+    if (base < 0) {
+        return -1;
+    }
+    int pc = base;
+    for (int i = 1; i < name.size(); ++i) {
+        if (name.at(i) == '#' || name.at(i) == QChar(0x266F)) {
+            ++pc;
+        } else if (name.at(i) == 'b' || name.at(i) == QChar(0x266D)) {
+            --pc;
+        }
+    }
+    return ((pc % 12) + 12) % 12;
+}
+
+JamForm jamForm(const MasterScore* ms, bool solo)
+{
+    JamForm form;
+    if (!ms) {
+        return form;
+    }
+    ChordChartData data = extractChordChart(ms);
+    form.bpm = soloBpm(data);
+    form.style = soloTempoWords(data);
+    if (solo) {
+        int choruses = 0;
+        if (soloOneChorus(data, soloLastBar(ms), choruses)) {
+            form.soloForm = true;
+            form.soloChoruses = choruses;
+        }
+    }
+    int firstChordBar = -1;
+    for (const ChordChartMeasure& m : data.measures) {
+        JamBar bar;
+        const Fraction ts = m.ts.isEmpty() ? Fraction(4, 4) : parseFrac(m.ts);
+        bar.beats = ts.numerator() > 0 ? ts.numerator() : 4;
+        bar.beatType = ts.denominator() > 0 ? ts.denominator() : 4;
+        const Fraction len = m.len.isEmpty() ? ts : parseFrac(m.len);
+        bar.quarters = len.toDouble() * 4.0 > 0 ? len.toDouble() * 4.0 : bar.beats * 4.0 / bar.beatType;
+        bar.mark = m.rm ? *m.rm : QString();
+        for (const ChordChartChord& c : m.chords) {
+            JamChord jc;
+            jc.at = parseFrac(c.t).toDouble() * 4.0;
+            jc.root = jamPitchClass(c.root);
+            if (jc.root < 0) {
+                continue;   // (N.C.)
+            }
+            jc.bass = c.bass.isEmpty() ? -1 : jamPitchClass(c.bass);
+            jc.quality = QString(c.q).remove('=');
+            jc.name = c.root + jc.quality + (c.bass.isEmpty() ? QString() : "/" + c.bass);
+            bar.chords.push_back(jc);
+        }
+        if (firstChordBar < 0 && !bar.chords.empty()) {
+            firstChordBar = int(form.bars.size());
+        }
+        form.bars.push_back(bar);
+    }
+    if (firstChordBar < 0) {
+        form.bars.clear();
+        form.why = muse::qtrc("starscore", "This score has no chord symbols to jam over.");
+        return form;
+    }
+    // (a song: from the first bar with a chord symbol; a solo's chorus is the form already)
+    if (!form.soloForm && firstChordBar > 0) {
+        form.bars.erase(form.bars.begin(), form.bars.begin() + firstChordBar);
+        form.firstBar = firstChordBar;
+    }
+    if (form.bpm <= 0) {
+        form.bpm = 120;
+    }
+    return form;
+}
 }
