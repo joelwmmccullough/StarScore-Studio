@@ -2535,6 +2535,17 @@ bool StarScoreService::autotestSoloStep(const QString& step)
                     out << QString("t%1: %2").arg(t).arg(v.join(' '));
                 }
             }
+            QStringList chords;   // (and the bar's chord symbols, as they read)
+            for (Segment* seg = m->first(SegmentType::ChordRest); seg; seg = seg->next(SegmentType::ChordRest)) {
+                for (const EngravingItem* a : seg->annotations()) {
+                    if (a && a->isHarmony()) {
+                        chords << toHarmony(a)->harmonyName().toQString();
+                    }
+                }
+            }
+            if (!chords.isEmpty()) {
+                out << "chords: " + chords.join(' ');
+            }
             return out.join(" | ");
         };
         if (master) {
