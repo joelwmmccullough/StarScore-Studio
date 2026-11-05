@@ -3041,9 +3041,11 @@ JamForm jamForm(const MasterScore* ms, bool solo)
     int firstChordBar = -1;
     for (const ChordChartMeasure& m : data.measures) {
         JamBar bar;
-        const Fraction ts = m.ts.isEmpty() ? Fraction(4, 4) : parseFrac(m.ts);
-        bar.beats = ts.numerator() > 0 ? ts.numerator() : 4;
-        bar.beatType = ts.denominator() > 0 ? ts.denominator() : 4;
+        // (the time signature as written: "12/8", not the reduced fraction 3/2)
+        const QStringList tsParts = m.ts.split('/');
+        bar.beats = tsParts.size() == 2 && tsParts[0].toInt() > 0 ? tsParts[0].toInt() : 4;
+        bar.beatType = tsParts.size() == 2 && tsParts[1].toInt() > 0 ? tsParts[1].toInt() : 4;
+        const Fraction ts(bar.beats, bar.beatType);
         const Fraction len = m.len.isEmpty() ? ts : parseFrac(m.len);
         bar.quarters = len.toDouble() * 4.0 > 0 ? len.toDouble() * 4.0 : bar.beats * 4.0 / bar.beatType;
         bar.mark = m.rm ? *m.rm : QString();
