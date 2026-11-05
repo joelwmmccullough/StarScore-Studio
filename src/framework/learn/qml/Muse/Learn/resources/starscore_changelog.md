@@ -8,6 +8,7 @@ Version numbers: the first number changes when files stop being compatible, the 
 
 - **Flats and sharps in chord chart titles.** A chord chart's title now draws its ♭ and ♯ with the music font: the title font has neither, so "Tumba (E♭ minor)" printed as "Tumba (E  minor)".
 - **An all-solos file with no band.** Its iReal Pro chart's composer is now "All Solos"; it was "Starsign".
+- **A solo's iReal Pro chart in parts.** When a solo's chords are too long for one iReal Pro chart, its parts in the playlist no longer each repeat the solo's number of choruses (Part 1 eleven times, then Part 2 eleven times); iReal Pro's own repeat setting is used.
 
 ## 1.25.2
 

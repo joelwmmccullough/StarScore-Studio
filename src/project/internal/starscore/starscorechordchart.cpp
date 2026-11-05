@@ -2926,7 +2926,9 @@ ChordChartResult writeSoloChordCharts(const MasterScore* ms, const QString& fold
                                                 "in %1 parts.").arg(links.size());
         }
         for (const IRealLink& l : links) {
-            const QString song = irealPlaylistSong(l.url, bpm, choruses);
+            // (1.25.3) a chart in parts isn't one chorus: each part played the solo's number of choruses would be
+            // wrong, so iReal Pro's own repeat setting is left to decide
+            const QString song = irealPlaylistSong(l.url, bpm, links.size() > 1 ? 0 : choruses);
             if (!song.isEmpty()) {
                 irealSongs << song;
             }
