@@ -2582,10 +2582,10 @@ bool StarScoreService::autotestSoloStep(const QString& step)
         if (!master) {
             return true;
         }
-        const ChordChartData d = extractChordChart(master->masterScore());
-        for (const ChordChartMeasure& m : d.measures) {
+        const starscore::ChordChartData d = starscore::extractChordChart(master->masterScore());
+        for (const starscore::ChordChartMeasure& m : d.measures) {
             QStringList ch;
-            for (const ChordChartChord& c : m.chords) {
+            for (const starscore::ChordChartChord& c : m.chords) {
                 ch << QString("%1:%2%3%4%5").arg(c.t, c.root, c.q, c.bass.isEmpty() ? QString() : "/" + c.bass,
                                                  c.hidden ? QString("(h)") : QString());
             }
