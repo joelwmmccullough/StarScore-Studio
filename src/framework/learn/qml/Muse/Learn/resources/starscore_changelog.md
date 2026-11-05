@@ -7,6 +7,7 @@ Version numbers: the first number changes when files stop being compatible, the 
 ## 1.25.3
 
 - **Flats and sharps in chord chart titles.** A chord chart's title now draws its ♭ and ♯ with the music font: the title font has neither, so "Tumba (E♭ minor)" printed as "Tumba (E  minor)".
+- **An all-solos file with no band.** Its iReal Pro chart's composer is now "All Solos"; it was "Starsign".
 
 ## 1.25.2
 

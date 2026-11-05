@@ -1800,7 +1800,10 @@ int StarScoreService::exportSoloChordCharts(QStringList& irealSongs, QStringList
     const QString title = player.isEmpty() ? song
                           : soloIsAllSolos(player) ? muse::qtrc("starscore", "%1 (all solos)").arg(song)
                           : QString("%1 (%2)").arg(song, player);
-    const QString ireal = soloIsAllSolos(player) ? data.solo.value("band").toString() : player;   // (iReal's composer)
+    // (iReal's composer: the band for all the solos on a recording, or "All Solos" when no band is given: an empty one
+    // printed "Starsign")
+    const QString band = data.solo.value("band").toString().trimmed();
+    const QString ireal = soloIsAllSolos(player) && !band.isEmpty() ? band : player;
     const starscore::ChordChartResult r = starscore::writeSoloChordCharts(ms, QFileInfo(project->path().toQString()).absolutePath(), base, title,
                                                     song, ireal, soloMinor(data.solo), keys, irealSongs, problems);
     return int(r.written.size());
