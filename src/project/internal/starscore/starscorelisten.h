@@ -19,6 +19,7 @@
 #include "async/asyncable.h"
 #include "modularity/ioc.h"
 #include "audio/main/iplayback.h"
+#include "audio/main/iplayer.h"
 #include "audio/common/starscorepcmdevice.h"
 
 namespace mu::project::starscore {
