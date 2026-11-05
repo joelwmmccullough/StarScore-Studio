@@ -4,6 +4,12 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.25.4
+
+- **Solos have versions.** A solo transcription's sheets print a real version instead of "Version 0.0.0": its first Export and Organize makes it 1.0.0; after that the minor version goes up when its notes or chord symbols changed (1.1.0), the patch when only its layout did (1.0.1), and it stays the same when nothing changed.
+- **Smaller moves between keys, a little more often.** A key now goes the long way round only when that puts at least 30% fewer notes off the staves (it was 25%). Pinetop's Boogie Woogie in B now goes down a half step instead of up a major 7th. A solo made before this has its keys picked again the next time it's opened.
+- **The side panels in your order.** Palettes, Layout, Properties and To-do, whichever of them share a tab group (pinned to the left of the window, say), are kept in that order, however the layout was saved or a panel was dropped in. Other tabs in the group keep their places.
+
 ## 1.25.3
 
 - **Flats and sharps in chord chart titles.** A chord chart's title now draws its ♭ and ♯ with the music font: the title font has neither, so "Tumba (E♭ minor)" printed as "Tumba (E  minor)".

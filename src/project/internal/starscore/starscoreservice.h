@@ -580,6 +580,7 @@ private:
     muse::async::Notification m_soloLearningChanged;
     muse::RetVal<QString> copyScoreAudio(const QString& soloPath, const QString& sourcePath, const QString& base);
     QString soloFileKeyName(int keyIndex, bool written) const;
+    QString soloVersionForExport();
     bool m_soloRefreshQueued = false;
     bool m_soloUndoRedo = false;
     bool m_soloRefreshing = false;

@@ -52,6 +52,8 @@ public:
     int currentIndex() const override;
     bool insertDockWidget(int index, DockWidgetBase *, const QIcon &, const QString &title) override;
     Q_INVOKABLE void setCurrentDockWidget(int index) override;
+    // StarScore Studio: moves a dock widget's tab to `to` in this group, the current tab staying current
+    void moveDockWidget(DockWidgetBase *dw, int to);
 
     /// @brief Returns the tab bar as a QObject for QML.
     /// As the base class is not a QObject.
@@ -93,6 +95,8 @@ public:
     int indexOf(const DockWidgetBase *);
     bool insert(DockWidgetBase *dw, int index);
     bool contains(DockWidgetBase *dw) const;
+    // StarScore Studio: a tab moved to another place in its group (no remove/insert: the dock widget stays put)
+    bool move(DockWidgetBase *dw, int to);
 
 protected:
     QHash<int, QByteArray> roleNames() const override;

@@ -22,6 +22,8 @@
 
 #include "dockwindow.h"
 
+#include <QTimer>
+
 #include "thirdparty/KDDockWidgets/src/DockWidgetQuick.h"
 #include "thirdparty/KDDockWidgets/src/LayoutSaver.h"
 #include "thirdparty/KDDockWidgets/src/private/quick/MainWindowQuick_p.h"
@@ -29,6 +31,8 @@
 #include "thirdparty/KDDockWidgets/src/private/multisplitter/Item_p.h"
 #include "thirdparty/KDDockWidgets/src/private/DockRegistry_p.h"
 #include "thirdparty/KDDockWidgets/src/Config.h"
+#include "thirdparty/KDDockWidgets/src/private/Frame_p.h"
+#include "thirdparty/KDDockWidgets/src/private/quick/TabWidgetQuick_p.h"
 
 #include "global/async/async.h"
 
@@ -322,6 +326,77 @@ void DockWindow::setDockOpen(const QString& dockName, bool open)
         m_currentPage->setDockOpen(dockName, open);
         m_docksOpenStatusChanged.send({ dockName });
         scheduleFitLayoutToWindow();
+        scheduleSortStarScorePanelTabs();
+    }
+}
+
+//! StarScore (Joel, 5 Nov 2026): Palettes, Layout, Properties and To-do, whichever of them share a tab group (pinned
+//! to the left of the window, usually), are kept in that order. Other tabs in the group keep their places.
+static const QStringList& starscorePanelTabOrder()
+{
+    static const QStringList order { "palettesPanel", "instrumentsPanel", "inspectorPanel", "starscoreTodoPanel" };
+    return order;
+}
+
+void DockWindow::scheduleSortStarScorePanelTabs()
+{
+    if (m_starscoreSortQueued) {
+        return;
+    }
+    m_starscoreSortQueued = true;
+    QTimer::singleShot(0, this, [this]() {
+        m_starscoreSortQueued = false;
+        sortStarScorePanelTabs();
+    });
+}
+
+void DockWindow::sortStarScorePanelTabs()
+{
+    if (!m_currentPage) {
+        return;
+    }
+    const QStringList& order = starscorePanelTabOrder();
+    std::vector<KDDockWidgets::Frame*> frames;
+    for (const QString& name : order) {
+        DockBase* dock = m_currentPage->dockByName(name);
+        KDDockWidgets::Frame* frame = dock && dock->dockWidget() ? dock->dockWidget()->frame() : nullptr;
+        if (frame && std::find(frames.begin(), frames.end(), frame) == frames.end()) {
+            frames.push_back(frame);
+        }
+    }
+    for (KDDockWidgets::Frame* frame : frames) {
+        auto* tabs = dynamic_cast<KDDockWidgets::TabWidgetQuick*>(frame->tabWidget());
+        if (!tabs) {
+            continue;
+        }
+        // the places they have now, given to them in the order they should be in
+        for (int pass = 0; pass < 4; ++pass) {
+            const QVector<KDDockWidgets::DockWidgetBase*> dws = frame->dockWidgets();
+            std::vector<int> places;
+            std::vector<KDDockWidgets::DockWidgetBase*> ours;
+            for (int i = 0; i < dws.size(); ++i) {
+                if (dws[i] && order.contains(dws[i]->uniqueName())) {
+                    places.push_back(i);
+                    ours.push_back(dws[i]);
+                }
+            }
+            if (ours.size() < 2) {
+                break;
+            }
+            std::stable_sort(ours.begin(), ours.end(), [&](const auto* a, const auto* b) {
+                return order.indexOf(a->uniqueName()) < order.indexOf(b->uniqueName());
+            });
+            bool moved = false;
+            for (size_t k = 0; k < ours.size(); ++k) {
+                if (tabs->indexOfDockWidget(ours[k]) != places[k]) {
+                    tabs->moveDockWidget(ours[k], places[k]);
+                    moved = true;
+                }
+            }
+            if (!moved) {
+                break;
+            }
+        }
     }
 }
 
@@ -690,6 +765,7 @@ bool DockWindow::doLoadPage(const QString& uri, const QVariantMap& params)
     newPage->setParams(params);
 
     m_currentPage = newPage;
+    scheduleSortStarScorePanelTabs();   // (StarScore: the restored layout's tab groups in Joel's order)
 
     connect(m_currentPage, &DockPageView::layoutRequested,
             this, &DockWindow::forceLayout, Qt::UniqueConnection);
@@ -868,6 +944,17 @@ void DockWindow::initDocks(DockPageView* page)
 
         connect(toolbar, &DockToolBarView::visibleChanged,
                 holder, &UniqueConnectionHolder::alignTopLevelToolBars, Qt::UniqueConnection);
+    }
+
+    // StarScore: a panel dropped into another tab group gets its place in Joel's order there
+    if (page) {
+        for (const QString& name : starscorePanelTabOrder()) {
+            DockBase* dock = page->dockByName(name);
+            if (dock && dock->dockWidget()) {
+                connect(dock->dockWidget(), &QQuickItem::parentChanged, this, &DockWindow::scheduleSortStarScorePanelTabs,
+                        Qt::UniqueConnection);
+            }
+        }
     }
 
     // StarScore: a page toolbar changing size (the note input bar wrapping its buttons) can let the layout fit again

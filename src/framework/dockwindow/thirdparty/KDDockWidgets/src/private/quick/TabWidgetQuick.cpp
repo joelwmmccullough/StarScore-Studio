@@ -167,6 +167,25 @@ DockWidgetBase *DockWidgetModel::dockWidgetAt(int index) const
     return m_dockWidgets[index];
 }
 
+bool DockWidgetModel::move(DockWidgetBase *dw, int to)
+{
+    const int from = m_dockWidgets.indexOf(dw);
+    if (from < 0 || to < 0 || to >= m_dockWidgets.size() || from == to)
+        return false;
+    // (beginMoveRows wants the row the item goes before, counted before the move)
+    if (!beginMoveRows(QModelIndex(), from, from, QModelIndex(), to > from ? to + 1 : to))
+        return false;
+    m_dockWidgets.move(from, to);
+    endMoveRows();
+    return true;
+}
+
+void TabWidgetQuick::moveDockWidget(DockWidgetBase *dw, int to)
+{
+    if (m_dockWidgetModel->move(dw, to))
+        Q_EMIT currentTabChanged(currentIndex());
+}
+
 bool DockWidgetModel::contains(DockWidgetBase *dw) const
 {
     return m_dockWidgets.contains(dw);

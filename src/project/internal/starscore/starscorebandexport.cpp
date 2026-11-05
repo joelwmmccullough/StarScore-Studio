@@ -6349,6 +6349,10 @@ RetVal<QString> StarScoreService::exportSoloSheets()
 
     // spelled as they're saved first (the keys' octaves picked from the notes as they are now)
     refreshSoloTranscription(master, false);
+    // (1.25.4) its version, on every sheet's footer
+    if (const QString version = soloVersionForExport(); !version.isEmpty() && version != scoreVersion()) {
+        setScoreVersion(version);
+    }
     // numbered round the circle of fifths from the original key (Joel, 4 Nov 2026): C, G, D, A … F for a solo in C
     std::vector<SoloKeyScore> keys = soloKeyScores(master);
     std::sort(keys.begin(), keys.end(), [](const SoloKeyScore& a, const SoloKeyScore& b) {

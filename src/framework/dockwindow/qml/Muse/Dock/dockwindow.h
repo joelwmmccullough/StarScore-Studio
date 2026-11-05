@@ -142,6 +142,10 @@ private:
     void adjustContentForAvailableSpace(DockPageView* page);
     void fitLayoutToWindow();
     void scheduleFitLayoutToWindow();
+    //! StarScore: Palettes, Layout, Properties and To-do in that order wherever they share a tab group
+    void sortStarScorePanelTabs();
+    void scheduleSortStarScorePanelTabs();
+    bool m_starscoreSortQueued = false;
     bool m_fitLayoutScheduled = false;
 
     void notifyAboutDocksOpenStatus();

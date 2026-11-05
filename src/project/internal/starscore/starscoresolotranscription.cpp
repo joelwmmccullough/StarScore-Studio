@@ -35,6 +35,7 @@
 #include <QRegularExpression>
 #include <QTimer>
 #include <QCoreApplication>
+#include <QCryptographicHash>
 
 #include "async/notifylist.h"
 #include <QUuid>
@@ -282,7 +283,7 @@ double soloShiftCost(const std::vector<SoloPitch>& pitches, int shift, bool writ
 }
 
 //! Up or down for a key `keyIndex` semitones above the original (keyIndex or keyIndex - 12): the smaller move, unless
-//! the other keeps the notes clearly nearer their staves (25% less off them); a tritone either way, the one nearer
+//! the other keeps the notes clearly nearer their staves (30% less off them, 1.25.4); a tritone either way, the one nearer
 //! the staves; with no notes yet, the nearer one. A shift that's nearly as good as the one in
 //! use is kept, so a key doesn't jump octaves back and forth while the solo is written.
 int soloPickShift(const std::vector<SoloPitch>& pitches, int keyIndex, int current, bool written = false, int offset = 0)
@@ -299,12 +300,13 @@ int soloPickShift(const std::vector<SoloPitch>& pitches, int keyIndex, int curre
     const double costDown = soloShiftCost(pitches, down, written, offset);
     int best = costUp < costDown ? up : down;
     if (up != -down) {
-        // (Joel, 4 Nov 2026) the smaller move, unless the bigger one has at least 25% fewer notes off the staves (B
-        // in a solo in C: down a half step, not up a major 7th, unless up reads clearly better)
+        // (Joel, 4 Nov 2026) the smaller move, unless the bigger one has at least 30% fewer notes off the staves (B
+        // in a solo in C: down a half step, not up a major 7th, unless up reads clearly better). 25% until 1.25.4,
+        // which sent Pinetop's B major up a major 7th at a ratio of about 0.75 (Joel, 5 Nov: "use your best judgement")
         const bool upSmaller = up < -down;
         const double costSmall = upSmaller ? costUp : costDown;
         const double costBig = upSmaller ? costDown : costUp;
-        best = costBig <= costSmall * 0.75 ? (upSmaller ? down : up) : (upSmaller ? up : down);
+        best = costBig <= costSmall * 0.70 ? (upSmaller ? down : up) : (upSmaller ? up : down);
     } else if (costUp == costDown) {
         // a tie: toward the middle of the piano
         double mean = 0.0;
@@ -323,6 +325,79 @@ int soloPickShift(const std::vector<SoloPitch>& pitches, int keyIndex, int curre
     }
     return best;
 }
+}
+
+namespace {
+QString soloLayoutSignature(mu::engraving::MasterScore* ms);   // (below)
+}
+
+//! (1.25.4, Joel 5 Nov 2026: solos get real versions) The version a solo's sheets are exported as, set and kept with
+//! what it was exported from: its first export 1.0.0; then the minor version up when its notes or chord symbols
+//! changed, the patch when only its layout did, the same version when nothing did. (A solo exported before 1.25.4
+//! keeps its version for this export: there's nothing to compare it with.)
+QString StarScoreService::soloVersionForExport()
+{
+    using namespace mu::engraving;
+    MasterScore* ms = masterScore();
+    if (!ms) {
+        return QString();
+    }
+    // what the solo plays: every note (where, how long, its pitch and spelling) and every chord symbol
+    QString music;
+    for (Segment* s = ms->firstSegment(SegmentType::ChordRest); s; s = s->next1(SegmentType::ChordRest)) {
+        for (track_idx_t t = 0; t < ms->ntracks(); ++t) {
+            const EngravingItem* e = s->element(t);
+            if (!e) {
+                continue;
+            }
+            music += QString("|%1:%2:").arg(s->tick().ticks()).arg(t);
+            if (e->isChord()) {
+                const Chord* c = toChord(e);
+                music += QString::number(c->ticks().ticks());
+                for (const Chord* g : c->graceNotes()) {
+                    for (const Note* n : g->notes()) {
+                        music += QString("g%1/%2").arg(n->pitch()).arg(n->tpc1());
+                    }
+                }
+                for (const Note* n : c->notes()) {
+                    music += QString(",%1/%2").arg(n->pitch()).arg(n->tpc1());
+                }
+            } else {
+                music += "r" + QString::number(toChordRest(e)->ticks().ticks());
+            }
+        }
+        for (const EngravingItem* a : s->annotations()) {
+            if (a && a->isHarmony()) {
+                music += "h" + toHarmony(a)->harmonyName().toQString();
+            }
+        }
+    }
+    auto hash = [](const QString& text) {
+        return QString::fromLatin1(QCryptographicHash::hash(text.toUtf8(), QCryptographicHash::Sha1).toHex());
+    };
+    const QString musicSig = hash(music);
+    const QString layoutSig = hash(soloLayoutSignature(ms));
+
+    Data data = load();
+    const QString before = scoreVersion();
+    const QString lastMusic = data.solo.value("exportedMusic").toString();
+    const QString lastLayout = data.solo.value("exportedLayout").toString();
+    QString version = before;
+    const QStringList parts = before.split('.');
+    const int major = parts.value(0).toInt(), minor = parts.value(1).toInt(), patch = parts.value(2).toInt();
+    if (before == "0.0.0") {
+        version = "1.0.0";
+    } else if (!lastMusic.isEmpty() && lastMusic != musicSig) {
+        version = QString("%1.%2.0").arg(major).arg(minor + 1);
+    } else if (!lastLayout.isEmpty() && lastLayout != layoutSig) {
+        version = QString("%1.%2.%3").arg(major).arg(minor).arg(patch + 1);
+    }
+    if (lastMusic != musicSig || lastLayout != layoutSig) {
+        data.solo["exportedMusic"] = musicSig;
+        data.solo["exportedLayout"] = layoutSig;
+        storeTo(ms, data, projectOf(ms));
+    }
+    return version;
 }
 
 QString StarScoreService::soloTranscriptionsFolder() const
@@ -1270,6 +1345,10 @@ void StarScoreService::refreshSoloTranscription(const IMasterNotationPtr& master
         }
     }
     data.solo["keys"] = keys;
+    // (1.25.4) the rule for each key's octave changed: a file from before it has its keys picked again, without
+    // keeping the octave it had
+    static constexpr int SOLO_SHIFT_RULE = 2;
+    const bool newRule = data.solo.value("shiftRule").toInt() < SOLO_SHIFT_RULE;
     for (const SoloKeyScore& k : scores) {
         int at = -1;
         for (int i = 0; i < keys.size(); ++i) {
@@ -1282,13 +1361,17 @@ void StarScoreService::refreshSoloTranscription(const IMasterNotationPtr& master
         }
         QJsonObject entry = keys.at(at).toObject();
         const int current = entry.value("shift").toInt();
-        const int shift = soloPickShift(pitches, k.index, current);
+        const int shift = soloPickShift(pitches, k.index, newRule ? 99 : current);
         if (shift != current) {
             entry["shift"] = shift;
             keys[at] = entry;
             keysChanged = true;
         }
         respellSoloKey(k.score, soloIntervalTo(fifths, soloTargetFifths(data.solo, k.index), shift), false);
+    }
+    if (newRule) {
+        data.solo["shiftRule"] = SOLO_SHIFT_RULE;
+        keysChanged = true;
     }
     if (keysChanged) {
         data.solo["keys"] = keys;
