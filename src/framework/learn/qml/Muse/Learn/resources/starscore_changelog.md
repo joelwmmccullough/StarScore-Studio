@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.25.3
+
+- **Flats and sharps in chord chart titles.** A chord chart's title now draws its ♭ and ♯ with the music font: the title font has neither, so "Tumba (E♭ minor)" printed as "Tumba (E  minor)".
+
 ## 1.25.2
 
 - **A solo's iReal Pro chart written as it is.** The one chorus of a solo's form is written out bar by bar between one pair of repeat signs ({: … :}), with no 1st and 2nd endings and no bars folded into shorter repeats. Tumba's vamp reads {: A9sus F♯9sus | A♯9sus G9sus | A9sus F♯9sus | A♯9sus G9sus :}. A form longer than one iReal Pro chart (48 bars) is still shortened.

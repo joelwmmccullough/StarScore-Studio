@@ -1125,6 +1125,7 @@ section > .row:first-child, .head + .row { margin-top: 8pt; }
 .ac.sharp { top: -0.36em; font-size: 0.72em; }
 .ac.flat { top: -0.12em; }
 .acc { font-family: BravuraText; -webkit-text-stroke: 0.045em currentColor; }
+h1 .tacc { font-family: BravuraText; font-size: 1.4em; line-height: 0; margin: 0 0.02em; }
 .q { font-size: 0.5em; margin-left: 0.05em; letter-spacing: 0.01em; }
 .c.hasacc .q { display: inline-block; min-width: 0.95em; }
 .q .acc { font-size: 1.1em; position: relative; top: -0.05em; }
@@ -1306,6 +1307,16 @@ const char* PDF_FOOTER_CSS = "\n.ver { font-family: Modernoir, sans-serif; font-
 
 //! Bravura Text glyphs: accidentalFlat and accidentalSharp (prototype: heavier than the chord-symbol flat)
 const QString FLAT = QString::fromUtf8("<span class=\"acc\">\xee\x89\xa0</span>");
+//! (1.25.2) The title with its ♭ and ♯ in the music font: the title font has none ("Tumba (E♭ minor)" printed
+//! "Tumba (E  minor)")
+QString titleHtml(const QString& title)
+{
+    QString h = esc(title);
+    h.replace(QString::fromUtf8("\u266D"), QString::fromUtf8("<span class=\"tacc\">\xee\x89\xa0</span>"));
+    h.replace(QString::fromUtf8("\u266F"), QString::fromUtf8("<span class=\"tacc\">\xee\x89\xa2</span>"));
+    h.replace(QString::fromUtf8("\u266E"), QString::fromUtf8("<span class=\"tacc\">\xee\x89\xa1</span>"));
+    return h;
+}
 const QString SHARP = QString::fromUtf8("<span class=\"acc\">\xee\x89\xa2</span>");
 
 QString accHtml(const QString& text)
@@ -1794,7 +1805,7 @@ QString chordChartHtml(const ChordChartData& song, const QString& title, const C
     }
     return QString("<!doctype html><html><head><meta charset='utf-8'><style>%1</style></head><body><div id='page'>"
                    "<header><h1>%2</h1>%3<div class='form'>%4</div></header>%5%6</div>%7</body></html>")
-           .arg(css, esc(title), a.tempo.isEmpty() ? QString() : QString("<div class=\"sub\">%1</div>").arg(tempoHtml(a.tempo)),
+           .arg(css, titleHtml(title), a.tempo.isEmpty() ? QString() : QString("<div class=\"sub\">%1</div>").arg(tempoHtml(a.tempo)),
                 formSpans.join(QString(" ")), out, footer, QString::fromUtf8(PDF_JS));
 }
 
