@@ -370,6 +370,7 @@ void DockWindow::sortStarScorePanelTabs()
             continue;
         }
         // the places they have now, given to them in the order they should be in
+        bool anyMoved = false;
         for (int pass = 0; pass < 4; ++pass) {
             const QVector<KDDockWidgets::DockWidgetBase*> dws = frame->dockWidgets();
             std::vector<int> places;
@@ -396,6 +397,13 @@ void DockWindow::sortStarScorePanelTabs()
             if (!moved) {
                 break;
             }
+            anyMoved = true;
+        }
+        // (1.27.1) the tab bar's titles are made again from the frame's tabs only when their number changes: told so
+        // after a move, or the titles stayed in the old order over the moved panels (Joel, 5 Nov 2026: "the tab names
+        // now don't match the actual tabs")
+        if (anyMoved) {
+            Q_EMIT frame->numDockWidgetsChanged();
         }
     }
 }

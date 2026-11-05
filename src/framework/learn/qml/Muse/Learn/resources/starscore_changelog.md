@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.27.1
+
+- **The side panels' tab names match their panels again.** 1.25.4 put Palettes, Layout, Properties and To-do in that order, but when it had to move them (a layout saved in another order), the tab names stayed in the old order: the To-do tab showed the palettes. The names now follow the panels.
+
 ## 1.27.0
 
 - **Practice › Listen: the recordings, Transcribe!-style.** A third mode in the Practice panel plays the recordings stored in the score (the full mix, the piano stem, everything but piano…), all on one clock:
