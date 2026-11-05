@@ -8,6 +8,7 @@ Version numbers: the first number changes when files stop being compatible, the 
 
 - **Solos have versions.** A solo transcription's sheets print a real version instead of "Version 0.0.0": its first Export and Organize makes it 1.0.0; after that the minor version goes up when its notes or chord symbols changed (1.1.0), the patch when only its layout did (1.0.1), and it stays the same when nothing changed.
 - **Smaller moves between keys, a little more often.** A key now goes the long way round only when that puts at least 30% fewer notes off the staves (it was 25%). Pinetop's Boogie Woogie in B now goes down a half step instead of up a major 7th. A solo made before this has its keys picked again the next time it's opened.
+- **Keys behind the main score's formatting brought up to date.** The twelve keys of Raffy Bushman's Renaissance had one locked system running from bar 11 to bar 500, while the main score locks two bars to a system, so bar 11 of every key was crushed together with 490 empty bars. A solo now remembers which formatting of the main score its keys were given; when it's opened, or its sheets exported, and the main score's formatting has changed since without reaching the keys, the keys get it again. (A solo from before this is checked by its system locks.)
 - **The side panels in your order.** Palettes, Layout, Properties and To-do, whichever of them share a tab group (pinned to the left of the window, say), are kept in that order, however the layout was saved or a panel was dropped in. Other tabs in the group keep their places.
 
 ## 1.25.3

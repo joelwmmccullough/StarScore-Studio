@@ -563,6 +563,7 @@ private:
     void scheduleSoloRefresh();
     void refreshSoloTranscription(const notation::IMasterNotationPtr& master, bool syncLayout);
     void onSoloTranscriptionOpened();
+    bool soloKeysLayoutStale(const notation::IMasterNotationPtr& master);
     mu::engraving::Interval soloInstrumentInterval() const;
     //! A key's part score made ready to print: in concert pitch, or written for the instrument. Returns its label.
     QString prepareSoloKeyForSheet(const SoloKeyScore& key, bool written);

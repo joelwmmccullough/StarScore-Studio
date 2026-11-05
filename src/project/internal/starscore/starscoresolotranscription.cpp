@@ -329,6 +329,7 @@ int soloPickShift(const std::vector<SoloPitch>& pitches, int keyIndex, int curre
 
 namespace {
 QString soloLayoutSignature(mu::engraving::MasterScore* ms);   // (below)
+QString soloSigHash(const QString& sig);                        // (below)
 }
 
 //! (1.25.4, Joel 5 Nov 2026: solos get real versions) The version a solo's sheets are exported as, set and kept with
@@ -1426,6 +1427,14 @@ void StarScoreService::refreshSoloTranscription(const IMasterNotationPtr& master
         if (before != muse::nidx && before >= 1 && stack->currentStateIndex() == before + 1) {
             stack->mergeCommands(before - 1);
         }
+        // (1.25.4) which formatting of the main score the keys have, kept in the file: a file opened with keys
+        // behind its main score gets them brought up to date (Raffy Bushman's Renaissance: its main score locked two
+        // bars a system, its keys one system from bar 11 to bar 500)
+        Data saved = loadFrom(ms);
+        if (saved.solo.value("layoutSig").toString() != soloSigHash(sig)) {
+            saved.solo["layoutSig"] = soloSigHash(sig);
+            storeTo(ms, saved, projectOf(ms));
+        }
     }
     if (m_soloLayoutSig.isEmpty() || syncLayout) {
         m_soloLayoutSig = sig;
@@ -1436,6 +1445,45 @@ void StarScoreService::refreshSoloTranscription(const IMasterNotationPtr& master
             k.notation->notationChanged().notify();
         }
     }
+}
+
+namespace {
+QString soloSigHash(const QString& sig)
+{
+    return QString::fromLatin1(QCryptographicHash::hash(sig.toUtf8(), QCryptographicHash::Sha1).toHex());
+}
+}
+
+//! (1.25.4) The twelve keys' formatting is behind the main score's: the file says it was copied from formatting the
+//! main score no longer has (a change that didn't reach the keys), or, in a file from before 1.25.4 that doesn't say,
+//! the keys' system locks aren't the main score's
+bool StarScoreService::soloKeysLayoutStale(const IMasterNotationPtr& master)
+{
+    using namespace mu::engraving;
+    MasterScore* ms = master ? master->masterScore() : nullptr;
+    if (!ms || !soloTagged(ms)) {
+        return false;
+    }
+    const QString stored = loadFrom(ms).solo.value("layoutSig").toString();
+    if (!stored.isEmpty()) {
+        return stored != soloSigHash(soloLayoutSignature(ms));
+    }
+    auto ranges = [](const Score* sc) {
+        std::set<std::pair<int, int> > out;
+        for (const SystemLock* l : sc->systemLocks()->allLocks()) {
+            if (l && l->startMB() && l->endMB()) {
+                out.insert({ l->startMB()->tick().ticks(), l->endMB()->endTick().ticks() });
+            }
+        }
+        return out;
+    };
+    const auto want = ranges(ms);
+    for (const SoloKeyScore& k : soloKeyScores(master)) {
+        if (k.score && ranges(k.score) != want) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void StarScoreService::onSoloTranscriptionOpened()
@@ -1491,11 +1539,13 @@ void StarScoreService::onSoloTranscriptionOpened()
             ms->setMetaTag(u"composer", String::fromQString(soloComposer(o)));
         }
     }
-    // (opened: the keys spelled again, the formatting left as it was saved)
-    m_soloLayoutSig = soloLayoutSignature(masterScore());
+    // (opened: the keys spelled again, the formatting left as it was saved, unless the keys are behind the main
+    // score's formatting: see soloKeysLayoutStale)
+    const bool stale = soloKeysLayoutStale(globalContext()->currentMasterNotation());
+    m_soloLayoutSig = stale ? QString() : soloLayoutSignature(masterScore());
     soloRememberStyle(masterScore());
     hideSoloKeyStaves(globalContext()->currentMasterNotation());
-    refreshSoloTranscription(globalContext()->currentMasterNotation(), false);
+    refreshSoloTranscription(globalContext()->currentMasterNotation(), stale);
 }
 
 //! (1.25.0, Joel) On the twelve keys' part scores, every staff of a two-staff instrument (the treble staff too, as

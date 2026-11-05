@@ -6347,8 +6347,14 @@ RetVal<QString> StarScoreService::exportSoloSheets()
     const QString sheets = QFileInfo(file).absolutePath() + "/Sheets";
     const bool transposing = !soloInstrumentInterval().isZero();
 
-    // spelled as they're saved first (the keys' octaves picked from the notes as they are now)
-    refreshSoloTranscription(master, false);
+    // spelled as they're saved first (the keys' octaves picked from the notes as they are now), and (1.25.4) with the
+    // main score's formatting if they're behind it
+    if (soloKeysLayoutStale(master)) {
+        m_soloLayoutSig.clear();
+        refreshSoloTranscription(master, true);
+    } else {
+        refreshSoloTranscription(master, false);
+    }
     // (1.25.4) its version, on every sheet's footer
     if (const QString version = soloVersionForExport(); !version.isEmpty() && version != scoreVersion()) {
         setScoreVersion(version);
