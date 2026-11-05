@@ -2605,10 +2605,9 @@ QString soloBarHarmony(const ChordChartMeasure& m, QString& sounding)
 {
     QStringList out;
     QString last = sounding;
+    // (1.25.2) hidden chord symbols too: they're the harmony there, kept off the lead sheet only (Tumba shows its
+    // vamp's chords in bars 2–5 and hides them in the other 146 bars)
     for (const ChordChartChord& c : m.chords) {
-        if (c.hidden) {
-            continue;
-        }
         const QString ch = c.root + " " + c.q + (c.bass.isEmpty() ? QString() : "/" + c.bass);
         if (out.isEmpty() && c.t != "0" && !last.isEmpty()) {
             out << "0 " + last;
@@ -2653,7 +2652,7 @@ bool soloOneChorus(ChordChartData& data, int lastBar, int& choruses)
             harmony.push_back(h);
             bool any = false;
             for (const ChordChartChord& c : ms[size_t(i)].chords) {
-                any = any || !c.hidden;
+                any = true;   // (hidden or not: see soloBarHarmony)
             }
             explicitBar.push_back(any);
         }
@@ -2733,6 +2732,9 @@ bool soloOneChorus(ChordChartData& data, int lastBar, int& choruses)
             if (pick < 0 && !mainTs.isEmpty()) {
                 m.ts = mainTs;
                 m.len = fracStr(parseFrac(mainTs));
+            }
+            for (ChordChartChord& c : m.chords) {
+                c.hidden = false;   // (a hidden chord is the form's chord there all the same)
             }
             m.i = p;
             m.startRepeat = false;
