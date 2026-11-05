@@ -5,6 +5,7 @@
  * let the user confirm them, optionally standardize the file, and save it as a new .starscore.
  */
 #include "starscoreservice.h"
+#include "starscorezip.h"
 #include "starscoreengraving.h"
 #include "starscorehornkeys.h"
 
@@ -2303,7 +2304,7 @@ void StarScoreService::tidyOpenedScore()
                                 + " Before one bass part";
             QDir().mkpath(dir);
             archived = dir + "/" + fi.fileName();
-            if (!QFileInfo::exists(archived) && !QFile::copy(path, archived)) {
+            if (!QFileInfo::exists(archived) && !mu::project::starscore::zip::copyWithoutMedia(path, archived)) {
                 archived.clear();
             }
         }

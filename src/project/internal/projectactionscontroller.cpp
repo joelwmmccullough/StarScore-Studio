@@ -20,6 +20,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include "projectactionscontroller.h"
+#include "starscore/starscorezip.h"
 
 #include "starscore/starscoreengraving.h"
 #include "notation/inotationelements.h"
@@ -163,7 +164,7 @@ void ProjectActionsController::init()
             QDir().mkpath(dir);
             const QString copy = dir + "/" + fi.fileName();
             if (!QFileInfo::exists(copy)) {
-                QFile::copy(path, copy);
+                mu::project::starscore::zip::copyWithoutMedia(path, copy);   // (1.26.0: its recordings stay in the song)
             }
         }
         const QStringList done = starScoreService()->standardizeSong(true);

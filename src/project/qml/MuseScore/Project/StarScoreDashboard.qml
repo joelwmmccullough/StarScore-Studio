@@ -522,16 +522,16 @@ Rectangle {
 
                                     delegate: FlatButton {
                                         required property var modelData
-                                        text: (modelData.kind === "transcribe" ? "T! " : "♪ ") + modelData.name
-                                        onClicked: solosModel.playAudio(modelData.path)
+                                        text: (modelData.kind === "transcribe" ? "T! " : modelData.kind === "video" ? "▶ " : "♪ ") + modelData.name
+                                        onClicked: solosModel.playAudio(soloRow.modelData.path, modelData.id)
                                     }
                                 }
                                 FlatButton {
-                                    text: qsTrc("starscore", "+ Audio or Transcribe! file")
+                                    text: qsTrc("starscore", "+ Audio, video or Transcribe! file")
                                     transparent: true
-                                    toolTipTitle: qsTrc("starscore", "Add an audio or Transcribe! file to the solo")
-                                    toolTipDescription: qsTrc("starscore", "The original recording, a stem-separated copy, a .xsc…: copied into "
-                                                              + "the Audio folder beside the solo")
+                                    toolTipTitle: qsTrc("starscore", "Add recordings, a video or a Transcribe! file to the solo")
+                                    toolTipDescription: qsTrc("starscore", "The full mix, the piano stem, everything but piano, the video, a .xsc…: "
+                                                              + "stored inside the solo's .starscore")
                                     onClicked: solosModel.addAudio(soloRow.modelData.path)
                                 }
                             }

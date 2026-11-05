@@ -4773,7 +4773,7 @@ void StarScoreService::onCurrentProjectChanged()
 
     m_mainProject->saveComplited().onReceive(this, [this](const io::path_t& path, SaveMode mode) {
         if (mode == SaveMode::Save || mode == SaveMode::SaveAs || mode == SaveMode::SaveCopy) {
-            if (!solos().empty() || !references().empty()) {
+            if (!solos().empty() || !references().empty() || !m_media.empty()) {
                 Ret ret = injectSolos(path);
                 if (!ret) {
                     LOGE() << "[starscore] could not store solos in " << path << ": " << ret.toString();
@@ -4783,6 +4783,9 @@ void StarScoreService::onCurrentProjectChanged()
                     // file: the song stays unsaved, closing it keeps that folder, and Joel is told (it was only logged,
                     // and closing the song deleted them)
                     m_soloInjectFailed = !ret;
+                    if (ret) {
+                        finishAudioFolderMoveIn();   // (1.26.0) the Audio folder's copies, now inside, to Version History
+                    }
                     if (!ret) {
                         if (m_mainProject) {
                             m_mainProject->markAsUnsaved();
@@ -4813,6 +4816,8 @@ void StarScoreService::onCurrentProjectChanged()
         } else {
             tidyOpenedScore();
         }
+        // (1.26.0) recordings in the 1.25.0 Audio folder beside it: offered for moving in
+        QTimer::singleShot(600, &m_timerGuard, [this]() { offerAudioFolderMoveIn(); });
     });
     if (autotestRequested()) {
         startAutotest();
@@ -4826,8 +4831,15 @@ void StarScoreService::clearSolos()
     }
     m_soloProjects.clear();
     m_mainProject.reset();
+    m_mediaWatcher.reset();
+    m_media.clear();
+    m_mediaFolderMoves.clear();
     if (!m_workDir.isEmpty()) {
-        if (m_soloInjectFailed) {
+        if (m_mediaOpenedOutside) {
+            // (1.26.0) Transcribe! may still have the song's Transcribe! file open: its folder stays, so a save there
+            // doesn't fail (the system clears it later)
+            LOGI() << "[starscore] a Transcribe! file was opened from this song; its working folder is left: " << m_workDir.toStdString();
+        } else if (m_soloInjectFailed) {
             // (1.24.0) the last save couldn't put the solos into the file: this folder is the only copy
             LOGW() << "[starscore] the solos and reference PDFs that couldn't be saved are kept in " << m_workDir.toStdString();
         } else {
@@ -4836,6 +4848,7 @@ void StarScoreService::clearSolos()
         m_workDir.clear();
     }
     m_soloInjectFailed = false;
+    m_mediaOpenedOutside = false;
 }
 
 io::path_t StarScoreService::soloWorkPath(const QString& soloId) const
@@ -4851,6 +4864,10 @@ void StarScoreService::extractSolos()
 
     m_workDir = QDir::tempPath() + "/StarScoreSolos-" + QUuid::createUuid().toString(QUuid::Id128);
     QDir().mkpath(m_workDir);
+
+    // (1.26.0) the recordings, video and Transcribe! files inside the file
+    loadMedia();
+    extractMedia();
 
     const std::vector<StarScoreSolo> list = solos();
     const std::vector<StarScoreReference> refs = references();
@@ -5406,87 +5423,7 @@ Ret StarScoreService::exportSolo(const QString& soloId, const io::path_t& msczPa
     return project.val->save(msczPath, SaveMode::SaveCopy, false);
 }
 
-Ret StarScoreService::injectSolos(const io::path_t& starscorePath)
-{
-    // Save changed solos to their working files first
-    for (auto& [id, project] : m_soloProjects) {
-        if (project->needSave().val) {
-            Ret ret = project->save(soloWorkPath(id), SaveMode::Save, false);
-            if (!ret) {
-                return ret;
-            }
-        }
-    }
-
-    const std::vector<StarScoreSolo> list = solos();
-    const QString target = starscorePath.toQString();
-    const QString tmp = target + ".solos-tmp";
-
-    {
-        ZipReader reader(starscorePath);
-        if (reader.hasError()) {
-            return make_ret(Ret::Code::UnknownError);
-        }
-        QFile::remove(tmp);
-        ZipWriter writer { io::path_t(tmp) };
-        for (const ZipReader::FileInfo& info : reader.fileInfoList()) {
-            const std::string name = info.filePath.toStdString();
-            if (!info.isFile || QString::fromStdString(name).startsWith(STARSCORE_SOLOS_DIR + "/")
-                || QString::fromStdString(name).startsWith(STARSCORE_REFS_DIR + "/")) {
-                continue;
-            }
-            const ByteArray data = reader.fileData(name);
-            // ZipReader::fileData returns nothing, without setting the error, when an entry can't be unpacked: the
-            // song file just saved is then left exactly as MuseScore wrote it rather than rewritten with an empty
-            // score inside
-            if (data.empty() && info.size > 0) {
-                LOGE() << "[starscore] could not read " << name << " back from " << starscorePath << "; the file is left as saved";
-                writer.close();
-                QFile::remove(tmp);
-                return make_ret(Ret::Code::UnknownError);
-            }
-            writer.addFile(name, data);
-        }
-        for (const StarScoreSolo& solo : list) {
-            QFile f(soloWorkPath(solo.id).toQString());
-            if (!f.open(QIODevice::ReadOnly)) {
-                LOGW() << "[starscore] missing working copy of solo " << solo.id;
-                continue;
-            }
-            writer.addFile(solo.file.toStdString(), ByteArray::fromQByteArray(f.readAll()));
-        }
-        for (const StarScoreReference& ref : references()) {
-            QFile f(referencePath(ref.id).toQString());
-            if (!f.open(QIODevice::ReadOnly)) {
-                LOGW() << "[starscore] missing working copy of reference " << ref.id;
-                continue;
-            }
-            writer.addFile(ref.file.toStdString(), ByteArray::fromQByteArray(f.readAll()));
-        }
-        writer.close();
-        if (writer.hasError()) {
-            QFile::remove(tmp);
-            return make_ret(Ret::Code::UnknownError);
-        }
-    }
-
-    // The song file is never gone from disk: the saved file steps aside under a temporary name, the new one takes its
-    // place, and only then is the old one removed. (Removing the target first and then renaming left no song file at
-    // all if the rename failed.)
-    const QString old = target + ".solos-old";
-    QFile::remove(old);
-    if (!QFile::rename(target, old)) {
-        QFile::remove(tmp);
-        return make_ret(Ret::Code::UnknownError);
-    }
-    if (!QFile::rename(tmp, target)) {
-        QFile::rename(old, target);   // the saved file back where it was
-        QFile::remove(tmp);
-        return make_ret(Ret::Code::UnknownError);
-    }
-    QFile::remove(old);
-    return make_ok();
-}
+// (injectSolos: in starscoremedia.cpp, 1.26.0, with the media)
 
 Ret StarScoreService::saveAll()
 {

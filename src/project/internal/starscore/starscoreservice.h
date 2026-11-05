@@ -103,6 +103,13 @@ private:
     }
 };
 
+//! (1.26.0) A file about to be stored inside a .starscore: what it is and the name it gets
+struct StarScoreMediaSource {
+    QString path;
+    QString kind;
+    QString name;
+};
+
 class StarScoreService : public IStarScoreService, public muse::Contextable, public muse::async::Asyncable
 {
     muse::GlobalInject<IProjectCreator> projectCreator;
@@ -166,9 +173,14 @@ public:
     QJsonArray soloLearningList() const override;
     muse::Ret setSoloKeyState(const QString& id, int keyIndex, const QString& state) override;
     muse::async::Notification soloLearningChanged() const override;
-    QJsonArray scoreAudioFiles(const QString& soloPath) const override;
-    muse::RetVal<QString> addScoreAudio(const QString& soloPath) override;
-    muse::Ret removeScoreAudio(const QString& audioPath) override;
+    QJsonArray scoreAudioFiles(const QString& scorePath) const override;
+    muse::RetVal<QString> addScoreAudio(const QString& scorePath) override;
+    muse::Ret removeScoreAudio(const QString& idOrPath) override;
+    muse::Ret openScoreAudio(const QString& scorePath, const QString& idOrPath) override;
+    muse::Ret relabelScoreAudio(const QString& mediaId) override;
+    muse::Ret saveScoreAudioCopy(const QString& mediaId) override;
+    std::vector<StarScoreMedia> media() const override;
+    QString mediaPath(const QString& mediaId) const override;
     std::vector<StarScoreHornChoice> doublerChoices() const override;
     std::vector<StarScoreHornChoice> lowHornChoices() const override;
     QString rosterDoublerName() const override;
@@ -579,7 +591,28 @@ private:
     void reconcileSoloChordMute(const notation::INotationPtr& from);
     void syncSoloChordMute(const mu::engraving::InstrumentTrackId& trackId, bool mute);
     muse::async::Notification m_soloLearningChanged;
-    muse::RetVal<QString> copyScoreAudio(const QString& soloPath, const QString& sourcePath, const QString& base);
+    // --- media inside the .starscore (1.26.0, starscoremedia.cpp) ---
+    using MediaSource = StarScoreMediaSource;
+    //! Stores files in the open song (sound files of Transcribe! files linked); the new media's ids
+    muse::RetVal<QStringList> addMediaToOpenSong(const std::vector<MediaSource>& sources);
+    //! Writes files into a .starscore that isn't open
+    muse::RetVal<QStringList> addMediaToClosedFile(const QString& scorePath, const std::vector<MediaSource>& sources);
+    //! Asks what a recording is: kind and name ("" kind: cancelled)
+    MediaSource askMediaKind(const QString& path, const std::vector<StarScoreMedia>& existing) const;
+    std::vector<MediaSource> mediaSourcesFor(const QStringList& paths, const std::vector<StarScoreMedia>& existing,
+                                             bool ask) const;
+    void loadMedia();
+    void extractMedia();
+    void watchMedia();
+    void offerAudioFolderMoveIn();
+    void finishAudioFolderMoveIn();
+    QString mediaWorkPath(const StarScoreMedia& m) const;
+    std::vector<StarScoreMedia> m_media;
+    QStringList m_mediaFolderMoves;   // Audio-folder files moved in, waiting for a save to go to Version History
+    std::unique_ptr<QObject> m_mediaWatcher;
+    bool m_mediaOpenedOutside = false;   // a Transcribe! file of the song was opened in Transcribe! this session
+    //! The autotest's media… steps (false: not one of them)
+    bool autotestMediaStep(const QString& step);
     QString soloFileKeyName(int keyIndex, bool written) const;
     QString soloVersionForExport();
     bool m_soloRefreshQueued = false;

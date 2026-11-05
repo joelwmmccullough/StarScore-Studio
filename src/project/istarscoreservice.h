@@ -287,6 +287,20 @@ struct StarScoreReference
     QString instrument;          // which part it is for, e.g. "Bass Guitar" (empty = the whole band / none)
 };
 
+//! (1.26.0, Joel 5 Nov 2026) A recording, stem, video or Transcribe! file stored inside the .starscore, the way
+//! reference PDFs are (entry "StarScoreMedia/<id>/<fileName>"; the list is the entry "StarScoreMedia/media.json")
+struct StarScoreMedia
+{
+    QString id;
+    QString name;        // shown on the chip: "Full mix", "Piano", "No piano", "Video", or the file's own name
+    QString kind;        // "full" | "piano" | "nopiano" | "video" | "transcribe" | "audio" (anything else)
+    QString fileName;    // the file's name when it was added ("Tumba (Piano).wav")
+    qint64 bytes = 0;
+    quint32 crc = 0;     // its zip checksum (with bytes: the same file added twice is noticed)
+    QString soundId;     // a Transcribe! file: the media it was made on
+    QString entry() const { return "StarScoreMedia/" + id + "/" + fileName; }
+};
+
 //! What adding a solo file would do, shown before the user confirms
 struct StarScoreSoloPlan
 {
@@ -615,15 +629,29 @@ public:
     //! A key of a solo marked as learned or memorized ("" = not yet); kept in 8 Solo Transcriptions/.solo-progress.json
     virtual muse::Ret setSoloKeyState(const QString& id, int keyIndex, const QString& state) = 0;
     virtual muse::async::Notification soloLearningChanged() const = 0;
-    //! (1.25.0) A score's audio files and Transcribe! files (the original recording, a stem-separated copy, a .xsc…),
-    //! any .starscore, song or solo: the files in the "Audio" folder beside it, [{ "name", "path", "kind": "audio" |
-    //! "transcribe" }]
+    //! A score's recordings, stems, video and Transcribe! files, any .starscore, song or solo. (1.26.0) Those stored
+    //! inside the file: [{ "id", "name", "kind": "full" | "piano" | "nopiano" | "video" | "transcribe" | "audio",
+    //! "inside": true, "path" (the open song's working copy; "" for a file that isn't open), "scorePath" }]; then any
+    //! still in the 1.25.0 "Audio" folder beside it: [{ "name", "path", "kind": "audio" | "transcribe", "inside": false }]
     virtual QJsonArray scoreAudioFiles(const QString& scorePath) const = 0;
-    //! Asks for a file (and, for audio, what it is), and copies it into the score's Audio folder (a Transcribe! file's
-    //! audio file too, under its own name). Returns the new path ("" when cancelled).
+    //! Asks for files (and, for audio, what each one is) and stores them inside the .starscore (1.26.0; a Transcribe!
+    //! file's recording too). The open song gets them now and keeps them when saved; a song that isn't open (Home) is
+    //! written at once. Returns the new media's id ("" when cancelled).
     virtual muse::RetVal<QString> addScoreAudio(const QString& scorePath) = 0;
-    //! Asks first, then moves the file into the score's Version History ("<date> Removed audio")
-    virtual muse::Ret removeScoreAudio(const QString& audioPath) = 0;
+    //! Asks first, then takes the media (by id) out of the open song; a copy goes into the Version History folder
+    //! beside the score ("<date> Removed audio"). A file still in the Audio folder (by path) moves there.
+    virtual muse::Ret removeScoreAudio(const QString& idOrPath) = 0;
+    //! (1.26.0) Opens a score's media in the Mac's own app (a Transcribe! file in Transcribe!): the open song's working
+    //! copy, or, for a song that isn't open, a copy unpacked for the moment (a Transcribe! file opens the song first,
+    //! so what's changed in Transcribe! is kept when the song is saved)
+    virtual muse::Ret openScoreAudio(const QString& scorePath, const QString& idOrPath) = 0;
+    //! (1.26.0) Asks again what a recording in the open song is (Full mix, Piano only, Everything but piano, its own name)
+    virtual muse::Ret relabelScoreAudio(const QString& mediaId) = 0;
+    //! (1.26.0) A copy of the open song's media saved where Joel picks
+    virtual muse::Ret saveScoreAudioCopy(const QString& mediaId) = 0;
+    //! (1.26.0) The open song's media
+    virtual std::vector<StarScoreMedia> media() const = 0;
+    virtual QString mediaPath(const QString& mediaId) const = 0;
     //! New StarScore dialog: the instruments the woodwind doubler can play (Soprano Sax … Flute), in menu order
     virtual std::vector<StarScoreHornChoice> doublerChoices() const = 0;
     //! New StarScore dialog: the low horns the 7-Horn section's 7th chair can be (Bass Trombone first), in menu order

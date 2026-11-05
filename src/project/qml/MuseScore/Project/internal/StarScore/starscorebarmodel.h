@@ -72,7 +72,7 @@ public:
     QVariantList audioFiles() const;
     bool canAddAudio() const;
     //! One audio or Transcribe! file's menu: Play (Open in Transcribe!) / Show in Finder / Remove
-    Q_INVOKABLE QVariantList audioFileMenu(const QString& path) const;
+    Q_INVOKABLE QVariantList audioFileMenu(const QVariantMap& item) const;
     //! A solo transcription's Keys menu: named major or minor; the keys with another spelling (D♭ / C♯ major)
     Q_INVOKABLE QVariantList soloKeysMenu() const;
 

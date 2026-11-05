@@ -23,6 +23,12 @@
  * SHA-1 before compression, the song file's size and SHA-1, and its zip entries (name, size) in order. The file is
  * rewritten whole each time (it is small) through a temporary file, so it is never left half-written.
  *
+ * Media (1.26.0): a .starscore can hold its song's recordings, stems and video (StarScoreMedia/…, hundreds of MB).
+ * Those aren't packed with the XML: each is kept once in Autosave Archive/Media, named by its checksum and size, and a
+ * version lists which of them it had ("media": [[entry, key]]), so a hundred versions of a song with a 500 MB video
+ * keep one copy of the video. Media no version lists any more is removed after packing. A song file that big is
+ * fingerprinted by its zip index (each entry's name, checksum and size) rather than read whole.
+ *
  * Thinning (newest version kept per period): every version from the last 2 hours, then one per hour for the last
  * day, one per day for the last 30 days, one per week for the last 26 weeks, and one per month after that, kept
  * for good. Only versions inside the history files are ever dropped.
@@ -51,6 +57,8 @@
 #include "global/serialization/zipwriter.h"
 #include "global/types/bytearray.h"
 
+#include "starscorezip.h"
+
 #include "../../thirdparty/zstd/zstd.h"
 
 #include "log.h"
@@ -70,6 +78,21 @@ struct Entry {
     qint64 size = 0;
 };
 
+//! (1.26.0) a media entry of a version: its name in the song file and its file in the Media store
+struct MediaRef {
+    QString name;
+    QString key;
+};
+
+const QString MEDIA_PREFIX("StarScoreMedia/");
+const QString MEDIA_INDEX("StarScoreMedia/media.json");
+const qint64 FINGERPRINT_FROM_BYTES = 32 * 1024 * 1024;
+
+bool isMediaEntry(const QString& name)
+{
+    return name.startsWith(MEDIA_PREFIX) && name != MEDIA_INDEX;
+}
+
 struct Version {
     QDateTime time;
     int ref = -1;               // index of the version this is a patch on (always the one before), or -1: whole
@@ -80,6 +103,7 @@ struct Version {
     qint64 fileSize = 0;
     QByteArray fileSha1;
     std::vector<Entry> entries;
+    std::vector<MediaRef> media;
 };
 
 struct History {
@@ -97,6 +121,16 @@ QString historyPath(const QString& song)
     return autosaveArchiveRoot() + "/" + song + HISTORY_SUFFIX;
 }
 
+QString mediaStoreDir()
+{
+    return autosaveArchiveRoot() + "/Media";
+}
+
+QString mediaKey(const starscore::zip::Entry& e)
+{
+    return QString("%1-%2").arg(e.crc, 8, 16, QChar('0')).arg(e.size);
+}
+
 QByteArray sha1Of(const QByteArray& data)
 {
     return QCryptographicHash::hash(data, QCryptographicHash::Sha1);
@@ -104,6 +138,18 @@ QByteArray sha1Of(const QByteArray& data)
 
 QByteArray fileSha1(const QString& path)
 {
+    // (1.26.0) a big file (a song holding its recordings): its zip index, not all of it
+    if (QFileInfo(path).size() >= FINGERPRINT_FROM_BYTES) {
+        const starscore::zip::Reader zip(path);
+        if (zip.ok()) {
+            QCryptographicHash h(QCryptographicHash::Sha1);
+            h.addData(QByteArrayLiteral("starscore-zip-index\n"));
+            for (const starscore::zip::Entry& e : zip.entries()) {
+                h.addData(QString("%1|%2|%3|%4\n").arg(e.name).arg(e.crc).arg(e.size).arg(e.method).toUtf8());
+            }
+            return h.result();
+        }
+    }
     QFile f(path);
     if (!f.open(QIODevice::ReadOnly)) {
         return QByteArray();
@@ -170,8 +216,43 @@ bool decompress(const QByteArray& frame, const QByteArray* ref, qint64 rawSize, 
 
 // --- .starscore <-> the XML it holds ----------------------------------------------------------------------------
 
-bool readSong(const QString& path, QByteArray& raw, std::vector<Entry>& entries)
+//! (1.26.0) The song file's media entries, each copied into the Media store unless a copy is there already
+bool storeMedia(const QString& path, std::vector<MediaRef>& media)
 {
+    media.clear();
+    const starscore::zip::Reader zip(path);
+    if (!zip.ok()) {
+        return false;
+    }
+    for (const starscore::zip::Entry& e : zip.entries()) {
+        if (!isMediaEntry(e.name) || e.isDir()) {
+            continue;
+        }
+        const QString key = mediaKey(e);
+        const QString stored = mediaStoreDir() + "/" + key;
+        if (!QFileInfo::exists(stored) || QFileInfo(stored).size() != e.size) {
+            QDir().mkpath(mediaStoreDir());
+            const QString part = stored + ".part";
+            if (!zip.copyTo(e, part)) {
+                QFile::remove(part);
+                LOGE() << "autosave archive: couldn't keep " << e.name.toStdString() << " of " << path.toStdString();
+                return false;
+            }
+            QFile::remove(stored);
+            if (!QFile::rename(part, stored)) {
+                return false;
+            }
+        }
+        media.push_back({ e.name, key });
+    }
+    return true;
+}
+
+bool readSong(const QString& path, QByteArray& raw, std::vector<Entry>& entries, std::vector<MediaRef>& media)
+{
+    if (!storeMedia(path, media)) {
+        return false;
+    }
     muse::ZipReader zip{ muse::io::path_t(path) };
     if (zip.hasError()) {
         return false;
@@ -179,7 +260,7 @@ bool readSong(const QString& path, QByteArray& raw, std::vector<Entry>& entries)
     raw.clear();
     entries.clear();
     for (const muse::ZipReader::FileInfo& fi : zip.fileInfoList()) {
-        if (!fi.isFile) {
+        if (!fi.isFile || isMediaEntry(fi.filePath.toQString())) {
             continue;
         }
         const muse::ByteArray data = zip.fileData(fi.filePath.toStdString());
@@ -193,7 +274,8 @@ bool readSong(const QString& path, QByteArray& raw, std::vector<Entry>& entries)
     return !entries.empty() && !zip.hasError();
 }
 
-bool writeSong(const QString& path, const QByteArray& raw, const std::vector<Entry>& entries)
+bool writeSong(const QString& path, const QByteArray& raw, const std::vector<Entry>& entries,
+               const std::vector<MediaRef>& media = {})
 {
     const QString part = path + ".part";
     QFile::remove(part);
@@ -210,6 +292,31 @@ bool writeSong(const QString& path, const QByteArray& raw, const std::vector<Ent
         zip.close();
         if (zip.hasError()) {
             QFile::remove(part);
+            return false;
+        }
+    }
+    // (1.26.0) its media from the Media store, copied in as they are
+    if (!media.empty()) {
+        const QString withMedia = path + ".part2";
+        {
+            const starscore::zip::Reader in(part);
+            starscore::zip::Writer out(withMedia);
+            for (const starscore::zip::Entry& e : in.entries()) {
+                out.addRaw(in, e);
+            }
+            for (const MediaRef& m : media) {
+                if (!out.addFile(m.name, mediaStoreDir() + "/" + m.key)) {
+                    LOGE() << "autosave archive: " << m.name.toStdString() << " is missing from the Media folder";
+                }
+            }
+            if (!in.ok() || !out.close()) {
+                QFile::remove(part);
+                QFile::remove(withMedia);
+                return false;
+            }
+        }
+        QFile::remove(part);
+        if (!QFile::rename(withMedia, part)) {
             return false;
         }
     }
@@ -257,6 +364,10 @@ bool readIndex(QFile& f, std::vector<Version>& versions, qint64& framesStart)
             const QJsonArray a = e.toArray();
             ver.entries.push_back({ a.at(0).toString(), qint64(a.at(1).toDouble()) });
         }
+        for (const QJsonValue& e : o.value("media").toArray()) {
+            const QJsonArray a = e.toArray();
+            ver.media.push_back({ a.at(0).toString(), a.at(1).toString() });
+        }
         if (!ver.time.isValid()) {
             return false;
         }
@@ -300,11 +411,19 @@ bool writeHistory(const QString& path, const History& h)
         for (const Entry& e : v.entries) {
             entries.append(QJsonArray { e.name, double(e.size) });
         }
-        versions.append(QJsonObject {
+        QJsonObject o {
             { "time", v.time.toString(TIME_FORMAT) }, { "ref", v.ref }, { "offset", double(v.offset) },
             { "length", double(v.length) }, { "rawSize", double(v.rawSize) },
             { "rawSha1", QString::fromLatin1(v.rawSha1.toHex()) }, { "fileSize", double(v.fileSize) },
-            { "fileSha1", QString::fromLatin1(v.fileSha1.toHex()) }, { "entries", entries } });
+            { "fileSha1", QString::fromLatin1(v.fileSha1.toHex()) }, { "entries", entries } };
+        if (!v.media.empty()) {
+            QJsonArray media;
+            for (const MediaRef& m : v.media) {
+                media.append(QJsonArray { m.name, m.key });
+            }
+            o["media"] = media;
+        }
+        versions.append(o);
     }
     const QByteArray index = QJsonDocument(QJsonObject { { "versions", versions } }).toJson(QJsonDocument::Compact);
     QByteArray len(8, 0);
@@ -467,7 +586,7 @@ int packSong(const QString& song, const std::vector<Waiting>& waiting, const QDa
             }
             prevOldRaw = raw;
         } else {
-            if (!readSong(it.copy->path, raw, v.entries)) {
+            if (!readSong(it.copy->path, raw, v.entries, v.media)) {
                 LOGW() << "autosave archive: not a song file: " << it.copy->path.toStdString();
                 unreadable.insert(it.copy->path);
                 continue;
@@ -692,6 +811,43 @@ QString archiveBeforeSave(const QString& songPath, const QDateTime& now, bool ba
     return target;
 }
 
+//! (1.26.0) Media no version of any song lists, and no copy waiting in Incoming holds, removed from the Media store
+static void sweepMediaStore()
+{
+    const QFileInfoList stored = QDir(mediaStoreDir()).entryInfoList(QDir::Files);
+    if (stored.isEmpty()) {
+        return;
+    }
+    std::set<QString> used;
+    for (const QFileInfo& fi : QDir(autosaveArchiveRoot()).entryInfoList({ QString("*") + HISTORY_SUFFIX }, QDir::Files)) {
+        std::vector<Version> versions;
+        if (!readHistoryIndex(fi.absoluteFilePath(), versions)) {
+            return;   // a history that can't be read: nothing removed
+        }
+        for (const Version& v : versions) {
+            for (const MediaRef& m : v.media) {
+                used.insert(m.key);
+            }
+        }
+    }
+    for (const auto& [song, list] : waitingCopies()) {
+        for (const Waiting& w : list) {
+            const starscore::zip::Reader zip(w.path);
+            for (const starscore::zip::Entry& e : zip.entries()) {
+                if (isMediaEntry(e.name)) {
+                    used.insert(mediaKey(e));
+                }
+            }
+        }
+    }
+    for (const QFileInfo& fi : stored) {
+        // (a file still being written is left alone)
+        if (!used.count(fi.fileName()) && !fi.fileName().endsWith(".part")) {
+            QFile::remove(fi.absoluteFilePath());
+        }
+    }
+}
+
 int packIncoming(const QDateTime& now)
 {
     QMutexLocker lock(&s_packMutex);
@@ -699,6 +855,7 @@ int packIncoming(const QDateTime& now)
     for (const auto& [song, list] : waitingCopies()) {
         packed += std::max(0, packSong(song, list, now));
     }
+    sweepMediaStore();
     return packed;
 }
 
@@ -797,7 +954,7 @@ QString extractVersion(const QString& song, const QDateTime& time, const QString
             continue;
         }
         QByteArray raw;
-        if (!unpackVersion(h, i, raw) || !writeSong(target, raw, h.versions[i].entries)) {
+        if (!unpackVersion(h, i, raw) || !writeSong(target, raw, h.versions[i].entries, h.versions[i].media)) {
             if (error) {
                 *error = "This version couldn't be unpacked.";
             }

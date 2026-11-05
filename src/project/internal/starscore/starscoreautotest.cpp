@@ -1918,6 +1918,10 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
     if (!handled && step.startsWith("solo") && autotestSoloStep(step)) {
         handled = true;
     }
+    // (1.26.0) the media steps (mediaadd:, medialist …), in starscoremedia.cpp
+    if (!handled && step.startsWith("media") && autotestMediaStep(step)) {
+        handled = true;
+    }
     if (handled) {
         // (done in the first chain)
     } else if (step.startsWith("formatdiff:")) {

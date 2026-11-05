@@ -53,6 +53,7 @@ public:
 protected:
 
     bool doOpen(OpenMode m) override;
+    void doClose() override;
     size_t dataSize() const override;
     const uint8_t* rawData() const override;
     bool resizeData(size_t size) override;
@@ -62,5 +63,10 @@ private:
 
     path_t m_filePath;
     ByteArray m_data;
+
+    // StarScore Studio (1.26.0): a big file opened only for reading is mapped into memory instead of read whole
+    // (a .starscore can hold a song's recordings and video: hundreds of MB, of which a reader only needs the score)
+    struct Mapped;
+    Mapped* m_mapped = nullptr;
 };
 }

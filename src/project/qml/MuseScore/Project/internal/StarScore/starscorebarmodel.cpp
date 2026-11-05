@@ -266,18 +266,26 @@ bool StarScoreBarModel::canAddAudio() const
     return QFileInfo::exists(starScore()->mainProjectPath().toQString());
 }
 
-QVariantList StarScoreBarModel::audioFileMenu(const QString& path) const
+QVariantList StarScoreBarModel::audioFileMenu(const QVariantMap& item) const
 {
-    const bool transcribe = path.endsWith(".xsc", Qt::CaseInsensitive);
-    return {
-        QVariantMap { { "id", "audio-open:" + path },
-                      { "title", transcribe ? muse::qtrc("starscore", "Open in Transcribe!") : muse::qtrc("starscore", "Play") },
-                      { "enabled", true } },
-        QVariantMap { { "id", "audio-show:" + path }, { "title", muse::qtrc("starscore", "Show in Finder") }, { "enabled", true } },
-        QVariantMap {},
-        QVariantMap { { "id", "audio-remove:" + path }, { "title", muse::qtrc("starscore", "Remove from this score…") },
-                      { "enabled", true } },
-    };
+    // (1.26.0) a file stored inside the score, by id; one still in the 1.25.0 Audio folder, by path
+    const QString kind = item.value("kind").toString();
+    const QString id = item.value("id").toString();
+    const bool inside = item.value("inside").toBool();
+    const QString openTitle = kind == "transcribe" ? muse::qtrc("starscore", "Open in Transcribe!")
+                              : kind == "video" ? muse::qtrc("starscore", "Watch") : muse::qtrc("starscore", "Play");
+    QVariantList menu { QVariantMap { { "id", "audio-open:" + id }, { "title", openTitle }, { "enabled", true } } };
+    if (inside) {
+        if (kind != "transcribe" && kind != "video") {
+            menu << QVariantMap { { "id", "audio-kind:" + id }, { "title", muse::qtrc("starscore", "What it is…") }, { "enabled", true } };
+        }
+        menu << QVariantMap { { "id", "audio-copy:" + id }, { "title", muse::qtrc("starscore", "Save a copy…") }, { "enabled", true } };
+    } else {
+        menu << QVariantMap { { "id", "audio-show:" + id }, { "title", muse::qtrc("starscore", "Show in Finder") }, { "enabled", true } };
+    }
+    menu << QVariantMap {};
+    menu << QVariantMap { { "id", "audio-remove:" + id }, { "title", muse::qtrc("starscore", "Remove from this score…") }, { "enabled", true } };
+    return menu;
 }
 
 QVariantList StarScoreBarModel::tiedSolos() const
@@ -1285,7 +1293,18 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
         }
         refresh();
     } else if (action == "audio-open") {
-        QDesktopServices::openUrl(QUrl::fromLocalFile(arg));
+        const Ret opened = starScore()->openScoreAudio(starScore()->mainProjectPath().toQString(), arg);
+        if (!opened) {
+            interactive()->error(muse::trc("starscore", "Couldn't open the file"), opened.text().empty() ? opened.toString() : opened.text());
+        }
+    } else if (action == "audio-kind") {
+        starScore()->relabelScoreAudio(arg);
+        refresh();
+    } else if (action == "audio-copy") {
+        const Ret saved = starScore()->saveScoreAudioCopy(arg);
+        if (!saved) {
+            interactive()->error(muse::trc("starscore", "Couldn't save the copy"), saved.text().empty() ? saved.toString() : saved.text());
+        }
     } else if (action == "audio-show") {
         interactive()->revealInFileBrowser(io::path_t(arg));
     } else if (action == "audio-remove") {

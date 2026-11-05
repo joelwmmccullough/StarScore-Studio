@@ -429,7 +429,8 @@ Rectangle {
             }
         }
 
-        // --- Audio (1.25.0): the score's audio and Transcribe! files, in the Audio folder beside the .starscore ---
+        // --- Audio: the score's recordings, video and Transcribe! files, stored inside the .starscore (1.26.0; in 1.25.0
+        // they were in an Audio folder beside it, still shown until moved in) ---
         RowLayout {
             Layout.fillWidth: true
             visible: !root.collapsed && (barModel.audioFiles.length > 0 || barModel.canAddAudio)
@@ -455,14 +456,19 @@ Rectangle {
                     delegate: StarScoreChip {
                         required property var modelData
 
-                        text: (modelData.kind === "transcribe" ? "T! " : "♪ ") + modelData.name
+                        text: (modelData.kind === "transcribe" ? "T! " : modelData.kind === "video" ? "▶ " : "♪ ") + modelData.name
+                              + (modelData.inside ? "" : qsTrc("starscore", " (Audio folder)"))
                         showDot: false
+                        dashed: !modelData.inside
                         toolTip: (modelData.kind === "transcribe" ? qsTrc("starscore", "Click to open it in Transcribe!")
-                                                                  : qsTrc("starscore", "Click to play it"))
+                                  : modelData.kind === "video" ? qsTrc("starscore", "Click to watch it")
+                                  : qsTrc("starscore", "Click to play it"))
+                                 + "\n" + (modelData.inside ? qsTrc("starscore", "Stored inside this score")
+                                                            : qsTrc("starscore", "Still in the Audio folder beside the score; it moves in when you reopen the score and say so"))
                                  + "\n" + qsTrc("starscore", "Right-click for options")
-                        menuItemsProvider: function() { return barModel.audioFileMenu(modelData.path) }
+                        menuItemsProvider: function() { return barModel.audioFileMenu(modelData) }
                         onLeftClicked: function(mouse) {
-                            barModel.handleMenuItem("audio-open:" + modelData.path)
+                            barModel.handleMenuItem("audio-open:" + modelData.id)
                         }
                         onMenuItemChosen: function(itemId) {
                             barModel.handleMenuItem(itemId)
@@ -472,11 +478,11 @@ Rectangle {
 
                 StarScoreChip {
                     visible: barModel.canAddAudio
-                    text: qsTrc("starscore", "+ Audio or Transcribe! file")
+                    text: qsTrc("starscore", "+ Audio, video or Transcribe! file")
                     dashed: true
                     showDot: false
-                    toolTip: qsTrc("starscore", "The original recording, a stem-separated copy, a Transcribe! file…: copied into the "
-                                   + "Audio folder beside this score")
+                    toolTip: qsTrc("starscore", "The full mix, the piano stem, everything but piano, the video, a Transcribe! file…: "
+                                   + "stored inside this score, so it's all in one file")
                     onLeftClicked: function(mouse) {
                         barModel.handleMenuItem("audio-add")
                     }

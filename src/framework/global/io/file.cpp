@@ -25,6 +25,10 @@
 
 #include "ioretcodes.h"
 
+#ifndef NO_QT_SUPPORT
+#include <QFile>
+#endif
+
 #include "log.h"
 
 using namespace muse;
@@ -35,9 +39,35 @@ File::File(const path_t& filePath)
 {
 }
 
+//! StarScore Studio (1.26.0): files at least this big, opened read-only, are mapped instead of read whole
+static constexpr int64_t MAP_FROM_BYTES = 32 * 1024 * 1024;
+
+struct File::Mapped {
+#ifndef NO_QT_SUPPORT
+    QFile file;
+#endif
+    const uint8_t* data = nullptr;
+    size_t size = 0;
+};
+
 File::~File()
 {
     close();
+    doClose();
+}
+
+void File::doClose()
+{
+    if (m_mapped) {
+#ifndef NO_QT_SUPPORT
+        if (m_mapped->data) {
+            m_mapped->file.unmap(const_cast<uchar*>(m_mapped->data));
+        }
+        m_mapped->file.close();
+#endif
+        delete m_mapped;
+        m_mapped = nullptr;
+    }
 }
 
 const path_t& File::filePath() const
@@ -106,7 +136,25 @@ bool File::doOpen(OpenMode m)
         }
     }
 
+    doClose();
     m_data = ByteArray();
+
+#ifndef NO_QT_SUPPORT
+    if (m == OpenMode::ReadOnly) {
+        auto mapped = new Mapped();
+        mapped->file.setFileName(m_filePath.toQString());
+        if (mapped->file.size() >= MAP_FROM_BYTES && mapped->file.open(QIODevice::ReadOnly)) {
+            mapped->size = size_t(mapped->file.size());
+            mapped->data = mapped->file.map(0, mapped->file.size());
+            if (mapped->data) {
+                m_mapped = mapped;
+                return true;
+            }
+        }
+        delete mapped;
+    }
+#endif
+
     Ret ret = fileSystem()->readFile(m_filePath, m_data);
     if (!ret) {
         setError(ret.code(), ret.text());
@@ -118,16 +166,19 @@ bool File::doOpen(OpenMode m)
 
 size_t File::dataSize() const
 {
-    return m_data.size();
+    return m_mapped ? m_mapped->size : m_data.size();
 }
 
 const uint8_t* File::rawData() const
 {
-    return m_data.constData();
+    return m_mapped ? m_mapped->data : m_data.constData();
 }
 
 bool File::resizeData(size_t size)
 {
+    if (m_mapped) {
+        return false;   // read-only
+    }
     m_data.resize(size);
     return true;
 }

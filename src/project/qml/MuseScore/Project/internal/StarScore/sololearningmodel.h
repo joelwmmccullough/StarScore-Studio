@@ -46,7 +46,7 @@ public:
     Q_INVOKABLE void setKeyState(const QString& id, int keyIndex, const QString& state);
     Q_INVOKABLE void openSolo(const QString& path);
     //! A solo's audio or Transcribe! file: opened in the Mac's own app; added (asks for the file and what it is)
-    Q_INVOKABLE void playAudio(const QString& path);
+    Q_INVOKABLE void playAudio(const QString& soloPath, const QString& idOrPath);
     Q_INVOKABLE void addAudio(const QString& soloPath);
 
 signals:

@@ -92,10 +92,12 @@ void SoloLearningModel::setKeyState(const QString& id, int keyIndex, const QStri
     // (the service's notification reloads the list)
 }
 
-void SoloLearningModel::playAudio(const QString& path)
+void SoloLearningModel::playAudio(const QString& soloPath, const QString& idOrPath)
 {
-    if (!path.isEmpty()) {
-        QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+    // (1.26.0) stored inside the solo: unpacked for the moment (a Transcribe! file opens the solo first)
+    const muse::Ret ret = starScore()->openScoreAudio(soloPath, idOrPath);
+    if (!ret) {
+        interactive()->error(muse::trc("starscore", "Couldn't open the file"), ret.text().empty() ? ret.toString() : ret.text());
     }
 }
 

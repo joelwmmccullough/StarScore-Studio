@@ -422,18 +422,20 @@ void ZipContainer::Impl::scanFiles()
     }
 
     // find EndOfDirectory header
+    // (StarScore Studio 1.26.0: positions as 64-bit numbers; a .starscore holding recordings can be past 2 GB, where
+    // int went negative and the file read as "not a zip")
     int i = 0;
-    int start_of_directory_local = -1;
+    int64_t start_of_directory_local = -1;
     int num_dir_entries = 0;
     EndOfDirectory eod;
     while (start_of_directory_local == -1) {
-        const int pos = int(device->size()) - int(sizeof(EndOfDirectory)) - i;
+        const int64_t pos = int64_t(device->size()) - int64_t(sizeof(EndOfDirectory)) - i;
         if (pos < 0 || i > 65535) {
             LOGW("Zip: EndOfDirectory not found");
             return;
         }
 
-        device->seek(pos);
+        device->seek(size_t(pos));
         device->read((uint8_t*)&eod, sizeof(EndOfDirectory));
         if (readUInt(eod.signature) == 0x06054b50) {
             break;
@@ -442,16 +444,16 @@ void ZipContainer::Impl::scanFiles()
     }
 
     // have the eod
-    start_of_directory_local = readUInt(eod.dir_start_offset);
+    start_of_directory_local = int64_t(readUInt(eod.dir_start_offset));
     num_dir_entries = readUShort(eod.num_dir_entries);
-    ZDEBUG("start_of_directory at %d, num_dir_entries=%d", start_of_directory_local, num_dir_entries);
+    ZDEBUG("start_of_directory at %d, num_dir_entries=%d", int(start_of_directory_local), num_dir_entries);
     int comment_length = readUShort(eod.comment_length);
     if (comment_length != i) {
         LOGW("Zip: failed to parse zip file.");
     }
     comment = device->read(std::min(comment_length, i));
 
-    device->seek(start_of_directory_local);
+    device->seek(size_t(start_of_directory_local));
     for (i = 0; i < num_dir_entries; ++i) {
         FileHeader header;
         int read = (int)device->read((uint8_t*)&header.h, sizeof(CentralFileHeader));
@@ -772,7 +774,7 @@ ByteArray ZipContainer::fileData(const std::string& fileName) const
     ushort general_purpose_bits = readUShort(header.h.general_purpose_bits);
     int compressed_size = readUInt(header.h.compressed_size);
     int uncompressed_size = readUInt(header.h.uncompressed_size);
-    int start = readUInt(header.h.offset_local_header);
+    const size_t start = readUInt(header.h.offset_local_header);   // (StarScore 1.26.0: past 2 GB in a big file)
 
     p->device->seek(start);
     LocalFileHeader lh;
