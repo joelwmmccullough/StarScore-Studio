@@ -2232,7 +2232,10 @@ std::vector<IRealLink> irealParts(const ChordChartData& song, const Analysis& a,
     if (song.minor && KEYS_MAJOR.count(keyNo + 3)) {
         key = KEYS_MAJOR.at(keyNo + 3) + "-";   // (the relative minor: A- for no sharps or flats)
     }
-    const QString style = song.irealStyle.isEmpty() && !song.irealStyleSet ? QString("Funk") : song.irealStyle;
+    // (an empty style would make "===" in a playlist, which iReal Pro reads as the end of the song: a solo whose tempo
+    // marking has no words gets "Medium Swing")
+    const QString style = !song.irealStyle.trimmed().isEmpty() ? song.irealStyle.trimmed()
+                          : song.irealStyleSet ? QString("Medium Swing") : QString("Funk");
     std::vector<IRealLink> links;
     const int bpm = soloBpm(song);
     for (std::vector<QStringList>& part : parts) {
@@ -2240,12 +2243,23 @@ std::vector<IRealLink> irealParts(const ChordChartData& song, const Analysis& a,
             part.back().last() = irealWithTempoText(part.back().last(), bpm);
         }
     }
+    QString lastTs;   // (the time signature in force at the end of the part before)
     for (size_t n = 0; n < parts.size(); ++n) {
         QString prog;
         int lineCount = 0;
         for (const QStringList& sec : parts[n]) {
             prog += sec.join(QString());
             lineCount += sec.size();
+        }
+        // (1.25.2) a part that starts in the middle of a section (a section longer than one chart, split by lines)
+        // opens with a barline and the time signature, as a chart's first bar must
+        if (n > 0 && prog.startsWith('|')) {
+            static const QRegularExpression tsAtStart("^\\|\\*?[A-Za-z]?T\\d\\d");
+            prog = "[" + (lastTs.isEmpty() || prog.contains(tsAtStart) ? QString() : lastTs) + prog.mid(1);
+        }
+        static const QRegularExpression tsToken("T\\d\\d");
+        for (QRegularExpressionMatchIterator it = tsToken.globalMatch(prog); it.hasNext();) {
+            lastTs = it.next().captured(0);
         }
         // rstrip()
         while (!prog.isEmpty() && prog.back().isSpace()) {
@@ -2254,6 +2268,8 @@ std::vector<IRealLink> irealParts(const ChordChartData& song, const Analysis& a,
         if (prog.endsWith(']')) {
             prog.chop(1);
             prog += "Z";
+        } else if (!prog.endsWith('}') && !prog.endsWith('Z')) {
+            prog += "Z";   // (1.25.2: a part that ends in the middle of a section ends with a final barline)
         }
         const QString t = parts.size() == 1 ? title : QString("%1 (Part %2 of %3)").arg(title).arg(n + 1).arg(parts.size());
         QString safeTitle = t;
