@@ -2539,6 +2539,23 @@ bool StarScoreService::autotestSoloStep(const QString& step)
         soloTestLog("  chord symbols muted (main, then each part score): " + states.join(' '));
         return true;
     }
+    if (step == "solochart") {
+        // solochart: the chord chart's bars as extracted (time signature, length, chords with their places)
+        IMasterNotationPtr master = globalContext()->currentMasterNotation();
+        if (!master) {
+            return true;
+        }
+        const ChordChartData d = extractChordChart(master->masterScore());
+        for (const ChordChartMeasure& m : d.measures) {
+            QStringList ch;
+            for (const ChordChartChord& c : m.chords) {
+                ch << QString("%1:%2%3%4%5").arg(c.t, c.root, c.q, c.bass.isEmpty() ? QString() : "/" + c.bass,
+                                                 c.hidden ? QString("(h)") : QString());
+            }
+            soloTestLog(QString("  bar %1 ts %2 len %3 | %4").arg(m.i + 1).arg(m.ts, m.len, ch.join(' ')));
+        }
+        return true;
+    }
     if (step.startsWith("solomixmute:") || step == "solomutelog") {
         // solomixmute:<1|0>: the chord symbols muted (unmuted) as the mixer does it, on the score showing (through the
         // playback controller, with the chord track of the showing score's own part); solomutelog: each score's state
