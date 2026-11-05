@@ -82,6 +82,8 @@ else()
         internal/abstractaudiosource.h
         internal/eventaudiosource.cpp
         internal/eventaudiosource.h
+        internal/starscorepcmsource.cpp
+        internal/starscorepcmsource.h
         internal/sinesource.cpp
         internal/sinesource.h
         # internal/noisesource.cpp
@@ -175,6 +177,17 @@ else()
 
     add_subdirectory(../thirdparty/fluidsynth fluidsynth)
     target_link_libraries(muse_audio_engine PRIVATE fluidsynth)
+
+    # StarScore Studio (1.27.0): Rubber Band (GPL-2.0-or-later, breakfastquay/rubberband e4296ac, Feb 2025), its
+    # single-file build, for Practice › Listen's speed and pitch
+    set(STARSCORE_RUBBERBAND_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../thirdparty/rubberband)
+    target_sources(muse_audio_engine PRIVATE ${STARSCORE_RUBBERBAND_DIR}/single/RubberBandSingle.cpp)
+    set_source_files_properties(${STARSCORE_RUBBERBAND_DIR}/single/RubberBandSingle.cpp PROPERTIES
+        SKIP_UNITY_BUILD_INCLUSION ON SKIP_PRECOMPILE_HEADERS ON COMPILE_OPTIONS "-w")
+    target_include_directories(muse_audio_engine PRIVATE ${STARSCORE_RUBBERBAND_DIR})
+    if (APPLE)
+        target_link_libraries(muse_audio_engine PRIVATE "-framework Accelerate")
+    endif()
 endif() # End of real engine
 
 if (MUSE_MODULE_AUDIO_EXPORT)

@@ -6,6 +6,9 @@
  *   count-in are playback's own.
  * - Jam: a backing band (bass, drums, piano) from the score's chord symbols, iReal Pro style: a solo's form, or the
  *   song's bars (or only the selected ones), in its key, at any tempo, for as many choruses as wanted.
+ * - Listen (1.27.0): the song's recordings stored in its .starscore (full mix, piano, no piano…) on one clock: click a
+ *   stem to hear it instead, or blend; slower or faster without changing pitch, pitch shift, loop the selected bars,
+ *   the score following the recording, and the video in its own window.
  * Make the panel taller, or float it and make it big, for watching; keep it low under the score while reading.
  */
 import QtQuick
@@ -58,6 +61,13 @@ Item {
                 toolTipTitle: qsTrc("starscore", "Backing band")
                 toolTipDescription: qsTrc("starscore", "Bass, drums and piano from the chord symbols, to solo over")
                 onClicked: practice.mode = "jam"
+            }
+            FlatButton {
+                text: qsTrc("starscore", "Listen")
+                accentButton: practice.mode === "listen"
+                toolTipTitle: qsTrc("starscore", "The recordings")
+                toolTipDescription: qsTrc("starscore", "The full mix and the stems stored in this score, in sync, at any speed")
+                onClicked: practice.mode = "listen"
             }
 
             Rectangle { width: 1; Layout.fillHeight: true; Layout.margins: 4; color: ui.theme.strokeColor }
@@ -158,6 +168,75 @@ Item {
                     maxValue: 40
                     measureUnitsSymbol: qsTrc("starscore", "bpm")
                     onValueEdited: function(v) { practice.tempoStep = v }
+                }
+            }
+
+
+            // Listen
+            RowLayout {
+                visible: practice.mode === "listen"
+                spacing: 6
+
+                FlatButton {
+                    icon: IconCode.REWIND
+                    enabled: practice.listenReady
+                    toolTipTitle: qsTrc("starscore", "Back to the start")
+                    onClicked: practice.listenRewind()
+                }
+                FlatButton {
+                    text: "◀"
+                    enabled: practice.listenReady
+                    toolTipTitle: qsTrc("starscore", "A bar back")
+                    onClicked: practice.listenSkip(-1)
+                }
+                FlatButton {
+                    icon: practice.listenPlaying ? IconCode.PAUSE : IconCode.PLAY
+                    accentButton: !practice.listenPlaying
+                    enabled: practice.listenReady
+                    toolTipTitle: practice.listenPlaying ? qsTrc("starscore", "Pause") : qsTrc("starscore", "Play")
+                    onClicked: practice.listenPlayPause()
+                }
+                FlatButton {
+                    text: "▶"
+                    enabled: practice.listenReady
+                    toolTipTitle: qsTrc("starscore", "A bar on")
+                    onClicked: practice.listenSkip(1)
+                }
+                FlatToggleButton {
+                    icon: IconCode.LOOP
+                    checked: practice.listenLoop
+                    enabled: practice.listenReady
+                    toolTipTitle: qsTrc("starscore", "Loop the selected bars")
+                    toolTipDescription: qsTrc("starscore", "Select the bars in the score first")
+                    onToggled: practice.toggleListenLoop()
+                }
+                StyledTextLabel {
+                    Layout.leftMargin: 10
+                    text: qsTrc("starscore", "Speed")
+                }
+                StyledSlider {
+                    Layout.preferredWidth: 140
+                    from: 10
+                    to: 200
+                    stepSize: 5
+                    value: practice.listenSpeed
+                    onMoved: practice.listenSpeed = value
+                }
+                StyledTextLabel {
+                    Layout.preferredWidth: 40
+                    horizontalAlignment: Text.AlignLeft
+                    text: practice.listenSpeed + "%"
+                }
+                StyledTextLabel { text: qsTrc("starscore", "Pitch") }
+                IncrementalPropertyControl {
+                    Layout.preferredWidth: 80
+                    currentValue: practice.listenPitch
+                    step: 0.5
+                    decimals: 1
+                    minValue: -12
+                    maxValue: 12
+                    measureUnitsSymbol: qsTrc("starscore", "st")
+                    onValueEdited: function(v) { practice.listenPitch = v }
                 }
             }
 
@@ -266,6 +345,131 @@ Item {
                 color: "#B0A898"
                 text: qsTrc("starscore", "No notes to show in this score.")
             }
+        }
+
+
+        // --- Listen: the stems, where the recording is, the bar map, the video ---
+        ColumnLayout {
+            visible: practice.mode === "listen"
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.margins: 6
+            spacing: 8
+
+            Shortcut {
+                sequence: "T"
+                enabled: practice.tapping
+                onActivated: practice.tap()
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 6
+
+                Repeater {
+                    model: practice.stems
+
+                    delegate: FlatButton {
+                        required property var modelData
+                        text: "♪ " + modelData.name
+                        accentButton: modelData.heard
+                        toolTipTitle: qsTrc("starscore", "Hear this one")
+                        toolTipDescription: qsTrc("starscore", "Click: hear only this. With Blend on: add it to (or take it out of) what's heard.")
+                        onClicked: practice.chooseStem(modelData.id, blendBox.checked)
+                    }
+                }
+                CheckBox {
+                    id: blendBox
+                    text: qsTrc("starscore", "Blend")
+                    checked: false
+                    onClicked: checked = !checked
+                }
+                Item { Layout.fillWidth: true }
+                FlatToggleButton {
+                    visible: practice.hasVideo
+                    icon: IconCode.EYE_OPEN
+                    checked: practice.videoShown
+                    toolTipTitle: qsTrc("starscore", "Video")
+                    toolTipDescription: qsTrc("starscore", "The video in a window of its own, muted, following the recording")
+                    onToggled: practice.toggleVideo()
+                }
+                CheckBox {
+                    text: qsTrc("starscore", "Score follows")
+                    checked: practice.follow
+                    onClicked: practice.follow = !checked
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+
+                StyledTextLabel {
+                    Layout.preferredWidth: 90
+                    horizontalAlignment: Text.AlignLeft
+                    text: practice.listenTime
+                }
+                StyledSlider {
+                    Layout.fillWidth: true
+                    from: 0
+                    to: 1000
+                    stepSize: 1
+                    enabled: practice.listenReady
+                    value: practice.listenFraction * 1000
+                    onMoved: practice.listenSeekFraction(value / 1000)
+                }
+                StyledTextLabel {
+                    Layout.preferredWidth: 160
+                    horizontalAlignment: Text.AlignRight
+                    text: practice.listenBar
+                    font: ui.theme.bodyBoldFont
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+
+                StyledTextLabel {
+                    text: practice.barMapInfo
+                    opacity: 0.8
+                }
+                FlatButton {
+                    visible: !practice.tapping
+                    text: qsTrc("starscore", "Tap the bars…")
+                    enabled: practice.listenReady
+                    toolTipTitle: qsTrc("starscore", "Make the bar map")
+                    toolTipDescription: qsTrc("starscore", "Select the bar the recording starts on, then tap (T) at the start of every bar as it plays")
+                    onClicked: practice.startTapping()
+                }
+                FlatButton {
+                    visible: practice.tapping
+                    text: qsTrc("starscore", "Tap (T)")
+                    accentButton: true
+                    onClicked: practice.tap()
+                }
+                FlatButton {
+                    visible: practice.tapping
+                    text: qsTrc("starscore", "Done")
+                    onClicked: practice.finishTapping()
+                }
+                FlatButton {
+                    text: qsTrc("starscore", "Go to the selected bar")
+                    enabled: practice.listenReady
+                    onClicked: practice.goToSelection()
+                }
+                Item { Layout.fillWidth: true }
+            }
+
+            StyledTextLabel {
+                Layout.fillWidth: true
+                visible: practice.listenInfo !== ""
+                wrapMode: Text.WordWrap
+                horizontalAlignment: Text.AlignLeft
+                text: practice.listenInfo
+            }
+
+            Item { Layout.fillHeight: true }
         }
 
         // --- Jam: where the band is, the chord now and next ---

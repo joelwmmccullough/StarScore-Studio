@@ -35,6 +35,7 @@ target_sources(muse_audio_common PRIVATE
     workmode.cpp
     workmode.h
     alignmentbuffer.h
+    starscorepcmdevice.h
 
     # Rpc
     rpc/irpcchannel.h

@@ -138,6 +138,11 @@ target_sources(project PRIVATE
     internal/starscore/starscorewatch.cpp
     internal/starscore/starscorejam.cpp
     internal/starscore/starscorejam.h
+    internal/starscore/starscoredecode.cpp
+    internal/starscore/starscoredecode.h
+    internal/starscore/starscorelisten.cpp
+    internal/starscore/starscorelisten.h
+    internal/starscore/starscorevideo.h
     internal/starscore/starscorewatch.h
     internal/starscore/starscorezip.h
     internal/starscore/starscoreautoarchive.h
@@ -213,7 +218,8 @@ set_source_files_properties(internal/starscore/starscoresolotranscription.cpp PR
 # StarScore practice: their own translation units (file-local helpers)
 set_source_files_properties(internal/starscore/starscorepractice.cpp internal/starscore/starscorepracticebook.cpp
     internal/starscore/starscorepracticeservice.cpp internal/starscore/starscorepracticexml.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
-set_source_files_properties(internal/starscore/starscorezip.cpp internal/starscore/starscoremedia.cpp internal/starscore/starscorewatch.cpp internal/starscore/starscorejam.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+set_source_files_properties(internal/starscore/starscoredecode.cpp PROPERTIES COMPILE_OPTIONS "-w")
+set_source_files_properties(internal/starscore/starscorezip.cpp internal/starscore/starscoremedia.cpp internal/starscore/starscorewatch.cpp internal/starscore/starscorejam.cpp internal/starscore/starscoredecode.cpp internal/starscore/starscorelisten.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 # zstd (BSD, facebook/zstd 1.5.7, single-file build) for the autosave archive's packed song histories
 target_sources(project PRIVATE thirdparty/zstd/zstd.c thirdparty/zstd/zstd.h thirdparty/zstd/zstd_errors.h)
 set_source_files_properties(thirdparty/zstd/zstd.c PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON SKIP_PRECOMPILE_HEADERS ON COMPILE_OPTIONS "-w")
@@ -231,11 +237,18 @@ if (OS_IS_MAC)
     set_source_files_properties(internal/starscore/organizer/orgplatform_mac.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
     target_link_libraries(project PRIVATE "-framework CoreGraphics" "-framework CoreFoundation" "-framework CoreText"
         "-framework AppKit" "-framework WebKit" "-framework PDFKit")
+    # (1.27.0) Practice › Listen: recordings decoded by the Mac's own decoders; the video shown with AVFoundation
+    target_sources(project PRIVATE internal/starscore/starscoredecode_mac.cpp internal/starscore/starscorevideo_mac.mm)
+    set_source_files_properties(internal/starscore/starscorevideo_mac.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+    target_link_libraries(project PRIVATE "-framework AudioToolbox" "-framework AVFoundation" "-framework AVKit"
+        "-framework CoreMedia")
     # Don't mix C++ and Objective-C++ in Unity Build
     set_source_files_properties(
         internal/platform/macos/macosrecentfilescontroller.mm
         internal/starscore/starscorepdf.cpp
         internal/starscore/organizer/orgplatform_mac.mm
+        internal/starscore/starscoredecode_mac.cpp
+        internal/starscore/starscorevideo_mac.mm
         PROPERTIES
         SKIP_UNITY_BUILD_INCLUSION ON
         SKIP_PRECOMPILE_HEADERS ON

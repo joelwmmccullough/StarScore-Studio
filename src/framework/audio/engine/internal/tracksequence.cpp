@@ -21,6 +21,7 @@
  */
 
 #include "tracksequence.h"
+#include "starscorepcmsource.h"
 
 #include "audio/common/audioerrors.h"
 #include "audio/common/audiosanitizer.h"
@@ -144,11 +145,11 @@ RetVal2<TrackId, AudioParams> TrackSequence::addTrack(const std::string& trackNa
 {
     ONLY_AUDIO_ENGINE_THREAD;
 
-    NOT_IMPLEMENTED;
-
     RetVal2<TrackId, AudioParams> result;
 
-    if (!device) {
+    // StarScore Studio (1.27.0): a decoded recording (Practice › Listen), played by a StarScorePcmSource
+    std::shared_ptr<StarScorePcmSource> source = StarScorePcmSource::fromDevice(device);
+    if (!device || !source) {
         result.ret = make_ret(Err::InvalidAudioFilePath);
         result.val1 = -1;
         return result;
@@ -156,13 +157,21 @@ RetVal2<TrackId, AudioParams> TrackSequence::addTrack(const std::string& trackNa
 
     TrackId newId = newTrackId();
 
+    source->setOutputSpec(audioEngine()->outputSpec());
+    RetVal<MixerChannelPtr> channel = mixer()->addChannel(newId, source);
+    if (!channel.ret) {
+        result.ret = channel.ret;
+        return result;
+    }
+
     SoundTrackPtr trackPtr = std::make_shared<SoundTrack>();
     trackPtr->id = newId;
     trackPtr->name = trackName;
     trackPtr->setPlaybackData(device);
+    trackPtr->inputHandler = source;
+    trackPtr->outputHandler = channel.val;
     trackPtr->setInputParams(requiredParams.in);
     trackPtr->setOutputParams(requiredParams.out);
-    //TODO create AudioSource and MixerChannel
 
     m_trackAboutToBeAdded.send(trackPtr);
     m_tracks.emplace(newId, trackPtr);

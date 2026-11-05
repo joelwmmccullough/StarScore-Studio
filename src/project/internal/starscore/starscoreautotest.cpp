@@ -50,6 +50,7 @@
 #include "starscoreautoarchive.h"
 #include "starscorewatch.h"
 #include "starscorejam.h"
+#include "starscorelisten.h"
 #include "engraving/dom/layoutbreak.h"
 #include "engraving/dom/system.h"
 #include "engraving/dom/textbase.h"
@@ -3789,6 +3790,73 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         autotestLog(QString("  %1: %2 (%3 bytes, %4 ms)").arg(step.mid(7), !player ? "no jam" : !player->isReady() ? "not ready"
                                                               : ok ? "written" : done ? "FAILED" : "timed out")
                     .arg(QFileInfo(step.mid(7)).size()).arg(wait.elapsed()));
+    } else if (step == "listen" || step.startsWith("listenwav:") || step.startsWith("barmap:")) {
+        // listen: the song's stored recordings decoded for Practice › Listen (1.27.0), and the bar map of its first
+        // Transcribe! file; listenwav:<speed>|<pitch>|<heard stem name>|<file>: rendered; barmap:<xsc file>: its markers
+        namespace ss = mu::project::starscore;
+        static std::unique_ptr<ss::ListenPlayer> listen;
+        if (step.startsWith("barmap:")) {
+            const ss::BarMap map = ss::transcribeBarMap(step.mid(7));
+            QStringList times;
+            for (size_t i = 0; i < map.barTimes.size() && i < 12; ++i) {
+                times << QString::number(map.barTimes[i], 'f', 3);
+            }
+            autotestLog(QString("  %1 bars: %2; sections %3; bar at 2.5 s: %4; bar 3 at %5 s").arg(map.barTimes.size())
+                        .arg(times.join(" ")).arg(map.sectionNames.join("/")).arg(map.barAt(2.5)).arg(map.timeOfBar(2), 0, 'f', 3));
+        } else if (step == "listen") {
+            std::vector<ss::ListenStem> stems;
+            for (const StarScoreMedia& m : media()) {
+                if (m.kind == "full" || m.kind == "piano" || m.kind == "nopiano" || m.kind == "audio") {
+                    stems.push_back({ m.id, m.name, m.kind, mediaPath(m.id) });
+                }
+            }
+            listen = std::make_unique<ss::ListenPlayer>(iocContext());
+            QElapsedTimer t;
+            t.start();
+            listen->load(stems);
+            const qint64 decoded = t.elapsed();
+            while (!listen->isReady() && listen->errors().isEmpty() && t.elapsed() < 20000) {
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+            }
+            autotestLog(QString("  %1 stems decoded in %2 ms, %3 (%4 ms)").arg(stems.size()).arg(decoded)
+                        .arg(listen->isReady() ? "ready" : "NOT READY").arg(t.elapsed()));
+            for (const auto& i : listen->info()) {
+                autotestLog(QString("    %1: %2 Hz, %3 ch, %4 s").arg(i.name).arg(i.sampleRate).arg(i.channels).arg(i.seconds, 0, 'f', 2));
+            }
+            for (const QString& e : listen->errors()) {
+                autotestLog("    error: " + e);
+            }
+        } else {
+            const QStringList a = step.mid(10).split('|');
+            bool done = false, ok = false;
+            QElapsedTimer t;
+            t.start();
+            if (listen && listen->isReady()) {
+                listen->setSpeed(a.value(0).toDouble() > 0 ? a.value(0).toDouble() : 1.0);
+                listen->setPitch(a.value(1).toDouble());
+                for (const auto& st : listen->stems()) {
+                    if (st.name == a.value(2)) {
+                        listen->setHeard({ st.mediaId });
+                    }
+                }
+                // (rendered through the same playback as the jam's renderWav)
+                muse::audio::SoundTrackFormat format;
+                format.type = muse::audio::SoundTrackType::WAV;
+                format.outputSpec.sampleRate = 44100;
+                format.outputSpec.samplesPerChannel = 1024;
+                format.outputSpec.audioChannelCount = 2;
+                format.sampleFormat = muse::audio::AudioSampleFormat::Int16;
+                listen->renderWav(a.value(3), format, [&](bool r) {
+                    ok = r;
+                    done = true;
+                });
+                while (!done && t.elapsed() < 180000) {
+                    QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+                }
+            }
+            autotestLog(QString("  %1: %2 (%3 bytes, %4 ms)").arg(a.value(3), !listen ? "nothing loaded" : ok ? "written" : done ? "FAILED" : "timed out")
+                        .arg(QFileInfo(a.value(3)).size()).arg(t.elapsed()));
+        }
     } else if (step == "watchnotes") {
         // watchnotes: the falling notes of the score showing (1.27.0): how many, the range, the first few
         QString name;

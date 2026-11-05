@@ -210,7 +210,9 @@ struct SoundTrack : public Track
             return false;
         }
 
-        m_ioDevice->close();
+        if (m_ioDevice) {   // (StarScore 1.27.0: the first device; there was none to close)
+            m_ioDevice->close();
+        }
         m_ioDevice = newDevice;
         playbackDataChanged.send(std::move(newDevice));
 

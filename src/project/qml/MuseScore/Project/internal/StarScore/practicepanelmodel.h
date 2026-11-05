@@ -17,6 +17,9 @@
 #include "playback/iplaybackcontroller.h"
 #include "project/istarscoreservice.h"
 #include "project/internal/starscore/starscorejam.h"
+#include "project/internal/starscore/starscorelisten.h"
+
+#include <QTimer>
 
 #include <QVariantList>
 #include <memory>
@@ -53,6 +56,23 @@ class PracticePanelModel : public QObject, public muse::Contextable, public muse
     Q_PROPERTY(QString jamNext READ jamNext NOTIFY jamChanged)               // the next chord
     Q_PROPERTY(QString jamInfo READ jamInfo NOTIFY changed)                  // the form: bars, style, or why there's none
 
+    // Listen (1.27.0): the song's stems, on one clock
+    Q_PROPERTY(QVariantList stems READ stems NOTIFY listenChanged)           // [{ id, name, kind, heard }]
+    Q_PROPERTY(bool listenReady READ listenReady NOTIFY listenChanged)
+    Q_PROPERTY(bool listenPlaying READ listenPlaying NOTIFY listenChanged)
+    Q_PROPERTY(QString listenTime READ listenTime NOTIFY listenPositionChanged)   // "1:23 / 6:02"
+    Q_PROPERTY(QString listenBar READ listenBar NOTIFY listenPositionChanged)     // "Bar 17 · B section"
+    Q_PROPERTY(double listenFraction READ listenFraction NOTIFY listenPositionChanged)
+    Q_PROPERTY(int listenSpeed READ listenSpeed WRITE setListenSpeed NOTIFY listenChanged)   // percent
+    Q_PROPERTY(double listenPitch READ listenPitch WRITE setListenPitch NOTIFY listenChanged) // semitones
+    Q_PROPERTY(bool listenLoop READ listenLoop NOTIFY listenChanged)
+    Q_PROPERTY(bool follow READ follow WRITE setFollow NOTIFY listenChanged)
+    Q_PROPERTY(bool hasVideo READ hasVideo NOTIFY listenChanged)
+    Q_PROPERTY(bool videoShown READ videoShown NOTIFY listenChanged)
+    Q_PROPERTY(QString barMapInfo READ barMapInfo NOTIFY listenChanged)
+    Q_PROPERTY(bool tapping READ tapping NOTIFY listenChanged)
+    Q_PROPERTY(QString listenInfo READ listenInfo NOTIFY listenChanged)
+
     QML_ELEMENT
 
     muse::ContextInject<mu::context::IGlobalContext> globalContext = { this };
@@ -81,6 +101,38 @@ public:
     Q_INVOKABLE void toggleCountIn();
     Q_INVOKABLE void jamPlay();
     Q_INVOKABLE void jamStop();
+
+    Q_INVOKABLE void listenPlayPause();
+    Q_INVOKABLE void listenRewind();
+    Q_INVOKABLE void listenSeekFraction(double f);
+    Q_INVOKABLE void listenSkip(int bars);           // a bar (or 5 seconds without a bar map) back or on
+    Q_INVOKABLE void chooseStem(const QString& id, bool add);   // add: blend it with those heard
+    Q_INVOKABLE void toggleListenLoop();             // the selected bars (or none)
+    Q_INVOKABLE void goToSelection();                // the recording to the selected bar
+    Q_INVOKABLE void toggleVideo();
+    Q_INVOKABLE void startTapping();                 // the bar map tapped in: T (or the button) at each bar
+    Q_INVOKABLE void tap();
+    Q_INVOKABLE void finishTapping();
+    Q_INVOKABLE void clearTaps();
+
+    QVariantList stems() const;
+    bool listenReady() const;
+    bool listenPlaying() const;
+    QString listenTime() const;
+    QString listenBar() const;
+    double listenFraction() const;
+    int listenSpeed() const;
+    void setListenSpeed(int percent);
+    double listenPitch() const;
+    void setListenPitch(double st);
+    bool listenLoop() const;
+    bool follow() const { return m_follow; }
+    void setFollow(bool f);
+    bool hasVideo() const;
+    bool videoShown() const;
+    QString barMapInfo() const { return m_barMapInfo; }
+    bool tapping() const { return m_tapping; }
+    QString listenInfo() const { return m_listenInfo; }
 
     QString mode() const { return m_mode; }
     void setMode(const QString& m);
@@ -114,6 +166,8 @@ public:
 signals:
     void changed();
     void jamChanged();
+    void listenChanged();
+    void listenPositionChanged();
 
 private:
     void restoreSettings();
@@ -122,6 +176,11 @@ private:
     void loadForm();
     void updateJamPosition();
     starscore::JamPlayer* player();
+    starscore::ListenPlayer* listener();
+    void loadListen();
+    void loadBarMap();
+    void onListenPosition();
+    QString videoPath() const;
 
     QString m_colors = "hands";
     double m_secondsShown = 4.0;
@@ -141,5 +200,16 @@ private:
     std::unique_ptr<starscore::JamPlayer> m_player;
     QString m_jamWhere, m_jamChord, m_jamNext, m_jamInfo;
     unsigned m_seed = 1;
+
+    std::unique_ptr<starscore::ListenPlayer> m_listen;
+    QString m_listenSong;          // the song the stems were loaded from
+    starscore::BarMap m_barMap;
+    QString m_barMapInfo;
+    QString m_listenInfo;
+    int m_listenBarNow = -9999;
+    bool m_follow = true;
+    bool m_tapping = false;
+    std::vector<double> m_taps;
+    QTimer m_videoTimer;
 };
 }

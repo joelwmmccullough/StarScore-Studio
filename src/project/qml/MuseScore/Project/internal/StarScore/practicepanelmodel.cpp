@@ -15,6 +15,8 @@
 #include "engraving/dom/starscoreplayback.h"
 #include "notation/inotationinteraction.h"
 #include "notation/inotationselection.h"
+#include "notation/inotationelements.h"
+#include "project/internal/starscore/starscorevideo.h"
 
 using namespace mu::project;
 
@@ -32,6 +34,14 @@ void PracticePanelModel::load()
     if (globalContext()) {
         globalContext()->currentProjectChanged().onNotify(this, [this]() {
             jamStop();
+            if (m_listen) {
+                m_listen->clear();
+                m_listenSong.clear();
+                starscore::video::close();
+            }
+            if (m_mode == "listen") {
+                loadListen();
+            }
             restoreSettings();
             loadForm();
             emit changed();
@@ -176,6 +186,17 @@ void PracticePanelModel::setMode(const QString& m)
             jamStop();
         } else if (playing()) {
             dispatcher()->dispatch("stop");
+        }
+        if (m != "listen" && m_listen) {
+            m_listen->pause();
+            starscore::video::close();
+        }
+        if (m == "listen") {
+            if (playing()) {
+                dispatcher()->dispatch("stop");
+            }
+            jamStop();
+            loadListen();
         }
         m_mode = m;
         saveSettings();
@@ -391,5 +412,470 @@ void PracticePanelModel::updateJamPosition()
         m_jamChord = current;
         m_jamNext = next;
         emit jamChanged();
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+//  Listen (1.27.0)
+// ---------------------------------------------------------------------------------------------------------------------
+
+namespace {
+bool isStemKind(const QString& kind)
+{
+    return kind == "full" || kind == "piano" || kind == "nopiano" || kind == "audio";
+}
+
+QString clock(double s)
+{
+    const int t = int(std::max(0.0, s));
+    return QString("%1:%2").arg(t / 60).arg(t % 60, 2, 10, QChar('0'));
+}
+}
+
+starscore::ListenPlayer* PracticePanelModel::listener()
+{
+    if (!m_listen) {
+        m_listen = std::make_unique<starscore::ListenPlayer>(iocContext());
+        connect(m_listen.get(), &starscore::ListenPlayer::readyChanged, this, [this]() {
+            const QStringList errors = m_listen->errors();
+            if (!errors.isEmpty()) {
+                m_listenInfo = muse::qtrc("starscore", "Couldn't play: %1").arg(errors.join("; "));
+            }
+            emit listenChanged();
+            emit listenPositionChanged();
+        });
+        connect(m_listen.get(), &starscore::ListenPlayer::playingChanged, this, [this]() {
+            if (m_listen->isPlaying()) {
+                m_videoTimer.start();
+            }
+            emit listenChanged();
+        });
+        connect(m_listen.get(), &starscore::ListenPlayer::positionChanged, this, [this]() { onListenPosition(); });
+        m_videoTimer.setInterval(100);
+        connect(&m_videoTimer, &QTimer::timeout, this, [this]() {
+            if (!m_listen) {
+                return;
+            }
+            starscore::video::follow(m_listen->position(), m_listen->speed(), m_listen->isPlaying());
+            if (!m_listen->isPlaying()) {
+                m_videoTimer.stop();
+            }
+        });
+        if (starScore()) {
+            starScore()->changed().onNotify(this, [this]() {
+                // new stems stored in the song: loaded again (when not playing)
+                if (m_mode == "listen" && m_listen && !m_listen->isPlaying()) {
+                    QStringList now;
+                    for (const StarScoreMedia& m : starScore()->media()) {
+                        if (isStemKind(m.kind)) {
+                            now << m.id;
+                        }
+                    }
+                    QStringList loaded;
+                    for (const auto& st : m_listen->stems()) {
+                        loaded << st.mediaId;
+                    }
+                    if (now != loaded) {
+                        m_listenSong.clear();
+                        loadListen();
+                    }
+                }
+            });
+        }
+    }
+    return m_listen.get();
+}
+
+void PracticePanelModel::loadListen()
+{
+    if (!starScore() || !globalContext() || !globalContext()->currentProject()) {
+        return;
+    }
+    const QString song = globalContext()->currentProject()->path().toQString();
+    if (m_listen && m_listenSong == song && m_listen->isReady()) {
+        return;
+    }
+    std::vector<starscore::ListenStem> stems;
+    for (const StarScoreMedia& m : starScore()->media()) {
+        if (isStemKind(m.kind)) {
+            stems.push_back({ m.id, m.name, m.kind, starScore()->mediaPath(m.id) });
+        }
+    }
+    // the full mix first: heard at the start
+    std::stable_sort(stems.begin(), stems.end(), [](const auto& a, const auto& b) {
+        auto rank = [](const QString& k) { return k == "full" ? 0 : k == "piano" ? 1 : k == "nopiano" ? 2 : 3; };
+        return rank(a.kind) < rank(b.kind);
+    });
+    m_listenSong = song;
+    m_listenInfo.clear();
+    if (stems.empty()) {
+        m_listenInfo = muse::qtrc("starscore", "No recordings in this score yet. Add the full mix and the stems with “+ Audio, "
+                                                "video or Transcribe! file” on the StarScore bar.");
+        if (m_listen) {
+            m_listen->clear();
+        }
+        emit listenChanged();
+        return;
+    }
+    listener()->load(stems);
+    loadBarMap();
+    emit listenChanged();
+}
+
+void PracticePanelModel::loadBarMap()
+{
+    m_barMap = starscore::BarMap();
+    m_barMapInfo.clear();
+    // tapped bars first (Joel's own), then the first Transcribe! file's measure markers
+    QSettings s;
+    s.beginGroup(songKey());
+    const QStringList taps = s.value("listenTaps").toStringList();
+    const int firstBar = s.value("listenFirstBar", 0).toInt();
+    s.endGroup();
+    if (taps.size() >= 2) {
+        for (const QString& t : taps) {
+            m_barMap.barTimes.push_back(t.toDouble());
+        }
+        m_barMap.firstBar = firstBar;
+        m_barMapInfo = muse::qtrc("starscore", "Bars: %1 tapped").arg(taps.size());
+    } else if (starScore()) {
+        for (const StarScoreMedia& m : starScore()->media()) {
+            if (m.kind != "transcribe") {
+                continue;
+            }
+            starscore::BarMap map = starscore::transcribeBarMap(starScore()->mediaPath(m.id));
+            if (!map.empty()) {
+                m_barMap = map;
+                m_barMapInfo = muse::qtrc("starscore", "Bars: %1 from %2").arg(map.barTimes.size()).arg(m.name);
+                break;
+            }
+        }
+    }
+    if (m_barMap.empty()) {
+        m_barMapInfo = muse::qtrc("starscore", "No bar map yet: tap the bars in once");
+    }
+}
+
+QVariantList PracticePanelModel::stems() const
+{
+    QVariantList out;
+    if (!m_listen) {
+        return out;
+    }
+    for (const auto& st : m_listen->stems()) {
+        out << QVariantMap { { "id", st.mediaId }, { "name", st.name }, { "kind", st.kind }, { "heard", m_listen->heard().contains(st.mediaId) } };
+    }
+    return out;
+}
+
+bool PracticePanelModel::listenReady() const
+{
+    return m_listen && m_listen->isReady();
+}
+
+bool PracticePanelModel::listenPlaying() const
+{
+    return m_listen && m_listen->isPlaying();
+}
+
+QString PracticePanelModel::listenTime() const
+{
+    return m_listen ? clock(m_listen->position()) + " / " + clock(m_listen->length()) : QString();
+}
+
+QString PracticePanelModel::listenBar() const
+{
+    if (!m_listen || m_barMap.empty()) {
+        return QString();
+    }
+    const double t = m_listen->position();
+    const int bar = m_barMap.barAt(t);
+    if (bar < 0) {
+        return muse::qtrc("starscore", "Before bar 1");
+    }
+    QString section;
+    for (size_t i = 0; i < m_barMap.sectionTimes.size(); ++i) {
+        if (m_barMap.sectionTimes[i] <= t + 1e-6) {
+            section = m_barMap.sectionNames.value(int(i));
+        }
+    }
+    return muse::qtrc("starscore", "Bar %1").arg(bar + 1) + (section.isEmpty() ? QString() : " · " + section);
+}
+
+double PracticePanelModel::listenFraction() const
+{
+    return m_listen && m_listen->length() > 0 ? m_listen->position() / m_listen->length() : 0.0;
+}
+
+int PracticePanelModel::listenSpeed() const
+{
+    return m_listen ? int(std::lround(m_listen->speed() * 100)) : 100;
+}
+
+void PracticePanelModel::setListenSpeed(int percent)
+{
+    listener()->setSpeed(std::clamp(percent, 10, 200) / 100.0);
+    emit listenChanged();
+    emit listenPositionChanged();
+}
+
+double PracticePanelModel::listenPitch() const
+{
+    return m_listen ? m_listen->pitch() : 0.0;
+}
+
+void PracticePanelModel::setListenPitch(double st)
+{
+    listener()->setPitch(st);
+    emit listenChanged();
+}
+
+bool PracticePanelModel::listenLoop() const
+{
+    return m_listen && m_listen->hasLoop();
+}
+
+void PracticePanelModel::setFollow(bool f)
+{
+    m_follow = f;
+    emit listenChanged();
+}
+
+void PracticePanelModel::listenPlayPause()
+{
+    loadListen();
+    if (!listenReady()) {
+        return;
+    }
+    if (m_listen->isPlaying()) {
+        m_listen->pause();
+    } else {
+        if (playing()) {
+            dispatcher()->dispatch("stop");
+        }
+        jamStop();
+        m_listen->play();
+    }
+}
+
+void PracticePanelModel::listenRewind()
+{
+    if (m_listen) {
+        m_listen->seek(m_listen->hasLoop() ? 0 : 0);
+        onListenPosition();
+    }
+}
+
+void PracticePanelModel::listenSeekFraction(double f)
+{
+    if (m_listen && m_listen->length() > 0) {
+        m_listen->seek(std::clamp(f, 0.0, 1.0) * m_listen->length());
+        onListenPosition();
+    }
+}
+
+void PracticePanelModel::listenSkip(int bars)
+{
+    if (!m_listen) {
+        return;
+    }
+    const double t = m_listen->position();
+    if (m_barMap.empty()) {
+        m_listen->seek(t + 5.0 * bars);
+    } else {
+        const int bar = std::max(m_barMap.firstBar, m_barMap.barAt(t) + bars);
+        m_listen->seek(m_barMap.timeOfBar(bar));
+    }
+    onListenPosition();
+}
+
+void PracticePanelModel::chooseStem(const QString& id, bool add)
+{
+    if (!m_listen) {
+        return;
+    }
+    QStringList heard = m_listen->heard();
+    if (add) {
+        if (heard.contains(id)) {
+            if (heard.size() > 1) {
+                heard.removeAll(id);
+            }
+        } else {
+            heard << id;
+        }
+    } else {
+        heard = QStringList { id };
+    }
+    m_listen->setHeard(heard);
+    emit listenChanged();
+}
+
+//! The selected bars (0-based, the score's), or false
+static bool selectedBars(const mu::notation::INotationPtr& notation, int& from, int& to)
+{
+    const auto sel = notation && notation->interaction() ? notation->interaction()->selection() : nullptr;
+    if (!sel || sel->isNone() || !sel->startMeasureBase()) {
+        return false;
+    }
+    const auto* a = sel->startMeasureBase()->findMeasure();
+    const auto* b = sel->endMeasureBase() ? sel->endMeasureBase()->findMeasure() : a;
+    if (!a || !b) {
+        return false;
+    }
+    from = a->index();
+    to = b->index();
+    return true;
+}
+
+void PracticePanelModel::toggleListenLoop()
+{
+    if (!m_listen) {
+        return;
+    }
+    if (m_listen->hasLoop()) {
+        m_listen->setLoop(0, 0);
+        emit listenChanged();
+        return;
+    }
+    int from = 0, to = 0;
+    if (m_barMap.empty() || !selectedBars(globalContext()->currentNotation(), from, to)) {
+        m_listenInfo = m_barMap.empty() ? muse::qtrc("starscore", "Looping bars needs the bar map: tap the bars in first.")
+                       : muse::qtrc("starscore", "Select the bars to loop first.");
+        emit listenChanged();
+        return;
+    }
+    const double a = m_barMap.timeOfBar(from);
+    const double b = m_barMap.timeOfBar(to + 1);
+    m_listen->setLoop(a, b);
+    m_listen->seek(a);
+    m_listenInfo.clear();
+    emit listenChanged();
+}
+
+void PracticePanelModel::goToSelection()
+{
+    int from = 0, to = 0;
+    if (m_listen && !m_barMap.empty() && selectedBars(globalContext()->currentNotation(), from, to)) {
+        m_listen->seek(m_barMap.timeOfBar(from));
+        onListenPosition();
+    }
+}
+
+QString PracticePanelModel::videoPath() const
+{
+    if (!starScore()) {
+        return QString();
+    }
+    for (const StarScoreMedia& m : starScore()->media()) {
+        if (m.kind == "video") {
+            return starScore()->mediaPath(m.id);
+        }
+    }
+    return QString();
+}
+
+bool PracticePanelModel::hasVideo() const
+{
+    return starscore::video::available() && !videoPath().isEmpty();
+}
+
+bool PracticePanelModel::videoShown() const
+{
+    return starscore::video::isOpen();
+}
+
+void PracticePanelModel::toggleVideo()
+{
+    if (starscore::video::isOpen()) {
+        starscore::video::close();
+    } else if (hasVideo()) {
+        const auto project = globalContext()->currentProject();
+        starscore::video::open(videoPath(), project ? project->displayName() : QString());
+        if (m_listen) {
+            starscore::video::follow(m_listen->position(), m_listen->speed(), m_listen->isPlaying());
+            if (m_listen->isPlaying()) {
+                m_videoTimer.start();
+            }
+        }
+    }
+    emit listenChanged();
+}
+
+void PracticePanelModel::startTapping()
+{
+    m_taps.clear();
+    m_tapping = true;
+    int from = 0, to = 0;
+    // the first tap is the selected bar (bar 1 when none is selected)
+    QSettings s;
+    s.beginGroup(songKey());
+    s.setValue("listenFirstBar", selectedBars(globalContext()->currentNotation(), from, to) ? from : 0);
+    s.endGroup();
+    m_listenInfo = muse::qtrc("starscore", "Tap at the start of each bar (press T, or the Tap button), from the bar selected in "
+                                            "the score (bar 1 when none is). Press Done when finished.");
+    if (m_listen && !m_listen->isPlaying()) {
+        m_listen->play();
+    }
+    emit listenChanged();
+}
+
+void PracticePanelModel::tap()
+{
+    if (m_tapping && m_listen) {
+        m_taps.push_back(m_listen->position());
+    }
+}
+
+void PracticePanelModel::finishTapping()
+{
+    m_tapping = false;
+    if (m_taps.size() >= 2) {
+        QStringList list;
+        for (double t : m_taps) {
+            list << QString::number(t, 'f', 4);
+        }
+        QSettings s;
+        s.beginGroup(songKey());
+        s.setValue("listenTaps", list);
+        s.endGroup();
+    }
+    m_listenInfo.clear();
+    loadBarMap();
+    emit listenChanged();
+    emit listenPositionChanged();
+}
+
+void PracticePanelModel::clearTaps()
+{
+    QSettings s;
+    s.beginGroup(songKey());
+    s.remove("listenTaps");
+    s.endGroup();
+    loadBarMap();
+    emit listenChanged();
+}
+
+void PracticePanelModel::onListenPosition()
+{
+    emit listenPositionChanged();
+    if (!m_listen || m_barMap.empty() || !m_follow || !m_listen->isPlaying()) {
+        return;
+    }
+    // the score follows the recording: the bar heard shown
+    const int bar = m_barMap.barAt(m_listen->position());
+    if (bar == m_listenBarNow || bar < 0) {
+        return;
+    }
+    m_listenBarNow = bar;
+    const auto notation = globalContext()->currentNotation();
+    if (!notation || !notation->interaction() || !notation->elements() || !notation->elements()->msScore()) {
+        return;
+    }
+    mu::engraving::Measure* m = notation->elements()->msScore()->firstMeasure();
+    for (int i = 0; m && i < bar; ++i) {
+        m = m->nextMeasure();
+    }
+    if (m) {
+        notation->interaction()->showItem(m);
     }
 }
