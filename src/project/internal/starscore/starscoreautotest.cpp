@@ -80,6 +80,7 @@
 #include "starscorepractice.h"
 #include "starscorepracticebook.h"
 #include <QEventLoop>
+#include <QSettings>
 
 #include <QCoreApplication>
 #include <QGuiApplication>
