@@ -185,6 +185,7 @@ Item {
                 }
                 FlatButton {
                     text: "◀"
+                    Layout.preferredWidth: 32
                     enabled: practice.listenReady
                     toolTipTitle: qsTrc("starscore", "A bar back")
                     onClicked: practice.listenSkip(-1)
@@ -198,6 +199,7 @@ Item {
                 }
                 FlatButton {
                     text: "▶"
+                    Layout.preferredWidth: 32
                     enabled: practice.listenReady
                     toolTipTitle: qsTrc("starscore", "A bar on")
                     onClicked: practice.listenSkip(1)
