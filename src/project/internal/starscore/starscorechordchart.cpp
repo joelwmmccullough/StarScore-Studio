@@ -3029,8 +3029,8 @@ JamForm jamForm(const MasterScore* ms, bool solo)
         return form;
     }
     ChordChartData data = extractChordChart(ms);
-    form.bpm = soloBpm(data);
-    form.style = soloTempoWords(data);
+    const int writtenBpm = soloBpm(data);
+    const QString writtenStyle = soloTempoWords(data);
     if (solo) {
         int choruses = 0;
         if (soloOneChorus(data, soloLastBar(ms), choruses)) {
@@ -3038,6 +3038,9 @@ JamForm jamForm(const MasterScore* ms, bool solo)
             form.soloChoruses = choruses;
         }
     }
+    // (a solo's chorus carries the tempo the solo starts at, as its iReal Pro chart does)
+    form.bpm = soloBpm(data) > 0 ? soloBpm(data) : writtenBpm;
+    form.style = !soloTempoWords(data).isEmpty() ? soloTempoWords(data) : writtenStyle;
     int firstChordBar = -1;
     for (const ChordChartMeasure& m : data.measures) {
         JamBar bar;
