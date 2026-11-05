@@ -35,6 +35,8 @@
 #include <QRegularExpression>
 #include <QTimer>
 #include <QCoreApplication>
+
+#include "async/notifylist.h"
 #include <QUuid>
 #include <QFile>
 #include <QUrl>
