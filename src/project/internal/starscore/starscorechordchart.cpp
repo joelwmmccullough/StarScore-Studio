@@ -2597,7 +2597,11 @@ QString soloBarHarmony(const ChordChartMeasure& m, QString& sounding)
         if (out.isEmpty() && c.t != "0" && !last.isEmpty()) {
             out << "0 " + last;
         }
-        out << c.t + " " + ch;
+        // (1.25.2) where in the bar, as a share of the bar: the same chords in a 12/8 bar and a 4/4 bar compare equal
+        // (Tumba's vamp is in 12/8 for its first 29 bars, then in 4/4)
+        const double bar = parseFrac(m.ts).toDouble();
+        const double at = bar > 0 ? parseFrac(c.t).toDouble() / bar : 0.0;
+        out << (at <= 0.0 ? QString("0") : QString::number(at, 'f', 3)) + " " + ch;
         last = ch;
     }
     if (out.isEmpty() && !last.isEmpty()) {
@@ -2652,8 +2656,16 @@ bool soloOneChorus(ChordChartData& data, int lastBar, int& choruses)
             std::map<QString, int> votes;
             // (1.25.2) every chorus votes, a bar with no chord symbol for the chord still sounding in it: Pinetop's
             // bar 2 is C7 (held from bar 1) in most choruses, F7 in the two with a quick IV
+            // (only a chorus with chord symbols somewhere in it votes for a bar it has none in)
             for (int i = p; i < total; i += P) {
-                if (!harmony[size_t(i)].isEmpty()) {
+                if (harmony[size_t(i)].isEmpty()) {
+                    continue;
+                }
+                bool chorusHasChords = false;
+                for (int q = i - p; q < std::min(total, i - p + P) && !chorusHasChords; ++q) {
+                    chorusHasChords = explicitBar[size_t(q)];
+                }
+                if (explicitBar[size_t(i)] || chorusHasChords) {
                     ++votes[harmony[size_t(i)]];
                 }
             }
@@ -2672,13 +2684,24 @@ bool soloOneChorus(ChordChartData& data, int lastBar, int& choruses)
         if (matches < explicitCount * 0.9) {
             continue;
         }
-        // the form found: its first chorus's bars, each with the chords most choruses have there
+        // the form found: its first chorus's bars, each with the chords most choruses have there, in the time
+        // signature most of the solo's bars are in (1.25.2)
+        std::map<QString, int> tsCount;
+        for (int i = start; i < end; ++i) {
+            ++tsCount[ms[size_t(i)].ts];
+        }
+        const QString mainTs = tsCount.empty() ? QString()
+                               : std::max_element(tsCount.begin(), tsCount.end(),
+                                                  [](const auto& a, const auto& b) { return a.second < b.second; })->first;
         std::vector<ChordChartMeasure> chorus;
         for (int p = 0; p < P; ++p) {
             int pick = -1;
-            for (int i = p; i < total && pick < 0; i += P) {
-                if (harmony[size_t(i)] == form[size_t(p)] && explicitBar[size_t(i)]) {
-                    pick = i;
+            for (int pass = 0; pass < 2 && pick < 0; ++pass) {
+                for (int i = p; i < total && pick < 0; i += P) {
+                    if (harmony[size_t(i)] == form[size_t(p)] && explicitBar[size_t(i)]
+                        && (pass == 1 || ms[size_t(start + i)].ts == mainTs)) {
+                        pick = i;
+                    }
                 }
             }
             // (a bar most choruses have no chord symbol in: the chord before goes on; written out when the form's bar
@@ -2691,6 +2714,10 @@ bool soloOneChorus(ChordChartData& data, int lastBar, int& choruses)
                 }
             }
             ChordChartMeasure m = ms[size_t(start + (pick < 0 ? p : pick))];
+            if (pick < 0 && !mainTs.isEmpty()) {
+                m.ts = mainTs;
+                m.len = fracStr(parseFrac(mainTs));
+            }
             m.i = p;
             m.startRepeat = false;
             m.endRepeat = 0;
