@@ -2141,6 +2141,61 @@ struct IRealLink {
     int lines = 0;
 };
 
+int soloBpm(const ChordChartData& data);   // (below)
+
+//! (1.25.2, Joel 4 Nov 2026) "<168 bpm>": the tempo as text under the first bar of a chart's last line (the bottom
+//! left), or the first bar on that line with no text of its own (a section's label, a "3x")
+QString irealWithTempoText(const QString& line, int bpm)
+{
+    if (bpm <= 0) {
+        return line;
+    }
+    const QString text = QString("<%1 bpm>").arg(bpm);
+    int i = 0;
+    const int n = int(line.size());
+    while (i < n) {
+        // a bar's start: its barline, then its section mark, time signature and ending
+        while (i < n && QString("{[|}").contains(line[i])) {
+            ++i;
+        }
+        int j = i;
+        bool hasText = false;
+        for (bool more = true; more && j < n;) {
+            more = false;
+            if (line[j] == '*' && j + 1 < n) {
+                j += 2;
+                more = true;
+            } else if (line[j] == 'T' && j + 2 < n && line[j + 1].isDigit() && line[j + 2].isDigit()) {
+                j += 3;
+                more = true;
+            } else if (line[j] == 'N' && j + 1 < n && line[j + 1].isDigit()) {
+                j += 2;
+                more = true;
+            } else if (line[j] == '<') {
+                const int close = line.indexOf('>', j);
+                if (close < 0) {
+                    break;
+                }
+                hasText = true;
+                j = close + 1;
+                more = true;
+            }
+        }
+        if (!hasText) {
+            return line.left(j) + text + line.mid(j);
+        }
+        // the next bar
+        i = j;
+        while (i < n && !QString("{[|}").contains(line[i])) {
+            ++i;
+        }
+        if (i >= n || line.mid(i).trimmed().isEmpty() || line.mid(i).trimmed() == "]" || line.mid(i).trimmed() == "}") {
+            break;
+        }
+    }
+    return line;   // (every bar on the line has text: none added)
+}
+
 //! The charts: one, or several parts when the song is longer than 12 lines
 std::vector<IRealLink> irealParts(const ChordChartData& song, const Analysis& a, const QString& title, const QString& composer,
                                   std::set<QString>& notes, int maxLines = 12)
@@ -2179,6 +2234,12 @@ std::vector<IRealLink> irealParts(const ChordChartData& song, const Analysis& a,
     }
     const QString style = song.irealStyle.isEmpty() && !song.irealStyleSet ? QString("Funk") : song.irealStyle;
     std::vector<IRealLink> links;
+    const int bpm = soloBpm(song);
+    for (std::vector<QStringList>& part : parts) {
+        if (!part.empty() && !part.back().isEmpty()) {
+            part.back().last() = irealWithTempoText(part.back().last(), bpm);
+        }
+    }
     for (size_t n = 0; n < parts.size(); ++n) {
         QString prog;
         int lineCount = 0;
