@@ -148,7 +148,8 @@ QString jamGrooveFor(const QString& words, int beats)
     if (has({ "funk", "groove", "fusion", "hip", "soul", "r&b", "gospel" })) {
         return "funk";
     }
-    return beats == 3 ? "waltz" : "funk";
+    // (no style words: 3/4 a jazz waltz, 6/8 and 12/8 a Latin groove, otherwise funk)
+    return beats == 3 ? "waltz" : (beats % 3 == 0 && beats >= 6) ? "latin" : "funk";
 }
 
 std::vector<int> jamChordTones(const QString& qualityIn)
