@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <locale>
+#include <sstream>
 #include <string>
 
 #include "rubberband/RubberBandStretcher.h"
@@ -191,6 +193,8 @@ void StarScorePcmSource::seek(const msecs_t newPositionMsecs, const bool)
     // (the playback's time runs at the speed: a second of it is `speed` seconds of the recording)
     m_pos = double(newPositionMsecs) / 1000000.0 * m_speed * m_rate;
     flush();
+    LOGI() << "[starscore] recording: to " << m_pos / m_rate << " s (speed " << m_speed << ", pitch " << m_pitch
+           << ", gain " << m_gain << ", active " << m_active << ")";
 }
 
 void StarScorePcmSource::flush()
@@ -206,11 +210,12 @@ void StarScorePcmSource::applyInputParams(const AudioInputParams& requiredParams
         if (it == requiredParams.configuration.end()) {
             return def;
         }
-        try {
-            return std::stod(it->second);
-        } catch (...) {
-            return def;
-        }
+        // (a point for the decimals, whatever the language settings)
+        std::istringstream in(it->second);
+        in.imbue(std::locale::classic());
+        double v = def;
+        in >> v;
+        return in.fail() ? def : v;
     };
     const double speed = std::clamp(num("speed", 1.0), 0.1, 2.0);
     const double pitch = std::clamp(num("pitch", 0.0), -24.0, 24.0);

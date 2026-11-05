@@ -237,9 +237,10 @@ void ListenPlayer::applyParams()
             continue;
         }
         AudioInputParams in;
-        in.configuration["speed"] = std::to_string(m_speed);
-        in.configuration["pitch"] = std::to_string(m_pitch);
-        in.configuration["gain"] = std::to_string(m_heard.contains(t->stem.mediaId) ? share : 0.0);
+        // (written with a point whatever the Mac's language: the engine reads them so)
+        in.configuration["speed"] = QString::number(m_speed, 'f', 6).toStdString();
+        in.configuration["pitch"] = QString::number(m_pitch, 'f', 6).toStdString();
+        in.configuration["gain"] = QString::number(m_heard.contains(t->stem.mediaId) ? share : 0.0, 'f', 6).toStdString();
         playback()->setInputParams(m_sequence, t->id, in);
     }
 }
