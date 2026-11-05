@@ -10,6 +10,7 @@ Version numbers: the first number changes when files stop being compatible, the 
   - **Switch stems without losing your place.** Click a stem to hear it instead; turn on Blend to hear two or more together.
   - **Speed without changing pitch,** 10–200%, and **pitch shift** in half steps (−12 to +12), by Rubber Band.
   - **Bars.** With a bar map, the panel shows the bar (and Transcribe!'s section) being heard, ◀ ▶ go a bar back or on, the loop button loops the bars selected in the score, "Go to the selected bar" jumps there, and the score follows the recording (turn off "Score follows" to stay where you are). The bar map comes from the measure markers of the Transcribe! file stored in the score, or you tap it in once: select the bar the recording starts on, press "Tap the bars…", then T at the start of every bar, and Done.
+  - **Falling notes with the recording.** Once there's a bar map, the score's notes fall under the Listen controls in time with the recording, at its speed.
   - **The video** (the eye button, on the Mac): the players' video in a window of its own, muted, following the recording at its speed.
   - Recordings play from the score's own copy; the Mac reads WAV, AIFF, MP3, M4A/AAC, ALAC, FLAC and CAF.
 
