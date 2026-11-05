@@ -697,6 +697,8 @@ QVariantList StarScoreBarModel::moreMenu() const
         const QVariantMap info = soloInfo();
         return {
             item("export-band", muse::qtrc("starscore", "Export and Organize… (the twelve keys' sheets)")),
+            item("synthesia-run", muse::qtrc("starscore", "Run in Synthesia")),
+            item("synthesia-setup", muse::qtrc("starscore", "Synthesia setup for this song…")),
             item("solo-open-tied", info.value("tiedSongTitle").toString().isEmpty()
                  ? muse::qtrc("starscore", "Open the song it's tied to (none)")
                  : muse::qtrc("starscore", "Open %1").arg(info.value("tiedSongTitle").toString()),
@@ -774,6 +776,8 @@ QVariantList StarScoreBarModel::moreMenu() const
                 refItems),
         QVariantMap {},
         item("export-band", muse::qtrc("starscore", "Export and Organize…")),
+        item("synthesia-run", muse::qtrc("starscore", "Run in Synthesia")),
+        item("synthesia-setup", muse::qtrc("starscore", "Synthesia setup for this song…")),
         item("export-arrangements", muse::qtrc("starscore", "Export arrangements as MuseScore files…"), !starScore()->arrangements().empty()),
         item("organize", muse::qtrc("starscore", "Run folder organization…")),
     };
@@ -1342,6 +1346,20 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
         dispatcher()->dispatch("starscore-check-ranges");
     } else if (action == "export-band") {
         dispatcher()->dispatch("starscore-export-band");
+    } else if (action == "synthesia-run" || action == "synthesia-setup") {
+        // (1.25.5) Run in Synthesia: a song set up before goes straight to Synthesia; the first time, or from the
+        // setup item, the setup dialog comes first
+        const bool configured = starScore()->synthesiaSetup().configured;
+        if (action == "synthesia-run" && configured) {
+            const QString problem = starScore()->runInSynthesia();
+            if (!problem.isEmpty()) {
+                interactive()->error(muse::trc("starscore", "Run in Synthesia"), problem.toStdString());
+            }
+        } else {
+            UriQuery query("musescore://starscore/synthesia");
+            query.addParam("runAfter", Val(action == "synthesia-run"));
+            interactive()->open(query);
+        }
     } else if (action == "set-version") {
         openEditDialog("version", QString());
     } else if (action == "set-copyright-year") {

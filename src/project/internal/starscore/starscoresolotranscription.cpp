@@ -36,6 +36,7 @@
 #include <QTimer>
 #include <QCoreApplication>
 #include <QCryptographicHash>
+#include <QStandardPaths>
 
 #include "async/notifylist.h"
 #include <QUuid>
@@ -2743,6 +2744,23 @@ bool StarScoreService::autotestSoloStep(const QString& step)
             states << (m ? "M" : "-");
         }
         soloTestLog("  chord symbols muted (main, then each part score): " + states.join(' '));
+        return true;
+    }
+    if (step == "synthesia" || step == "synthesia:main") {
+        // synthesia[:main]: Run in Synthesia with this song's setup (the score showing, or the main score): the setup,
+        // then the files written (in the autotest nothing is opened)
+        StarScoreSynthesiaSetup setup = synthesiaSetup(step != "synthesia:main");
+        for (const StarScoreSynthesiaTrack& t : setup.tracks) {
+            soloTestLog(QString("  track %1 [%2]: hand %3, program %4%5").arg(t.name, t.key, t.hand).arg(t.program)
+                        .arg(t.firstOfPart ? QString() : QString(" (same part)")));
+        }
+        setSynthesiaSetup(setup);
+        const QString problem = runInSynthesia();
+        soloTestLog("  run: " + (problem.isEmpty() ? QString("ok") : problem));
+        const QString folder = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/Synthesia";
+        for (const QFileInfo& fi : QDir(folder).entryInfoList(QDir::Files, QDir::Name)) {
+            soloTestLog(QString("  file %1 (%2 bytes)").arg(fi.filePath()).arg(fi.size()));
+        }
         return true;
     }
     if (step == "solochart") {

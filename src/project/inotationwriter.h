@@ -55,6 +55,8 @@ public:
 
         LEADING_SILENCE_SEC,
         TRAILING_SILENCE_SEC,
+
+        STARSCORE_NO_CHORD_SYMBOLS,   // StarScore (MIDI): the chord symbols' playback left out (Run in Synthesia)
     };
 
     using Options = std::map<OptionKey, muse::Val>;

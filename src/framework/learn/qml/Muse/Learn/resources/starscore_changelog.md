@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.25.5
+
+- **Run in Synthesia.** A "Run in Synthesia" button on the StarScore bar (and in its ⋯ menu) opens the score straight in Synthesia: no MIDI export, no finding the file in Synthesia, no setting it up again. The first time for a song, a small window asks how it goes: the score showing when you click (a part score, or a solo's key, in that key) or always the main score; which staff is the right hand and which the left, which ones Synthesia plays and which it leaves out; and each part's sound. That's kept with the song, so after that the button goes straight to Synthesia (change it with ⋯ › Synthesia setup for this song…). Chord symbols are never sent. StarScore writes the MIDI file and a Synthesia file beside it (the hands, the title and the composer) into its own folder, so Synthesia knows the hands as soon as the song opens.
+
 ## 1.25.4
 
 - **Solos have versions.** A solo transcription's sheets print a real version instead of "Version 0.0.0": its first Export and Organize makes it 1.0.0; after that the minor version goes up when its notes or chord symbols changed (1.1.0), the patch when only its layout did (1.0.1), and it stays the same when nothing changed.

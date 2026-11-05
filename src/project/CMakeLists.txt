@@ -121,6 +121,7 @@ target_sources(project PRIVATE
     internal/starscore/starscoredemos.cpp
     internal/starscore/starscoreupdate.cpp
     internal/starscore/starscoresolotranscription.cpp
+    internal/starscore/starscoresynthesia.cpp
     internal/starscore/starscoredoubletime.cpp
     internal/starscore/starscorestandardize.cpp
     internal/starscore/starscoreprogress.cpp
@@ -203,6 +204,7 @@ set_source_files_properties(internal/starscore/starscoreautotest.cpp PROPERTIES 
 set_source_files_properties(internal/starscore/starscorechordchart.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 # StarScore Solo Transcriptions (1.24.0): its own translation unit, so the other files keep the unity batches they had
 set_source_files_properties(internal/starscore/starscoresolotranscription.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+set_source_files_properties(internal/starscore/starscoresynthesia.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 # StarScore practice: their own translation units (file-local helpers)
 set_source_files_properties(internal/starscore/starscorepractice.cpp internal/starscore/starscorepracticebook.cpp
     internal/starscore/starscorepracticeservice.cpp internal/starscore/starscorepracticexml.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
