@@ -19,6 +19,13 @@ struct WatchNote {
     int hand = 0;       // the staff in its part: 0 the right hand (or the only staff), 1 the left, 2 any after those
 };
 
+//! (1.27.2) where a bar starts, for the falling notes' bar lines
+struct WatchBar {
+    double start = 0;   // seconds, like WatchNote
+    int number = 1;     // as the score numbers it
+};
+
 //! The playing notes of the score showing (hidden and drum staves left out), by start; name: the part score's name
-std::vector<WatchNote> watchNotes(const mu::notation::INotationPtr& notation, QString* name = nullptr);
+std::vector<WatchNote> watchNotes(const mu::notation::INotationPtr& notation, QString* name = nullptr,
+                                   std::vector<WatchBar>* bars = nullptr);
 }

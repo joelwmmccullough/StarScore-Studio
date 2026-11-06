@@ -75,6 +75,7 @@ private:
     void scheduleReload();
 
     std::vector<FallNote> m_notes;
+    std::vector<starscore::WatchBar> m_bars;   // (1.27.2) bar lines across the falling notes
     int m_lowKey = 21;
     int m_highKey = 108;
     QString m_scoreName;

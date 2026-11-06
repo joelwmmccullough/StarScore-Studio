@@ -20,8 +20,11 @@
 using namespace mu::engraving;
 
 namespace mu::project::starscore {
-std::vector<WatchNote> watchNotes(const mu::notation::INotationPtr& notation, QString* name)
+std::vector<WatchNote> watchNotes(const mu::notation::INotationPtr& notation, QString* name, std::vector<WatchBar>* bars)
 {
+    if (bars) {
+        bars->clear();
+    }
     std::vector<WatchNote> out;
     if (!notation || !notation->elements()) {
         return out;
@@ -39,6 +42,9 @@ std::vector<WatchNote> watchNotes(const mu::notation::INotationPtr& notation, QS
         const int offset = rs->utick - rs->tick;
         const int segEnd = rs->tick + rs->len();
         for (Measure* m = score->tick2measure(Fraction::fromTicks(rs->tick)); m && m->tick().ticks() < segEnd; m = m->nextMeasure()) {
+            if (bars) {
+                bars->push_back({ ms->utick2utime(m->tick().ticks() + offset), m->no() + 1 });
+            }
             for (Segment* s = m->first(SegmentType::ChordRest); s; s = s->next(SegmentType::ChordRest)) {
                 for (track_idx_t t = 0; t < score->ntracks(); ++t) {
                     EngravingItem* e = s->element(t);

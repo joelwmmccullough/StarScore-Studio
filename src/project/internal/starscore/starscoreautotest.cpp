@@ -3872,7 +3872,8 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
     } else if (step == "watchnotes") {
         // watchnotes: the falling notes of the score showing (1.27.0): how many, the range, the first few
         QString name;
-        const std::vector<mu::project::starscore::WatchNote> notes = mu::project::starscore::watchNotes(globalContext()->currentNotation(), &name);
+        std::vector<mu::project::starscore::WatchBar> bars;
+        const std::vector<mu::project::starscore::WatchNote> notes = mu::project::starscore::watchNotes(globalContext()->currentNotation(), &name, &bars);
         int low = 127, high = 0;
         int hands[3] = { 0, 0, 0 };
         for (const auto& n : notes) {
@@ -3888,6 +3889,11 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             first << QString("%1@%2-%3").arg(notes[i].pitch).arg(notes[i].start, 0, 'f', 2).arg(notes[i].end, 0, 'f', 2);
         }
         autotestLog("  first: " + first.join(" "));
+        QStringList barList;
+        for (size_t i = 0; i < std::min<size_t>(6, bars.size()); ++i) {
+            barList << QString("%1@%2").arg(bars[i].number).arg(bars[i].start, 0, 'f', 2);
+        }
+        autotestLog(QString("  bars: %1, first: %2").arg(bars.size()).arg(barList.join(" ")));
     } else if (step == "filesave") {
         // filesave: File › Save, in place (a .starscore keeps its solos and reference PDFs)
         dispatcher()->dispatch("file-save");

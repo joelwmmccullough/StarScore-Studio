@@ -145,7 +145,7 @@ void FallingNotesView::reload()
     if (m_notation) {
         m_notation->notationChanged().onNotify(this, [this]() { scheduleReload(); }, muse::async::Asyncable::Mode::SetReplace);
     }
-    m_notes = starscore::watchNotes(m_notation, &m_scoreName);
+    m_notes = starscore::watchNotes(m_notation, &m_scoreName, &m_bars);
     // the keyboard: the notes' range, whole octaves C to C, at least two octaves, within the piano's 88 keys
     int low = 127, high = 0;
     for (const FallNote& n : m_notes) {
@@ -188,6 +188,28 @@ void FallingNotesView::paint(QPainter* p)
         if (k % 12 == 0 || k % 12 == 5) {
             const double x = keyX(k, m_lowKey) * ww;
             p->drawLine(QPointF(x, 0), QPointF(x, fallH));
+        }
+    }
+
+    // (1.27.2) a line where each bar starts, its number at the left, so a falling note can be found in the sheet
+    {
+        const QColor lineColor = m_dark ? QColor(255, 255, 255, 48) : QColor(0, 0, 0, 48);
+        const QColor numberColor = m_dark ? QColor(255, 255, 255, 110) : QColor(0, 0, 0, 120);
+        QFont f = p->font();
+        f.setPixelSize(10);
+        p->setFont(f);
+        const auto firstBar = std::lower_bound(m_bars.begin(), m_bars.end(), t,
+                                               [](const starscore::WatchBar& b, double v) { return b.start < v; });
+        double lastNumberY = 1e9;
+        for (auto it = firstBar; it != m_bars.end() && it->start <= t + m_secondsShown; ++it) {
+            const double y = fallH - (it->start - t) * pps;
+            p->setPen(QPen(lineColor, 1));
+            p->drawLine(QPointF(0, y), QPointF(r.width(), y));
+            if (lastNumberY - y >= 14 && y >= 12) {   // (bars too close together: not every number)
+                p->setPen(numberColor);
+                p->drawText(QRectF(3, y - 13, 40, 12), Qt::AlignLeft | Qt::AlignBottom, QString::number(it->number));
+                lastNumberY = y;
+            }
         }
     }
 
