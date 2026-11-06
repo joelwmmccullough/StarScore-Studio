@@ -1977,9 +1977,11 @@ IRealBarCells irealBarTokens(const BarKey& k, const BarKey* prev, std::set<QStri
         out.cells[slot] = irealChord(kk, notes);
         used.push_back(slot);
     }
-    std::sort(used.begin(), used.end());
-    for (size_t i = 1; i < used.size(); ++i) {
-        if (used[i] - used[i - 1] == 1) {
+    // small: four or more chords to the bar (iReal Pro's own charts), or a long chord right before another one, which
+    // would run into it (A- G6 side by side fit; Eb-/Gb Fh7 don't)
+    out.small = used.size() >= 4;
+    for (int c = 0; c + 1 < width; ++c) {
+        if (out.cells[c] != " " && out.cells[c + 1] != " " && out.cells[c].size() >= 4) {
             out.small = true;
         }
     }
@@ -2121,20 +2123,21 @@ std::vector<std::pair<const Group*, QStringList> > irealSections(const Analysis&
             } else if (it.kind == Item::Rep) {
                 for (size_t j = 0; j < it.keys.size(); ++j) {
                     const bool lastBar = j == it.keys.size() - 1;
-                    bars.push_back({ irealBarTokens(it.keys[j], prev, notes, width), j == 0 ? "{" : "|", lastBar ? "}" : "|", 0,
+                    bars.push_back({ irealBarTokens(it.keys[j], j == 0 ? nullptr : prev, notes, width), j == 0 ? "{" : "|", lastBar ? "}" : "|", 0,
                                      lastBar && it.n > 2 ? it.n : 0, it.keys[j].ts });
                     prev = &it.keys[j];
                 }
             } else {
                 for (size_t j = 0; j < it.keys.size(); ++j) {
-                    bars.push_back({ irealBarTokens(it.keys[j], prev, notes, width), j == 0 ? "{" : "|", "|", 0, 0, it.keys[j].ts });
+                    bars.push_back({ irealBarTokens(it.keys[j], j == 0 ? nullptr : prev, notes, width), j == 0 ? "{" : "|", "|", 0, 0, it.keys[j].ts });
                     prev = &it.keys[j];
                 }
                 for (size_t n = 0; n < it.ends.size(); ++n) {
                     const Keys& e = it.ends[n];
                     for (size_t j = 0; j < e.size(); ++j) {
                         const bool lastPass = n == it.ends.size() - 1;
-                        bars.push_back({ irealBarTokens(e[j], prev, notes, width), "|", j == e.size() - 1 && !lastPass ? "}" : "|",
+                        // (no repeat-the-bar sign as an ending's first bar: "2. x" reads as nothing)
+                        bars.push_back({ irealBarTokens(e[j], j == 0 ? nullptr : prev, notes, width), "|", j == e.size() - 1 && !lastPass ? "}" : "|",
                                          j == 0 ? int(n) + 1 : 0, 0, e[j].ts });
                         prev = &e[j];
                     }
