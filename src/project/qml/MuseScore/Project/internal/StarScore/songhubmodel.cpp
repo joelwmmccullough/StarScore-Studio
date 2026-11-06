@@ -22,6 +22,7 @@
 #include <QUrl>
 
 #include "dockwindow/idockwindow.h"
+#include "engraving/dom/excerpt.h"
 #include "engraving/dom/masterscore.h"
 #include "project/internal/starscore/starscorestatus.h"
 #include "translation.h"
@@ -201,10 +202,8 @@ void SongHubModel::refresh()
     // --- the title and the facts line
     mu::notation::IMasterNotationPtr master = globalContext()->currentMasterNotation();
     mu::engraving::MasterScore* ms = master ? master->masterScore() : nullptr;
-    if (ms) {
-        m_title = ms->metaTag(u"workTitle").toQString();
-    }
-    if (m_title.isEmpty()) {
+    m_title = ss->songTitle();
+    if (m_title.isEmpty() || m_title == "Untitled score") {
         m_title = file.completeBaseName();
         const qsizetype dash = m_title.indexOf(" - ");
         if (dash == 4) {
@@ -233,11 +232,11 @@ void SongHubModel::refresh()
         }
     }
     const QString version = ss->scoreVersion();
-    if (!version.isEmpty()) {
+    if (!version.isEmpty() && version != "0.0.0") {
         facts << muse::qtrc("starscore", "Version %1").arg(version);
     }
     if (ms) {
-        const QString composer = ms->metaTag(u"composer").toQString();
+        const QString composer = ms->metaTag(u"composer").toQString().simplified();
         if (!composer.isEmpty()) {
             facts << composer;
         }
@@ -286,8 +285,14 @@ void SongHubModel::refresh()
             }
             const QString name = e->name();
             int status = -1;
-            if (e->isInited() && e->notation() && e->notation()->elements()) {
-                status = ss->partScoreStatus(e->notation()->elements()->msScore());
+            if (ms) {
+                // (from the engraving excerpt: a part score not opened yet has no notation of its own)
+                for (const mu::engraving::Excerpt* ex : ms->excerpts()) {
+                    if (ex && ex->name().toQString() == name && ex->excerptScore()) {
+                        status = ss->partScoreStatus(ex->excerptScore());
+                        break;
+                    }
+                }
             }
             m_partScores << QVariantMap {
                 { "name", name }, { "status", status },

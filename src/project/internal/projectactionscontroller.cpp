@@ -743,6 +743,12 @@ Ret ProjectActionsController::doFinishOpenProject()
         const bool autotest = qEnvironmentVariableIsSet("STARSCORE_AUTOTEST") && !qEnvironmentVariableIsSet("STARSCORE_AUTOTEST_SONGPAGE");
         if (starscoreFile && !autotest && QSettings().value("StarScore/songPage/openHere", true).toBool()) {
             notationPageUri = Uri("musescore://song");
+            // (at startup the score's page is still being opened: the Song page goes on top once it has)
+            QTimer::singleShot(250, [ia = interactive()]() {
+                if (ia && !ia->isOpened(Uri("musescore://song")).val) {
+                    ia->open(Uri("musescore://song"));
+                }
+            });
         }
     }
 

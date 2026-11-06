@@ -235,331 +235,338 @@ Rectangle {
                 columnSpacing: 18
                 rowSpacing: 18
 
-                // ---------------- arrangements and sections ----------------
-                Card {
-                    visible: hub.isStarScore && !hub.isSoloFile
-                    title: qsTrc("starscore", "Arrangements")
-                    subtitle: qsTrc("starscore", "click to open the score on one")
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 1
+                    Layout.alignment: Qt.AlignTop
+                    spacing: 18
 
-                    Repeater {
-                        model: hub.arrangements
-                        delegate: HubRow {
-                            required property var modelData
-                            text: modelData.name
-                            detail: modelData.statusName
-                            showDot: true
-                            dot: modelData.color
-                            bold: modelData.active
-                            onClicked: hub.openArrangement(modelData.id)
-                            buttons: FlatButton {
-                                visible: modelData.scoreName !== ""
-                                text: qsTrc("starscore", "Score")
-                                toolTipTitle: modelData.scoreName
-                                toolTipDescription: qsTrc("starscore", "This arrangement's own score")
-                                onClicked: hub.openPartScore(modelData.scoreName)
-                            }
-                        }
-                    }
-                    Empty {
-                        visible: hub.arrangements.length === 0
-                        text: qsTrc("starscore", "No arrangements yet.")
-                    }
-                    StyledTextLabel {
-                        Layout.fillWidth: true
-                        Layout.topMargin: 8
-                        visible: hub.sections.length > 0
-                        text: qsTrc("starscore", "Sections")
-                        font: ui.theme.bodyBoldFont
-                        horizontalAlignment: Text.AlignLeft
-                    }
-                    Flow {
-                        Layout.fillWidth: true
-                        spacing: 6
+                    // ---------------- arrangements and sections ----------------
+                    Card {
+                        visible: hub.isStarScore && !hub.isSoloFile
+                        title: qsTrc("starscore", "Arrangements")
+                        subtitle: qsTrc("starscore", "click to open the score on one")
+
                         Repeater {
-                            model: hub.sections
-                            delegate: Rectangle {
+                            model: hub.arrangements
+                            delegate: HubRow {
                                 required property var modelData
-                                width: secText.implicitWidth + 30
-                                height: 26
-                                radius: 13
-                                color: "transparent"
-                                border.color: ui.theme.strokeColor
-                                Row {
-                                    anchors.centerIn: parent
-                                    spacing: 6
-                                    Rectangle {
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        width: 8
-                                        height: 8
-                                        radius: 4
-                                        color: modelData.color
-                                    }
-                                    StyledTextLabel {
-                                        id: secText
-                                        text: modelData.name
-                                    }
-                                }
-                                ToolTip.visible: secMouse.containsMouse
-                                ToolTip.text: modelData.statusName
-                                MouseArea {
-                                    id: secMouse
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // ---------------- a solo transcription's keys ----------------
-                Card {
-                    visible: hub.isSoloFile
-                    title: qsTrc("starscore", "Keys")
-                    subtitle: qsTrc("starscore", "how far you've got with each")
-
-                    Flow {
-                        Layout.fillWidth: true
-                        spacing: 6
-                        Repeater {
-                            model: hub.soloKeys
-                            delegate: Rectangle {
-                                required property var modelData
-                                width: keyText.implicitWidth + 20
-                                height: 28
-                                radius: 6
-                                color: modelData.state === "memorized" ? "#3FB05A"
-                                       : modelData.state === "learned" ? "#E3A72B" : "transparent"
-                                border.color: ui.theme.strokeColor
-                                StyledTextLabel {
-                                    id: keyText
-                                    anchors.centerIn: parent
-                                    text: modelData.short !== "" ? modelData.short : modelData.name
-                                    color: modelData.state !== "" ? "#000000" : ui.theme.fontPrimaryColor
-                                }
-                                ToolTip.visible: keyMouse.containsMouse
-                                ToolTip.text: modelData.name + (modelData.state !== "" ? " · " + modelData.state : "")
-                                MouseArea {
-                                    id: keyMouse
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                }
-                            }
-                        }
-                    }
-                    Empty {
-                        visible: hub.soloKeys.length === 0
-                        text: qsTrc("starscore", "No keys exported yet: export the solo sheets to start the list.")
-                    }
-                }
-
-                // ---------------- part scores ----------------
-                Card {
-                    title: qsTrc("starscore", "Part scores")
-                    subtitle: hub.partScores.length > 0 ? qsTrc("starscore", "%1 in this file").arg(hub.partScores.length) : ""
-
-                    Repeater {
-                        model: hub.partScores
-                        delegate: HubRow {
-                            required property var modelData
-                            visible: !modelData.arrangementScore
-                            text: modelData.name
-                            detail: modelData.statusName
-                            showDot: true
-                            dot: modelData.color !== "" ? modelData.color : "transparent"
-                            opacity: modelData.visible ? 1.0 : 0.6
-                            onClicked: hub.openPartScore(modelData.name)
-                        }
-                    }
-                    Empty {
-                        visible: hub.partScores.length === 0
-                        text: qsTrc("starscore", "No part scores yet.")
-                    }
-                }
-
-                // ---------------- practice ----------------
-                Card {
-                    title: qsTrc("starscore", "Practice")
-                    subtitle: qsTrc("starscore", "beside the score")
-
-                    Flow {
-                        Layout.fillWidth: true
-                        spacing: 10
-                        FlatButton {
-                            text: qsTrc("starscore", "Watch")
-                            toolTipTitle: qsTrc("starscore", "Falling notes")
-                            toolTipDescription: qsTrc("starscore", "The score falling onto a keyboard as it plays, or Wait for me on a MIDI keyboard")
-                            onClicked: hub.practice("watch")
-                        }
-                        FlatButton {
-                            visible: !hub.isSoloFile || hub.arrangements.length > 0 || true
-                            text: qsTrc("starscore", "Jam")
-                            toolTipTitle: qsTrc("starscore", "Backing band")
-                            toolTipDescription: qsTrc("starscore", "Bass, drums and piano from the chord symbols, to solo over")
-                            onClicked: hub.practice("jam")
-                        }
-                        FlatButton {
-                            enabled: hub.media.length > 0
-                            text: qsTrc("starscore", "Listen")
-                            toolTipTitle: qsTrc("starscore", "The recordings")
-                            toolTipDescription: hub.media.length > 0 ? qsTrc("starscore", "The recordings stored in this score, in sync, at any speed")
-                                                                     : qsTrc("starscore", "Add a recording first (Recordings and video, below)")
-                            onClicked: hub.practice("listen")
-                        }
-                    }
-                    StyledTextLabel {
-                        Layout.fillWidth: true
-                        Layout.topMargin: 8
-                        visible: hub.solos.length > 0
-                        text: qsTrc("starscore", "Solos in this song")
-                        font: ui.theme.bodyBoldFont
-                        horizontalAlignment: Text.AlignLeft
-                    }
-                    Repeater {
-                        model: hub.solos
-                        delegate: HubRow {
-                            required property var modelData
-                            text: modelData.name
-                            detail: modelData.detail
-                            onClicked: hub.openSolo(modelData.id)
-                        }
-                    }
-                }
-
-                // ---------------- recordings and video ----------------
-                Card {
-                    title: qsTrc("starscore", "Recordings and video")
-                    subtitle: qsTrc("starscore", "stored in this file")
-                    actions: FlatButton {
-                        text: qsTrc("starscore", "+ Add")
-                        onClicked: hub.addMedia()
-                    }
-
-                    Repeater {
-                        model: hub.media
-                        delegate: HubRow {
-                            required property var modelData
-                            text: modelData.name
-                            detail: modelData.kindTitle + " · " + modelData.size
-                            onClicked: hub.openMedia(modelData.id)
-                        }
-                    }
-                    Empty {
-                        visible: hub.media.length === 0
-                        text: qsTrc("starscore", "None yet. Add the full mix, stems, the players' video or a Transcribe! file.")
-                    }
-                }
-
-                // ---------------- reference PDFs ----------------
-                Card {
-                    visible: hub.isStarScore
-                    title: qsTrc("starscore", "Reference PDFs")
-                    subtitle: qsTrc("starscore", "stored in this file")
-                    actions: FlatButton {
-                        text: qsTrc("starscore", "+ Add")
-                        onClicked: hub.addReference()
-                    }
-
-                    Repeater {
-                        model: hub.references
-                        delegate: HubRow {
-                            required property var modelData
-                            text: modelData.name
-                            detail: modelData.instrument
-                            onClicked: hub.openReference(modelData.id)
-                            buttons: FlatButton {
-                                icon: IconCode.OPEN_FILE
-                                toolTipTitle: qsTrc("starscore", "Open in another app")
-                                onClicked: hub.openReferenceElsewhere(modelData.id)
-                            }
-                        }
-                    }
-                    Empty {
-                        visible: hub.references.length === 0
-                        text: qsTrc("starscore", "None yet.")
-                    }
-                }
-
-                // ---------------- to do ----------------
-                Card {
-                    visible: hub.isStarScore && !hub.isSoloFile
-                    title: qsTrc("starscore", "Still to do")
-
-                    Repeater {
-                        model: hub.todo
-                        delegate: ColumnLayout {
-                            required property var modelData
-                            Layout.fillWidth: true
-                            spacing: 0
-                            HubRow {
-                                text: modelData.title
+                                text: modelData.name
                                 detail: modelData.statusName
                                 showDot: true
                                 dot: modelData.color
-                                onClicked: hub.openPanel("todo")
+                                bold: modelData.active
+                                onClicked: hub.openArrangement(modelData.id)
+                                buttons: FlatButton {
+                                    visible: modelData.scoreName !== ""
+                                    text: qsTrc("starscore", "Score")
+                                    toolTipTitle: modelData.scoreName
+                                    toolTipDescription: qsTrc("starscore", "This arrangement's own score")
+                                    onClicked: hub.openPartScore(modelData.scoreName)
+                                }
                             }
-                            StyledTextLabel {
-                                Layout.fillWidth: true
-                                Layout.leftMargin: 26
-                                visible: modelData.details !== "" || modelData.note !== ""
-                                text: [modelData.details, modelData.note].filter(function(t) { return t !== "" }).join(" · ")
-                                opacity: 0.6
-                                wrapMode: Text.WordWrap
-                                horizontalAlignment: Text.AlignLeft
+                        }
+                        Empty {
+                            visible: hub.arrangements.length === 0
+                            text: qsTrc("starscore", "No arrangements yet.")
+                        }
+                        StyledTextLabel {
+                            Layout.fillWidth: true
+                            Layout.topMargin: 8
+                            visible: hub.sections.length > 0
+                            text: qsTrc("starscore", "Sections")
+                            font: ui.theme.bodyBoldFont
+                            horizontalAlignment: Text.AlignLeft
+                        }
+                        Flow {
+                            Layout.fillWidth: true
+                            spacing: 6
+                            Repeater {
+                                model: hub.sections
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    width: secText.implicitWidth + 30
+                                    height: 26
+                                    radius: 13
+                                    color: "transparent"
+                                    border.color: ui.theme.strokeColor
+                                    Row {
+                                        anchors.centerIn: parent
+                                        spacing: 6
+                                        Rectangle {
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            width: 8
+                                            height: 8
+                                            radius: 4
+                                            color: modelData.color
+                                        }
+                                        StyledTextLabel {
+                                            id: secText
+                                            text: modelData.name
+                                        }
+                                    }
+                                    ToolTip.visible: secMouse.containsMouse
+                                    ToolTip.text: modelData.statusName
+                                    MouseArea {
+                                        id: secMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                    }
+                                }
                             }
                         }
                     }
-                    Empty {
-                        visible: hub.todo.length === 0
-                        text: qsTrc("starscore", "Nothing: every part is finished.")
+
+                    // ---------------- a solo transcription's keys ----------------
+                    Card {
+                        visible: hub.isSoloFile
+                        title: qsTrc("starscore", "Keys")
+                        subtitle: qsTrc("starscore", "how far you've got with each")
+
+                        Flow {
+                            Layout.fillWidth: true
+                            spacing: 6
+                            Repeater {
+                                model: hub.soloKeys
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    width: keyText.implicitWidth + 20
+                                    height: 28
+                                    radius: 6
+                                    color: modelData.state === "memorized" ? "#3FB05A"
+                                           : modelData.state === "learned" ? "#E3A72B" : "transparent"
+                                    border.color: ui.theme.strokeColor
+                                    StyledTextLabel {
+                                        id: keyText
+                                        anchors.centerIn: parent
+                                        text: modelData.short !== "" ? modelData.short : modelData.name
+                                        color: modelData.state !== "" ? "#000000" : ui.theme.fontPrimaryColor
+                                    }
+                                    ToolTip.visible: keyMouse.containsMouse
+                                    ToolTip.text: modelData.name + (modelData.state !== "" ? " · " + modelData.state : "")
+                                    MouseArea {
+                                        id: keyMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                    }
+                                }
+                            }
+                        }
+                        Empty {
+                            visible: hub.soloKeys.length === 0
+                            text: qsTrc("starscore", "No keys exported yet: export the solo sheets to start the list.")
+                        }
+                    }
+
+                    // ---------------- practice ----------------
+                    Card {
+                        title: qsTrc("starscore", "Practice")
+                        subtitle: qsTrc("starscore", "beside the score")
+
+                        Flow {
+                            Layout.fillWidth: true
+                            spacing: 10
+                            FlatButton {
+                                text: qsTrc("starscore", "Watch")
+                                toolTipTitle: qsTrc("starscore", "Falling notes")
+                                toolTipDescription: qsTrc("starscore", "The score falling onto a keyboard as it plays, or Wait for me on a MIDI keyboard")
+                                onClicked: hub.practice("watch")
+                            }
+                            FlatButton {
+                                visible: !hub.isSoloFile || hub.arrangements.length > 0 || true
+                                text: qsTrc("starscore", "Jam")
+                                toolTipTitle: qsTrc("starscore", "Backing band")
+                                toolTipDescription: qsTrc("starscore", "Bass, drums and piano from the chord symbols, to solo over")
+                                onClicked: hub.practice("jam")
+                            }
+                            FlatButton {
+                                enabled: hub.media.length > 0
+                                text: qsTrc("starscore", "Listen")
+                                toolTipTitle: qsTrc("starscore", "The recordings")
+                                toolTipDescription: hub.media.length > 0 ? qsTrc("starscore", "The recordings stored in this score, in sync, at any speed")
+                                                                         : qsTrc("starscore", "Add a recording first (Recordings and video, below)")
+                                onClicked: hub.practice("listen")
+                            }
+                        }
+                        StyledTextLabel {
+                            Layout.fillWidth: true
+                            Layout.topMargin: 8
+                            visible: hub.solos.length > 0
+                            text: qsTrc("starscore", "Solos in this song")
+                            font: ui.theme.bodyBoldFont
+                            horizontalAlignment: Text.AlignLeft
+                        }
+                        Repeater {
+                            model: hub.solos
+                            delegate: HubRow {
+                                required property var modelData
+                                text: modelData.name
+                                detail: modelData.detail
+                                onClicked: hub.openSolo(modelData.id)
+                            }
+                        }
+                    }
+
+                    // ---------------- recordings and video ----------------
+                    Card {
+                        title: qsTrc("starscore", "Recordings and video")
+                        subtitle: qsTrc("starscore", "stored in this file")
+                        actions: FlatButton {
+                            text: qsTrc("starscore", "+ Add")
+                            onClicked: hub.addMedia()
+                        }
+
+                        Repeater {
+                            model: hub.media
+                            delegate: HubRow {
+                                required property var modelData
+                                text: modelData.name
+                                detail: modelData.kindTitle + " · " + modelData.size
+                                onClicked: hub.openMedia(modelData.id)
+                            }
+                        }
+                        Empty {
+                            visible: hub.media.length === 0
+                            text: qsTrc("starscore", "None yet. Add the full mix, stems, the players' video or a Transcribe! file.")
+                        }
+                    }
+
+                    // ---------------- to do ----------------
+                    Card {
+                        visible: hub.isStarScore && !hub.isSoloFile
+                        title: qsTrc("starscore", "Still to do")
+
+                        Repeater {
+                            model: hub.todo
+                            delegate: ColumnLayout {
+                                required property var modelData
+                                Layout.fillWidth: true
+                                spacing: 0
+                                HubRow {
+                                    text: modelData.title
+                                    detail: modelData.statusName
+                                    showDot: true
+                                    dot: modelData.color
+                                    onClicked: hub.openPanel("todo")
+                                }
+                                StyledTextLabel {
+                                    Layout.fillWidth: true
+                                    Layout.leftMargin: 26
+                                    visible: modelData.details !== "" || modelData.note !== ""
+                                    text: [modelData.details, modelData.note].filter(function(t) { return t !== "" }).join(" · ")
+                                    opacity: 0.6
+                                    wrapMode: Text.WordWrap
+                                    horizontalAlignment: Text.AlignLeft
+                                }
+                            }
+                        }
+                        Empty {
+                            visible: hub.todo.length === 0
+                            text: qsTrc("starscore", "Nothing: every part is finished.")
+                        }
                     }
                 }
-            }
 
-            // ---------------- sheets and files ----------------
-            GridLayout {
-                Layout.fillWidth: true
-                columns: root.wide ? 2 : 1
-                columnSpacing: 18
-                rowSpacing: 18
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 1
+                    Layout.alignment: Qt.AlignTop
+                    spacing: 18
 
-                Card {
-                    visible: !hub.isSoloFile
-                    title: qsTrc("starscore", "In Sheets and Demos")
-                    subtitle: hub.songFolder
-                    actions: FlatButton {
-                        visible: hub.songFolder !== ""
-                        icon: IconCode.OPEN_FILE
-                        toolTipTitle: qsTrc("starscore", "Open the folder")
-                        onClicked: hub.openPath(hub.songFolder)
+                    // ---------------- part scores ----------------
+                    Card {
+                        title: qsTrc("starscore", "Part scores")
+                        subtitle: hub.partScores.length > 0 ? qsTrc("starscore", "%1 in this file").arg(hub.partScores.length) : ""
+
+                        Repeater {
+                            model: hub.partScores
+                            delegate: HubRow {
+                                required property var modelData
+                                visible: !modelData.arrangementScore
+                                text: modelData.name
+                                detail: modelData.statusName
+                                showDot: true
+                                dot: modelData.color !== "" ? modelData.color : "transparent"
+                                opacity: modelData.visible ? 1.0 : 0.6
+                                onClicked: hub.openPartScore(modelData.name)
+                            }
+                        }
+                        Empty {
+                            visible: hub.partScores.length === 0
+                            text: qsTrc("starscore", "No part scores yet.")
+                        }
                     }
 
-                    Repeater {
-                        model: hub.bandFolders
-                        delegate: FolderRow { hubModel: hub }
-                    }
-                    Empty {
-                        visible: hub.bandFolders.length === 0
-                        text: hub.songFolder === "" ? qsTrc("starscore", "Not exported yet: Export to Sheets and Demos makes its folder.")
-                                                    : qsTrc("starscore", "The folder is empty.")
-                    }
-                }
+                    // ---------------- reference PDFs ----------------
+                    Card {
+                        visible: hub.isStarScore
+                        title: qsTrc("starscore", "Reference PDFs")
+                        subtitle: qsTrc("starscore", "stored in this file")
+                        actions: FlatButton {
+                            text: qsTrc("starscore", "+ Add")
+                            onClicked: hub.addReference()
+                        }
 
-                Card {
-                    title: qsTrc("starscore", "Beside this file")
-                    subtitle: qsTrc("starscore", "in its folder in Projects and Sheets")
-                    actions: FlatButton {
-                        icon: IconCode.OPEN_FILE
-                        toolTipTitle: qsTrc("starscore", "Open the folder")
-                        onClicked: hub.showInFolder(hub.filePath)
+                        Repeater {
+                            model: hub.references
+                            delegate: HubRow {
+                                required property var modelData
+                                text: modelData.name
+                                detail: modelData.instrument
+                                onClicked: hub.openReference(modelData.id)
+                                buttons: FlatButton {
+                                    icon: IconCode.OPEN_FILE
+                                    toolTipTitle: qsTrc("starscore", "Open in another app")
+                                    onClicked: hub.openReferenceElsewhere(modelData.id)
+                                }
+                            }
+                        }
+                        Empty {
+                            visible: hub.references.length === 0
+                            text: qsTrc("starscore", "None yet.")
+                        }
                     }
 
-                    Repeater {
-                        model: hub.localFolders
-                        delegate: FolderRow { hubModel: hub }
+                    // ---------------- sheets and files ----------------
+                    Card {
+                        visible: !hub.isSoloFile
+                        title: qsTrc("starscore", "In Sheets and Demos")
+                        subtitle: hub.songFolder
+                        actions: FlatButton {
+                            visible: hub.songFolder !== ""
+                            icon: IconCode.OPEN_FILE
+                            toolTipTitle: qsTrc("starscore", "Open the folder")
+                            onClicked: hub.openPath(hub.songFolder)
+                        }
+
+                        Repeater {
+                            model: hub.bandFolders
+                            delegate: FolderRow { hubModel: hub }
+                        }
+                        Empty {
+                            visible: hub.bandFolders.length === 0
+                            text: hub.songFolder === "" ? qsTrc("starscore", "Not exported yet: Export to Sheets and Demos makes its folder.")
+                                                        : qsTrc("starscore", "The folder is empty.")
+                        }
                     }
-                    Empty {
-                        visible: hub.localFolders.length === 0
-                        text: qsTrc("starscore", "Nothing else in its folder.")
+
+                    Card {
+                        title: qsTrc("starscore", "Beside this file")
+                        subtitle: qsTrc("starscore", "in its folder in Projects and Sheets")
+                        actions: FlatButton {
+                            icon: IconCode.OPEN_FILE
+                            toolTipTitle: qsTrc("starscore", "Open the folder")
+                            onClicked: hub.showInFolder(hub.filePath)
+                        }
+
+                        Repeater {
+                            model: hub.localFolders
+                            delegate: FolderRow { hubModel: hub }
+                        }
+                        Empty {
+                            visible: hub.localFolders.length === 0
+                            text: qsTrc("starscore", "Nothing else in its folder.")
+                        }
                     }
                 }
             }

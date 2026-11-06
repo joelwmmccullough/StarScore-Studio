@@ -844,6 +844,12 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
     return planBandExportFor(false);
 }
 
+QString StarScoreService::songTitle() const
+{
+    INotationProjectPtr project = exportSourceProject();
+    return project ? starscoreSongTitle(project) : QString();
+}
+
 QString StarScoreService::bandSongFolderPath() const
 {
     INotationProjectPtr project = exportSourceProject();
