@@ -13,6 +13,7 @@ Version numbers: the first number changes when files stop being compatible, the 
   - **Practice:** Watch, Jam and Listen open the score with the Practice panel in that mode. The song's solos are listed below; click one to open it.
   - **Recordings and video** stored in the file: click one to open it in its own app (a Transcribe! file opens pointed at the stored recording). "+ Add" adds more.
   - **Reference PDFs** stored in the file: click one to see it in the Reference PDF panel beside the score, or open it in another app. "+ Add" adds more.
+  - **Releases and live takes:** the song's albums and singles and its live performances (the Recordings dialog's list), newest first with your star ratings. Click one to watch it on YouTube; "Edit…" opens the Recordings dialog.
   - **Still to do:** what isn't finished yet, from the to-do list. Click a line to open the To-do panel.
   - **In Sheets and Demos:** the song's folders there, each sheet folder on its own line with how many PDFs it has and when it last changed. Click a folder to list its files (click a file to open it), or the arrow to open the folder.
   - **Beside this file:** the folders next to the .starscore in Projects and Sheets (Version History, MuseScore Files, a solo's Sheets…), the same way.

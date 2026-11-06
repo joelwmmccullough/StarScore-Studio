@@ -24,10 +24,23 @@ Rectangle {
         id: hub
     }
 
-    Component.onCompleted: hub.load()
+    // the song's releases and live performances (the Recordings dialog's list, from Sheets and Demos)
+    RecordingsModel {
+        id: recordings
+    }
+
+    Component.onCompleted: {
+        hub.load()
+        if (hub.isStarScore && !hub.isSoloFile) {
+            recordings.load()
+        }
+    }
     onVisibleChanged: {
         if (visible) {
             hub.refresh()
+            if (hub.isStarScore && !hub.isSoloFile) {
+                recordings.load()
+            }
         }
     }
 
@@ -428,6 +441,50 @@ Rectangle {
                         Empty {
                             visible: hub.media.length === 0
                             text: qsTrc("starscore", "None yet. Add the full mix, stems, the players' video or a Transcribe! file.")
+                        }
+                    }
+
+                    // ---------------- releases and live performances ----------------
+                    Card {
+                        visible: hub.isStarScore && !hub.isSoloFile
+                        title: qsTrc("starscore", "Releases and live takes")
+                        subtitle: recordings.releases.length + recordings.performances.length > 0
+                                  ? qsTrc("starscore", "%1 releases, %2 live takes").arg(recordings.releases.length).arg(recordings.performances.length)
+                                  : ""
+                        actions: FlatButton {
+                            text: qsTrc("starscore", "Edit…")
+                            onClicked: hub.dispatch("starscore-recordings")
+                        }
+
+                        Repeater {
+                            model: recordings.releases
+                            delegate: HubRow {
+                                required property var modelData
+                                text: modelData.label !== "" ? modelData.label : modelData.kind
+                                detail: modelData.date
+                                onClicked: {
+                                    if (modelData.link !== "") {
+                                        Qt.openUrlExternally(modelData.link)
+                                    }
+                                }
+                            }
+                        }
+                        Repeater {
+                            model: recordings.performances.slice(0, 12)
+                            delegate: HubRow {
+                                required property var modelData
+                                text: modelData.date + " · " + modelData.venue
+                                detail: (modelData.rating > 0 ? "★".repeat(modelData.rating) + "  " : "") + modelData.time
+                                onClicked: Qt.openUrlExternally(modelData.link)
+                            }
+                        }
+                        Empty {
+                            visible: recordings.performances.length > 12
+                            text: qsTrc("starscore", "and %1 more: Edit… lists them all").arg(recordings.performances.length - 12)
+                        }
+                        Empty {
+                            visible: recordings.releases.length + recordings.performances.length === 0
+                            text: qsTrc("starscore", "None listed yet.")
                         }
                     }
 
