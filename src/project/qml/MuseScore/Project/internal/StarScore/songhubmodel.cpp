@@ -124,6 +124,10 @@ void SongHubModel::load()
                 practice(arg);
             } else if (kind == "todo") {
                 openPanel("todo");
+            } else if (kind == "demo") {   // (stays on the page)
+                if (arg.toInt() < m_demos.size()) {
+                    playDemo(m_demos.at(arg.toInt()).toMap().value("path").toString());
+                }
             } else {
                 openScore();
             }
