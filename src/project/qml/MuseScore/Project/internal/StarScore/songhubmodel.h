@@ -47,6 +47,7 @@ class SongHubModel : public QObject, public muse::Contextable, public muse::asyn
     Q_PROPERTY(QVariantList media READ media NOTIFY changed)
     Q_PROPERTY(QVariantList bandFolders READ bandFolders NOTIFY changed)
     Q_PROPERTY(QVariantList localFolders READ localFolders NOTIFY changed)
+    Q_PROPERTY(bool foldersReady READ foldersReady NOTIFY changed)
     Q_PROPERTY(QVariantList todo READ todo NOTIFY changed)
     Q_PROPERTY(QVariantList statusColors READ statusColors CONSTANT)
     //! when a song is opened: this page first (true, the default) or straight to the score
@@ -105,6 +106,7 @@ public:
     QVariantList media() const { return m_media; }
     QVariantList bandFolders() const { return m_bandFolders; }
     QVariantList localFolders() const { return m_localFolders; }
+    bool foldersReady() const { return m_foldersReady; }
     QVariantList todo() const { return m_todo; }
     QVariantList statusColors() const;
     bool openHere() const;
@@ -138,5 +140,8 @@ private:
     QVariantList m_localFolders;
     QVariantList m_todo;
     bool m_loaded = false;
+    int m_generation = 0;
+    bool m_foldersReady = false;
+    QString m_foldersFor;   // which refresh the folders being read are for
 };
 }

@@ -603,7 +603,8 @@ Rectangle {
                         Empty {
                             visible: hub.bandFolders.length === 0
                             text: hub.songFolder === "" ? qsTrc("starscore", "Not exported yet: Export to Sheets and Demos makes its folder.")
-                                                        : qsTrc("starscore", "The folder is empty.")
+                                  : !hub.foldersReady ? qsTrc("starscore", "Reading the folder…")
+                                  : qsTrc("starscore", "The folder is empty.")
                         }
                     }
 
@@ -622,7 +623,7 @@ Rectangle {
                         }
                         Empty {
                             visible: hub.localFolders.length === 0
-                            text: qsTrc("starscore", "Nothing else in its folder.")
+                            text: !hub.foldersReady ? qsTrc("starscore", "Reading the folder…") : qsTrc("starscore", "Nothing else in its folder.")
                         }
                     }
                 }

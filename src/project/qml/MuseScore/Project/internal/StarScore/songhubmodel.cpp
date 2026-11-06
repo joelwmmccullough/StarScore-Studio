@@ -10,7 +10,10 @@
 #include <memory>
 #include <set>
 
+#include <QCoreApplication>
 #include <QDateTime>
+#include <QPointer>
+#include <QThreadPool>
 #include <QDesktopServices>
 #include <QDir>
 #include <QDirIterator>
@@ -183,8 +186,6 @@ void SongHubModel::refresh()
     m_soloKeys.clear();
     m_references.clear();
     m_media.clear();
-    m_bandFolders.clear();
-    m_localFolders.clear();
     m_todo.clear();
     m_title.clear();
     m_facts.clear();
@@ -202,6 +203,12 @@ void SongHubModel::refresh()
     }
 
     m_filePath = mainPath.toQString();
+    if (m_filePath != m_foldersFor) {   // (another song: its folders aren't these)
+        m_bandFolders.clear();
+        m_localFolders.clear();
+        m_foldersReady = false;
+        m_foldersFor = m_filePath;
+    }
     const QFileInfo file(m_filePath);
 
     // --- the title and the facts line
@@ -339,37 +346,52 @@ void SongHubModel::refresh()
 
     // --- the song's folder in Sheets and Demos: its folders, and the sheet folders inside Sheet Music
     m_songFolder = ss->bandSongFolderPath();
-    if (!m_songFolder.isEmpty()) {
-        const QDir song(m_songFolder);
-        const QFileInfoList top = song.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
-        for (const QFileInfo& d : top) {
-            if (d.fileName().startsWith('.')) {
-                continue;
-            }
-            if (d.fileName().startsWith("Sheet Music")) {
-                // each sheet folder on its own line ("1 Lead Sheet", "3H Tpt Alt Ten", …)
-                for (const QFileInfo& sub : QDir(d.filePath()).entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
-                    if (!sub.fileName().startsWith('.')) {
-                        QVariantMap entry = folderEntry(sub.fileName(), sub.filePath());
-                        entry["group"] = d.fileName();
-                        m_bandFolders << entry;
-                    }
-                }
-                continue;
-            }
-            QVariantMap entry = folderEntry(d.fileName(), d.filePath());
-            entry["group"] = QString();
-            m_bandFolders << entry;
-        }
-    }
 
-    // --- beside the file in Projects and Sheets (Version History, a solo's Sheets, MuseScore Files, …)
-    const QDir here = file.absoluteDir();
-    for (const QFileInfo& d : here.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
-        if (!d.fileName().startsWith('.')) {
-            m_localFolders << folderEntry(d.fileName(), d.filePath());
+    // --- the folders (in Sheets and Demos, and beside the file) are read on another thread: Sheets and Demos is on
+    // Google Drive, where reading every file in Version History can take a while. They fill in when ready.
+    const QString songFolder = m_songFolder;
+    const QString fileFolder = file.absolutePath();
+    const int generation = ++m_generation;
+    QPointer<SongHubModel> self(this);
+    QThreadPool::globalInstance()->start([self, songFolder, fileFolder, generation]() {
+        QVariantList band;
+        if (!songFolder.isEmpty()) {
+            for (const QFileInfo& d : QDir(songFolder).entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
+                if (d.fileName().startsWith('.')) {
+                    continue;
+                }
+                if (d.fileName().startsWith("Sheet Music")) {
+                    // each sheet folder on its own line ("1 Lead Sheet", "3H Tpt Alt Ten", …)
+                    for (const QFileInfo& sub : QDir(d.filePath()).entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
+                        if (!sub.fileName().startsWith('.')) {
+                            QVariantMap entry = folderEntry(sub.fileName(), sub.filePath());
+                            entry["group"] = d.fileName();
+                            band << entry;
+                        }
+                    }
+                    continue;
+                }
+                QVariantMap entry = folderEntry(d.fileName(), d.filePath());
+                entry["group"] = QString();
+                band << entry;
+            }
         }
-    }
+        // beside the file in Projects and Sheets (Version History, a solo's Sheets, MuseScore Files, …)
+        QVariantList local;
+        for (const QFileInfo& d : QDir(fileFolder).entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
+            if (!d.fileName().startsWith('.')) {
+                local << folderEntry(d.fileName(), d.filePath());
+            }
+        }
+        QMetaObject::invokeMethod(qApp, [self, band, local, generation]() {
+            if (self && self->m_generation == generation) {
+                self->m_bandFolders = band;
+                self->m_localFolders = local;
+                self->m_foldersReady = true;
+                emit self->changed();
+            }
+        }, Qt::QueuedConnection);
+    });
 
     // --- what's left to do
     if (!m_isSoloFile) {
