@@ -79,8 +79,12 @@ void SongHubModel::load()
     static bool done = false;
     const QString todo = qEnvironmentVariable("STARSCORE_AUTOTEST_HUBDO");
     if (!done && !todo.isEmpty()) {
-        done = true;
+        // (done when it runs: the page may be unloaded and loaded again before then, and this model with it)
         QTimer::singleShot(2000, this, [this, todo]() {
+            if (done) {
+                return;
+            }
+            done = true;
             const QString kind = todo.section(':', 0, 0);
             const QString arg = todo.section(':', 1);
             auto byName = [](const QVariantList& list, const QString& key, const QString& value) {
