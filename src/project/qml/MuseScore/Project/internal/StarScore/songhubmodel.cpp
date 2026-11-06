@@ -12,6 +12,7 @@
 #include <set>
 
 #include <QCoreApplication>
+#include <QDebug>
 #include <QCryptographicHash>
 #include <QJsonDocument>
 #include <QStandardPaths>
@@ -43,6 +44,7 @@ using namespace mu::project;
 
 static const char* OPEN_HERE_SETTING = "StarScore/songPage/openHere";
 static const char* PRACTICE_MODE_REQUEST = "StarScore/practice/requestMode";
+static int s_autotestDemo = -1;   // (the autotest's demo:<n>, waiting for the demos to be read)
 
 SongHubModel::SongHubModel(QObject* parent)
     : QObject(parent), muse::Contextable(muse::iocCtxForQmlObject(this))
@@ -103,6 +105,7 @@ void SongHubModel::load()
                 return;
             }
             done = true;
+            qInfo() << "[starscore] song page autotest:" << todo;
             const QString kind = todo.section(':', 0, 0);
             const QString arg = todo.section(':', 1);
             auto byName = [](const QVariantList& list, const QString& key, const QString& value) {
@@ -125,16 +128,12 @@ void SongHubModel::load()
                 practice(arg);
             } else if (kind == "todo") {
                 openPanel("todo");
-            } else if (kind == "demo") {   // (stays on the page; the demos are read on another thread: waited for)
-                auto tryPlay = std::make_shared<std::function<void(int)> >();
-                *tryPlay = [this, arg, tryPlay](int left) {
-                    if (arg.toInt() < m_demos.size()) {
-                        playDemo(m_demos.at(arg.toInt()).toMap().value("path").toString());
-                    } else if (left > 0) {
-                        QTimer::singleShot(500, this, [tryPlay, left]() { (*tryPlay)(left - 1); });
-                    }
-                };
-                (*tryPlay)(20);
+            } else if (kind == "demo") {   // (stays on the page; played once the demos are read, by this page or the next)
+                s_autotestDemo = arg.toInt();
+                if (s_autotestDemo < m_demos.size()) {
+                    playDemo(m_demos.at(s_autotestDemo).toMap().value("path").toString());
+                    s_autotestDemo = -1;
+                }
             } else {
                 openScore();
             }
@@ -461,6 +460,15 @@ void SongHubModel::refresh()
                 self->m_bandFolders = band;
                 self->m_localFolders = local;
                 self->m_demos = demos;
+                if (s_autotestDemo >= 0 && s_autotestDemo < demos.size()) {   // (the autotest's demo:<n>)
+                    const int n = s_autotestDemo;
+                    s_autotestDemo = -1;
+                    QTimer::singleShot(0, self, [self, n]() {
+                        if (self) {
+                            self->playDemo(self->m_demos.at(n).toMap().value("path").toString());
+                        }
+                    });
+                }
                 self->m_foldersReady = true;
                 emit self->changed();
             }
@@ -801,6 +809,7 @@ void SongHubModel::playDemo(const QString& path)
         });
     }
     m_player->stop();
+    qInfo() << "[starscore] song page: playing the demo" << path;
     m_demoPlaying = path;
     emit demoChanged();
     m_player->load({ starscore::ListenStem { "demo", QFileInfo(path).completeBaseName(), "full", path } });
