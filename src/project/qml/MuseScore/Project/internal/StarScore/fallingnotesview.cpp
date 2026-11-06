@@ -64,6 +64,10 @@ FallingNotesView::FallingNotesView(QQuickItem* parent)
         if (qEnvironmentVariableIsSet("STARSCORE_AUTOTEST_WAIT")) {   // (the autotest's pictures of Wait for me)
             QTimer::singleShot(1500, this, [this]() {
                 reload();
+                const QString hands = qEnvironmentVariable("STARSCORE_AUTOTEST_WAIT");
+                if (hands == "right" || hands == "left") {
+                    setWaitHands(hands);
+                }
                 setWaitMode(true);
                 emit waitChanged();
             });

@@ -21,9 +21,6 @@
  */
 #include "tupletlayout.h"
 
-#include <cstdio>
-#include <cstdlib>
-
 #include "dom/beam.h"
 #include "dom/chord.h"
 #include "dom/note.h"
@@ -168,14 +165,6 @@ void TupletLayout::starscorePlaceNumberAtCrossBeam(Tuplet* item, const ChordRest
             chords.add(cr->ldata()->shape().translated(cr->pagePos()));
         }
     }
-    if (std::getenv("STARSCORE_TUPLET_DEBUG")) {
-        std::fprintf(stderr, "tuplet %d: beam %.2f,%.2f-%.2f,%.2f mid %.2f, staves:", cr1->tick().ticks(), x1 / sp, y1 / sp, x2 / sp,
-                     y2 / sp, midX / sp);
-        for (const auto& band : staffBands) {
-            std::fprintf(stderr, " %.2f-%.2f", band.first / sp, band.second / sp);
-        }
-        std::fprintf(stderr, "\n");
-    }
     auto clear = [&](const RectF& r) {
         for (const auto& band : staffBands) {
             if (r.bottom() > band.first && r.top() < band.second) {
@@ -204,9 +193,9 @@ void TupletLayout::starscorePlaceNumberAtCrossBeam(Tuplet* item, const ChordRest
         above = nearest->isChord() && toChord(nearest)->up();
     }
 
-    // where it can go: centred over the tuplet, that side at the usual distance from the beam, then nearer the beam,
-    // then (unless a side was asked for) the same on the other side; then the same moved along the beam (by up to half
-    // the tuplet's width). The first place clear of the staves and the notes wins; if none is, the first one.
+    // where it can go: that side at the usual distance from the beam, then nearer the beam, then moved along the beam
+    // (by up to half the tuplet's width), then (unless a side was asked for) the same on the other side. The first
+    // place clear of the staves and the notes wins; if none is, the first one.
     const double halfSpan = 0.5 * std::abs(cr2->pagePos().x() - cr1->pagePos().x());
     std::vector<double> shifts { 0.0 };
     for (double d = 0.5 * sp; d <= halfSpan; d += 0.5 * sp) {
@@ -217,11 +206,11 @@ void TupletLayout::starscorePlaceNumberAtCrossBeam(Tuplet* item, const ChordRest
     PointF best;
     bool found = false;
     bool first = true;
-    for (size_t si = 0; si < shifts.size() && !found; ++si) {
-        for (int sideTry = 0; sideTry < (asked ? 1 : 2) && !found; ++sideTry) {
-            const bool up = sideTry == 0 ? above : !above;
+    for (int sideTry = 0; sideTry < (asked ? 1 : 2) && !found; ++sideTry) {
+        const bool up = sideTry == 0 ? above : !above;
+        for (double shift : shifts) {
             for (double g : gaps) {
-                const double cx = midX + shifts[si];
+                const double cx = midX + shift;
                 const double by = beamYAt(cx);
                 const double cy = up ? by - halfBeam - g * sp - 0.5 * nb.height() : by + halfBeam + g * sp + 0.5 * nb.height();
                 const PointF c(cx, cy);
@@ -230,20 +219,14 @@ void TupletLayout::starscorePlaceNumberAtCrossBeam(Tuplet* item, const ChordRest
                     first = false;
                 }
                 const RectF box(cx - 0.5 * nb.width(), cy - 0.5 * nb.height(), nb.width(), nb.height());
-                if (std::getenv("STARSCORE_TUPLET_DEBUG")) {
-                    bool onStaff = false;
-                    for (const auto& band : staffBands) {
-                        onStaff = onStaff || (box.bottom() > band.first && box.top() < band.second);
-                    }
-                    std::fprintf(stderr, "tuplet %d: shift %.2f %s gap %.2f box y %.2f-%.2f x %.2f-%.2f staff %d notes %d\n",
-                                 cr1->tick().ticks(), shifts[si] / sp, up ? "above" : "below", g, box.top() / sp, box.bottom() / sp,
-                                 box.left() / sp, box.right() / sp, int(onStaff), int(chords.intersects(box)));
-                }
                 if (clear(box)) {
                     best = c;
                     found = true;
                     break;
                 }
+            }
+            if (found) {
+                break;
             }
         }
     }

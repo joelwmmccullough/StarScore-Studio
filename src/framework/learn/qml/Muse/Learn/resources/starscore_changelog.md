@@ -7,7 +7,6 @@ Version numbers: the first number changes when files stop being compatible, the 
 ## 1.27.3
 
 - **Practice › Watch › Wait for me plays the other hand.** With Right hand or Left hand chosen, StarScore plays the other hand's notes as they come, so you hear the whole piece while practising one hand. Turn off "Play the other hand" to practise in silence. Notes that start together with the ones you're waiting on sound once you've played them.
-- **A cross-staff tuplet's number stays centred where it can.** When its usual side is blocked, the number now tries the other side of the beam, still centred over the tuplet, before it moves along the beam.
 
 ## 1.27.2
 
