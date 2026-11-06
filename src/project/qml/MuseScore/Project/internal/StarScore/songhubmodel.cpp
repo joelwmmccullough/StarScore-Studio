@@ -162,14 +162,17 @@ QVariantMap SongHubModel::folderEntry(const QString& name, const QString& path)
             newest = fi.lastModified();
         }
     }
+    auto count = [](int n, const char* one, const char* many) {
+        return n == 1 ? muse::qtrc("starscore", one) : muse::qtrc("starscore", many).arg(n);
+    };
     QString detail;
     if (pdfs > 0) {
-        detail = muse::qtrc("starscore", "%n PDF(s)", nullptr, pdfs);
+        detail = count(pdfs, "1 PDF", "%1 PDFs");
         if (files > pdfs) {
-            detail += ", " + muse::qtrc("starscore", "%n other file(s)", nullptr, files - pdfs);
+            detail += ", " + count(files - pdfs, "1 other file", "%1 other files");
         }
     } else {
-        detail = files > 0 ? muse::qtrc("starscore", "%n file(s)", nullptr, files) : muse::qtrc("starscore", "empty");
+        detail = files > 0 ? count(files, "1 file", "%1 files") : muse::qtrc("starscore", "empty");
     }
     if (newest.isValid()) {
         detail += " · " + QLocale().toString(newest.date(), QLocale::ShortFormat);

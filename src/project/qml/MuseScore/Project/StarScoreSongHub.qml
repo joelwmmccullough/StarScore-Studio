@@ -532,14 +532,16 @@ Rectangle {
 
                     // ---------------- part scores ----------------
                     Card {
+                        id: partsCard
+                        property bool showAll: false
+                        readonly property var shown: hub.partScores.filter(function(p) { return !p.arrangementScore })
                         title: qsTrc("starscore", "Part scores")
-                        subtitle: hub.partScores.length > 0 ? qsTrc("starscore", "%1 in this file").arg(hub.partScores.length) : ""
+                        subtitle: partsCard.shown.length > 0 ? qsTrc("starscore", "%1 in this file").arg(partsCard.shown.length) : ""
 
                         Repeater {
-                            model: hub.partScores
+                            model: partsCard.showAll ? partsCard.shown : partsCard.shown.slice(0, 14)
                             delegate: HubRow {
                                 required property var modelData
-                                visible: !modelData.arrangementScore
                                 text: modelData.name
                                 detail: modelData.statusName
                                 showDot: true
@@ -548,8 +550,15 @@ Rectangle {
                                 onClicked: hub.openPartScore(modelData.name)
                             }
                         }
+                        FlatButton {
+                            visible: partsCard.shown.length > 14
+                            transparent: true
+                            text: partsCard.showAll ? qsTrc("starscore", "Show fewer")
+                                                    : qsTrc("starscore", "Show all %1").arg(partsCard.shown.length)
+                            onClicked: partsCard.showAll = !partsCard.showAll
+                        }
                         Empty {
-                            visible: hub.partScores.length === 0
+                            visible: partsCard.shown.length === 0
                             text: qsTrc("starscore", "No part scores yet.")
                         }
                     }
@@ -588,7 +597,7 @@ Rectangle {
                     Card {
                         visible: !hub.isSoloFile
                         title: qsTrc("starscore", "In Sheets and Demos")
-                        subtitle: hub.songFolder
+                        subtitle: hub.songFolder.substring(hub.songFolder.lastIndexOf("/") + 1)
                         actions: FlatButton {
                             visible: hub.songFolder !== ""
                             icon: IconCode.OPEN_FILE
