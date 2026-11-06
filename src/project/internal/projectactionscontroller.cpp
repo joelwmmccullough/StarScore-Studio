@@ -734,6 +734,7 @@ Ret ProjectActionsController::doFinishOpenProject()
     };
 
     Uri notationPageUri = resolveNotationPageUri();
+    bool songPage = false;
 
     // StarScore (1.28.0, Joel 5 Nov 2026): a song opens on its Song page (what it has, and a way into each), unless
     // "Show this page when a song opens" is off there. The autotest stays on the score (unless it asks for the page).
@@ -743,7 +744,9 @@ Ret ProjectActionsController::doFinishOpenProject()
         const bool autotest = qEnvironmentVariableIsSet("STARSCORE_AUTOTEST") && !qEnvironmentVariableIsSet("STARSCORE_AUTOTEST_SONGPAGE");
         if (starscoreFile && !autotest && QSettings().value("StarScore/songPage/openHere", true).toBool()) {
             notationPageUri = Uri("musescore://song");
-            // (at startup the score's page is still being opened: the Song page goes on top once it has)
+            songPage = true;
+            // (opened a moment later: at startup the score's page is still being opened, and the Song page has to go
+            // on top of it once it has; opening it now as well made it load twice)
             QTimer::singleShot(250, [ia = interactive()]() {
                 if (ia && !ia->isOpened(Uri("musescore://song")).val) {
                     ia->open(Uri("musescore://song"));
@@ -766,6 +769,9 @@ Ret ProjectActionsController::doFinishOpenProject()
         });
     }
 
+    if (songPage) {
+        return make_ret(Ret::Code::Ok);   // (the timer above opens it)
+    }
     return openPageIfNeed(notationPageUri);
 }
 

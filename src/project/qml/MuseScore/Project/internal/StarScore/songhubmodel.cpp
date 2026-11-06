@@ -95,12 +95,12 @@ void SongHubModel::load()
     refresh();
 
     // (the autotest: STARSCORE_AUTOTEST_HUBDO="arr:<name>" | "part:<name>" | "solo:<n>" | "ref:<n>" | "practice:<mode>" |
-    // "todo" | "score", done 2 s after the page loads, to test where each goes)
+    // "todo" | "score" | "demo:<n>", done 4 s after the page loads (after the startup has settled on it), to test where each goes)
     static bool done = false;
     const QString todo = qEnvironmentVariable("STARSCORE_AUTOTEST_HUBDO");
     if (!done && !todo.isEmpty()) {
         // (done when it runs: the page may be unloaded and loaded again before then, and this model with it)
-        QTimer::singleShot(2000, this, [this, todo]() {
+        QTimer::singleShot(4000, this, [this, todo]() {
             if (done) {
                 return;
             }
