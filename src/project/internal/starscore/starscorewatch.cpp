@@ -57,6 +57,8 @@ std::vector<WatchNote> watchNotes(const mu::notation::INotationPtr& notation, QS
                         continue;
                     }
                     const int hand = int(std::min<staff_idx_t>(chord->vStaffIdx() - staff->part()->startTrack() / VOICES, 2));
+                    const int chordTick = chord->tick().ticks();
+                    const int chordTrack = int(chord->track());
                     auto add = [&](Chord* c, int startTick) {
                         for (Note* n : c->notes()) {
                             if (n->tieBack() || !n->play()) {
@@ -64,7 +66,7 @@ std::vector<WatchNote> watchNotes(const mu::notation::INotationPtr& notation, QS
                             }
                             const int from = startTick + offset;
                             const int to = from + std::max(1, n->playTicks());
-                            out.push_back({ ms->utick2utime(from), ms->utick2utime(to), n->ppitch(), hand });
+                            out.push_back({ ms->utick2utime(from), ms->utick2utime(to), n->ppitch(), hand, chordTick, chordTrack });
                         }
                     };
                     // grace notes before the beat, briefly
@@ -91,7 +93,7 @@ void WaitFollower::setNotes(const std::vector<WatchNote>& notes, int hands)
             continue;
         }
         if (m_groups.empty() || n.start - m_groups.back().start > CHORD) {
-            m_groups.push_back({ n.start, {} });
+            m_groups.push_back({ n.start, {}, n.tick, n.track });
         }
         std::vector<int>& p = m_groups.back().pitches;
         if (std::find(p.begin(), p.end(), n.pitch) == p.end()) {

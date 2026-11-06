@@ -20,6 +20,8 @@ struct WatchNote {
     double end = 0;
     int pitch = 60;     // as it plays (a solo's key part score: in its key)
     int hand = 0;       // the staff in its part: 0 the right hand (or the only staff), 1 the left, 2 any after those
+    int tick = 0;       // (1.27.2) where its chord is in the score (not played out), and on which track
+    int track = 0;
 };
 
 //! (1.27.2) where a bar starts, for the falling notes' bar lines
@@ -58,6 +60,9 @@ public:
     //! the next notes' keys, and which of them have been played
     std::vector<int> waitingFor() const;
     double nextStart() const { return finished() ? m_end : m_groups[m_next].start; }
+    //! where the next notes are in the score (the first of them), for the playback cursor; tick < 0: none
+    int nextTick() const { return finished() ? -1 : m_groups[m_next].tick; }
+    int nextTrack() const { return finished() ? 0 : m_groups[m_next].track; }
     bool expected(int pitch) const;
     bool hit(int pitch) const { return pitch >= 0 && pitch < 128 && m_hit[pitch]; }
     bool wrong(int pitch) const { return pitch >= 0 && pitch < 128 && m_wrong[pitch]; }
@@ -73,6 +78,8 @@ private:
     struct Group {
         double start = 0;
         std::vector<int> pitches;
+        int tick = 0;
+        int track = 0;
     };
     void checkDone();
 

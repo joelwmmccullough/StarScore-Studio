@@ -12,6 +12,9 @@
 #include <QPainterPath>
 #include <QFontMetricsF>
 
+#include "engraving/dom/chordrest.h"
+#include "engraving/dom/score.h"
+
 
 using namespace mu::project;
 
@@ -153,6 +156,9 @@ void FallingNotesView::onFrame()
         m_wait.advance(dt);
         if (m_wait.holding() != wasHolding) {
             updateWaitStatus();
+            if (m_wait.holding()) {
+                showNextInScore();
+            }
         }
         if (m_wait.finished() && m_wait.clock() > m_wait.end() + 1.0 && !m_playing) {
             m_frameTimer.stop();
@@ -160,6 +166,22 @@ void FallingNotesView::onFrame()
         }
     }
     update();
+}
+
+void FallingNotesView::showNextInScore()
+{
+    // the playback cursor to the notes waited for, so they can be found in the sheet
+    if (!m_notation || !m_notation->elements() || !playbackController() || m_wait.nextTick() < 0) {
+        return;
+    }
+    mu::engraving::Score* score = m_notation->elements()->msScore();
+    if (!score) {
+        return;
+    }
+    mu::engraving::ChordRest* cr = score->findCR(mu::engraving::Fraction::fromTicks(m_wait.nextTick()), m_wait.nextTrack());
+    if (cr && cr->tick().ticks() == m_wait.nextTick()) {
+        playbackController()->seekElement(cr, false);
+    }
 }
 
 int FallingNotesView::waitHandsMask() const
@@ -190,6 +212,9 @@ void FallingNotesView::setWaitMode(bool on)
         m_wait.start(m_positionSecs);
         m_waitTick.restart();
         m_frameTimer.start();
+        if (m_wait.holding()) {
+            showNextInScore();
+        }
     } else if (!m_playing) {
         m_frameTimer.stop();
     }
@@ -214,6 +239,9 @@ void FallingNotesView::waitRestart(double from)
     m_waitTick.restart();
     if (m_waitMode) {
         m_frameTimer.start();
+        if (m_wait.holding()) {
+            showNextInScore();
+        }
     }
     updateWaitStatus();
     update();

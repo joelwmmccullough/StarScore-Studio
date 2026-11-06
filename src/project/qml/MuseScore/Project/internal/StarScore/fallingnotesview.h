@@ -94,6 +94,7 @@ private:
     void onFrame();
     int waitHandsMask() const;
     void updateWaitStatus();
+    void showNextInScore();
     QColor keyColor(int key, bool down, const QColor& noteColor) const;
 
     std::vector<FallNote> m_notes;
