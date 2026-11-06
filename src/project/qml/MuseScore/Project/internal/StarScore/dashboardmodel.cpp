@@ -4,6 +4,8 @@
  * StarScore Studio — Home › Dashboard: every Starsign song's arrangements, what's done, and what to work on next
  */
 #include "dashboardmodel.h"
+
+#include "dockwindow/idockwindow.h"
 #include "project/internal/starscore/organizer/orgfiling.h"
 
 #include <algorithm>
