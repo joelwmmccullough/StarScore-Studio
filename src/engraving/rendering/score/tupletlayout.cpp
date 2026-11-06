@@ -139,25 +139,7 @@ void TupletLayout::starscorePlaceNumberAtCrossBeam(Tuplet* item, const ChordRest
     const double x2 = beamPage.x() + main->line.x2();
     const double y1 = beamPage.y() + main->line.y1();
     const double y2 = beamPage.y() + main->line.y2();
-    const double beamY = y1 + (y2 - y1) * (midX - x1) / (x2 - x1);
 
-    // the side: as asked, else the side away from the heads of the chord nearest the middle
-    bool above = false;
-    if (item->direction() == DirectionV::UP) {
-        above = true;
-    } else if (item->direction() == DirectionV::DOWN) {
-        above = false;
-    } else {
-        const ChordRest* nearest = cr1;
-        for (const DurationElement* de : item->elements()) {
-            if (de && de->isChordRest() && std::abs(toChordRest(de)->pagePos().x() - midX)
-                < std::abs(nearest->pagePos().x() - midX)) {
-                nearest = toChordRest(de);
-            }
-        }
-        // a stem going up to the beam has its heads below: the number goes above
-        above = nearest->isChord() && toChord(nearest)->up();
-    }
     const double sp = item->spatium();
     const double halfBeam = 0.5 * beam->beamWidth();
     auto beamYAt = [&](double x) { return y1 + (y2 - y1) * (x - x1) / (x2 - x1); };
