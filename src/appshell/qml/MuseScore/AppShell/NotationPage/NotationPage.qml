@@ -597,7 +597,8 @@ DockPage {
 
             height: 320
             minimumHeight: root.horizontalPanelMinHeight
-            maximumHeight: root.horizontalPanelMaxHeight
+            //! (1.29.0, Joel: undocked it should stretch to any size) the bottom panels' cap only while docked
+            maximumHeight: floating ? root.panelMaxDimension : root.horizontalPanelMaxHeight
 
             minimumWidth: root.panelMinDimension
             maximumWidth: root.panelMaxDimension

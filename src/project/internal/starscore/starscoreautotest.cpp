@@ -674,6 +674,56 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         interactive()->open(UriQuery(section.isEmpty() ? std::string("musescore://home")
                                      : ("musescore://home?section=" + section.toStdString())));
         autotestLog("  home " + section);
+    } else if (step.startsWith("floatdock:")) {
+        // floatdock:<dock name>:<W>:<H>: the panel undocked (if it isn't), its window stretched to W x H; logs the size
+        // it ends up (1.29.0: Practice undocked was held to 520 px high)
+        const QStringList a = step.mid(10).split(':');
+        auto* dw = dockWindowProvider() ? dockWindowProvider()->window() : nullptr;
+        if (!dw) {
+            autotestLog("  no dock window");
+        } else {
+            if (!dw->isDockOpen(a.value(0))) {
+                dw->setDockOpen(a.value(0), true);
+            }
+            for (int i = 0; i < 20; ++i) {
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 25);
+            }
+            if (!dw->isDockFloating(a.value(0))) {
+                dw->toggleDockFloating(a.value(0));
+            }
+            QElapsedTimer t;
+            t.start();
+            while (t.elapsed() < 1500) {
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 25);
+            }
+            QWindow* main = nullptr;
+            QWindow* floating = nullptr;
+            for (QWindow* w : QGuiApplication::topLevelWindows()) {
+                if (w->objectName() == "ApplicationWindow") {
+                    main = w;
+                }
+            }
+            for (QWindow* w : QGuiApplication::topLevelWindows()) {
+                if (w != main && w->isVisible()
+                    && (!floating || w->width() * w->height() > floating->width() * floating->height())) {
+                    floating = w;
+                }
+            }
+            if (!floating) {
+                autotestLog(QString("  %1: floating %2, no window found").arg(a.value(0)).arg(dw->isDockFloating(a.value(0))));
+            } else {
+                const QSize before = floating->size();
+                floating->resize(a.value(1).toInt(), a.value(2).toInt());
+                t.restart();
+                while (t.elapsed() < 800) {
+                    QCoreApplication::processEvents(QEventLoop::AllEvents, 25);
+                }
+                autotestLog(QString("  %1: floating, %2x%3 -> asked %4x%5 -> %6x%7 (max %8x%9)").arg(a.value(0))
+                            .arg(before.width()).arg(before.height()).arg(a.value(1), a.value(2))
+                            .arg(floating->width()).arg(floating->height())
+                            .arg(floating->maximumWidth()).arg(floating->maximumHeight()));
+            }
+        }
     } else if (step.startsWith("uri:")) {
         // uri:<uri>: opens it (uri:muse://preferences); not waited for
         interactive()->open(UriQuery(step.mid(4).toStdString()));
