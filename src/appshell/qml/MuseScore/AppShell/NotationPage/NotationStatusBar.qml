@@ -174,13 +174,44 @@ Item {
             }
         }
 
+        //! StarScore (1.27.4): "Note colors": the note heads in the solo sheets' pitch colours while writing, on screen only
+        NoteColorsViewModel {
+            id: noteColorsView
+        }
+
+        SeparatorLine { orientation: Qt.Vertical; visible: noteColorsControl.visible }
+
+        ConcertPitchControl {
+            id: noteColorsControl
+            Layout.alignment: Qt.AlignVCenter
+            Layout.preferredHeight: 28
+
+            text: qsTrc("starscore", "Note colors")
+            icon: IconCode.BRUSH
+            checked: noteColorsView.on
+            visible: statusBarRow.remainingSpace > width + concertPitchControl.width
+
+            toolTipTitle: qsTrc("starscore", "Note colors")
+            toolTipDescription: qsTrc("starscore", "Show the note heads in their pitch colours, as on the exported solo sheets. Only on screen: the file and the exported sheets don't change.")
+
+            navigation.panel: navPanel
+            navigation.order: 3
+
+            onToggleConcertPitchRequested: {
+                noteColorsView.toggle()
+            }
+        }
+
         //! StarScore: how the Flexible horns are shown while writing (Joel, 6 Oct 2026), next to concert pitch; only
         //! when the score has a Flexible section. One setting for every score; the exported sheets don't change.
         FlexibleViewModel {
             id: flexibleView
         }
 
-        Component.onCompleted: flexibleView.load()
+        Component.onCompleted: {
+            flexibleView.load()
+            noteColorsView.load()
+        }
 
         SeparatorLine { orientation: Qt.Vertical; visible: flexibleViewControl.visible }
 

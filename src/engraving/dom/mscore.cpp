@@ -58,6 +58,7 @@ double MScore::nudgeStep50;
 
 bool MScore::noImages = false;
 bool MScore::pdfPrinting = false;
+bool MScore::starscoreViewNoteColors = false;
 bool MScore::svgPrinting = false;
 
 extern void initDrumset();

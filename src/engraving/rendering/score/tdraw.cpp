@@ -2397,6 +2397,24 @@ void TDraw::draw(const Note* item, Painter* painter, const PaintOptions& opt)
 
     painter->setPen(useCriticalColor ? config->criticalColor() : item->curColor(opt));
 
+    // StarScore (1.27.4): "Note colors" in the status bar: the head in its pitch's colour, as on the solo sheets (by the
+    // pitch shown: written, or concert in concert pitch), on screen only. A selected note keeps the selection colour;
+    // slash notation and drum notes have no pitch colour.
+    if (MScore::starscoreViewNoteColors && !opt.isPrinting && !useCriticalColor && !item->selected() && !item->mark()
+        && item->visible() && !item->fixed() && item->headGroup() != NoteHeadGroup::HEAD_SLASH && !isTabStaff
+        && item->staff() && item->chord() && !item->staff()->isDrumStaff(item->chord()->tick())) {
+        static const char* COLORS[12] = {
+            "#C7C102", "#FF5DA1", "#028800", "#2DD3C0", "#001CA4", "#CC75F8",
+            "#92D303", "#F47700", "#915700", "#AD000E", "#829EFF", "#770096"
+        };
+        static const char* DARK_COLORS[12] = {
+            "#E6DF2E", "#FF6FAE", "#36C234", "#3FE0CC", "#5072FF", "#E4B2FF",
+            "#A8E621", "#FF8A1F", "#CC8E33", "#F2434F", "#A9BEFF", "#AE45D6"
+        };
+        const int pc = ((item->epitch() % 12) + 12) % 12;
+        painter->setPen(Color::fromString(opt.invertColors ? DARK_COLORS[pc] : COLORS[pc]));
+    }
+
     // tablature
     if (isTabStaff) {
         if (item->displayFret() == Note::DisplayFretOption::Hide || item->shouldHideFret()) {

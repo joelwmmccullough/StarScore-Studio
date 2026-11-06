@@ -225,6 +225,9 @@ public:
     static bool noImages;
 
     static bool pdfPrinting;
+    //! StarScore (1.27.4, Joel 5 Nov 2026): the status bar's "Note colors": note heads shown in the solo sheets' 12 pitch
+    //! colours while writing. On screen only; the file and exports don't change.
+    static bool starscoreViewNoteColors;
     static bool svgPrinting;
 
     static double verticalPageGap;

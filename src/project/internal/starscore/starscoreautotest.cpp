@@ -49,6 +49,7 @@
 #include "starscorehornkeys.h"
 #include "starscoreautoarchive.h"
 #include "starscorewatch.h"
+#include "engraving/dom/mscore.h"
 #include "starscorejam.h"
 #include "starscorelisten.h"
 #include "engraving/dom/layoutbreak.h"
@@ -3894,6 +3895,13 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             barList << QString("%1@%2").arg(bars[i].number).arg(bars[i].start, 0, 'f', 2);
         }
         autotestLog(QString("  bars: %1, first: %2").arg(bars.size()).arg(barList.join(" ")));
+    } else if (step.startsWith("notecolors:")) {
+        // notecolors:on|off: the status bar's Note colors (1.27.4), on screen only
+        mu::engraving::MScore::starscoreViewNoteColors = step.section(':', 1) == "on";
+        if (globalContext()->currentNotation()) {
+            globalContext()->currentNotation()->notationChanged().notify();
+        }
+        autotestLog(QString("  note colors %1").arg(mu::engraving::MScore::starscoreViewNoteColors ? "on" : "off"));
     } else if (step.startsWith("waitsim")) {
         // waitsim[:right|left]: Wait for me (1.27.2) played by the test: it must stop at the first notes, not move on
         // for a wrong key, move on once all of them are played (early is fine), and get to the end

@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.27.4
+
+- **Note colors in the status bar.** A "Note colors" checkbox next to Concert pitch shows the note heads in their pitch colours while you write, the same 12 colours as the exported solo sheets (lighter ones on a dark score). The colour follows the pitch shown, so it changes with Concert pitch. It's only on screen: nothing in the file changes, and exports look as before. One setting for every score. (Tools' "Color notes by pitch" still colours the notes in the file itself.)
+
 ## 1.27.3
 
 - **Practice › Watch › Wait for me plays the other hand.** With Right hand or Left hand chosen, StarScore plays the other hand's notes as they come, so you hear the whole piece while practising one hand. Turn off "Play the other hand" to practise in silence. Notes that start together with the ones you're waiting on sound once you've played them.

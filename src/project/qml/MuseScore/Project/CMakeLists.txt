@@ -71,6 +71,8 @@ qt_add_qml_module(project_qml
         internal/StarScore/songbooksvisibilitymodel.cpp
         internal/StarScore/flexibleviewmodel.cpp
         internal/StarScore/flexibleviewmodel.h
+        internal/StarScore/notecolorsviewmodel.cpp
+        internal/StarScore/notecolorsviewmodel.h
         internal/StarScore/songbooksvisibilitymodel.h
         internal/StarScore/starscorestylesmodel.cpp
         internal/StarScore/starscorestylesmodel.h
