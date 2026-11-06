@@ -21,6 +21,10 @@
  */
 #include "tupletlayout.h"
 
+#include "dom/beam.h"
+#include "dom/chord.h"
+#include "dom/note.h"
+
 #include "dom/chordrest.h"
 #include "dom/tuplet.h"
 #include "dom/text.h"
@@ -69,6 +73,7 @@ void TupletLayout::layout(Tuplet* item, LayoutContext& ctx)
     item->setPos(0.0, 0.0);
 
     layoutBracket(item, cr1, cr2, ctx);
+    starscorePlaceNumberAtCrossBeam(item, cr1, cr2);
 
     // collect bounding box
     RectF r;
@@ -89,6 +94,75 @@ void TupletLayout::layout(Tuplet* item, LayoutContext& ctx)
     if (!item->cross()) {
         Autoplace::autoplaceMeasureElement(item, item->mutldata(), item->isUp(), /* add to skyline */ true);
     }
+}
+
+//! StarScore Studio (1.27.1, Joel 5 Nov 2026: Raffy Bushman's Renaissance, bar 28: a quintuplet beamed across the two
+//! staves had its 5 on the bass staff's lines, "hard to read as it's intersecting with the lines"). A tuplet without a
+//! bracket whose notes share one beam across two staves gets its number beside the beam, at the middle of the tuplet,
+//! on the side the beam leaves free there (away from the note heads of the chord nearest the middle); an explicit
+//! direction picks the side (up: above the beam, down: below it).
+void TupletLayout::starscorePlaceNumberAtCrossBeam(Tuplet* item, const ChordRest* cr1, const ChordRest* cr2)
+{
+    if (!item->number() || item->hasBracket() || !cr1 || !cr2 || !cr1->isChord() || !cr2->isChord()) {
+        return;
+    }
+    const Beam* beam = cr1->beam();
+    if (!beam || beam != cr2->beam()) {
+        return;
+    }
+    // across two staves: the beam's chords on more than one staff
+    bool crossStaff = beam->cross();
+    for (const ChordRest* cr : beam->elements()) {
+        crossStaff = crossStaff || (cr && cr->vStaffIdx() != cr1->vStaffIdx());
+    }
+    if (!crossStaff) {
+        return;
+    }
+    const BeamSegment* main = nullptr;
+    for (const BeamSegment* seg : beam->beamSegments()) {
+        if (seg && seg->level == 0 && !seg->isBeamlet) {
+            main = seg;
+            break;
+        }
+    }
+    if (!main || muse::RealIsEqual(main->line.x1(), main->line.x2())) {
+        return;
+    }
+
+    Text* number = item->number();
+    const RectF nb = number->ldata()->bbox();
+    const PointF beamPage = beam->pagePos();
+    const PointF tupletPage = item->pagePos();
+    // the middle of the tuplet: between its first and last note heads
+    const double midX = 0.5 * (cr1->pagePos().x() + cr2->pagePos().x() + toChord(cr2)->upNote()->headWidth());
+    const double x1 = beamPage.x() + main->line.x1();
+    const double x2 = beamPage.x() + main->line.x2();
+    const double y1 = beamPage.y() + main->line.y1();
+    const double y2 = beamPage.y() + main->line.y2();
+    const double beamY = y1 + (y2 - y1) * (midX - x1) / (x2 - x1);
+
+    // the side: as asked, else the side away from the heads of the chord nearest the middle
+    bool above = false;
+    if (item->direction() == DirectionV::UP) {
+        above = true;
+    } else if (item->direction() == DirectionV::DOWN) {
+        above = false;
+    } else {
+        const ChordRest* nearest = cr1;
+        for (const DurationElement* de : item->elements()) {
+            if (de && de->isChordRest() && std::abs(toChordRest(de)->pagePos().x() - midX)
+                < std::abs(nearest->pagePos().x() - midX)) {
+                nearest = toChordRest(de);
+            }
+        }
+        // a stem going up to the beam has its heads below: the number goes above
+        above = nearest->isChord() && toChord(nearest)->up();
+    }
+    const double sp = item->spatium();
+    const double halfBeam = 0.5 * beam->beamWidth();
+    const double gap = 0.4 * sp;
+    const double centerY = above ? beamY - halfBeam - gap - 0.5 * nb.height() : beamY + halfBeam + gap + 0.5 * nb.height();
+    number->mutldata()->setPos(PointF(midX - tupletPage.x() - nb.center().x(), centerY - tupletPage.y() - nb.center().y()));
 }
 
 void TupletLayout::layoutTupletAndNestedTuplets(Tuplet* t, LayoutContext& ctx)

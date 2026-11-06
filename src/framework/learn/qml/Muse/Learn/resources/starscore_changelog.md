@@ -7,6 +7,7 @@ Version numbers: the first number changes when files stop being compatible, the 
 ## 1.27.1
 
 - **The side panels' tab names match their panels again.** 1.25.4 put Palettes, Layout, Properties and To-do in that order, but when it had to move them (a layout saved in another order), the tab names stayed in the old order: the To-do tab showed the palettes. The names now follow the panels.
+- **A tuplet beamed across both staves gets its number beside the beam.** A cross-staff beamed tuplet with no bracket (Renaissance bar 28's quintuplet) had its number placed on the staff lines. It now sits at the middle of the tuplet, just above or below the beam, on the side the note heads leave free (Direction Up or Down in Properties picks the side). A tuplet set to always show its bracket keeps it: set Bracket to Auto or None for the new placement.
 
 ## 1.27.0
 
