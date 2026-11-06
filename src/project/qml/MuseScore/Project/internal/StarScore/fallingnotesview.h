@@ -20,6 +20,7 @@
 #include "modularity/ioc.h"
 #include "context/iglobalcontext.h"
 #include "playback/iplaybackcontroller.h"
+#include "midi/imidiinport.h"
 #include "project/internal/starscore/starscorewatch.h"
 
 namespace mu::project {
@@ -37,11 +38,18 @@ class FallingNotesView : public QQuickPaintedItem, public muse::Contextable, pub
     Q_PROPERTY(bool playing READ playing NOTIFY playingChanged)
     //! (1.27.0) a time to show other than playback's (Listen: where the recording is, in the score's seconds); < 0: none
     Q_PROPERTY(double externalTime READ externalTime WRITE setExternalTime NOTIFY playingChanged)
+    //! (1.27.2) Wait for me: the notes stop at each note of the hands chosen until it's played on a MIDI keyboard
+    Q_PROPERTY(bool waitMode READ waitMode WRITE setWaitMode NOTIFY waitChanged)
+    //! "both", "right" or "left" (the left hand: the second staff and any after it)
+    Q_PROPERTY(QString waitHands READ waitHands WRITE setWaitHands NOTIFY waitChanged)
+    Q_PROPERTY(QString waitStatus READ waitStatus NOTIFY waitChanged)
+    Q_PROPERTY(bool midiConnected READ midiConnected NOTIFY waitChanged)
 
     QML_ELEMENT
 
     muse::ContextInject<mu::context::IGlobalContext> globalContext = { this };
     muse::ContextInject<mu::playback::IPlaybackController> playbackController = { this };
+    muse::ContextInject<muse::midi::IMidiInPort> midiInPort = { this };
 
 public:
     explicit FallingNotesView(QQuickItem* parent = nullptr);
@@ -58,7 +66,16 @@ public:
     double externalTime() const { return m_externalTime; }
     void setExternalTime(double t);
 
+    bool waitMode() const { return m_waitMode; }
+    void setWaitMode(bool on);
+    QString waitHands() const { return m_waitHands; }
+    void setWaitHands(const QString& h);
+    QString waitStatus() const { return m_waitStatus; }
+    bool midiConnected() const;
+
     Q_INVOKABLE void reload();
+    //! Wait for me: start again from this many seconds in (< 0: where playback is), the counts cleared
+    Q_INVOKABLE void waitRestart(double from = -1);
 
     void paint(QPainter* painter) override;
 
@@ -68,11 +85,16 @@ signals:
     void settingsChanged();
     void notesChanged();
     void playingChanged();
+    void waitChanged();
 
 private:
     void listen();
     double now() const;
     void scheduleReload();
+    void onFrame();
+    int waitHandsMask() const;
+    void updateWaitStatus();
+    QColor keyColor(int key, bool down, const QColor& noteColor) const;
 
     std::vector<FallNote> m_notes;
     std::vector<starscore::WatchBar> m_bars;   // (1.27.2) bar lines across the falling notes
@@ -90,5 +112,12 @@ private:
     QTimer m_frameTimer;
     QTimer m_reloadTimer;
     mu::notation::INotationPtr m_notation;
+
+    bool m_waitMode = false;
+    QString m_waitHands = "both";
+    QString m_waitStatus;
+    starscore::WaitFollower m_wait;
+    QElapsedTimer m_waitTick;
+    double m_loadedSpeed = 1.0;   // the playback speed the notes' seconds were worked out at
 };
 }

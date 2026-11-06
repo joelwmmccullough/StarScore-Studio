@@ -47,7 +47,7 @@ FallingNotesView::FallingNotesView(QQuickItem* parent)
 {
     setAntialiasing(true);
     m_frameTimer.setInterval(16);
-    connect(&m_frameTimer, &QTimer::timeout, this, [this]() { update(); });
+    connect(&m_frameTimer, &QTimer::timeout, this, &FallingNotesView::onFrame);
     m_reloadTimer.setSingleShot(true);
     m_reloadTimer.setInterval(300);
     connect(&m_reloadTimer, &QTimer::timeout, this, &FallingNotesView::reload);
@@ -102,7 +102,7 @@ void FallingNotesView::listen()
     playbackController()->isPlayingChanged().onNotify(this, [this]() {
         m_playing = playbackController()->isPlaying();
         m_sincePosition.restart();
-        if (m_playing) {
+        if (m_playing || m_waitMode) {
             m_frameTimer.start();
         } else {
             m_frameTimer.stop();
@@ -110,6 +110,130 @@ void FallingNotesView::listen()
         emit playingChanged();
         update();
     });
+    // (1.27.2) the speed changes the notes' seconds
+    playbackController()->currentTempoChanged().onNotify(this, [this]() { scheduleReload(); });
+    if (midiInPort()) {
+        midiInPort()->deviceChanged().onNotify(this, [this]() { updateWaitStatus(); });
+        midiInPort()->eventReceived().onReceive(this, [this](muse::midi::tick_t, const muse::midi::Event& e) {
+            if (!m_waitMode) {
+                return;
+            }
+            using Op = muse::midi::Event::Opcode;
+            if (e.opcode() == Op::NoteOn && e.velocity7() > 0) {
+                m_wait.noteOn(e.note());
+            } else if (e.opcode() == Op::NoteOn || e.opcode() == Op::NoteOff) {
+                m_wait.noteOff(e.note());
+            } else {
+                return;
+            }
+            m_waitTick.restart();   // (the clock moves on from the moment the notes were played)
+            updateWaitStatus();
+            update();
+        });
+    }
+}
+
+void FallingNotesView::onFrame()
+{
+    if (m_waitMode) {
+        const double dt = std::min<qint64>(m_waitTick.restart(), 100) / 1000.0;
+        const bool wasHolding = m_wait.holding();
+        m_wait.advance(dt);
+        if (m_wait.holding() != wasHolding) {
+            updateWaitStatus();
+        }
+        if (m_wait.finished() && m_wait.clock() > m_wait.end() + 1.0 && !m_playing) {
+            m_frameTimer.stop();
+            updateWaitStatus();
+        }
+    }
+    update();
+}
+
+int FallingNotesView::waitHandsMask() const
+{
+    return m_waitHands == "right" ? 1 : m_waitHands == "left" ? 6 : 7;
+}
+
+bool FallingNotesView::midiConnected() const
+{
+    return midiInPort() && midiInPort()->isConnected();
+}
+
+void FallingNotesView::setWaitMode(bool on)
+{
+    if (on == m_waitMode) {
+        return;
+    }
+    m_waitMode = on;
+    if (on) {
+        // the MIDI keyboard mustn't write into the score while practising
+        if (m_notation && m_notation->interaction()) {
+            if (m_notation->interaction()->noteInput()->isNoteInputMode()) {
+                m_notation->interaction()->noteInput()->endNoteInput();
+            }
+            m_notation->interaction()->clearSelection();
+        }
+        m_wait.setNotes(m_notes, waitHandsMask());
+        m_wait.start(m_positionSecs);
+        m_waitTick.restart();
+        m_frameTimer.start();
+    } else if (!m_playing) {
+        m_frameTimer.stop();
+    }
+    updateWaitStatus();
+    update();
+}
+
+void FallingNotesView::setWaitHands(const QString& h)
+{
+    if (h == m_waitHands) {
+        return;
+    }
+    m_waitHands = h;
+    m_wait.setNotes(m_notes, waitHandsMask());
+    updateWaitStatus();
+    update();
+}
+
+void FallingNotesView::waitRestart(double from)
+{
+    m_wait.start(from < 0 ? m_positionSecs : from);
+    m_waitTick.restart();
+    if (m_waitMode) {
+        m_frameTimer.start();
+    }
+    updateWaitStatus();
+    update();
+}
+
+void FallingNotesView::updateWaitStatus()
+{
+    QString s;
+    if (m_waitMode) {
+        if (!midiConnected()) {
+            s = tr("No MIDI keyboard connected: choose one in Preferences › Audio & MIDI.") + "  ";
+        }
+        int bar = 0;
+        const auto it = std::upper_bound(m_bars.begin(), m_bars.end(), m_wait.clock() + 0.001,
+                                         [](double v, const starscore::WatchBar& b) { return v < b.start; });
+        if (it != m_bars.begin()) {
+            bar = std::prev(it)->number;
+        }
+        if (m_wait.finished()) {
+            s += tr("Done: %1 right, %2 wrong").arg(m_wait.rightCount()).arg(m_wait.wrongCount());
+        } else {
+            if (bar > 0) {
+                s += tr("Bar %1").arg(bar) + " · ";
+            }
+            s += (m_wait.holding() ? tr("play the lit keys") : tr("get ready")) + " · "
+                 + tr("%1 right, %2 wrong").arg(m_wait.rightCount()).arg(m_wait.wrongCount());
+        }
+    }
+    if (s != m_waitStatus) {
+        m_waitStatus = s;
+    }
+    emit waitChanged();
 }
 
 void FallingNotesView::scheduleReload()
@@ -128,6 +252,9 @@ void FallingNotesView::setExternalTime(double t)
 
 double FallingNotesView::now() const
 {
+    if (m_waitMode) {
+        return m_wait.clock();
+    }
     if (m_externalTime >= 0) {
         return m_externalTime;
     }
@@ -146,6 +273,12 @@ void FallingNotesView::reload()
         m_notation->notationChanged().onNotify(this, [this]() { scheduleReload(); }, muse::async::Asyncable::Mode::SetReplace);
     }
     m_notes = starscore::watchNotes(m_notation, &m_scoreName, &m_bars);
+    // (1.27.2) Wait for me: the same place in the music after a change of speed
+    const double speed = playbackController() ? playbackController()->tempoMultiplier() : 1.0;
+    const double waitAt = m_wait.clock() * (speed > 0 ? m_loadedSpeed / speed : 1.0);
+    m_loadedSpeed = speed > 0 ? speed : 1.0;
+    m_wait.setNotes(m_notes, waitHandsMask());
+    m_wait.seek(waitAt);
     // the keyboard: the notes' range, whole octaves C to C, at least two octaves, within the piano's 88 keys
     int low = 127, high = 0;
     for (const FallNote& n : m_notes) {
@@ -165,6 +298,31 @@ void FallingNotesView::reload()
     m_highKey = high;
     emit notesChanged();
     update();
+}
+
+QColor FallingNotesView::keyColor(int k, bool down, const QColor& noteColor) const
+{
+    if (!m_waitMode) {
+        return down ? noteColor : QColor();
+    }
+    // Wait for me: a wrong key red, a key held its note's colour, the keys waited for lit faintly
+    if (m_wait.held(k)) {
+        if (m_wait.wrong(k)) {
+            return QColor("#E0302A");
+        }
+        return down ? QColor(noteColor.red(), noteColor.green(), noteColor.blue()) : QColor("#4CC36A");
+    }
+    if (m_wait.holding() && m_wait.expected(k) && !m_wait.hit(k)) {
+        QColor c = down ? noteColor : QColor("#4CC36A");
+        c.setAlpha(150);
+        return c;
+    }
+    if (down) {
+        QColor c = noteColor;
+        c.setAlpha(std::min(c.alpha(), 90));
+        return c;
+    }
+    return QColor();
 }
 
 void FallingNotesView::paint(QPainter* p)
@@ -223,7 +381,10 @@ void FallingNotesView::paint(QPainter* p)
         if (n.end < t || n.pitch < m_lowKey || n.pitch > m_highKey) {
             continue;
         }
-        const QColor c = m_colors == "pitch" ? QColor(PITCH_COLORS[((n.pitch % 12) + 12) % 12]) : QColor(HAND_COLORS[n.hand]);
+        QColor c = m_colors == "pitch" ? QColor(PITCH_COLORS[((n.pitch % 12) + 12) % 12]) : QColor(HAND_COLORS[n.hand]);
+        if (m_waitMode && !m_wait.waitsFor(n)) {
+            c.setAlpha(80);   // (Wait for me: the hand not being played, faint)
+        }
         const bool black = isBlack(n.pitch);
         const double x = keyX(n.pitch, m_lowKey) * ww + (black ? 0.0 : ww * 0.08);
         const double w = black ? ww * 0.6 : ww * 0.84;
@@ -233,8 +394,12 @@ void FallingNotesView::paint(QPainter* p)
         if (rect.height() > 0.5) {
             QPainterPath path;
             path.addRoundedRect(rect, std::min(4.0, w / 3), std::min(4.0, w / 3));
-            p->fillPath(path, black ? c.darker(125) : c);
-            p->setPen(QPen(c.darker(160), 1));
+            QColor fill = black ? c.darker(125) : c;
+            QColor edge = c.darker(160);
+            fill.setAlpha(c.alpha());
+            edge.setAlpha(c.alpha());
+            p->fillPath(path, fill);
+            p->setPen(QPen(edge, 1));
             p->drawPath(path);
         }
         if (n.start <= t && n.end > t) {
@@ -251,7 +416,11 @@ void FallingNotesView::paint(QPainter* p)
             continue;
         }
         const QRectF key(keyX(k, m_lowKey) * ww, ky, ww, keyboardH);
-        p->fillRect(key.adjusted(0.5, 0, -0.5, 0), down[k] ? downColor[k].lighter(130) : QColor("#FAFAF7"));
+        p->fillRect(key.adjusted(0.5, 0, -0.5, 0), QColor("#FAFAF7"));
+        if (const QColor kc = keyColor(k, down[k], downColor[k]); kc.isValid()) {
+            QColor lit = kc.alpha() == 255 ? kc.lighter(130) : kc;
+            p->fillRect(key.adjusted(0.5, 0, -0.5, 0), lit);
+        }
         p->setPen(QPen(QColor("#555555"), 1));
         p->drawRect(key);
         if (k % 12 == 0 && ww > 9) {
@@ -267,6 +436,9 @@ void FallingNotesView::paint(QPainter* p)
             continue;
         }
         const QRectF key(keyX(k, m_lowKey) * ww, ky, ww * 0.6, keyboardH * 0.62);
-        p->fillRect(key, down[k] ? downColor[k] : QColor("#1A1A1A"));
+        p->fillRect(key, QColor("#1A1A1A"));
+        if (const QColor kc = keyColor(k, down[k], downColor[k]); kc.isValid()) {
+            p->fillRect(key, kc);
+        }
     }
 }

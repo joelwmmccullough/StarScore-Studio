@@ -80,14 +80,46 @@ Item {
                 FlatButton {
                     icon: IconCode.REWIND
                     toolTipTitle: qsTrc("starscore", "Back to the start")
-                    onClicked: practice.rewind()
+                    onClicked: {
+                        practice.rewind()
+                        if (fall.waitMode) {
+                            fall.waitRestart(0)
+                        }
+                    }
                 }
                 FlatButton {
                     icon: practice.playing ? IconCode.PAUSE : IconCode.PLAY
-                    accentButton: !practice.playing
+                    accentButton: !practice.playing && !fall.waitMode
                     toolTipTitle: practice.playing ? qsTrc("starscore", "Pause") : qsTrc("starscore", "Play")
                     toolTipDescription: qsTrc("starscore", "From the selection or where playback stopped")
-                    onClicked: practice.togglePlay()
+                    onClicked: {
+                        fall.waitMode = false
+                        practice.togglePlay()
+                    }
+                }
+                // (1.27.2) Synthesia's wait mode
+                FlatToggleButton {
+                    icon: IconCode.MIDI_INPUT
+                    checked: fall.waitMode
+                    toolTipTitle: qsTrc("starscore", "Wait for me")
+                    toolTipDescription: qsTrc("starscore", "Play along on a MIDI keyboard: the notes stop at each note until you play it")
+                    onToggled: {
+                        if (!fall.waitMode && practice.playing) {
+                            practice.togglePlay()
+                        }
+                        fall.waitMode = !fall.waitMode
+                    }
+                }
+                StyledDropdown {
+                    visible: fall.waitMode
+                    Layout.preferredWidth: 120
+                    model: [
+                        { "text": qsTrc("starscore", "Both hands"), "value": "both" },
+                        { "text": qsTrc("starscore", "Right hand"), "value": "right" },
+                        { "text": qsTrc("starscore", "Left hand"), "value": "left" }
+                    ]
+                    currentIndex: indexOfValue(fall.waitHands)
+                    onActivated: function(index, value) { fall.waitHands = value }
                 }
                 FlatToggleButton {
                     icon: IconCode.LOOP
@@ -348,6 +380,23 @@ Item {
                 visible: fall.noteCount === 0
                 color: "#B0A898"
                 text: qsTrc("starscore", "No notes to show in this score.")
+            }
+            // (1.27.2) Wait for me: where you are and how it's going
+            Rectangle {
+                visible: fall.waitMode && fall.waitStatus !== ""
+                anchors.top: parent.top
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.topMargin: 6
+                width: waitText.implicitWidth + 20
+                height: waitText.implicitHeight + 8
+                radius: 4
+                color: fall.dark ? "#CC2A241C" : "#CCFFFFFF"
+
+                StyledTextLabel {
+                    id: waitText
+                    anchors.centerIn: parent
+                    text: fall.waitStatus
+                }
             }
         }
 

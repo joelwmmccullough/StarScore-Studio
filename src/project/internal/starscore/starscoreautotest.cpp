@@ -3894,6 +3894,58 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             barList << QString("%1@%2").arg(bars[i].number).arg(bars[i].start, 0, 'f', 2);
         }
         autotestLog(QString("  bars: %1, first: %2").arg(bars.size()).arg(barList.join(" ")));
+    } else if (step.startsWith("waitsim")) {
+        // waitsim[:right|left]: Wait for me (1.27.2) played by the test: it must stop at the first notes, not move on
+        // for a wrong key, move on once all of them are played (early is fine), and get to the end
+        const QString h = step.section(':', 1);
+        mu::project::starscore::WaitFollower w;
+        const std::vector<mu::project::starscore::WatchNote> notes = mu::project::starscore::watchNotes(globalContext()->currentNotation());
+        w.setNotes(notes, h == "right" ? 1 : h == "left" ? 6 : 7);
+        w.start(0);
+        for (int i = 0; i < 400 && !w.holding(); ++i) {
+            w.advance(0.05);
+        }
+        const std::vector<int> first = w.waitingFor();
+        QStringList fp;
+        for (int p : first) {
+            fp << QString::number(p);
+        }
+        autotestLog(QString("  stops at %1 s for %2 (holding %3)").arg(w.clock(), 0, 'f', 3).arg(fp.join(" ")).arg(w.holding()));
+        const int wrongKey = first.empty() ? 60 : (std::find(first.begin(), first.end(), first[0] + 1) == first.end() ? first[0] + 1 : first[0] + 2);
+        w.noteOn(wrongKey);
+        w.noteOff(wrongKey);
+        w.advance(1.0);
+        autotestLog(QString("  after a wrong key and a second: %1 s, holding %2, wrong %3").arg(w.clock(), 0, 'f', 3).arg(w.holding()).arg(w.wrongCount()));
+        // play it all: each time it stops, press its keys (half the time a little early, before it stops)
+        int groups = 0, early = 0;
+        double lastClock = -1;
+        bool stuck = false;
+        for (int guard = 0; guard < 200000 && !w.finished(); ++guard) {
+            const std::vector<int> want = w.waitingFor();
+            const bool goEarly = (groups % 2) == 1 && !w.holding()
+                                 && w.nextStart() - w.clock() <= mu::project::starscore::WaitFollower::EARLY / 2;
+            if (w.holding() || goEarly) {
+                const int before = w.rightCount();
+                for (int p : want) {
+                    w.noteOn(p);
+                }
+                for (int p : want) {
+                    w.noteOff(p);
+                }
+                if (w.rightCount() > before) {
+                    ++groups;
+                    early += goEarly ? 1 : 0;
+                }
+            }
+            w.advance(0.01);
+            if (w.clock() < lastClock - 1e-9) {
+                stuck = true;
+            }
+            lastClock = w.clock();
+        }
+        autotestLog(QString("  played %1 chords (%2 early), right %3, wrong %4, finished %5, clock %6 s of %7 s, backwards %8")
+                    .arg(groups).arg(early).arg(w.rightCount()).arg(w.wrongCount()).arg(w.finished())
+                    .arg(w.clock(), 0, 'f', 2).arg(w.end(), 0, 'f', 2).arg(stuck));
     } else if (step == "filesave") {
         // filesave: File › Save, in place (a .starscore keeps its solos and reference PDFs)
         dispatcher()->dispatch("file-save");
