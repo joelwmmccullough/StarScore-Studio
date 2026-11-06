@@ -330,6 +330,8 @@ public:
 
     QString bandSongFolderPath() const override;
     QString songTitle() const override;
+    QString songNotes() const override;
+    void setSongNotes(const QString& notes) override;
     QString scoreVersion() const override;
     StarScoreVersionSuggestion suggestVersionBump(const StarScoreBandExportPlan& plan) const override;
     void setScoreVersion(const QString& version) override;
@@ -440,6 +442,8 @@ public:
         // ticks}); worked out again when the reference part's systems or the song's bars change
         QJsonObject scoreSystems;
         QJsonObject recordings;
+        // (1.28.1) the Song page's notes about the song, as typed
+        QString songNotes;
         // a Solo Transcription (1.24.0): its song, player, band, recording, link, instrument, the song it's tied to,
         // and its twelve key part scores ("keys": [{ "shift", "name" }]); empty for a band song
         QJsonObject solo;

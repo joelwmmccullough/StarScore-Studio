@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.28.1
+
+- **Notes on the Song page.** A Notes box at the top of the Song page for anything about the song: what to work on next, who plays what, ideas for the arrangement. The notes are kept in the .starscore (the song shows as changed; save it to keep them).
+
 ## 1.28.0
 
 - **The Song page.** Opening a song now shows its own page first, with everything you've made for it, instead of going straight into the notation. "Song" sits between Home and Score in the top bar, and Score is the notation as before.

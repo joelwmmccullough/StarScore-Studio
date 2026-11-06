@@ -3895,6 +3895,12 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             barList << QString("%1@%2").arg(bars[i].number).arg(bars[i].start, 0, 'f', 2);
         }
         autotestLog(QString("  bars: %1, first: %2").arg(bars.size()).arg(barList.join(" ")));
+    } else if (step.startsWith("songnotes")) {
+        // songnotes[:<text>]: the Song page's notes (1.28.1): set them (when given), then log them
+        if (step.startsWith("songnotes:")) {
+            setSongNotes(step.mid(10).replace("\\n", "\n"));
+        }
+        autotestLog("  notes: " + songNotes().replace("\n", " / "));
     } else if (step.startsWith("notecolors:")) {
         // notecolors:on|off: the status bar's Note colors (1.27.4), on screen only
         mu::engraving::MScore::starscoreViewNoteColors = step.section(':', 1) == "on";

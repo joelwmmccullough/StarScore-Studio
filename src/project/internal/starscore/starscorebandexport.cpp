@@ -775,6 +775,28 @@ QJsonObject StarScoreService::songRecordings() const
     return loadFrom(project->masterNotation()->masterScore()).recordings;
 }
 
+QString StarScoreService::songNotes() const
+{
+    INotationProjectPtr project = exportSourceProject();
+    return project ? loadFrom(project->masterNotation()->masterScore()).songNotes : QString();
+}
+
+void StarScoreService::setSongNotes(const QString& notes)
+{
+    INotationProjectPtr project = exportSourceProject();
+    if (!project) {
+        return;
+    }
+    engraving::MasterScore* ms = project->masterNotation()->masterScore();
+    Data data = loadFrom(ms);
+    if (data.songNotes == notes) {
+        return;
+    }
+    data.songNotes = notes;
+    storeTo(ms, data, project);
+    project->markAsUnsaved();
+}
+
 void StarScoreService::setSongRecordings(const QJsonObject& recordings)
 {
     INotationProjectPtr project = exportSourceProject();

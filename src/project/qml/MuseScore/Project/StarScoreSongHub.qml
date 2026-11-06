@@ -254,6 +254,46 @@ Rectangle {
                     Layout.alignment: Qt.AlignTop
                     spacing: 18
 
+                    // ---------------- notes (1.28.1) ----------------
+                    Card {
+                        visible: hub.isStarScore
+                        title: qsTrc("starscore", "Notes")
+                        subtitle: qsTrc("starscore", "kept in this file")
+
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: Math.max(70, Math.min(260, notesArea.contentHeight + 24))
+                            radius: 4
+                            color: ui.theme.textFieldColor
+                            border.color: notesArea.activeFocus ? ui.theme.accentColor : ui.theme.strokeColor
+
+                            ScrollView {
+                                anchors.fill: parent
+                                anchors.margins: 6
+                                TextArea {
+                                    id: notesArea
+                                    text: hub.notes
+                                    color: ui.theme.fontPrimaryColor
+                                    font: ui.theme.bodyFont
+                                    wrapMode: TextEdit.Wrap
+                                    placeholderText: qsTrc("starscore", "What to work on next, who plays what, ideas for the arrangement…")
+                                    // kept as you type (a moment after you stop), and when you click away
+                                    onTextChanged: notesTimer.restart()
+                                    onActiveFocusChanged: {
+                                        if (!activeFocus) {
+                                            hub.setNotes(text)
+                                        }
+                                    }
+                                }
+                            }
+                            Timer {
+                                id: notesTimer
+                                interval: 800
+                                onTriggered: hub.setNotes(notesArea.text)
+                            }
+                        }
+                    }
+
                     // ---------------- arrangements and sections ----------------
                     Card {
                         visible: hub.isStarScore && !hub.isSoloFile

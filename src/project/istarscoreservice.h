@@ -902,6 +902,9 @@ public:
     virtual QString bandSongFolderPath() const = 0;
     //! (1.28.0) the song's title: the score's, or the title frame's when that is empty or "Untitled score"
     virtual QString songTitle() const = 0;
+    //! (1.28.1) the Song page's notes about the song, kept in the file (setting them marks the song unsaved)
+    virtual QString songNotes() const = 0;
+    virtual void setSongNotes(const QString& notes) = 0;
     virtual QString scoreVersion() const = 0;                 // from the score, or the starting version for this song
     //! Which number to raise for the next export, from the bar-by-bar signatures kept at the last export of each
     //! sheet. Major: the song's form changed (bar count, rehearsal marks, key or time signatures), the lead sheet

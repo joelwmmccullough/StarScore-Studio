@@ -38,6 +38,8 @@ class SongHubModel : public QObject, public muse::Contextable, public muse::asyn
     Q_PROPERTY(QString facts READ facts NOTIFY changed)
     Q_PROPERTY(QString filePath READ filePath NOTIFY changed)
     Q_PROPERTY(QString songFolder READ songFolder NOTIFY changed)
+    //! (1.28.1) notes about the song, kept in the file
+    Q_PROPERTY(QString notes READ notes NOTIFY changed)
     Q_PROPERTY(QVariantList arrangements READ arrangements NOTIFY changed)
     Q_PROPERTY(QVariantList sections READ sections NOTIFY changed)
     Q_PROPERTY(QVariantList partScores READ partScores NOTIFY changed)
@@ -89,6 +91,7 @@ public:
     Q_INVOKABLE void dispatch(const QString& actionCode);
     //! the score's page with one of its panels open ("todo", "reference", "practice", "audit")
     Q_INVOKABLE void openPanel(const QString& which);
+    Q_INVOKABLE void setNotes(const QString& text);
 
     bool hasSong() const { return m_hasSong; }
     bool isStarScore() const { return m_isStarScore; }
@@ -97,6 +100,7 @@ public:
     QString facts() const { return m_facts; }
     QString filePath() const { return m_filePath; }
     QString songFolder() const { return m_songFolder; }
+    QString notes() const { return m_notes; }
     QVariantList arrangements() const { return m_arrangements; }
     QVariantList sections() const { return m_sections; }
     QVariantList partScores() const { return m_partScores; }
@@ -129,6 +133,7 @@ private:
     QString m_facts;
     QString m_filePath;
     QString m_songFolder;
+    QString m_notes;
     QVariantList m_arrangements;
     QVariantList m_sections;
     QVariantList m_partScores;

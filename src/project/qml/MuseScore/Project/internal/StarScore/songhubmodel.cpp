@@ -349,6 +349,7 @@ void SongHubModel::refresh()
 
     // --- the song's folder in Sheets and Demos: its folders, and the sheet folders inside Sheet Music
     m_songFolder = ss->bandSongFolderPath();
+    m_notes = ss->songNotes();
 
     // --- the folders (in Sheets and Demos, and beside the file) are read on another thread: Sheets and Demos is on
     // Google Drive, where reading every file in Version History can take a while. They fill in when ready.
@@ -626,6 +627,14 @@ QVariantList SongHubModel::filesIn(const QString& folder) const
                              { "detail", QLocale().toString(fi.lastModified().date(), QLocale::ShortFormat) } };
     }
     return out;
+}
+
+void SongHubModel::setNotes(const QString& text)
+{
+    if (starScore() && text != m_notes) {
+        m_notes = text;
+        starScore()->setSongNotes(text);
+    }
 }
 
 void SongHubModel::dispatch(const QString& actionCode)
