@@ -160,9 +160,95 @@ void TupletLayout::starscorePlaceNumberAtCrossBeam(Tuplet* item, const ChordRest
     }
     const double sp = item->spatium();
     const double halfBeam = 0.5 * beam->beamWidth();
-    const double gap = 0.4 * sp;
-    const double centerY = above ? beamY - halfBeam - gap - 0.5 * nb.height() : beamY + halfBeam + gap + 0.5 * nb.height();
-    number->mutldata()->setPos(PointF(midX - tupletPage.x() - nb.center().x(), centerY - tupletPage.y() - nb.center().y()));
+    auto beamYAt = [&](double x) { return y1 + (y2 - y1) * (x - x1) / (x2 - x1); };
+
+    // (1.27.2, Joel: "the 5 is still intersecting a staff line") what the number mustn't touch: the staves (lines and
+    // the spaces between them) and the beam's chords (heads, stems, accidentals, ledger lines)
+    std::vector<std::pair<double, double> > staffBands;
+    if (const System* system = cr1->measure() ? cr1->measure()->system() : nullptr) {
+        const Fraction tick = cr1->tick();
+        for (staff_idx_t i = 0; i < system->staves().size(); ++i) {
+            const SysStaff* ss = system->staff(i);
+            const Staff* staff = item->score()->staff(i);
+            if (!ss || !ss->show() || !staff) {
+                continue;
+            }
+            const double top = system->staffYpage(i);
+            staffBands.push_back({ top - 0.1 * sp, top + staff->staffHeight(tick) + 0.1 * sp });
+        }
+    }
+    Shape chords;
+    for (const ChordRest* cr : beam->elements()) {
+        if (cr && cr->isChord()) {
+            chords.add(cr->ldata()->shape().translated(cr->pagePos()));
+        }
+    }
+    auto clear = [&](const RectF& r) {
+        for (const auto& band : staffBands) {
+            if (r.bottom() > band.first && r.top() < band.second) {
+                return false;
+            }
+        }
+        return !chords.intersects(r);
+    };
+
+    // the side: as asked, else the side away from the heads of the chord nearest the middle
+    bool above = false;
+    const bool asked = item->direction() != DirectionV::AUTO;
+    if (item->direction() == DirectionV::UP) {
+        above = true;
+    } else if (item->direction() == DirectionV::DOWN) {
+        above = false;
+    } else {
+        const ChordRest* nearest = cr1;
+        for (const DurationElement* de : item->elements()) {
+            if (de && de->isChordRest() && std::abs(toChordRest(de)->pagePos().x() - midX)
+                < std::abs(nearest->pagePos().x() - midX)) {
+                nearest = toChordRest(de);
+            }
+        }
+        // a stem going up to the beam has its heads below: the number goes above
+        above = nearest->isChord() && toChord(nearest)->up();
+    }
+
+    // where it can go: that side at the usual distance from the beam, then nearer the beam, then moved along the beam
+    // (by up to half the tuplet's width), then (unless a side was asked for) the same on the other side. The first
+    // place clear of the staves and the notes wins; if none is, the first one.
+    const double halfSpan = 0.5 * std::abs(cr2->pagePos().x() - cr1->pagePos().x());
+    std::vector<double> shifts { 0.0 };
+    for (double d = 0.5 * sp; d <= halfSpan; d += 0.5 * sp) {
+        shifts.push_back(d);
+        shifts.push_back(-d);
+    }
+    const std::vector<double> gaps { 0.4, 0.3, 0.2, 0.12 };
+    PointF best;
+    bool found = false;
+    bool first = true;
+    for (int sideTry = 0; sideTry < (asked ? 1 : 2) && !found; ++sideTry) {
+        const bool up = sideTry == 0 ? above : !above;
+        for (double shift : shifts) {
+            for (double g : gaps) {
+                const double cx = midX + shift;
+                const double by = beamYAt(cx);
+                const double cy = up ? by - halfBeam - g * sp - 0.5 * nb.height() : by + halfBeam + g * sp + 0.5 * nb.height();
+                const PointF c(cx, cy);
+                if (first) {
+                    best = c;
+                    first = false;
+                }
+                const RectF box(cx - 0.5 * nb.width(), cy - 0.5 * nb.height(), nb.width(), nb.height());
+                if (clear(box)) {
+                    best = c;
+                    found = true;
+                    break;
+                }
+            }
+            if (found) {
+                break;
+            }
+        }
+    }
+    number->mutldata()->setPos(PointF(best.x() - tupletPage.x() - nb.center().x(), best.y() - tupletPage.y() - nb.center().y()));
 }
 
 void TupletLayout::layoutTupletAndNestedTuplets(Tuplet* t, LayoutContext& ctx)
