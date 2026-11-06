@@ -786,7 +786,17 @@ void SongHubModel::playDemo(const QString& path)
     if (!m_player) {
         m_player = std::make_unique<starscore::ListenPlayer>(iocContext());
         connect(m_player.get(), &starscore::ListenPlayer::readyChanged, this, [this]() {
+            qInfo() << "[starscore] song page: demo ready" << m_player->isReady() << m_player->errors();
             if (!m_player->isReady()) {
+                // (also when a demo is swapped for another: the old one's sound let go, nothing to say)
+                if (!m_player->errors().isEmpty()) {
+                    if (interactive()) {
+                        interactive()->error(muse::trc("starscore", "Couldn't play the demo"),
+                                             m_player->errors().join("\n").toStdString());
+                    }
+                    m_demoPlaying.clear();
+                    emit demoChanged();
+                }
                 return;
             }
             if (!m_player->errors().isEmpty() && interactive()) {

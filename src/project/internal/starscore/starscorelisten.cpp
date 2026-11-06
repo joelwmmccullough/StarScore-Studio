@@ -173,6 +173,8 @@ void ListenPlayer::load(const std::vector<ListenStem>& stems)
         m_tracks.push_back(std::move(t));
     }
     if (m_tracks.empty() || !playback()) {
+        LOGW() << "[starscore] listen: nothing to load (" << m_tracks.size() << " decoded, playback "
+               << (playback() ? "there" : "missing") << ")";
         emit readyChanged();
         return;
     }
@@ -187,6 +189,7 @@ void ListenPlayer::load(const std::vector<ListenStem>& stems)
         }
         m_sequence = id;
         m_player = playback()->player(id);
+        LOGI() << "[starscore] listen: sequence " << id << (m_player ? "" : " (no player)");
         if (!m_player) {
             return;
         }
