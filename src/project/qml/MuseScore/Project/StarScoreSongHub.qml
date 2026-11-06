@@ -234,6 +234,27 @@ Rectangle {
                         text: qsTrc("starscore", "Autosave archive…")
                         onClicked: hub.dispatch("starscore-autosave-archive")
                     }
+                    // (1.28.1) the song's other tools, from the File and Format menus
+                    FlatButton {
+                        id: moreButton
+                        visible: hub.isStarScore && !hub.isSoloFile
+                        text: qsTrc("starscore", "More…")
+                        onClicked: moreMenu.toggleOpened([
+                            { "id": "starscore-recordings", "title": qsTrc("starscore", "Releases and live takes…") },
+                            { "id": "starscore-export-arrangements", "title": qsTrc("starscore", "Export arrangements as MuseScore files…") },
+                            { "id": "starscore-standardize", "title": qsTrc("starscore", "Standardize this song…") },
+                            { "id": "starscore-organize", "title": qsTrc("starscore", "Organize Sheets and Demos…") },
+                            { "id": "starscore-band-roster", "title": qsTrc("starscore", "Band roster…") }
+                        ])
+
+                        StyledMenuLoader {
+                            id: moreMenu
+                            menuAnchorItem: ui.rootItem
+                            onHandleMenuItem: function(itemId) {
+                                Qt.callLater(hub.dispatch, itemId)
+                            }
+                        }
+                    }
                     CheckBox {
                         text: qsTrc("starscore", "Show this page when a song opens")
                         checked: hub.openHere

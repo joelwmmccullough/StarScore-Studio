@@ -7,6 +7,7 @@ Version numbers: the first number changes when files stop being compatible, the 
 ## 1.28.1
 
 - **Notes on the Song page.** A Notes box at the top of the Song page for anything about the song: what to work on next, who plays what, ideas for the arrangement. The notes are kept in the .starscore (the song shows as changed; save it to keep them).
+- **More… on the Song page:** the song's other tools in one menu: Releases and live takes…, Export arrangements as MuseScore files…, Standardize this song…, Organize Sheets and Demos…, Band roster….
 
 ## 1.28.0
 
