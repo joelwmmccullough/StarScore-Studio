@@ -88,7 +88,7 @@ SongFacts songFacts(MasterScore* ms)
         // out again)
         const double mult = ms->tempomap()->tempoMultiplier().val > 0 ? ms->tempomap()->tempoMultiplier().val : 1.0;
         f.bpm = int(std::lround(ms->tempomap()->tempo(0).val * 60.0));
-        const RepeatList& repeats = ms->repeatList();
+        const RepeatList& repeats = ms->repeatList(true, false);   // (repeats played out; the ties left as they are)
         const int ticks = repeats.ticks();
         if (ticks > 0) {
             f.seconds = int(std::lround(repeats.utick2utime(ticks) * mult));
