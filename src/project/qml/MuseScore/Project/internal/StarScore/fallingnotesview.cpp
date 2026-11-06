@@ -10,6 +10,7 @@
 
 #include <QPainter>
 #include <QPainterPath>
+#include <QFontMetricsF>
 
 
 using namespace mu::project;
@@ -118,7 +119,11 @@ void FallingNotesView::listen()
         update();
     });
     // (1.27.2) the speed changes the notes' seconds
-    playbackController()->currentTempoChanged().onNotify(this, [this]() { scheduleReload(); });
+    playbackController()->currentTempoChanged().onNotify(this, [this]() {
+        if (!qFuzzyCompare(playbackController()->tempoMultiplier(), m_loadedSpeed)) {   // (not a tempo marking)
+            scheduleReload();
+        }
+    });
     if (midiInPort()) {
         midiInPort()->deviceChanged().onNotify(this, [this]() { updateWaitStatus(); });
         midiInPort()->eventReceived().onReceive(this, [this](muse::midi::tick_t, const muse::midi::Event& e) {
@@ -356,23 +361,19 @@ void FallingNotesView::paint(QPainter* p)
         }
     }
 
-    // (1.27.2) a line where each bar starts, its number at the left, so a falling note can be found in the sheet
+    // (1.27.2) a line where each bar starts, its number at the left (drawn over the notes, below), so a falling note
+    // can be found in the sheet
+    std::vector<std::pair<double, int> > barNumbers;
     {
-        const QColor lineColor = m_dark ? QColor(255, 255, 255, 48) : QColor(0, 0, 0, 48);
-        const QColor numberColor = m_dark ? QColor(255, 255, 255, 110) : QColor(0, 0, 0, 120);
-        QFont f = p->font();
-        f.setPixelSize(10);
-        p->setFont(f);
+        p->setPen(QPen(m_dark ? QColor(255, 255, 255, 56) : QColor(0, 0, 0, 64), 1));
         const auto firstBar = std::lower_bound(m_bars.begin(), m_bars.end(), t,
                                                [](const starscore::WatchBar& b, double v) { return b.start < v; });
         double lastNumberY = 1e9;
         for (auto it = firstBar; it != m_bars.end() && it->start <= t + m_secondsShown; ++it) {
             const double y = fallH - (it->start - t) * pps;
-            p->setPen(QPen(lineColor, 1));
             p->drawLine(QPointF(0, y), QPointF(r.width(), y));
-            if (lastNumberY - y >= 14 && y >= 12) {   // (bars too close together: not every number)
-                p->setPen(numberColor);
-                p->drawText(QRectF(3, y - 13, 40, 12), Qt::AlignLeft | Qt::AlignBottom, QString::number(it->number));
+            if (lastNumberY - y >= 16 && y >= 14) {   // (bars too close together: not every number)
+                barNumbers.push_back({ y, it->number });
                 lastNumberY = y;
             }
         }
@@ -412,6 +413,20 @@ void FallingNotesView::paint(QPainter* p)
         if (n.start <= t && n.end > t) {
             down[n.pitch] = true;
             downColor[n.pitch] = c;
+        }
+    }
+
+    if (!barNumbers.empty()) {
+        QFont f = p->font();
+        f.setPixelSize(10);
+        p->setFont(f);
+        const QFontMetricsF fm(f);
+        for (const auto& [y, number] : barNumbers) {
+            const QString text = QString::number(number);
+            const QRectF box(2, y - 14, fm.horizontalAdvance(text) + 6, 13);
+            p->fillRect(box, m_dark ? QColor(21, 18, 14, 190) : QColor(244, 241, 234, 210));
+            p->setPen(m_dark ? QColor(255, 255, 255, 150) : QColor(0, 0, 0, 160));
+            p->drawText(box, Qt::AlignCenter, text);
         }
     }
 

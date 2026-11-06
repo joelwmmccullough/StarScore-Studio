@@ -4,6 +4,11 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.27.2
+
+- **Practice › Watch: Wait for me.** Play along on a MIDI keyboard: turn on the keyboard button next to Play, and the falling notes stop at each note until you play it, the way Synthesia's wait mode works. Choose Both hands, Right hand or Left hand; the other hand's notes still fall, faintly, and don't wait. The keys to play light up faintly, a key you hold lights in its note's colour, and a wrong key lights red. A note played a moment early counts. The top of the view shows the bar you're in and how many notes you've played right and wrong. It starts from where playback is; ◀◀ starts again from the beginning. The speed slider sets how fast the notes come between stops. While it's on, the MIDI keyboard doesn't write notes into the score. Choose your keyboard in Preferences › Audio & MIDI.
+- **Practice › Watch: bar lines.** A line across the falling notes where each bar starts, with its bar number, so a note can be found in the sheet.
+
 ## 1.27.1
 
 - **The side panels' tab names match their panels again.** 1.25.4 put Palettes, Layout, Properties and To-do in that order, but when it had to move them (a layout saved in another order), the tab names stayed in the old order: the To-do tab showed the palettes. The names now follow the panels.
