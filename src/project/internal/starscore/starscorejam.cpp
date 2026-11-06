@@ -947,18 +947,18 @@ void JamPlayer::addTracks(const std::function<void()>& done)
         auto [setup, meta] = track.instrument == "drums" ? findSetup("drumset")
                              : track.instrument == "bass" ? findSetup("bass_guitar", { m_jam.electricBass ? "electric" : "acoustic", "plucked" })
                              : findSetup("piano", { "grand" });
-        if (!setup.isValid() && track.instrument == "bass") {
-            std::tie(setup, meta) = findSetup("contrabass");
-        }
-        if (!setup.isValid() && track.instrument == "piano") {
-            std::tie(setup, meta) = findSetup("piano");
-        }
         if (!setup.isValid()) {
-            LOGW() << "[starscore] jam: no sound for " << track.instrument.toStdString();
-            if (--*remaining == 0) {
-                done();
-            }
-            continue;
+            // (1.29.0) the basic profile lists no SoundFont sounds (it's empty unless sounds carry their own setup):
+            // the instrument described as score playback describes it, with no sound chosen, so the audio engine
+            // plays it with MuseScore Basic, as it does the score's instruments (before, Jam found nothing: silent)
+            using SC = mpe::SoundSubCategory;
+            setup = track.instrument == "drums" ? mpe::PlaybackSetupData(mpe::SoundId::Drumset, mpe::SoundCategory::Percussions)
+                    : track.instrument == "bass"
+                    ? mpe::PlaybackSetupData(mpe::SoundId::BassGuitar, mpe::SoundCategory::Strings,
+                                             m_jam.electricBass ? mpe::SoundSubCategories { SC::Electric, SC::Plucked }
+                                                                : mpe::SoundSubCategories { SC::Acoustic, SC::Plucked })
+                    : mpe::PlaybackSetupData(mpe::SoundId::Piano, mpe::SoundCategory::Keyboards, { SC::Grand });
+            meta = AudioResourceMeta();
         }
         AudioInputParams in { meta, {} };
         AudioOutputParams out;

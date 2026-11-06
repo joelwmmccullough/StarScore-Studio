@@ -13,9 +13,16 @@ Version numbers: the first number changes when files stop being compatible, the 
   - **Demos:** the demos in the song's Sheets and Demos folder, with play and stop right on the page, and a bar showing where it is (click it to jump).
   - **Pictures of the sheets:** opening a folder under "In Sheets and Demos" shows each PDF's first page (on the Mac). Click one to open it.
   - **Songbooks:** the albums of Home › Songbooks the song is on, with its track number (when Songbooks are turned on in Preferences).
+- **iReal Pro charts are laid out properly.**
+  - Every bar takes exactly its share of the line, so rows line up: four bars to a line, or two in a section that has a bar of more than four chords (Renaissance's 7/4 vamp). Before, a bar of five chords spilled over and pushed every bar after it out of place.
+  - Chords sit on their beat, and chords right next to each other are written small, as in iReal Pro's own charts.
+  - A bar the same as the one before is shown with the repeat-bar sign.
+  - The same repeat played again and again is one repeat with the whole count (24x), not a row of repeats.
+  - Section names go above the bar, so they don't sit on a repeat's count or the chords' bass notes. A boxed A–D only where the score's section is A–D; later letters (G, K, M) are written above the bar instead of being renamed.
 - **Practice:**
   - **The falling notes are what you hear.** They now come from StarScore's playback itself, so a trill falls as its alternating notes, a tremolo as its repeated notes, a staccato or staccatissimo note is short, an arpeggio rolls, and grace notes, mordents, turns and glissandos fall as they sound. Repeated notes show a small gap between them. Wait for me waits for the written notes only: a trill's other notes fall too, and playing them isn't counted wrong.
   - **Scroll or drag through the music.** Over the falling notes, scroll up (or drag down) to go on, scroll down (or drag up) to go back; playback and the score's cursor follow. In Listen, each step is a bar.
+  - **Jam plays again.** The backing band was silent: it looked for its piano, bass and drum sounds in a list that's empty unless extra SoundFonts are installed, found none, and added no instruments. It now asks for them the way the score's own playback does, and gets MuseScore Basic's grand piano, bass and drum kit.
   - **Speed goes back to 100% when Practice is closed.**
   - **Undocked, it can be any size.** Pulled out of the window, the Practice panel now stretches as tall as the screen (it was held to about a third). Docked at the bottom, it keeps the old limit.
 

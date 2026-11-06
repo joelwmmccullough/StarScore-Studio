@@ -3229,6 +3229,18 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             autotestLog(QString("  wrote chords.json, chart.html, ireal.html (%1 bars, lead %2, status %3)")
                         .arg(data.measures.size()).arg(data.lead, data.leadStatus.value_or("none")));
         }
+    } else if (step == "solochords") {
+        // solochords: a solo transcription's chord charts as its export writes them (1.29.0), into the autotest folder's
+        // "Chord Charts": its iReal Pro page and one chart in concert C; then each iReal song (the playlist's form)
+        QStringList songs, problems;
+        const starscore::ChordChartResult r = starscore::writeSoloChordCharts(ms, autotestDir(), "solo", "Solo", "Solo", "Player", false,
+                                                                             { { "00 C", "C", 0, 0, 0 } }, songs, problems);
+        autotestLog(QString("  wrote %1; %2 iReal song(s)%3").arg(r.written.join(", ")).arg(songs.size())
+                    .arg(problems.isEmpty() ? QString() : "; " + problems.join(" / ")));
+        QFile f(autotestDir() + "/ireal-songs.txt");
+        if (f.open(QIODevice::WriteOnly)) {
+            f.write(songs.join("\n===\n").toUtf8());
+        }
     } else if (step.startsWith("rechord:")) {
         // rechord:<marks>|<from>|<to>: in the bars from each rehearsal mark (e.g. "G+J") to the next one, in the main
         // score and every part score, each chord symbol whose extension is exactly <from> (e.g. "^9") gets <to>

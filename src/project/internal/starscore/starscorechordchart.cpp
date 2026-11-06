@@ -1933,33 +1933,57 @@ const std::map<int, QString> KEYS_MAJOR {
     { 3, "A" }, { 4, "E" }, { 5, "B" }, { 6, "F#" }, { 7, "C#" }
 };
 
-//! the 4 cells of one bar (more chords: the bar takes more cells)
-QStringList irealBarTokens(const BarKey& k, const BarKey* prev, std::set<QString>& notes)
+//! (1.29.0, Joel: Renaissance's chart "unreadable") In iReal Pro every chord, slash, "x" and space is one cell of a
+//! line's 16, and a comma only joins two chords with no empty cell between them (it does not put them in one cell).
+//! Before, a bar with more than 4 chords was written as 5+ cells, so the line ran past 16 cells and every bar after it
+//! was pushed out of place. Now a bar is always exactly `width` cells: 4 (four bars to a line, as nearly every chart in
+//! iReal Pro's Jazz 1460), or 8 in a section with a bar of more than 4 chords (two bars to a line). Each chord sits in
+//! the cell of its beat; chords in neighbouring cells are written small, as iReal Pro's own charts write a bar of four.
+struct IRealBarCells {
+    QStringList cells;
+    bool small = false;
+};
+
+int irealBarWidth(const BarKey& k)
 {
-    if (prev && sameChords(prev->ch, k.ch) && k.ch.size() == 1 && prev->ts == k.ts) {
-        return { "x", " ", " ", " " };
+    const int n = int(k.ch.size());
+    return n <= 4 ? 4 : n <= 8 ? 8 : 16;
+}
+
+IRealBarCells irealBarTokens(const BarKey& k, const BarKey* prev, std::set<QString>& notes, int width = 4)
+{
+    IRealBarCells out;
+    out.cells = QStringList(width, " ");
+    // the same as the bar before (any number of chords): iReal Pro's repeat-the-bar sign, in the bar's second cell as
+    // in its own charts; a bar with no chords also keeps the chord before sounding
+    if ((prev && *prev == k && !k.ch.empty()) || k.ch.empty()) {
+        out.cells[width == 4 ? 1 : width / 2 - 1] = "x";
+        return out;
     }
     const Fraction lnf = parseFrac(k.len);
-    QStringList cells { " ", " ", " ", " " };
-    if (k.ch.size() > 4) {
-        QStringList all;
-        for (const auto& [pos, kk] : k.ch) {
-            all << irealChord(kk, notes);
-        }
-        return { all.join(','), " ", " ", " " };
-    }
+    std::vector<int> used;
     for (const auto& [pos, kk] : k.ch) {
-        const Fraction q = pos / lnf * Fraction(4, 1);
-        int slot = std::min(3, q.numerator() / q.denominator());
-        while (slot < 3 && cells[slot] != " ") {
+        const Fraction q = pos / lnf * Fraction(width, 1);
+        int slot = std::clamp(q.numerator() / std::max(1, q.denominator()), 0, width - 1);
+        while (slot < width && out.cells[slot] != " ") {
             ++slot;
         }
-        cells[slot] = cells[slot] == " " ? irealChord(kk, notes) : cells[slot] + "," + irealChord(kk, notes);
+        if (slot >= width) {   // (no room after it: the nearest free cell before)
+            slot = width - 1;
+            while (slot > 0 && out.cells[slot] != " ") {
+                --slot;
+            }
+        }
+        out.cells[slot] = irealChord(kk, notes);
+        used.push_back(slot);
     }
-    if (k.ch.empty()) {
-        cells[0] = "x";
+    std::sort(used.begin(), used.end());
+    for (size_t i = 1; i < used.size(); ++i) {
+        if (used[i] - used[i - 1] == 1) {
+            out.small = true;
+        }
     }
-    return cells;
+    return out;
 }
 
 //! iReal cells: a chord fills its cell, a space is an empty cell; chords in neighbouring cells are joined by a comma
@@ -1970,7 +1994,7 @@ QString cellsText(const QStringList& cells)
     for (const QString& c : cells) {
         if (!c.trimmed().isEmpty()) {
             out += (prevChord ? "," : "") + c;
-            prevChord = true;
+            prevChord = c != "x";
         } else {
             out += " ";
             prevChord = false;
@@ -1980,7 +2004,7 @@ QString cellsText(const QStringList& cells)
 }
 
 struct IRealBar {
-    QStringList tokens;
+    IRealBarCells tokens;
     QString open, close;
     int ending = 0;
     int times = 0;
@@ -2016,23 +2040,30 @@ std::vector<std::pair<const Group*, QStringList> > irealSections(const Analysis&
     const Analysis& a = *ap;
     static const QStringList LETTERS { "A", "B", "C", "D" };
     int li = 0;
+    bool smallOn = false;   // (1.29.0) chords written small from an "s" until an "l", across sections
     QString prevTs;   // null = none yet
     for (size_t gi = 0; gi < a.groups.size(); ++gi) {
         const Group& g = a.groups[gi];
         const QString label = g.labels.first();
         const QString low = label.toLower();
         QString mark;
+        // (1.29.0) iReal Pro's boxed marks are only A-D, Intro and Verse: a section lettered A-D in the score gets its own
+        // letter's box; one lettered E or later (Renaissance's G, K, M) gets no box, its letter written above the bar
+        // instead (before, the letters were dealt out A, B, C, D, A… so a box said "B" over a section the score calls G)
+        const QString first = shortLabel(label);
         if (low == "in" || low == "intro" || (gi == 0 && (low.isEmpty() || low == "i"))) {
             mark = "*i";
-        } else if (low.startsWith('v')) {
+        } else if (low.startsWith('v') && first.size() > 1) {
             mark = "*V";
-        } else {
+        } else if (first.size() == 1 && LETTERS.contains(first.toUpper())) {
+            mark = "*" + first.toUpper();
+        } else if (first.size() != 1) {
             mark = "*" + LETTERS[li % 4];
             ++li;
         }
         QString text = g.labels.size() == 1 ? shortLabel(label) : shortLabel(g.labels.first()) + "-" + shortLabel(g.labels.last());
-        if (g.labels.size() > 1) {
-            text += QString(" (%1x)").arg(g.labels.size());
+        if (g.labels.size() == 1 && !mark.isEmpty() && mark.mid(1) == text) {
+            text.clear();   // (the box says it)
         }
         if (a.soloForm) {
             text.clear();   // (1.25.2: a solo's form has its section mark only; Pinetop's "A" was written under it as well)
@@ -2050,29 +2081,60 @@ std::vector<std::pair<const Group*, QStringList> > irealSections(const Analysis&
                 }
             }
         }
+        // (1.29.0) the same bars repeated, then repeated again (Renaissance's vamp, 4 times in each of six sections): one
+        // repeat with the whole count, not six repeat signs in a row
+        {
+            std::vector<Item> merged;
+            for (const Item& it : items) {
+                if (!merged.empty() && it.kind == Item::Rep && merged.back().kind == Item::Rep && sameKeys(merged.back().keys, 0, it.keys, 0, it.keys.size())
+                    && merged.back().keys.size() == it.keys.size()) {
+                    merged.back().n += it.n;
+                } else if (!merged.empty() && it.kind == Item::BarItem && merged.back().kind == Item::Rep && merged.back().keys.size() == 1
+                           && merged.back().keys.front() == it.keys.front()) {
+                    merged.back().n += 1;
+                } else {
+                    merged.push_back(it);
+                }
+            }
+            items = merged;
+        }
+        // (1.29.0) how many cells a bar takes in this section: 4, or 8 (two bars to a line) when a bar has more than four
+        // chords
+        int width = 4;
+        for (const Item& it : items) {
+            for (const BarKey& k : it.keys) {
+                width = std::max(width, irealBarWidth(k));
+            }
+            for (const Keys& e : it.ends) {
+                for (const BarKey& k : e) {
+                    width = std::max(width, irealBarWidth(k));
+                }
+            }
+        }
+        const int perLine = std::max(1, 16 / width);
         std::vector<IRealBar> bars;
         const BarKey* prev = nullptr;
         for (const Item& it : items) {
             if (it.kind == Item::BarItem) {
-                bars.push_back({ irealBarTokens(it.keys.front(), prev, notes), "|", "|", 0, 0, it.keys.front().ts });
+                bars.push_back({ irealBarTokens(it.keys.front(), prev, notes, width), "|", "|", 0, 0, it.keys.front().ts });
                 prev = &it.keys.front();
             } else if (it.kind == Item::Rep) {
                 for (size_t j = 0; j < it.keys.size(); ++j) {
                     const bool lastBar = j == it.keys.size() - 1;
-                    bars.push_back({ irealBarTokens(it.keys[j], prev, notes), j == 0 ? "{" : "|", lastBar ? "}" : "|", 0,
+                    bars.push_back({ irealBarTokens(it.keys[j], prev, notes, width), j == 0 ? "{" : "|", lastBar ? "}" : "|", 0,
                                      lastBar && it.n > 2 ? it.n : 0, it.keys[j].ts });
                     prev = &it.keys[j];
                 }
             } else {
                 for (size_t j = 0; j < it.keys.size(); ++j) {
-                    bars.push_back({ irealBarTokens(it.keys[j], prev, notes), j == 0 ? "{" : "|", "|", 0, 0, it.keys[j].ts });
+                    bars.push_back({ irealBarTokens(it.keys[j], prev, notes, width), j == 0 ? "{" : "|", "|", 0, 0, it.keys[j].ts });
                     prev = &it.keys[j];
                 }
                 for (size_t n = 0; n < it.ends.size(); ++n) {
                     const Keys& e = it.ends[n];
                     for (size_t j = 0; j < e.size(); ++j) {
                         const bool lastPass = n == it.ends.size() - 1;
-                        bars.push_back({ irealBarTokens(e[j], prev, notes), "|", j == e.size() - 1 && !lastPass ? "}" : "|",
+                        bars.push_back({ irealBarTokens(e[j], prev, notes, width), "|", j == e.size() - 1 && !lastPass ? "}" : "|",
                                          j == 0 ? int(n) + 1 : 0, 0, e[j].ts });
                         prev = &e[j];
                     }
@@ -2094,10 +2156,10 @@ std::vector<std::pair<const Group*, QStringList> > irealSections(const Analysis&
             }
         }
         const QString after = nb && bars[nb - 1].close == "}" ? "}" : "]";
-        // lines of 4 bars (16 cells)
+        // lines of 16 cells: 4 bars, or 2 bars of 8 cells
         QStringList lines;
-        for (int s0 = 0; s0 < nb; s0 += 4) {
-            const int chunk = std::min(4, nb - s0);
+        for (int s0 = 0; s0 < nb; s0 += perLine) {
+            const int chunk = std::min(perLine, nb - s0);
             QString txt;
             for (int j = 0; j < chunk; ++j) {
                 const IRealBar& b = bars[s0 + j];
@@ -2127,17 +2189,23 @@ std::vector<std::pair<const Group*, QStringList> > irealSections(const Analysis&
                     QString t = text;
                     t.remove('<');
                     t.remove('>');
-                    pre += "<" + t + ">";
+                    // (1.29.0) above the bar, as iReal Pro's own charts write "Solos", so it never sits on a repeat's
+                    // count or the chords' bass notes under the bar
+                    pre += "<*74" + t + ">";
                 }
                 if (b.times) {
                     pre += QString("<%1x>").arg(b.times);
                 }
-                txt += before[k] + pre + cellsText(b.tokens);
+                if (b.tokens.small != smallOn) {
+                    pre += b.tokens.small ? "s" : "l";
+                    smallOn = b.tokens.small;
+                }
+                txt += before[k] + pre + cellsText(b.tokens.cells);
             }
-            if (s0 + 4 >= nb) {
+            if (s0 + perLine >= nb) {
                 txt += after;
-                if (chunk < 4) {
-                    txt += QString(4 * (4 - chunk), ' ');   // empty cells: the next section starts on a new line
+                if (chunk < perLine) {
+                    txt += QString(width * (perLine - chunk), ' ');   // empty cells: the next section starts on a new line
                 }
             }
             lines << txt;

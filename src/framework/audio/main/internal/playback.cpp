@@ -127,12 +127,14 @@ Promise<TrackSequenceId> Playback::addSequence()
 
         auto sendAddSequence = [this, resolve]() {
             Msg msg = rpc::make_request(Method::AddSequence);
+            LOGI() << "[starscore] audio: asking for a new sequence";
             channel()->send(msg, [this, resolve](const Msg& res) {
                 ONLY_AUDIO_MAIN_THREAD;
                 TrackSequenceId seqId = 0;
                 IF_ASSERT_FAILED(RpcPacker::unpack(res.data, seqId)) {
                     return;
                 }
+                LOGI() << "[starscore] audio: new sequence " << seqId;
                 m_sequenceAdded.send(seqId);
                 (void)resolve(seqId);
             });
@@ -142,6 +144,7 @@ Promise<TrackSequenceId> Playback::addSequence()
         if (startAudioController()->isAudioStarted()) {
             sendAddSequence();
         } else {
+            LOGI() << "[starscore] audio: a new sequence waits for the audio to start";
             m_pendingAddSequences.push_back(sendAddSequence);
             startAudioController()->isAudioStartedChanged().onReceive(this, [this](bool arg) {
                 LOGD() << "isAudioStartedChanged: " << arg;
