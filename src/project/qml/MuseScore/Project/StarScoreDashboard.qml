@@ -284,6 +284,8 @@ Rectangle {
                                     Layout.fillWidth: true
                                     visible: songCard.modelData.facts !== ""
                                     horizontalAlignment: Text.AlignLeft
+                                    wrapMode: Text.Wrap
+                                    maximumLineCount: 2
                                     elide: Text.ElideRight
                                     text: songCard.modelData.facts
                                     opacity: 0.6

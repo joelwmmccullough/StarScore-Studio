@@ -9,7 +9,10 @@
 
 #include <QStringList>
 
+#include "engraving/dom/harmony.h"
 #include "engraving/dom/masterscore.h"
+#include "engraving/dom/pitchspelling.h"
+#include "engraving/dom/segment.h"
 #include "engraving/dom/repeatlist.h"
 #include "engraving/dom/sig.h"
 #include "engraving/dom/staff.h"
@@ -77,9 +80,35 @@ SongFacts songFacts(MasterScore* ms)
     const Fraction start = Fraction(0, 1);
     if (ms->nstaves() > 0) {
         const KeySigEvent ev = ms->staff(0)->keySigEvent(start);
-        f.key = keyName(int(ev.concertKey()), ev.mode() == KeyMode::MINOR || ev.mode() == KeyMode::AEOLIAN);
+        const int fifths = int(ev.concertKey());
+        bool minor = ev.mode() == KeyMode::MINOR || ev.mode() == KeyMode::AEOLIAN;
+        if (ev.mode() == KeyMode::UNKNOWN || ev.mode() == KeyMode::NONE) {
+            // (most key signatures don't say: a song whose first chord symbol is the relative minor's minor chord is
+            // taken to be in the minor key, "A minor" for a song with no sharps or flats starting on Am)
+            for (Segment* seg = ms->firstSegment(SegmentType::ChordRest); seg; seg = seg->next1(SegmentType::ChordRest)) {
+                const Harmony* h = nullptr;
+                for (EngravingItem* a : seg->annotations()) {
+                    if (a && a->isHarmony()) {
+                        h = toHarmony(a);
+                        break;
+                    }
+                }
+                if (!h || h->chords().empty()) {
+                    continue;
+                }
+                const int root = h->chords().front()->rootTpc();
+                const QString suffix = h->chords().front()->textName().toQString();
+                const int majorTonic = ((7 * fifths) % 12 + 12) % 12;
+                const int minorTonic = (majorTonic + 9) % 12;
+                const bool minorChord = (suffix.startsWith('m') && !suffix.startsWith("ma") && !suffix.startsWith("mix"))
+                                        || suffix.startsWith('-') || suffix.startsWith("min");
+                minor = root != Tpc::TPC_INVALID && (tpc2pitch(root) % 12 + 12) % 12 == minorTonic && minorChord;
+                break;
+            }
+        }
+        f.key = keyName(fifths, minor);
     }
-    const TimeSigFrac ts = ms->sigmap()->timesig(0).timesig();
+    const TimeSigFrac ts = ms->sigmap()->timesig(0).nominal();   // (the written one, not a pickup's length)
     if (ts.numerator() > 0) {
         f.timeSig = QString("%1/%2").arg(ts.numerator()).arg(ts.denominator());
     }

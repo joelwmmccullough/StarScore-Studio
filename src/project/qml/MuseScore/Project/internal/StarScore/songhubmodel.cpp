@@ -6,6 +6,7 @@
 #include "songhubmodel.h"
 
 #include <algorithm>
+#include <functional>
 #include <map>
 #include <memory>
 #include <set>
@@ -124,10 +125,16 @@ void SongHubModel::load()
                 practice(arg);
             } else if (kind == "todo") {
                 openPanel("todo");
-            } else if (kind == "demo") {   // (stays on the page)
-                if (arg.toInt() < m_demos.size()) {
-                    playDemo(m_demos.at(arg.toInt()).toMap().value("path").toString());
-                }
+            } else if (kind == "demo") {   // (stays on the page; the demos are read on another thread: waited for)
+                auto tryPlay = std::make_shared<std::function<void(int)> >();
+                *tryPlay = [this, arg, tryPlay](int left) {
+                    if (arg.toInt() < m_demos.size()) {
+                        playDemo(m_demos.at(arg.toInt()).toMap().value("path").toString());
+                    } else if (left > 0) {
+                        QTimer::singleShot(500, this, [tryPlay, left]() { (*tryPlay)(left - 1); });
+                    }
+                };
+                (*tryPlay)(20);
             } else {
                 openScore();
             }
