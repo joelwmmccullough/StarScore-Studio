@@ -12,7 +12,9 @@
 #include <QPainterPath>
 #include <QFontMetricsF>
 
+#include "engraving/dom/chord.h"
 #include "engraving/dom/chordrest.h"
+#include "engraving/dom/note.h"
 #include "engraving/dom/score.h"
 
 
@@ -154,6 +156,10 @@ void FallingNotesView::onFrame()
         const double dt = std::min<qint64>(m_waitTick.restart(), 100) / 1000.0;
         const bool wasHolding = m_wait.holding();
         m_wait.advance(dt);
+        const std::vector<size_t> due = m_wait.takeOthersDue();
+        if (m_waitAccompany) {
+            playOthers(due);
+        }
         if (m_wait.holding() != wasHolding) {
             updateWaitStatus();
             if (m_wait.holding()) {
@@ -181,6 +187,44 @@ void FallingNotesView::showNextInScore()
     mu::engraving::ChordRest* cr = score->findCR(mu::engraving::Fraction::fromTicks(m_wait.nextTick()), m_wait.nextTrack());
     if (cr && cr->tick().ticks() == m_wait.nextTick()) {
         playbackController()->seekElement(cr, false);
+    }
+}
+
+void FallingNotesView::setWaitAccompany(bool on)
+{
+    if (on != m_waitAccompany) {
+        m_waitAccompany = on;
+        emit waitChanged();
+    }
+}
+
+void FallingNotesView::playOthers(const std::vector<size_t>& noteIndexes)
+{
+    if (noteIndexes.empty() || !m_notation || !m_notation->elements() || !playbackController()) {
+        return;
+    }
+    mu::engraving::Score* score = m_notation->elements()->msScore();
+    if (!score) {
+        return;
+    }
+    for (size_t i : noteIndexes) {
+        if (i >= m_notes.size() || m_notes[i].noteIdx < 0) {
+            continue;   // (grace notes: left out)
+        }
+        const FallNote& n = m_notes[i];
+        mu::engraving::ChordRest* cr = score->findCR(mu::engraving::Fraction::fromTicks(n.tick), n.track);
+        if (!cr || !cr->isChord() || cr->tick().ticks() != n.tick) {
+            continue;
+        }
+        const mu::engraving::Chord* chord = mu::engraving::toChord(cr);
+        if (n.noteIdx >= int(chord->notes().size())) {
+            continue;
+        }
+        mu::playback::IPlaybackController::PlayParams params;
+        params.flushSound = false;
+        params.duration = muse::mpe::duration_t(std::max(0.05, n.end - n.start) * 1000000.0);
+        const std::vector<const mu::engraving::EngravingItem*> notes { chord->notes()[n.noteIdx] };
+        playbackController()->playElements(notes, params, false);
     }
 }
 

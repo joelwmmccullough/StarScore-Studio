@@ -60,13 +60,15 @@ std::vector<WatchNote> watchNotes(const mu::notation::INotationPtr& notation, QS
                     const int chordTick = chord->tick().ticks();
                     const int chordTrack = int(chord->track());
                     auto add = [&](Chord* c, int startTick) {
-                        for (Note* n : c->notes()) {
+                        for (size_t ni = 0; ni < c->notes().size(); ++ni) {
+                            Note* n = c->notes()[ni];
                             if (n->tieBack() || !n->play()) {
                                 continue;   // (a tied note sounds from the first of its chain)
                             }
                             const int from = startTick + offset;
                             const int to = from + std::max(1, n->playTicks());
-                            out.push_back({ ms->utick2utime(from), ms->utick2utime(to), n->ppitch(), hand, chordTick, chordTrack });
+                            out.push_back({ ms->utick2utime(from), ms->utick2utime(to), n->ppitch(), hand, chordTick, chordTrack,
+                                             c == chord ? int(ni) : -1 });
                         }
                     };
                     // grace notes before the beat, briefly
@@ -86,10 +88,13 @@ void WaitFollower::setNotes(const std::vector<WatchNote>& notes, int hands)
 {
     m_hands = hands;
     m_groups.clear();
+    m_others.clear();
     m_end = 0;
-    for (const WatchNote& n : notes) {   // (by start)
+    for (size_t i = 0; i < notes.size(); ++i) {   // (by start)
+        const WatchNote& n = notes[i];
         m_end = std::max(m_end, n.end);
         if (!waitsFor(n)) {
+            m_others.push_back({ n.start, i });
             continue;
         }
         if (m_groups.empty() || n.start - m_groups.back().start > CHORD) {
@@ -118,6 +123,8 @@ void WaitFollower::seek(double from)
                               [](const Group& g, double v) { return g.start < v; }) - m_groups.begin();
     m_hit.fill(false);
     m_wrong.fill(false);
+    m_nextOther = std::lower_bound(m_others.begin(), m_others.end(), from - 0.005,
+                                   [](const std::pair<double, size_t>& o, double v) { return o.first < v; }) - m_others.begin();
     advance(0);
 }
 
@@ -137,6 +144,22 @@ void WaitFollower::advance(double secs)
 std::vector<int> WaitFollower::waitingFor() const
 {
     return finished() ? std::vector<int>() : m_groups[m_next].pitches;
+}
+
+std::vector<size_t> WaitFollower::takeOthersDue()
+{
+    std::vector<size_t> due;
+    while (m_nextOther < m_others.size()) {
+        const double start = m_others[m_nextOther].first;
+        // while stopped, the notes starting with the ones waited for wait too
+        const bool reached = m_holding ? start < m_clock - CHORD : start <= m_clock;
+        if (!reached) {
+            break;
+        }
+        due.push_back(m_others[m_nextOther].second);
+        ++m_nextOther;
+    }
+    return due;
 }
 
 bool WaitFollower::expected(int pitch) const

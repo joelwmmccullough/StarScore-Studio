@@ -4,6 +4,11 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.27.3
+
+- **Practice › Watch › Wait for me plays the other hand.** With Right hand or Left hand chosen, StarScore plays the other hand's notes as they come, so you hear the whole piece while practising one hand. Turn off "Play the other hand" to practise in silence. Notes that start together with the ones you're waiting on sound once you've played them.
+- **A cross-staff tuplet's number stays centred where it can.** When its usual side is blocked, the number now tries the other side of the beam, still centred over the tuplet, before it moves along the beam.
+
 ## 1.27.2
 
 - **Practice › Watch: Wait for me.** Play along on a MIDI keyboard: turn on the keyboard button next to Play, and the falling notes stop at each note until you play it, the way Synthesia's wait mode works. Choose Both hands, Right hand or Left hand; the other hand's notes still fall, faintly, and don't wait. The keys to play light up faintly, a key you hold lights in its note's colour, and a wrong key lights red. A note played a moment early counts. The top of the view shows the bar you're in and how many notes you've played right and wrong. It starts from where playback is, and the score's playback line moves to each note it waits for; ◀◀ starts again from the beginning. The speed slider sets how fast the notes come between stops. While it's on, the MIDI keyboard doesn't write notes into the score. Choose your keyboard in Preferences › Audio & MIDI.

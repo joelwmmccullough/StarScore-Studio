@@ -22,6 +22,7 @@ struct WatchNote {
     int hand = 0;       // the staff in its part: 0 the right hand (or the only staff), 1 the left, 2 any after those
     int tick = 0;       // (1.27.2) where its chord is in the score (not played out), and on which track
     int track = 0;
+    int noteIdx = -1;   // (1.27.3) which note of its chord (< 0: a grace note), for playing it
 };
 
 //! (1.27.2) where a bar starts, for the falling notes' bar lines
@@ -70,6 +71,10 @@ public:
     int rightCount() const { return m_right; }
     int wrongCount() const { return m_wrongCount; }
     double end() const { return m_end; }
+    //! (1.27.3) the notes of the hands not waited for that the clock has reached since the last call (indexes into the
+    //! notes given to setNotes), for StarScore to play them: notes starting with the next notes waited for come once
+    //! those are played
+    std::vector<size_t> takeOthersDue();
 
     static constexpr double EARLY = 0.6;
     static constexpr double CHORD = 0.04;   // notes starting this close together are played together
@@ -84,6 +89,8 @@ private:
     void checkDone();
 
     std::vector<Group> m_groups;
+    std::vector<std::pair<double, size_t> > m_others;   // (start, index) of the notes not waited for
+    size_t m_nextOther = 0;
     size_t m_next = 0;
     int m_hands = 7;
     double m_clock = 0;

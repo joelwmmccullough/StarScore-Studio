@@ -3917,7 +3917,7 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         w.advance(1.0);
         autotestLog(QString("  after a wrong key and a second: %1 s, holding %2, wrong %3").arg(w.clock(), 0, 'f', 3).arg(w.holding()).arg(w.wrongCount()));
         // play it all: each time it stops, press its keys (half the time a little early, before it stops)
-        int groups = 0, early = 0;
+        int groups = 0, early = 0, others = 0, lateOthers = 0;
         double lastClock = -1;
         bool stuck = false;
         for (int guard = 0; guard < 200000 && !w.finished(); ++guard) {
@@ -3938,6 +3938,10 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
                 }
             }
             w.advance(0.01);
+            for (size_t idx : w.takeOthersDue()) {
+                others += 1;
+                lateOthers += notes[idx].start < w.clock() - 0.05 ? 1 : 0;
+            }
             if (w.clock() < lastClock - 1e-9) {
                 stuck = true;
             }
@@ -3946,6 +3950,7 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         autotestLog(QString("  played %1 chords (%2 early), right %3, wrong %4, finished %5, clock %6 s of %7 s, backwards %8")
                     .arg(groups).arg(early).arg(w.rightCount()).arg(w.wrongCount()).arg(w.finished())
                     .arg(w.clock(), 0, 'f', 2).arg(w.end(), 0, 'f', 2).arg(stuck));
+        autotestLog(QString("  the other hand: %1 notes played (%2 more than 0.05 s late)").arg(others).arg(lateOthers));
     } else if (step == "filesave") {
         // filesave: File › Save, in place (a .starscore keeps its solos and reference PDFs)
         dispatcher()->dispatch("file-save");

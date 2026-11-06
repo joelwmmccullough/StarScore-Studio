@@ -121,6 +121,12 @@ Item {
                     currentIndex: indexOfValue(fall.waitHands)
                     onActivated: function(index, value) { fall.waitHands = value }
                 }
+                CheckBox {
+                    visible: fall.waitMode && fall.waitHands !== "both"
+                    text: qsTrc("starscore", "Play the other hand")
+                    checked: fall.waitAccompany
+                    onClicked: fall.waitAccompany = !checked
+                }
                 FlatToggleButton {
                     icon: IconCode.LOOP
                     checked: practice.loop

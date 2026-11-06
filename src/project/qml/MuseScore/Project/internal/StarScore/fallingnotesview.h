@@ -43,6 +43,8 @@ class FallingNotesView : public QQuickPaintedItem, public muse::Contextable, pub
     //! "both", "right" or "left" (the left hand: the second staff and any after it)
     Q_PROPERTY(QString waitHands READ waitHands WRITE setWaitHands NOTIFY waitChanged)
     Q_PROPERTY(QString waitStatus READ waitStatus NOTIFY waitChanged)
+    //! (1.27.3) while one hand is waited for, StarScore plays the other hand's notes as they come
+    Q_PROPERTY(bool waitAccompany READ waitAccompany WRITE setWaitAccompany NOTIFY waitChanged)
     Q_PROPERTY(bool midiConnected READ midiConnected NOTIFY waitChanged)
 
     QML_ELEMENT
@@ -71,6 +73,8 @@ public:
     QString waitHands() const { return m_waitHands; }
     void setWaitHands(const QString& h);
     QString waitStatus() const { return m_waitStatus; }
+    bool waitAccompany() const { return m_waitAccompany; }
+    void setWaitAccompany(bool on);
     bool midiConnected() const;
 
     Q_INVOKABLE void reload();
@@ -95,6 +99,7 @@ private:
     int waitHandsMask() const;
     void updateWaitStatus();
     void showNextInScore();
+    void playOthers(const std::vector<size_t>& noteIndexes);
     QColor keyColor(int key, bool down, const QColor& noteColor) const;
 
     std::vector<FallNote> m_notes;
@@ -116,6 +121,7 @@ private:
 
     bool m_waitMode = false;
     QString m_waitHands = "both";
+    bool m_waitAccompany = true;
     QString m_waitStatus;
     starscore::WaitFollower m_wait;
     QElapsedTimer m_waitTick;

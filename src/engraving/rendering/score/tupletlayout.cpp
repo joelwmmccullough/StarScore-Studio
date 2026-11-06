@@ -193,9 +193,9 @@ void TupletLayout::starscorePlaceNumberAtCrossBeam(Tuplet* item, const ChordRest
         above = nearest->isChord() && toChord(nearest)->up();
     }
 
-    // where it can go: that side at the usual distance from the beam, then nearer the beam, then moved along the beam
-    // (by up to half the tuplet's width), then (unless a side was asked for) the same on the other side. The first
-    // place clear of the staves and the notes wins; if none is, the first one.
+    // where it can go: centred over the tuplet, that side at the usual distance from the beam, then nearer the beam,
+    // then (unless a side was asked for) the same on the other side; then the same moved along the beam (by up to half
+    // the tuplet's width). The first place clear of the staves and the notes wins; if none is, the first one.
     const double halfSpan = 0.5 * std::abs(cr2->pagePos().x() - cr1->pagePos().x());
     std::vector<double> shifts { 0.0 };
     for (double d = 0.5 * sp; d <= halfSpan; d += 0.5 * sp) {
@@ -206,11 +206,11 @@ void TupletLayout::starscorePlaceNumberAtCrossBeam(Tuplet* item, const ChordRest
     PointF best;
     bool found = false;
     bool first = true;
-    for (int sideTry = 0; sideTry < (asked ? 1 : 2) && !found; ++sideTry) {
-        const bool up = sideTry == 0 ? above : !above;
-        for (double shift : shifts) {
+    for (size_t si = 0; si < shifts.size() && !found; ++si) {
+        for (int sideTry = 0; sideTry < (asked ? 1 : 2) && !found; ++sideTry) {
+            const bool up = sideTry == 0 ? above : !above;
             for (double g : gaps) {
-                const double cx = midX + shift;
+                const double cx = midX + shifts[si];
                 const double by = beamYAt(cx);
                 const double cy = up ? by - halfBeam - g * sp - 0.5 * nb.height() : by + halfBeam + g * sp + 0.5 * nb.height();
                 const PointF c(cx, cy);
@@ -224,9 +224,6 @@ void TupletLayout::starscorePlaceNumberAtCrossBeam(Tuplet* item, const ChordRest
                     found = true;
                     break;
                 }
-            }
-            if (found) {
-                break;
             }
         }
     }
