@@ -92,6 +92,9 @@ public:
     //! the score's page with one of its panels open ("todo", "reference", "practice", "audit")
     Q_INVOKABLE void openPanel(const QString& which);
     Q_INVOKABLE void setNotes(const QString& text);
+    //! the header's More… menu (1.28.2): the song's tools, Move to (its group in Projects and Sheets), Audit
+    Q_INVOKABLE QVariantList moreMenu() const;
+    Q_INVOKABLE void handleMore(const QString& itemId);
 
     bool hasSong() const { return m_hasSong; }
     bool isStarScore() const { return m_isStarScore; }

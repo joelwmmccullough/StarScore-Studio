@@ -28,6 +28,7 @@
 #include "dockwindow/idockwindow.h"
 #include "engraving/dom/excerpt.h"
 #include "engraving/dom/masterscore.h"
+#include "project/internal/starscore/organizer/orgfiling.h"
 #include "project/internal/starscore/starscorestatus.h"
 #include "translation.h"
 
@@ -485,6 +486,7 @@ void SongHubModel::openPanel(const QString& which)
         { "todo", { "starscoreTodoPanel", "" } },
         { "reference", { "starscoreReferencePanel", "" } },
         { "practice", { "starscorePracticePanel", "" } },
+        { "audit", { "starscoreAuditPanel", "" } },
     };
     const auto it = PANELS.find(which);
     toScore();
@@ -627,6 +629,52 @@ QVariantList SongHubModel::filesIn(const QString& folder) const
                              { "detail", QLocale().toString(fi.lastModified().date(), QLocale::ShortFormat) } };
     }
     return out;
+}
+
+QVariantList SongHubModel::moreMenu() const
+{
+    auto item = [](const QString& id, const QString& title, bool enabled = true) {
+        return QVariantMap { { "id", id }, { "title", title }, { "enabled", enabled } };
+    };
+    QVariantList items;
+    items << item("action:starscore-recordings", muse::qtrc("starscore", "Releases and live takes…"));
+    items << item("action:starscore-export-arrangements", muse::qtrc("starscore", "Export arrangements as MuseScore files…"));
+    items << item("panel:audit", muse::qtrc("starscore", "Audit this song"));
+    items << item("action:starscore-standardize", muse::qtrc("starscore", "Standardize this song…"));
+
+    // where the song is kept in Projects and Sheets (as the StarScore bar's "Move to")
+    const QString group = starScore() ? starScore()->songGroup() : QString();
+    QVariantList moveItems;
+    for (const QString& g : starscore::org::starsignSongGroups()) {
+        const QStringList seg = g.split('/');
+        auto plain = [](QString n) { return n.mid(n.indexOf(' ') + 1); };   // "1 Originals" -> "Originals"
+        moveItems << QVariantMap { { "id", "move:" + g }, { "title", plain(seg.value(1)) + " › " + plain(seg.value(2)) },
+                                   { "checkable", true }, { "checked", g == group }, { "enabled", !group.isEmpty() && g != group } };
+    }
+    QVariantMap move = item("move", muse::qtrc("starscore", "Move to"), !group.isEmpty());
+    move["subitems"] = moveItems;
+    items << move;
+
+    items << item("action:starscore-organize", muse::qtrc("starscore", "Organize Sheets and Demos…"));
+    items << item("action:starscore-band-roster", muse::qtrc("starscore", "Band roster…"));
+    return items;
+}
+
+void SongHubModel::handleMore(const QString& itemId)
+{
+    const QString kind = itemId.section(':', 0, 0);
+    const QString arg = itemId.section(':', 1);
+    if (kind == "action") {
+        dispatch(arg);
+    } else if (kind == "panel") {
+        openPanel(arg);
+    } else if (kind == "move" && starScore()) {
+        const muse::RetVal<QString> r = starScore()->moveSongTo(arg);
+        if (!r.ret && interactive()) {
+            interactive()->error(muse::trc("starscore", "The song wasn't moved"), r.ret.toString());
+        }
+        refresh();
+    }
 }
 
 void SongHubModel::setNotes(const QString& text)
