@@ -27,6 +27,7 @@
 using namespace mu::appshell;
 
 static const QString HOME_PAGE("musescore://home");
+static const QString SONG_PAGE("musescore://song");   // StarScore (1.28.0)
 static const QString NOTATION_PAGE("musescore://notation");
 static const QString NOTATION_REVIEW_PAGE("musescore://notation/review");
 static const QString PUBLISH_PAGE("musescore://publish");
@@ -103,6 +104,7 @@ void MainToolBarModel::load()
 
     m_items.clear();
     m_items << buildItem(muse::qtrc("appshell", "Home"), HOME_PAGE, m_currentUri);
+    m_items << buildItem(muse::qtrc("appshell", "Song"), SONG_PAGE, m_currentUri);
     m_items << buildItem(muse::qtrc("appshell", "Score"), NOTATION_PAGE, m_currentUri);
     m_items << buildItem(muse::qtrc("appshell", "Publish"), PUBLISH_PAGE, m_currentUri);
 
@@ -141,6 +143,12 @@ void MainToolBarModel::updateNotationPageItem()
     for (int i = 0; i < m_items.size(); ++i) {
         QVariantMap& item = m_items[i];
 
+        if (item[URI_KEY].toString() == SONG_PAGE) {
+            item[IS_TITLE_BOLD_KEY] = context()->currentProject() != nullptr;
+            QModelIndex modelIndex = index(i);
+            emit dataChanged(modelIndex, modelIndex, { IsTitleBoldRole });
+            continue;
+        }
         if (isNotationPageUri(item[URI_KEY].toString())) {
             item[URI_KEY] = QString::fromStdString(projectFilesController()->resolveNotationPageUri().toString());
             item[IS_TITLE_BOLD_KEY] = context()->currentProject() != nullptr;

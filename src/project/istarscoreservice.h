@@ -898,6 +898,8 @@ public:
     virtual muse::RetVal<QString> exportTimeVariants(const QStringList& onlyPaths, bool halfTime, bool doubleTime) = 0;
 
     // --- Version number ("Version 4.0.1" in the copyright text, printed at the bottom of every page)
+    //! (1.28.0) the open song's folder in Sheets and Demos ("" when it has none yet), without planning an export
+    virtual QString bandSongFolderPath() const = 0;
     virtual QString scoreVersion() const = 0;                 // from the score, or the starting version for this song
     //! Which number to raise for the next export, from the bar-by-bar signatures kept at the last export of each
     //! sheet. Major: the song's form changed (bar count, rehearsal marks, key or time signatures), the lead sheet

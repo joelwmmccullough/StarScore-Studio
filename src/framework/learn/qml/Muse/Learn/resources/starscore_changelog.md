@@ -4,6 +4,21 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.28.0
+
+- **The Song page.** Opening a song now shows its own page first, with everything you've made for it, instead of going straight into the notation. "Song" sits between Home and Score in the top bar, and Score is the notation as before.
+  - **The song:** its title, code, kind (original, cover, vocal cover), where it is (Repertoire, In Progress, Sketches), version, composer and when it was saved. Buttons: Open the score, Export to Sheets and Demos…, Show in Finder, the song's Sheets and Demos folder, and the Autosave archive.
+  - **Arrangements:** each with its status. Click one to open the score showing that arrangement, or "Score" for the arrangement's own score. The sections are listed below with their statuses.
+  - **Part scores:** click one to open it.
+  - **Practice:** Watch, Jam and Listen open the score with the Practice panel in that mode. The song's solos are listed below; click one to open it.
+  - **Recordings and video** stored in the file: click one to open it in its own app (a Transcribe! file opens pointed at the stored recording). "+ Add" adds more.
+  - **Reference PDFs** stored in the file: click one to see it in the Reference PDF panel beside the score, or open it in another app. "+ Add" adds more.
+  - **Still to do:** what isn't finished yet, from the to-do list. Click a line to open the To-do panel.
+  - **In Sheets and Demos:** the song's folders there, each sheet folder on its own line with how many PDFs it has and when it last changed. Click a folder to list its files (click a file to open it), or the arrow to open the folder.
+  - **Beside this file:** the folders next to the .starscore in Projects and Sheets (Version History, MuseScore Files, a solo's Sheets…), the same way.
+  - A solo transcription shows its keys, coloured by how far you've got with each (learned, memorized).
+  - "Show this page when a song opens" (on the page) turns it off: songs then open straight on the score, as before.
+
 ## 1.27.4
 
 - **Note colors in the status bar.** A "Note colors" checkbox next to Concert pitch shows the note heads in their pitch colours while you write, the same 12 colours as the exported solo sheets (lighter ones on a dark score). The colour follows the pitch shown, so it changes with Concert pitch. It's only on screen: nothing in the file changes, and exports look as before. One setting for every score. (Tools' "Color notes by pitch" still colours the notes in the file itself.)

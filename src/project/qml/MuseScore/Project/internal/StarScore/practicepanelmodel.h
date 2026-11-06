@@ -97,6 +97,8 @@ public:
     void setSecondsShown(double s);
 
     Q_INVOKABLE void load();
+    //! (1.28.0) the Song page's Watch / Jam / Listen: the mode it asked for, once
+    Q_INVOKABLE void takeRequestedMode();
     Q_INVOKABLE void togglePlay();
     Q_INVOKABLE void rewind();
     Q_INVOKABLE void toggleLoop();

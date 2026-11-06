@@ -77,6 +77,7 @@ void AppShellModule::resolveImports()
     auto ir = ioc()->resolve<IInteractiveUriRegister>(moduleName());
     if (ir) {
         ir->registerPageUri(Uri("musescore://home"));
+        ir->registerPageUri(Uri("musescore://song"));   // StarScore (1.28.0)
         ir->registerPageUri(Uri("musescore://notation"));
         ir->registerPageUri(Uri("musescore://notation/review"));
         ir->registerPageUri(Uri("musescore://sequencer"));

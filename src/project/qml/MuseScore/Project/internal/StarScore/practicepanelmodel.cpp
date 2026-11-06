@@ -207,6 +207,18 @@ void PracticePanelModel::saveSettings()
 //  Jam
 // ---------------------------------------------------------------------------------------------------------------------
 
+void PracticePanelModel::takeRequestedMode()
+{
+    QSettings settings;
+    const QString requested = settings.value("StarScore/practice/requestMode").toString();
+    if (!requested.isEmpty()) {
+        settings.remove("StarScore/practice/requestMode");
+        if (requested == "watch" || requested == "jam" || requested == "listen") {
+            setMode(requested);
+        }
+    }
+}
+
 void PracticePanelModel::setMode(const QString& m)
 {
     if (m != m_mode) {

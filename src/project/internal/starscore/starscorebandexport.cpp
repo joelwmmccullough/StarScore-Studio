@@ -844,6 +844,37 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExport() const
     return planBandExportFor(false);
 }
 
+QString StarScoreService::bandSongFolderPath() const
+{
+    INotationProjectPtr project = exportSourceProject();
+    const QString band = bandFolder();
+    if (!project || band.isEmpty()) {
+        return QString();
+    }
+    const std::map<QString, QString> folderToCode = starscoreReadCodes(band);
+    const QString fileBase = QFileInfo(project->path().toQString()).completeBaseName();
+    const QRegularExpressionMatch codeMatch = starscoreCodedNameRe().match(fileBase);
+    const QString codeFromName = codeMatch.hasMatch() ? codeMatch.captured(1) : QString();
+    const QString title = starscoreSongTitle(project);
+    QString folder;
+    for (const auto& [f, code] : folderToCode) {
+        if (!codeFromName.isEmpty() && code == codeFromName) {
+            folder = f;
+            break;
+        }
+    }
+    if (folder.isEmpty()) {
+        for (const auto& [f, code] : folderToCode) {
+            if (starscorePlainFolderName(f) == starscoreSafeFileName(title).toLower()) {
+                folder = f;
+                break;
+            }
+        }
+    }
+    const QString path = folder.isEmpty() ? QString() : QDir::cleanPath(band + "/" + folder);
+    return !path.isEmpty() && QFileInfo(path).isDir() ? path : QString();
+}
+
 //! titlesOnly: for the part scores' titles (labelPartBooks), a song not yet in Sheets and Demos (or with no Sheets
 //! and Demos folder chosen) is planned too, as if it were there under its suggested code (Joel, 20 Oct 2026: a new
 //! song's mutes didn't show on its part scores until its first export)

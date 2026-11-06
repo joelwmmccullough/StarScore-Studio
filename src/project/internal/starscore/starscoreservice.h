@@ -328,6 +328,7 @@ public:
     QStringList bandExportUnticked(const QString& code) const override;
     void setBandExportUnticked(const QString& code, const QStringList& paths) override;
 
+    QString bandSongFolderPath() const override;
     QString scoreVersion() const override;
     StarScoreVersionSuggestion suggestVersionBump(const StarScoreBandExportPlan& plan) const override;
     void setScoreVersion(const QString& version) override;

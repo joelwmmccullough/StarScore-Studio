@@ -33,6 +33,7 @@ import "./HomePage"
 import "./NotationPage"
 import "./NotationReviewPage"
 import "./PublishPage"
+import "./SongPage"
 import "./DevTools"
 
 DockWindow {
@@ -104,6 +105,9 @@ DockWindow {
         HomePage {
             window: root.window
         },
+
+        // StarScore (1.28.0): the open song's page
+        SongPage {},
 
         NotationPage {
             topToolbarKeyNavSec: topToolbarKeyNavSec

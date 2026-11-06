@@ -72,6 +72,8 @@ qt_add_qml_module(project_qml
         internal/StarScore/flexibleviewmodel.cpp
         internal/StarScore/flexibleviewmodel.h
         internal/StarScore/notecolorsviewmodel.cpp
+        internal/StarScore/songhubmodel.cpp
+        internal/StarScore/songhubmodel.h
         internal/StarScore/notecolorsviewmodel.h
         internal/StarScore/songbooksvisibilitymodel.h
         internal/StarScore/starscorestylesmodel.cpp
@@ -219,6 +221,7 @@ qt_add_qml_module(project_qml
         StarScorePracticePanel.qml
         AuditLibraryDialog.qml
         StarScoreDashboard.qml
+        StarScoreSongHub.qml
         StarScoreSongbooks.qml
         StarScorePractice.qml
         PracticeRunnerDialog.qml

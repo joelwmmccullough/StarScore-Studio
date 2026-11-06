@@ -20,6 +20,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include "projectactionscontroller.h"
+
+#include <QSettings>
 #include "starscore/starscorezip.h"
 
 #include "starscore/starscoreengraving.h"
@@ -731,7 +733,18 @@ Ret ProjectActionsController::doFinishOpenProject()
         });
     };
 
-    const Uri notationPageUri = resolveNotationPageUri();
+    Uri notationPageUri = resolveNotationPageUri();
+
+    // StarScore (1.28.0, Joel 5 Nov 2026): a song opens on its Song page (what it has, and a way into each), unless
+    // "Show this page when a song opens" is off there. The autotest stays on the score (unless it asks for the page).
+    {
+        INotationProjectPtr opened = globalContext()->currentProject();
+        const bool starscoreFile = opened && opened->path().toQString().endsWith(".starscore", Qt::CaseInsensitive);
+        const bool autotest = qEnvironmentVariableIsSet("STARSCORE_AUTOTEST") && !qEnvironmentVariableIsSet("STARSCORE_AUTOTEST_SONGPAGE");
+        if (starscoreFile && !autotest && QSettings().value("StarScore/songPage/openHere", true).toBool()) {
+            notationPageUri = Uri("musescore://song");
+        }
+    }
 
     if (interactive()->isOpened(notationPageUri).val) {
         showUpdateNotification();

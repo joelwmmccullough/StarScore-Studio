@@ -29,7 +29,16 @@ Item {
         id: practice
     }
 
-    Component.onCompleted: practice.load()
+    Component.onCompleted: {
+        practice.load()
+        practice.takeRequestedMode()
+    }
+    // (1.28.0) the Song page's Watch / Jam / Listen, when the panel was already open
+    onVisibleChanged: {
+        if (visible) {
+            practice.takeRequestedMode()
+        }
+    }
 
     StyledTextLabel {
         anchors.centerIn: parent

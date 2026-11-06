@@ -82,6 +82,7 @@ qt_add_qml_module(appshell_qml
         platform/PlatformMenuBar.qml
         PublishPage/PublishPage.qml
         PublishPage/PublishToolBar.qml
+        SongPage/SongPage.qml
         WelcomeDialog.qml
         WindowContent.qml
     RESOURCES
