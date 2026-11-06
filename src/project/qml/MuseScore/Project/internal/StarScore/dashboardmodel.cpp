@@ -7,6 +7,7 @@
 
 #include "dockwindow/idockwindow.h"
 #include "project/internal/starscore/organizer/orgfiling.h"
+#include "project/internal/starscore/starscoresongfacts.h"
 
 #include <algorithm>
 #include <map>
@@ -353,7 +354,17 @@ void DashboardModel::rebuild()
             };
         }
         const StarScoreAuditFileSummary& sum = s->summary;
+        // (1.29.0) for the song library: its tags, key/tempo/length, kind and where it is
+        const QString kind = starscore::org::starsignKindOf(s->path);
+        const QString stage = starscore::org::starsignStageOf(s->path);
+        const QString stageName = stage == "repertoire" ? muse::qtrc("starscore", "Repertoire")
+                                  : stage == "sketch" ? muse::qtrc("starscore", "Sketch")
+                                  : stage == "progress" ? muse::qtrc("starscore", "In progress") : QString();
+        const QString kindName = kind == "vocal" ? muse::qtrc("starscore", "Vocal cover")
+                                 : (kind == "cover" || s->cover) ? muse::qtrc("starscore", "Cover") : muse::qtrc("starscore", "Original");
         m_rows << QVariantMap {
+            { "tags", sum.tags }, { "facts", starscore::SongFacts::fromMap(sum.facts).line() },
+            { "kindName", kindName }, { "stage", stage }, { "stageName", stageName }, { "cellCount", cells.size() },
             { "title", s->title }, { "path", s->path }, { "cover", s->cover }, { "legacy", s->legacy }, { "plays", s->plays },
             { "scanned", s->scanned }, { "cells", cells }, { "done", doneHere }, { "openIssues", sum.openIssues },
             { "likely", sum.likelyErrors },
@@ -448,6 +459,12 @@ void DashboardModel::rebuild()
 void DashboardModel::openSong(const QString& path, bool withAudit)
 {
     if (path.isEmpty()) {
+        return;
+    }
+    // (1.29.0) the song open already: its Song page (from the library; the audit's own opens go to the score)
+    if (!withAudit && starScore() && QFileInfo(starScore()->mainProjectPath().toQString()).absoluteFilePath()
+        == QFileInfo(path).absoluteFilePath()) {
+        interactive()->open(muse::Uri("musescore://song"));
         return;
     }
     auto d = dispatcher();

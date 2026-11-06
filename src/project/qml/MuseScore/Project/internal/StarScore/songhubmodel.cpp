@@ -11,6 +11,9 @@
 #include <set>
 
 #include <QCoreApplication>
+#include <QCryptographicHash>
+#include <QJsonDocument>
+#include <QStandardPaths>
 #include <QDateTime>
 #include <QPointer>
 #include <QThreadPool>
@@ -30,6 +33,9 @@
 #include "engraving/dom/masterscore.h"
 #include "project/internal/starscore/organizer/orgfiling.h"
 #include "project/internal/starscore/starscorestatus.h"
+#include "project/internal/starscore/starscorepdf.h"
+#include "project/internal/starscore/starscoresongfacts.h"
+#include "starscoresongs.h"
 #include "translation.h"
 
 using namespace mu::project;
@@ -40,6 +46,13 @@ static const char* PRACTICE_MODE_REQUEST = "StarScore/practice/requestMode";
 SongHubModel::SongHubModel(QObject* parent)
     : QObject(parent), muse::Contextable(muse::iocCtxForQmlObject(this))
 {
+}
+
+SongHubModel::~SongHubModel()
+{
+    if (m_player) {
+        m_player->stop();   // (a demo stops when the page closes)
+    }
 }
 
 bool SongHubModel::openSongsHere()
@@ -351,6 +364,37 @@ void SongHubModel::refresh()
     // --- the song's folder in Sheets and Demos: its folders, and the sheet folders inside Sheet Music
     m_songFolder = ss->bandSongFolderPath();
     m_notes = ss->songNotes();
+    m_tags = ss->songTags();
+    m_musicFacts = starscore::SongFacts::fromMap(ss->songFacts()).line();
+
+    // (1.29.0) the songbooks it's in: the albums of Home › Songbooks whose tracklist has it
+    m_songbooks.clear();
+    {
+        const QJsonObject saved = QJsonDocument::fromJson(QSettings().value("StarScore/songbook/albums").toByteArray()).object();
+        std::vector<std::pair<QString, QStringList> > albums;
+        for (const QJsonValue& v : saved.value("order").toArray()) {
+            QStringList songs;
+            for (const QJsonValue& t : saved.value("albums").toObject().value(v.toString()).toArray()) {
+                songs << t.toString();
+            }
+            albums.push_back({ v.toString(), songs });
+        }
+        if (albums.empty()) {   // (Songbooks' own starting lists, before any are saved)
+            albums.push_back({ "Ichiban", { "Seagrass", "Fish Oil", "Cumulonimbus", "Deimos", "Shatter", "Amplitudes", "Royal",
+                                            "Deep Speech", "Last Pint", "Okane" } });
+            albums.push_back({ "Feed Your Kids Bugs", { "Double Entendre", "Feed Your Kids Bugs", "Everpresent", "Branston Pickle",
+                                                        "February", "Hit List", "Dream of Mushroom", "Updog" } });
+        }
+        const QString me = starscoresongs::normalName(m_title);
+        for (const auto& [album, songs] : albums) {
+            for (int i = 0; i < songs.size(); ++i) {
+                if (starscoresongs::normalName(songs.at(i)) == me) {
+                    m_songbooks << QVariantMap { { "album", album }, { "track", i + 1 }, { "tracks", songs.size() } };
+                    break;
+                }
+            }
+        }
+    }
 
     // --- the folders (in Sheets and Demos, and beside the file) are read on another thread: Sheets and Demos is on
     // Google Drive, where reading every file in Version History can take a while. They fill in when ready.
@@ -381,6 +425,19 @@ void SongHubModel::refresh()
                 band << entry;
             }
         }
+        // (1.29.0) the demos: the audio files in the song's Demos folder, newest first
+        QVariantList demos;
+        if (!songFolder.isEmpty()) {
+            static const QStringList AUDIO { "*.wav", "*.mp3", "*.aif", "*.aiff", "*.m4a", "*.flac", "*.caf" };
+            QFileInfoList files = QDir(songFolder + "/Demos").entryInfoList(AUDIO, QDir::Files, QDir::Time);
+            for (const QFileInfo& f : files) {
+                if (f.fileName().startsWith('.')) {
+                    continue;
+                }
+                demos << QVariantMap { { "name", f.completeBaseName() }, { "path", f.filePath() },
+                                       { "detail", QLocale().toString(f.lastModified().date(), QLocale::ShortFormat) } };
+            }
+        }
         // beside the file in Projects and Sheets (Version History, a solo's Sheets, MuseScore Files, …)
         QVariantList local;
         for (const QFileInfo& d : QDir(fileFolder).entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
@@ -388,10 +445,11 @@ void SongHubModel::refresh()
                 local << folderEntry(d.fileName(), d.filePath());
             }
         }
-        QMetaObject::invokeMethod(qApp, [self, band, local, generation]() {
+        QMetaObject::invokeMethod(qApp, [self, band, local, demos, generation]() {
             if (self && self->m_generation == generation) {
                 self->m_bandFolders = band;
                 self->m_localFolders = local;
+                self->m_demos = demos;
                 self->m_foldersReady = true;
                 emit self->changed();
             }
@@ -674,6 +732,139 @@ void SongHubModel::handleMore(const QString& itemId)
             interactive()->error(muse::trc("starscore", "The song wasn't moved"), r.ret.toString());
         }
         refresh();
+    }
+}
+
+void SongHubModel::addTag(const QString& tag)
+{
+    const QString t = tag.simplified();
+    if (!starScore() || t.isEmpty() || m_tags.contains(t, Qt::CaseInsensitive)) {
+        return;
+    }
+    QStringList tags = m_tags;
+    tags << t;
+    starScore()->setSongTags(tags);
+    refresh();
+}
+
+void SongHubModel::removeTag(const QString& tag)
+{
+    if (!starScore()) {
+        return;
+    }
+    QStringList tags = m_tags;
+    tags.removeAll(tag);
+    starScore()->setSongTags(tags);
+    refresh();
+}
+
+void SongHubModel::playDemo(const QString& path)
+{
+    if (m_player && m_demoPlaying == path) {
+        stopDemo();
+        return;
+    }
+    if (!m_player) {
+        m_player = std::make_unique<starscore::ListenPlayer>(iocContext());
+        connect(m_player.get(), &starscore::ListenPlayer::readyChanged, this, [this]() {
+            if (!m_player->isReady()) {
+                return;
+            }
+            if (!m_player->errors().isEmpty() && interactive()) {
+                interactive()->error(muse::trc("starscore", "Couldn't play the demo"), m_player->errors().join("\n").toStdString());
+                m_demoPlaying.clear();
+                emit demoChanged();
+                return;
+            }
+            m_player->setHeard({ "demo" });
+            m_player->play();
+            emit demoChanged();
+        });
+        connect(m_player.get(), &starscore::ListenPlayer::positionChanged, this, [this]() { emit demoChanged(); });
+        connect(m_player.get(), &starscore::ListenPlayer::playingChanged, this, [this]() {
+            // (played to the end: back to the start, stopped)
+            if (m_player && !m_player->isPlaying() && m_player->length() > 0 && m_player->position() >= m_player->length() - 0.05) {
+                m_demoPlaying.clear();
+            }
+            emit demoChanged();
+        });
+    }
+    m_player->stop();
+    m_demoPlaying = path;
+    emit demoChanged();
+    m_player->load({ starscore::ListenStem { "demo", QFileInfo(path).completeBaseName(), "full", path } });
+}
+
+void SongHubModel::stopDemo()
+{
+    if (m_player) {
+        m_player->stop();
+    }
+    m_demoPlaying.clear();
+    emit demoChanged();
+}
+
+void SongHubModel::seekDemo(double fraction)
+{
+    if (m_player && m_player->length() > 0) {
+        m_player->seek(std::clamp(fraction, 0.0, 1.0) * m_player->length());
+        emit demoChanged();
+    }
+}
+
+QString SongHubModel::demoPosition() const
+{
+    if (!m_player || m_demoPlaying.isEmpty()) {
+        return QString();
+    }
+    auto mmss = [](double s) {
+        const int t = int(std::max(0.0, s));
+        return QString("%1:%2").arg(t / 60).arg(t % 60, 2, 10, QChar('0'));
+    };
+    return m_player->isReady() ? mmss(m_player->position()) + " / " + mmss(m_player->length()) : muse::qtrc("starscore", "Loading…");
+}
+
+double SongHubModel::demoProgress() const
+{
+    return m_player && m_player->length() > 0 ? std::clamp(m_player->position() / m_player->length(), 0.0, 1.0) : 0.0;
+}
+
+QString SongHubModel::thumbnail(const QString& pdfPath)
+{
+    const QFileInfo fi(pdfPath);
+    if (!fi.exists() || fi.suffix().compare("pdf", Qt::CaseInsensitive) != 0) {
+        return QString();
+    }
+    // cached by the file and when it changed
+    const QString dir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/StarScore Sheet Pictures";
+    const QByteArray key = (fi.absoluteFilePath() + "|" + QString::number(fi.lastModified().toMSecsSinceEpoch())).toUtf8();
+    const QString png = dir + "/" + QString::fromLatin1(QCryptographicHash::hash(key, QCryptographicHash::Md5).toHex()) + ".png";
+    if (QFileInfo::exists(png)) {
+        return QUrl::fromLocalFile(png).toString();
+    }
+    if (m_thumbsPending.count(png)) {
+        return QString();
+    }
+    m_thumbsPending.insert(png);
+    QDir().mkpath(dir);
+    QPointer<SongHubModel> self(this);
+    const QString pdf = fi.absoluteFilePath();
+    QThreadPool::globalInstance()->start([self, pdf, png]() {
+        const bool ok = starscore::renderPdfPageToPng(pdf, 0, 360, png, false);
+        QMetaObject::invokeMethod(qApp, [self, ok]() {
+            if (self && ok) {
+                ++self->m_thumbRevision;
+                emit self->thumbsChanged();
+            }
+        }, Qt::QueuedConnection);
+    });
+    return QString();
+}
+
+void SongHubModel::openSongbooks()
+{
+    if (interactive()) {
+        interactive()->open(muse::UriQuery("musescore://home?section=songbooks"));
     }
 }
 

@@ -206,6 +206,67 @@ Rectangle {
                     horizontalAlignment: Text.AlignLeft
                     wrapMode: Text.WordWrap
                 }
+                // (1.29.0) key, time signature, tempo, bars, length
+                StyledTextLabel {
+                    Layout.fillWidth: true
+                    visible: hub.musicFacts !== ""
+                    text: hub.musicFacts
+                    opacity: 0.75
+                    horizontalAlignment: Text.AlignLeft
+                    wrapMode: Text.WordWrap
+                }
+                // (1.29.0) tags: click × to take one off; type one and press Enter to add it
+                Flow {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 2
+                    spacing: 6
+                    visible: hub.isStarScore
+
+                    Repeater {
+                        model: hub.tags
+                        delegate: Rectangle {
+                            required property string modelData
+                            height: 24
+                            width: tagRow.implicitWidth + 16
+                            radius: 12
+                            color: ui.theme.buttonColor
+                            Row {
+                                id: tagRow
+                                anchors.centerIn: parent
+                                spacing: 6
+                                StyledTextLabel {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: modelData
+                                }
+                                StyledTextLabel {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: "×"
+                                    opacity: tagX.containsMouse ? 1.0 : 0.5
+                                    MouseArea {
+                                        id: tagX
+                                        anchors.fill: parent
+                                        anchors.margins: -4
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: hub.removeTag(modelData)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    TextInputField {
+                        id: tagInput
+                        width: 140
+                        height: 24
+                        hint: qsTrc("starscore", "+ Add a tag")
+                        onTextEditingFinished: function(newText) {
+                            if (newText.trim() !== "") {
+                                hub.addTag(newText)
+                                tagInput.clear()
+                            }
+                        }
+                    }
+                }
                 Flow {
                     Layout.fillWidth: true
                     Layout.topMargin: 6
@@ -499,6 +560,77 @@ Rectangle {
                         }
                     }
 
+                    // ---------------- demos (1.29.0) ----------------
+                    Card {
+                        visible: hub.isStarScore && !hub.isSoloFile && hub.demos.length > 0
+                        title: qsTrc("starscore", "Demos")
+                        subtitle: qsTrc("starscore", "in Sheets and Demos")
+
+                        Repeater {
+                            model: hub.demos
+                            delegate: ColumnLayout {
+                                required property var modelData
+                                readonly property bool playing: hub.demoPlaying === modelData.path
+                                Layout.fillWidth: true
+                                spacing: 0
+                                HubRow {
+                                    text: (playing ? "■  " : "▶  ") + modelData.name
+                                    detail: playing ? hub.demoPosition : modelData.detail
+                                    bold: playing
+                                    onClicked: hub.playDemo(modelData.path)
+                                    buttons: FlatButton {
+                                        icon: IconCode.OPEN_FILE
+                                        toolTipTitle: qsTrc("starscore", "Open in another app")
+                                        onClicked: hub.openPath(modelData.path)
+                                    }
+                                }
+                                // where it is; click to go there
+                                Rectangle {
+                                    visible: playing
+                                    Layout.fillWidth: true
+                                    Layout.leftMargin: 8
+                                    Layout.rightMargin: 8
+                                    Layout.bottomMargin: 4
+                                    height: 6
+                                    radius: 3
+                                    color: ui.theme.strokeColor
+                                    Rectangle {
+                                        width: parent.width * hub.demoProgress
+                                        height: parent.height
+                                        radius: 3
+                                        color: ui.theme.accentColor
+                                    }
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        anchors.margins: -6
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: function(mouse) { hub.seekDemo((mouse.x - 6) / Math.max(1, width - 12)) }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // ---------------- songbooks (1.29.0) ----------------
+                    SongbooksVisibilityModel {
+                        id: songbooksShown
+                    }
+                    Card {
+                        visible: hub.isStarScore && !hub.isSoloFile && songbooksShown.shown && hub.songbooks.length > 0
+                        title: qsTrc("starscore", "Songbooks")
+                        subtitle: qsTrc("starscore", "the albums it's on")
+
+                        Repeater {
+                            model: hub.songbooks
+                            delegate: HubRow {
+                                required property var modelData
+                                text: modelData.album
+                                detail: qsTrc("starscore", "track %1 of %2").arg(modelData.track).arg(modelData.tracks)
+                                onClicked: hub.openSongbooks()
+                            }
+                        }
+                    }
+
                     // ---------------- releases and live performances ----------------
                     Card {
                         visible: hub.isStarScore && !hub.isSoloFile
@@ -722,8 +854,74 @@ Rectangle {
                 onClicked: folderRow.hubModel.openPath(folderRow.modelData.path)
             }
         }
+        // (1.29.0) the PDFs as pictures of their first page (a plain card where there's no picture yet), click to open
+        Flow {
+            Layout.fillWidth: true
+            Layout.leftMargin: 22
+            Layout.topMargin: 4
+            Layout.bottomMargin: 4
+            spacing: 10
+            visible: folderRow.expanded && pdfRepeater.count > 0
+
+            Repeater {
+                id: pdfRepeater
+                model: folderRow.expanded ? folderRow.files.filter(function(f) { return f.path.toLowerCase().endsWith(".pdf") }) : []
+                delegate: Item {
+                    id: tile
+                    required property var modelData
+                    readonly property string picture: folderRow.hubModel.thumbRevision >= 0 ? folderRow.hubModel.thumbnail(modelData.path) : ""
+                    width: 128
+                    height: 196
+
+                    Rectangle {
+                        id: page
+                        width: 128
+                        height: 166
+                        color: "#FFFFFF"
+                        border.color: tileMouse.containsMouse ? ui.theme.accentColor : ui.theme.strokeColor
+                        border.width: tileMouse.containsMouse ? 2 : 1
+
+                        Image {
+                            anchors.fill: parent
+                            anchors.margins: 1
+                            source: tile.picture
+                            fillMode: Image.PreserveAspectFit
+                            asynchronous: true
+                            visible: tile.picture !== ""
+                        }
+                        StyledTextLabel {
+                            anchors.centerIn: parent
+                            visible: tile.picture === ""
+                            text: "PDF"
+                            color: "#888888"
+                        }
+                    }
+                    StyledTextLabel {
+                        anchors.top: page.bottom
+                        anchors.topMargin: 4
+                        width: parent.width
+                        text: tile.modelData.name.replace(/^.*\//, "").replace(/\.pdf$/i, "")
+                        font: ui.theme.bodyFont
+                        horizontalAlignment: Text.AlignHCenter
+                        elide: Text.ElideMiddle
+                        maximumLineCount: 2
+                        wrapMode: Text.Wrap
+                    }
+                    MouseArea {
+                        id: tileMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: folderRow.hubModel.openPath(tile.modelData.path)
+                    }
+                    ToolTip.visible: tileMouse.containsMouse
+                    ToolTip.delay: 600
+                    ToolTip.text: tile.modelData.name + " · " + tile.modelData.detail
+                }
+            }
+        }
         Repeater {
-            model: folderRow.expanded ? folderRow.files : []
+            model: folderRow.expanded ? folderRow.files.filter(function(f) { return !f.path.toLowerCase().endsWith(".pdf") }) : []
             delegate: HubRow {
                 required property var modelData
                 Layout.leftMargin: 22

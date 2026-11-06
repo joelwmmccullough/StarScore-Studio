@@ -15,6 +15,7 @@
  * plus the listen-through (each horn section at each rehearsal mark) and the library scan.
  */
 #include "starscoreservice.h"
+#include "starscoresongfacts.h"
 #include "organizer/orgfiling.h"
 #include "starscorestatus.h"
 
@@ -1875,8 +1876,9 @@ static void auditUpdateCache(const QString& path, const QJsonObject& entry)
 
 // Bumped whenever a cached summary would be read differently; entries with another version are audited again
 // (3: the dashboard's arrangement list, 1.8.0; 4: the reference check removed, 1.10.0; 5: Finished = audited, 1.18.14;
-// 6: "Written, unformatted" added as status 3, 1.18.38 — version 5 entries are read with their statuses moved up)
-static const int AUDIT_CACHE_VERSION = 6;
+// 6: "Written, unformatted" added as status 3, 1.18.38 — version 5 entries are read with their statuses moved up;
+// 7: the song's tags and facts for the song library, 1.29.0)
+static const int AUDIT_CACHE_VERSION = 7;
 
 //! A status number read from the cache: before version 6, 3 was Needs review and 4 Finished
 static int auditCachedStatus(const QJsonObject& entry, int status)
@@ -1903,7 +1905,8 @@ static QJsonObject auditSummaryToJson(const StarScoreAuditFileSummary& s)
         { "secStatus", secStatus },
         { "title", s.title }, { "open", s.openIssues }, { "likely", s.likelyErrors }, { "arr", s.arrangements },
         { "audited", s.arrangementsAudited }, { "changed", s.arrangementsChanged }, { "steps", s.listenSteps },
-        { "approved", s.listenApproved }, { "error", s.error }, { "arrs", arrs }, { "v", AUDIT_CACHE_VERSION }
+        { "approved", s.listenApproved }, { "error", s.error }, { "arrs", arrs }, { "v", AUDIT_CACHE_VERSION },
+        { "tags", QJsonArray::fromStringList(s.tags) }, { "facts", QJsonObject::fromVariantMap(s.facts) }
     };
 }
 
@@ -1943,13 +1946,17 @@ static StarScoreAuditFileSummary auditSummaryFromJson(const QString& path, const
     for (auto it = secStatus.begin(); it != secStatus.end(); ++it) {
         s.sectionStatus[it.key()] = auditCachedStatus(o, it.value().toInt());
     }
+    for (const QJsonValue& t : o.value("tags").toArray()) {
+        s.tags << t.toString();
+    }
+    s.facts = o.value("facts").toObject().toVariantMap();
     return s;
 }
 
 static bool auditCacheCurrent(const QJsonObject& entry, const QString& stamp)
 {
-    return entry.value("stamp").toString() == stamp && (entry.value("v").toInt() == AUDIT_CACHE_VERSION
-                                                          || entry.value("v").toInt() == 5);
+    // (before 7 there are no tags or facts: read again)
+    return entry.value("stamp").toString() == stamp && entry.value("v").toInt() == AUDIT_CACHE_VERSION;
 }
 
 //! Which dashboard column an arrangement fills: "3H" (3-Horn Standard), "3F" (3-Horn Flexible), "4T" (4-Horn 2-Trumpet), …
@@ -2135,6 +2142,8 @@ StarScoreAuditFileSummary StarScoreService::auditFile(const QString& path, bool 
             auto it = live.sectionStatus.find(sec.templateKey);
             live.sectionStatus[sec.templateKey] = it == live.sectionStatus.end() ? st : std::min(it->second, st);
         }
+        live.tags = liveData.songTags;
+        live.facts = starscore::songFacts(m_mainProject->masterNotation()->masterScore()).toMap();
         return live;
     }
 
@@ -2176,6 +2185,8 @@ StarScoreAuditFileSummary StarScoreService::auditFile(const QString& path, bool 
                 auto it = summary.sectionStatus.find(sec.templateKey);
                 summary.sectionStatus[sec.templateKey] = it == summary.sectionStatus.end() ? st : std::min(it->second, st);
             }
+            summary.tags = fileData.songTags;
+            summary.facts = starscore::songFacts(ms).toMap();
         }
         QFile::remove(tmp);
     }

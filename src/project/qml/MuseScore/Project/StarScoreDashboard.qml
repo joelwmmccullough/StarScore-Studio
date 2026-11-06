@@ -19,6 +19,39 @@ Rectangle {
 
     property bool showAllTasks: false
     property string filter: "all"      // "all", "originals", "covers"
+    // (1.29.0) the song library: what's typed in its search box, and the tag picked (empty: any)
+    property string search: ""
+    property string tagFilter: ""
+
+    function libraryShows(row) {
+        if (root.filter !== "all" && (root.filter === "covers") !== row.cover) {
+            return false
+        }
+        if (root.tagFilter !== "" && (row.tags || []).indexOf(root.tagFilter) < 0) {
+            return false
+        }
+        var q = root.search.trim().toLowerCase()
+        if (q === "") {
+            return true
+        }
+        var hay = [row.title, row.kindName, row.stageName, row.facts].concat(row.tags || []).join(" ").toLowerCase()
+        return q.split(/\s+/).every(function(w) { return hay.indexOf(w) >= 0 })
+    }
+
+    function allTags() {
+        var seen = {}
+        var out = []
+        for (var i = 0; i < dash.songs.length; ++i) {
+            var t = dash.songs[i].tags || []
+            for (var j = 0; j < t.length; ++j) {
+                if (!seen[t[j]]) {
+                    seen[t[j]] = true
+                    out.push(t[j])
+                }
+            }
+        }
+        return out.sort()
+    }
 
     readonly property color doneColor: "#3FB05A"
     readonly property color auditColor: "#8E7CF0"
@@ -96,7 +129,7 @@ Rectangle {
                 StyledTextLabel {
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignLeft
-                    text: qsTrc("starscore", "Starsign dashboard")
+                    text: qsTrc("starscore", "Songs")
                     font: ui.theme.headerBoldFont
                 }
                 StyledTextLabel {
@@ -135,6 +168,164 @@ Rectangle {
                         toolTipDescription: dash.folder
                         enabled: !dash.scanning
                         onClicked: dash.chooseFolder()
+                    }
+                }
+            }
+
+            // ---------------- The song library (1.29.0) ----------------
+            // Every song as a card: click it to open the song on its Song page
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 10
+                visible: dash.songs.length > 0
+
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: 8
+                    TextInputField {
+                        width: 220
+                        hint: qsTrc("starscore", "Search songs, tags, keys…")
+                        clearTextButtonVisible: true
+                        onTextChanged: function(newText) { root.search = newText }
+                        onTextCleared: root.search = ""
+                    }
+                    FlatButton {
+                        text: qsTrc("starscore", "All")
+                        accentButton: root.filter === "all"
+                        onClicked: root.filter = "all"
+                    }
+                    FlatButton {
+                        text: qsTrc("starscore", "Originals")
+                        accentButton: root.filter === "originals"
+                        onClicked: root.filter = "originals"
+                    }
+                    FlatButton {
+                        text: qsTrc("starscore", "Covers")
+                        accentButton: root.filter === "covers"
+                        onClicked: root.filter = "covers"
+                    }
+                }
+                // the tags used, to pick one
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: 6
+                    visible: tagRepeater.count > 0
+                    Repeater {
+                        id: tagRepeater
+                        model: root.allTags()
+                        delegate: Rectangle {
+                            required property string modelData
+                            height: 24
+                            width: tagText.implicitWidth + 18
+                            radius: 12
+                            color: root.tagFilter === modelData ? ui.theme.accentColor : ui.theme.buttonColor
+                            StyledTextLabel {
+                                id: tagText
+                                anchors.centerIn: parent
+                                text: modelData
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.tagFilter = root.tagFilter === modelData ? "" : modelData
+                            }
+                        }
+                    }
+                }
+
+                Flow {
+                    id: libraryFlow
+                    Layout.fillWidth: true
+                    spacing: 10
+
+                    Repeater {
+                        model: dash.songs
+                        delegate: Rectangle {
+                            id: songCard
+                            required property var modelData
+                            visible: root.libraryShows(modelData)
+                            width: visible ? Math.max(200, Math.min(260, (libraryFlow.width - 30) / 4)) : 0
+                            height: visible ? cardColumn.implicitHeight + 20 : 0
+                            radius: 8
+                            color: cardMouse.containsMouse ? ui.theme.buttonColor : ui.theme.backgroundPrimaryColor
+                            border.color: ui.theme.strokeColor
+
+                            MouseArea {
+                                id: cardMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: dash.openSong(songCard.modelData.path, false)
+                            }
+
+                            ColumnLayout {
+                                id: cardColumn
+                                x: 10
+                                y: 10
+                                width: parent.width - 20
+                                spacing: 3
+
+                                StyledTextLabel {
+                                    Layout.fillWidth: true
+                                    horizontalAlignment: Text.AlignLeft
+                                    elide: Text.ElideRight
+                                    text: songCard.modelData.title
+                                    font: ui.theme.bodyBoldFont
+                                }
+                                StyledTextLabel {
+                                    Layout.fillWidth: true
+                                    horizontalAlignment: Text.AlignLeft
+                                    elide: Text.ElideRight
+                                    text: songCard.modelData.kindName + (songCard.modelData.stageName ? " · " + songCard.modelData.stageName : "")
+                                          + (songCard.modelData.plays > 0 ? " · " + qsTrc("starscore", "played %1×").arg(songCard.modelData.plays) : "")
+                                    opacity: 0.6
+                                }
+                                StyledTextLabel {
+                                    Layout.fillWidth: true
+                                    visible: songCard.modelData.facts !== ""
+                                    horizontalAlignment: Text.AlignLeft
+                                    elide: Text.ElideRight
+                                    text: songCard.modelData.facts
+                                    opacity: 0.6
+                                }
+                                Flow {
+                                    Layout.fillWidth: true
+                                    spacing: 4
+                                    visible: (songCard.modelData.tags || []).length > 0
+                                    Repeater {
+                                        model: songCard.modelData.tags || []
+                                        delegate: Rectangle {
+                                            required property string modelData
+                                            height: 18
+                                            width: smallTag.implicitWidth + 12
+                                            radius: 9
+                                            color: ui.theme.buttonColor
+                                            StyledTextLabel {
+                                                id: smallTag
+                                                anchors.centerIn: parent
+                                                text: modelData
+                                                opacity: 0.85
+                                            }
+                                        }
+                                    }
+                                }
+                                // how many of its arrangements are done
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    Layout.topMargin: 4
+                                    visible: songCard.modelData.scanned && songCard.modelData.cellCount > 0
+                                    height: 5
+                                    radius: 2
+                                    color: ui.theme.strokeColor
+                                    Rectangle {
+                                        width: parent.width * songCard.modelData.done / Math.max(1, songCard.modelData.cellCount)
+                                        height: parent.height
+                                        radius: 2
+                                        color: root.doneColor
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -611,7 +802,7 @@ Rectangle {
                         StyledTextLabel {
                             Layout.fillWidth: true
                             horizontalAlignment: Text.AlignLeft
-                            text: qsTrc("starscore", "Every song")
+                            text: qsTrc("starscore", "Progress by arrangement")
                             font: ui.theme.largeBodyBoldFont
                         }
                         FlatButton {

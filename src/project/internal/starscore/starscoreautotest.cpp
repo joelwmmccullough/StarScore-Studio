@@ -49,6 +49,7 @@
 #include "starscorehornkeys.h"
 #include "starscoreautoarchive.h"
 #include "starscorewatch.h"
+#include "starscoresongfacts.h"
 #include "engraving/dom/mscore.h"
 #include "starscorejam.h"
 #include "starscorelisten.h"
@@ -3895,6 +3896,13 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             barList << QString("%1@%2").arg(bars[i].number).arg(bars[i].start, 0, 'f', 2);
         }
         autotestLog(QString("  bars: %1, first: %2").arg(bars.size()).arg(barList.join(" ")));
+    } else if (step.startsWith("songtags")) {
+        // songtags[:a|b|c]: the song's tags (1.29.0): set them (when given), then log them and the song's facts
+        if (step.startsWith("songtags:")) {
+            setSongTags(step.mid(9).split('|', Qt::SkipEmptyParts));
+        }
+        autotestLog("  tags: " + songTags().join(", "));
+        autotestLog("  facts: " + starscore::SongFacts::fromMap(songFacts()).line());
     } else if (step.startsWith("songnotes")) {
         // songnotes[:<text>]: the Song page's notes (1.28.1): set them (when given), then log them
         if (step.startsWith("songnotes:")) {

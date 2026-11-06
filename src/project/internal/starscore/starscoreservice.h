@@ -332,6 +332,9 @@ public:
     QString songTitle() const override;
     QString songNotes() const override;
     void setSongNotes(const QString& notes) override;
+    QStringList songTags() const override;
+    void setSongTags(const QStringList& tags) override;
+    QVariantMap songFacts() const override;
     QString scoreVersion() const override;
     StarScoreVersionSuggestion suggestVersionBump(const StarScoreBandExportPlan& plan) const override;
     void setScoreVersion(const QString& version) override;
@@ -444,6 +447,8 @@ public:
         QJsonObject recordings;
         // (1.28.1) the Song page's notes about the song, as typed
         QString songNotes;
+        // (1.29.0) the song's tags, as typed ("ballad", "Ichiban", "needs a vocalist")
+        QStringList songTags;
         // a Solo Transcription (1.24.0): its song, player, band, recording, link, instrument, the song it's tied to,
         // and its twelve key part scores ("keys": [{ "shift", "name" }]); empty for a band song
         QJsonObject solo;

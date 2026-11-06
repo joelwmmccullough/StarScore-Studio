@@ -25,6 +25,10 @@
 #include "iinteractive.h"
 #include "dockwindow/idockwindowprovider.h"
 #include "project/istarscoreservice.h"
+#include "project/internal/starscore/starscorelisten.h"
+
+#include <memory>
+#include <set>
 
 namespace mu::project {
 class SongHubModel : public QObject, public muse::Contextable, public muse::async::Asyncable
@@ -54,6 +58,17 @@ class SongHubModel : public QObject, public muse::Contextable, public muse::asyn
     Q_PROPERTY(QVariantList statusColors READ statusColors CONSTANT)
     //! when a song is opened: this page first (true, the default) or straight to the score
     Q_PROPERTY(bool openHere READ openHere WRITE setOpenHere NOTIFY changed)
+    //! (1.29.0) the song's tags (kept in the file); its key, time signature, tempo, bars and length; the songbooks it's
+    //! in (the album tracklists of Home › Songbooks); the demos in its Sheets and Demos folder, and the one playing
+    Q_PROPERTY(QStringList tags READ tags NOTIFY changed)
+    Q_PROPERTY(QString musicFacts READ musicFacts NOTIFY changed)
+    Q_PROPERTY(QVariantList songbooks READ songbooks NOTIFY changed)
+    Q_PROPERTY(QVariantList demos READ demos NOTIFY changed)
+    Q_PROPERTY(QString demoPlaying READ demoPlaying NOTIFY demoChanged)
+    Q_PROPERTY(QString demoPosition READ demoPosition NOTIFY demoChanged)
+    Q_PROPERTY(double demoProgress READ demoProgress NOTIFY demoChanged)
+    //! bumped when a sheet's picture is ready (thumbnail())
+    Q_PROPERTY(int thumbRevision READ thumbRevision NOTIFY thumbsChanged)
 
     QML_ELEMENT
 
@@ -65,6 +80,7 @@ class SongHubModel : public QObject, public muse::Contextable, public muse::asyn
 
 public:
     explicit SongHubModel(QObject* parent = nullptr);
+    ~SongHubModel() override;
 
     Q_INVOKABLE void load();
     Q_INVOKABLE void refresh();
@@ -95,6 +111,15 @@ public:
     //! the header's More… menu (1.28.2): the song's tools, Move to (its group in Projects and Sheets), Audit
     Q_INVOKABLE QVariantList moreMenu() const;
     Q_INVOKABLE void handleMore(const QString& itemId);
+    Q_INVOKABLE void addTag(const QString& tag);
+    Q_INVOKABLE void removeTag(const QString& tag);
+    //! a demo played (or stopped, when it's the one playing) on the Song page
+    Q_INVOKABLE void playDemo(const QString& path);
+    Q_INVOKABLE void stopDemo();
+    Q_INVOKABLE void seekDemo(double fraction);
+    //! a sheet's first page as a picture ("" until it's ready: thumbRevision changes then; never on Linux/Windows)
+    Q_INVOKABLE QString thumbnail(const QString& pdfPath);
+    Q_INVOKABLE void openSongbooks();
 
     bool hasSong() const { return m_hasSong; }
     bool isStarScore() const { return m_isStarScore; }
@@ -117,6 +142,14 @@ public:
     QVariantList todo() const { return m_todo; }
     QVariantList statusColors() const;
     bool openHere() const;
+    QStringList tags() const { return m_tags; }
+    QString musicFacts() const { return m_musicFacts; }
+    QVariantList songbooks() const { return m_songbooks; }
+    QVariantList demos() const { return m_demos; }
+    QString demoPlaying() const { return m_demoPlaying; }
+    QString demoPosition() const;
+    double demoProgress() const;
+    int thumbRevision() const { return m_thumbRevision; }
     void setOpenHere(bool on);
 
     //! the setting (read by the open flow too)
@@ -124,6 +157,8 @@ public:
 
 signals:
     void changed();
+    void demoChanged();
+    void thumbsChanged();
 
 private:
     void toScore();
@@ -150,6 +185,14 @@ private:
     bool m_loaded = false;
     int m_generation = 0;
     bool m_foldersReady = false;
-    QString m_foldersFor;   // which refresh the folders being read are for
+    QString m_foldersFor;
+    QStringList m_tags;
+    QString m_musicFacts;
+    QVariantList m_songbooks;
+    QVariantList m_demos;
+    QString m_demoPlaying;
+    std::unique_ptr<starscore::ListenPlayer> m_player;
+    int m_thumbRevision = 0;
+    std::set<QString> m_thumbsPending;   // which refresh the folders being read are for
 };
 }

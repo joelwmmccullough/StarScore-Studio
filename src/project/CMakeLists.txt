@@ -136,6 +136,8 @@ target_sources(project PRIVATE
     internal/starscore/starscorezip.cpp
     internal/starscore/starscoremedia.cpp
     internal/starscore/starscorewatch.cpp
+    internal/starscore/starscoresongfacts.cpp
+    internal/starscore/starscoresongfacts.h
     internal/starscore/starscorejam.cpp
     internal/starscore/starscorejam.h
     internal/starscore/starscoredecode.cpp

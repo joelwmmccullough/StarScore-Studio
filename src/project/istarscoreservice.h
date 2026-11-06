@@ -21,6 +21,7 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QString>
+#include <QVariantMap>
 #include <QStringList>
 
 #include "internal/starscore/organizer/orgchangelog.h"
@@ -518,6 +519,8 @@ struct StarScoreAuditFileSummary
     QString error;                   // couldn't be read
     std::vector<StarScoreFileArrangement> arrangementList;
     std::map<QString, int> sectionStatus;   // section template key -> status (the least finished, if several)
+    QStringList tags;                // (1.29.0) the song's tags
+    QVariantMap facts;               // (1.29.0) key, time signature, tempo, bars, length (starscoresongfacts.h)
 };
 
 //! One sheet of a songbook or chart: which part of a song, how it's written, and what its title frame says
@@ -905,6 +908,11 @@ public:
     //! (1.28.1) the Song page's notes about the song, kept in the file (setting them marks the song unsaved)
     virtual QString songNotes() const = 0;
     virtual void setSongNotes(const QString& notes) = 0;
+    //! (1.29.0) the song's tags, kept in the file (setting them marks the song unsaved)
+    virtual QStringList songTags() const = 0;
+    virtual void setSongTags(const QStringList& tags) = 0;
+    //! (1.29.0) the open song's key, time signature, tempo, bars and length (starscoresongfacts.h, as a map)
+    virtual QVariantMap songFacts() const = 0;
     virtual QString scoreVersion() const = 0;                 // from the score, or the starting version for this song
     //! Which number to raise for the next export, from the bar-by-bar signatures kept at the last export of each
     //! sheet. Major: the song's form changed (bar count, rehearsal marks, key or time signatures), the lead sheet

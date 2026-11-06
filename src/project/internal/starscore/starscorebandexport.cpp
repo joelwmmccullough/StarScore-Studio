@@ -14,6 +14,7 @@
  * the folders list by date).
  */
 #include "starscoreservice.h"
+#include "starscoresongfacts.h"
 #include "starscorehornkeys.h"
 #include "starscorelayoutcheck.h"
 
@@ -795,6 +796,42 @@ void StarScoreService::setSongNotes(const QString& notes)
     data.songNotes = notes;
     storeTo(ms, data, project);
     project->markAsUnsaved();
+}
+
+QStringList StarScoreService::songTags() const
+{
+    INotationProjectPtr project = exportSourceProject();
+    return project ? loadFrom(project->masterNotation()->masterScore()).songTags : QStringList();
+}
+
+void StarScoreService::setSongTags(const QStringList& tags)
+{
+    INotationProjectPtr project = exportSourceProject();
+    if (!project) {
+        return;
+    }
+    QStringList clean;
+    for (const QString& t : tags) {
+        const QString tag = t.simplified();
+        if (!tag.isEmpty() && !clean.contains(tag, Qt::CaseInsensitive)) {
+            clean << tag;
+        }
+    }
+    engraving::MasterScore* ms = project->masterNotation()->masterScore();
+    Data data = loadFrom(ms);
+    if (data.songTags == clean) {
+        return;
+    }
+    data.songTags = clean;
+    storeTo(ms, data, project);
+    project->markAsUnsaved();
+    m_changed.notify();
+}
+
+QVariantMap StarScoreService::songFacts() const
+{
+    INotationProjectPtr project = exportSourceProject();
+    return project ? starscore::songFacts(project->masterNotation()->masterScore()).toMap() : QVariantMap();
 }
 
 void StarScoreService::setSongRecordings(const QJsonObject& recordings)

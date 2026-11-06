@@ -4,6 +4,16 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.29.0
+
+- **Home is now a song library.** Home's right half is "Songs": every song as a card with its kind, where it is (Repertoire, In progress, Sketch), how often it's played, its key, tempo and length, its tags, and a bar showing how many of its arrangements are done. Search by title, tag, key or anything on the card; pick Originals or Covers; click a tag to see only the songs with it. Click a card to open the song on its Song page (or go to its Song page, if it's open already). The progress grid and the to-do list are still below. The first time, StarScore reads every song again for the new facts, which takes a few minutes in the background.
+- **The Song page:**
+  - **Key, time signature, tempo, bars and length** under the title (the key at the start, the tempo marking at the start, the length played through with repeats).
+  - **Tags:** type a tag and press Enter to add it, click × to take one off. They're kept in the .starscore, and the song library can filter by them.
+  - **Demos:** the demos in the song's Sheets and Demos folder, with play and stop right on the page, and a bar showing where it is (click it to jump).
+  - **Pictures of the sheets:** opening a folder under "In Sheets and Demos" shows each PDF's first page (on the Mac). Click one to open it.
+  - **Songbooks:** the albums of Home › Songbooks the song is on, with its track number (when Songbooks are turned on in Preferences).
+
 ## 1.28.2
 
 - **More… on the Song page also has Audit this song and Move to** (Originals, Covers or Vocal Covers › Repertoire, In Progress or Sketches), as in the StarScore bar's menu.

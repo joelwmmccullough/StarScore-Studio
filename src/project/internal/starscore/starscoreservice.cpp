@@ -525,6 +525,9 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
     data.scoreSystems = root.value("scoreSystems").toObject();
     data.recordings = root.value("recordings").toObject();
     data.songNotes = root.value("songNotes").toString();
+    for (const QJsonValue& t : root.value("songTags").toArray()) {
+        data.songTags << t.toString();
+    }
     data.solo = root.value("solo").toObject();
     const QJsonObject partStatus = root.value("partStatus").toObject();
     for (auto it = partStatus.begin(); it != partStatus.end(); ++it) {
@@ -708,6 +711,9 @@ QString StarScoreService::toJson(const Data& data)
     }
     if (!data.songNotes.isEmpty()) {
         root["songNotes"] = data.songNotes;
+    }
+    if (!data.songTags.isEmpty()) {
+        root["songTags"] = QJsonArray::fromStringList(data.songTags);
     }
     QJsonObject partStatus;
     for (const auto& [pid, key] : data.partStatus) {
