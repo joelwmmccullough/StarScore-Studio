@@ -103,6 +103,7 @@ public:
 
     void seekElement(const notation::EngravingItem* element, bool flushSound = true) override;
     void seekBeat(int measureIndex, int beatIndex, bool flushSound = true) override;
+    void seekToSecs(muse::audio::secs_t secs, bool flushSound = true) override;
 
     bool actionChecked(const muse::actions::ActionCode& actionCode) const override;
     muse::async::Channel<muse::actions::ActionCode> actionCheckedChanged() const override;

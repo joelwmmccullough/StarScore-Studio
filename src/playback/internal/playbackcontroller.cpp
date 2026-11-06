@@ -443,6 +443,13 @@ void PlaybackController::seekElement(const notation::EngravingItem* element, boo
     seek(playedTickToSecs(tick.val), flushSound);
 }
 
+void PlaybackController::seekToSecs(muse::audio::secs_t secs, bool flushSound)
+{
+    if (currentPlayer()) {
+        seek(muse::audio::secs_t(std::max(double(secs), 0.0)), flushSound);
+    }
+}
+
 void PlaybackController::seekBeat(int measureIndex, int beatIndex, bool flushSound)
 {
     secs_t targetSecs = beatToSecs(measureIndex, beatIndex);

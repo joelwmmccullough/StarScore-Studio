@@ -11,6 +11,8 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QFontMetricsF>
+#include <QMouseEvent>
+#include <QWheelEvent>
 
 #include "engraving/dom/chord.h"
 #include "engraving/dom/chordrest.h"
@@ -52,6 +54,15 @@ FallingNotesView::FallingNotesView(QQuickItem* parent)
     : QQuickPaintedItem(parent), muse::Contextable(muse::iocCtxForQmlObject(this))
 {
     setAntialiasing(true);
+    setAcceptedMouseButtons(Qt::LeftButton);
+    m_seekTimer.setSingleShot(true);
+    m_seekTimer.setInterval(40);
+    connect(&m_seekTimer, &QTimer::timeout, this, [this]() {
+        if (m_seekTarget >= 0 && playbackController()) {
+            playbackController()->seekToSecs(muse::audio::secs_t(m_seekTarget), true);
+        }
+        m_seekTarget = -1;
+    });
     m_frameTimer.setInterval(16);
     connect(&m_frameTimer, &QTimer::timeout, this, &FallingNotesView::onFrame);
     m_reloadTimer.setSingleShot(true);
@@ -388,6 +399,87 @@ void FallingNotesView::reload()
     update();
 }
 
+double FallingNotesView::fallHeight() const
+{
+    const double h = boundingRect().height();
+    return std::max(1.0, h - std::clamp(h * 0.22, 40.0, 120.0));
+}
+
+void FallingNotesView::scrollBy(double secs)
+{
+    if (m_externalTime >= 0) {
+        // Listen: the recording moves by bars (its own clock); a notch or a screen-height of dragging is about a bar
+        m_wheelSteps += secs / std::max(0.5, m_secondsShown / 4.0);
+        const int steps = int(m_wheelSteps);
+        if (steps != 0) {
+            m_wheelSteps -= steps;
+            emit scrollSteps(steps);
+        }
+        return;
+    }
+    double end = m_notes.empty() ? 0.0 : m_notes.back().end;
+    for (const FallNote& n : m_notes) {
+        end = std::max(end, n.end);
+    }
+    const double to = std::clamp(now() + secs, 0.0, std::max(0.0, end));
+    if (m_waitMode) {
+        m_wait.seek(to);
+        m_waitTick.restart();
+        if (m_wait.holding()) {
+            showNextInScore();
+        }
+        updateWaitStatus();
+    } else {
+        m_positionSecs = to;
+        m_sincePosition.restart();
+        m_seekTarget = to;
+        if (!m_seekTimer.isActive()) {
+            m_seekTimer.start();
+        }
+    }
+    update();
+}
+
+void FallingNotesView::wheelEvent(QWheelEvent* event)
+{
+    // up (or two fingers up): on through the music, the notes coming down; down: back
+    double secs = 0;
+    if (!event->pixelDelta().isNull()) {
+        secs = event->pixelDelta().y() / fallHeight() * m_secondsShown;
+    } else {
+        secs = event->angleDelta().y() / 120.0 * m_secondsShown * 0.1;
+    }
+    if (secs != 0) {
+        scrollBy(secs);
+    }
+    event->accept();
+}
+
+void FallingNotesView::mousePressEvent(QMouseEvent* event)
+{
+    m_dragging = true;
+    m_dragLastY = event->position().y();
+    event->accept();
+}
+
+void FallingNotesView::mouseMoveEvent(QMouseEvent* event)
+{
+    if (!m_dragging) {
+        return;
+    }
+    // the notes follow the pointer: dragged down, the music moves on
+    const double dy = event->position().y() - m_dragLastY;
+    m_dragLastY = event->position().y();
+    scrollBy(dy / fallHeight() * m_secondsShown);
+    event->accept();
+}
+
+void FallingNotesView::mouseReleaseEvent(QMouseEvent* event)
+{
+    m_dragging = false;
+    event->accept();
+}
+
 QColor FallingNotesView::keyColor(int k, bool down, const QColor& noteColor) const
 {
     if (!m_waitMode) {
@@ -473,7 +565,10 @@ void FallingNotesView::paint(QPainter* p)
         const double x = keyX(n.pitch, m_lowKey) * ww + (black ? 0.0 : ww * 0.08);
         const double w = black ? ww * 0.6 : ww * 0.84;
         const double yBottom = fallH - (n.start - t) * pps;
-        const double yTop = fallH - (n.end - t) * pps;
+        double yTop = fallH - (n.end - t) * pps;
+        if (yBottom - yTop > 4) {
+            yTop += std::min(2.0, (yBottom - yTop) * 0.2);   // (1.29.0) a gap before the next sound: repeats show apart
+        }
         QRectF rect(x, std::max(0.0, yTop), w, std::min(fallH, yBottom) - std::max(0.0, yTop));
         if (rect.height() > 0.5) {
             QPainterPath path;

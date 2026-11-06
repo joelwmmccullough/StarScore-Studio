@@ -22,7 +22,10 @@ struct WatchNote {
     int hand = 0;       // the staff in its part: 0 the right hand (or the only staff), 1 the left, 2 any after those
     int tick = 0;       // (1.27.2) where its chord is in the score (not played out), and on which track
     int track = 0;
-    int noteIdx = -1;   // (1.27.3) which note of its chord (< 0: a grace note), for playing it
+    int noteIdx = -1;   // (1.27.3) which note of its chord (< 0: a grace note, or one of extra's sounds), for playing it
+    //! (1.29.0) one of the sounds playback adds to a written note (a trill's or turn's other notes, a tremolo's repeats,
+    //! a glissando's steps): drawn, but not waited for in Wait for me
+    bool extra = false;
 };
 
 //! (1.27.2) where a bar starts, for the falling notes' bar lines
@@ -91,6 +94,7 @@ private:
     std::vector<Group> m_groups;
     std::vector<std::pair<double, size_t> > m_others;   // (start, index) of the notes not waited for
     size_t m_nextOther = 0;
+    std::vector<WatchNote> m_extras;   // (1.29.0) by start
     size_t m_next = 0;
     int m_hands = 7;
     double m_clock = 0;

@@ -94,6 +94,8 @@ public:
 
     virtual void seekElement(const notation::EngravingItem* element, bool flushSound = true) = 0;
     virtual void seekBeat(int measureIndex, int beatIndex, bool flushSound = true) = 0;
+    //! StarScore (1.29.0): to a time in playback's seconds (Practice's falling notes scrolled)
+    virtual void seekToSecs(muse::audio::secs_t secs, bool flushSound = true) { (void)secs; (void)flushSound; }
 
     virtual bool actionChecked(const muse::actions::ActionCode& actionCode) const = 0;
     virtual muse::async::Channel<muse::actions::ActionCode> actionCheckedChanged() const = 0;

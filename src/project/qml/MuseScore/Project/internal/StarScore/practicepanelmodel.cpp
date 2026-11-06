@@ -28,6 +28,27 @@ PracticePanelModel::PracticePanelModel(QObject* parent)
 
 void PracticePanelModel::load()
 {
+    // (1.29.0, Joel: a speed set here goes back to normal when Practice is closed) playback's speed and Listen's
+    QTimer::singleShot(0, this, [this]() {
+        muse::dock::IDockWindow* window = dockWindowProvider() ? dockWindowProvider()->window() : nullptr;
+        if (!window) {
+            return;
+        }
+        window->docksOpenStatusChanged().onReceive(this, [this, window](const QStringList& names) {
+            if (!names.contains("starscorePracticePanel") || window->isDockOpen("starscorePracticePanel")) {
+                return;
+            }
+            if (playbackController() && !qFuzzyCompare(playbackController()->tempoMultiplier(), 1.0)) {
+                playbackController()->setTempoMultiplier(1.0);
+            }
+            if (m_listen && !qFuzzyCompare(m_listen->speed(), 1.0)) {
+                m_listen->setSpeed(1.0);
+                emit listenChanged();
+                emit listenPositionChanged();
+            }
+            emit changed();
+        });
+    });
     if (playbackController()) {
         playbackController()->isPlayingChanged().onNotify(this, [this]() { emit changed(); });
         playbackController()->actionCheckedChanged().onReceive(this, [this](const muse::actions::ActionCode&) { emit changed(); });

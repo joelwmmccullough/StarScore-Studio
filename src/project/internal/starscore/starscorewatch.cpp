@@ -16,10 +16,96 @@
 #include "engraving/dom/segment.h"
 #include "engraving/dom/staff.h"
 #include "notation/inotationelements.h"
+#include "engraving/playback/playbackeventsrenderer.h"
+#include "engraving/playback/playbackcontext.h"
+#include "engraving/playback/playbacksetupdataresolver.h"
+#include "engraving/playback/utils/pitchutils.h"
+#include "mpe/iarticulationprofilesrepository.h"
+#include "modularity/ioc.h"
+
+#include <cmath>
+#include <map>
 
 using namespace mu::engraving;
 
 namespace mu::project::starscore {
+namespace {
+int midiOf(muse::mpe::pitch_level_t level)
+{
+    return int(std::lround(muse::mpe::ZERO_PITCH_LEVEL_MIDI_EQUIVALENT + level / double(muse::mpe::PITCH_LEVEL_STEP)));
+}
+
+int expectedMidi(const Note* n)
+{
+    return midiOf(notePitchLevel(n->playingTpc(), n->playingOctave()));
+}
+
+//! (1.29.0) A chord's notes as playback plays them: the chord through playback's own renderer (trills, mordents and
+//! turns as their notes, tremolos repeated, staccato and the like shortened, arpeggios rolled, grace notes, glissandos).
+//! false: nothing could be rendered (the old way is used then)
+bool renderedNotes(const Chord* chord, int offset, const muse::mpe::ArticulationsProfilePtr& profile,
+                   const PlaybackContextPtr& ctx, int hand, std::vector<WatchNote>& out)
+{
+    static const PlaybackEventsRenderer renderer;
+    muse::mpe::PlaybackEventsMap result;
+    renderer.render(chord, offset, profile, ctx, result);
+    struct Ev {
+        double start, end;
+        int pitch;
+    };
+    std::vector<Ev> evs;
+    for (const auto& [ts, list] : result) {
+        for (const muse::mpe::PlaybackEvent& e : list) {
+            if (const auto* ne = std::get_if<muse::mpe::NoteEvent>(&e)) {
+                const auto& a = ne->arrangementCtx();
+                if (a.actualDuration <= 0) {
+                    continue;
+                }
+                evs.push_back({ a.actualTimestamp / 1e6, (a.actualTimestamp + a.actualDuration) / 1e6, midiOf(ne->pitchCtx().nominalPitchLevel) });
+            }
+        }
+    }
+    if (evs.empty()) {
+        return false;
+    }
+    std::stable_sort(evs.begin(), evs.end(), [](const Ev& a, const Ev& b) { return a.start < b.start; });
+    // the pitch as it plays here (a solo's key: its playback transposition) from playback's pitch
+    const int shift = chord->notes().empty() ? 0 : chord->notes().front()->ppitch() - expectedMidi(chord->notes().front());
+    const double chordStart = chord->score()->repeatList().utick2utime(chord->tick().ticks() + offset) - 0.001;
+    std::vector<bool> used(evs.size(), false);
+    std::vector<WatchNote> mine(evs.size());
+    for (size_t i = 0; i < evs.size(); ++i) {
+        mine[i] = { evs[i].start, evs[i].end, evs[i].pitch + shift, hand, chord->tick().ticks(), int(chord->track()), -1, true };
+    }
+    // the written notes: each note's first sound at or after the beat; then each grace note's first sound
+    for (size_t ni = 0; ni < chord->notes().size(); ++ni) {
+        const int want = expectedMidi(chord->notes()[ni]);
+        for (size_t i = 0; i < evs.size(); ++i) {
+            if (!used[i] && evs[i].pitch == want && evs[i].start >= chordStart) {
+                used[i] = true;
+                mine[i].noteIdx = int(ni);
+                mine[i].extra = false;
+                break;
+            }
+        }
+    }
+    for (const Chord* g : chord->graceNotes()) {
+        for (const Note* gn : g->notes()) {
+            const int want = expectedMidi(gn);
+            for (size_t i = 0; i < evs.size(); ++i) {
+                if (!used[i] && evs[i].pitch == want) {
+                    used[i] = true;
+                    mine[i].extra = false;   // (noteIdx stays -1: a grace note)
+                    break;
+                }
+            }
+        }
+    }
+    out.insert(out.end(), mine.begin(), mine.end());
+    return true;
+}
+}
+
 std::vector<WatchNote> watchNotes(const mu::notation::INotationPtr& notation, QString* name, std::vector<WatchBar>* bars)
 {
     if (bars) {
@@ -37,6 +123,33 @@ std::vector<WatchNote> watchNotes(const mu::notation::INotationPtr& notation, QS
     if (name) {
         *name = score->isMaster() ? QString() : score->name().toQString();
     }
+    // (1.29.0) playback's articulation profiles and context (dynamics, playing techniques), per part
+    auto profiles = muse::modularity::globalIoc()->resolve<muse::mpe::IArticulationProfilesRepository>("starscore");
+    std::map<const Part*, PlaybackContextPtr> contexts;
+    std::map<int, muse::mpe::ArticulationsProfilePtr> profileFor;
+    const PlaybackSetupDataResolver setupResolver;
+    auto profileOf = [&](const Chord* chord) -> muse::mpe::ArticulationsProfilePtr {
+        if (!profiles) {
+            return nullptr;
+        }
+        muse::mpe::PlaybackSetupData setup;
+        setupResolver.resolveSetupData(chord->part()->instrument(chord->tick()), setup);
+        auto it = profileFor.find(int(setup.category));
+        if (it == profileFor.end()) {
+            it = profileFor.emplace(int(setup.category), profiles->defaultProfile(setup.category)).first;
+        }
+        return it->second;
+    };
+    auto contextOf = [&](const Part* part) {
+        auto it = contexts.find(part);
+        if (it == contexts.end()) {
+            auto ctx = std::make_shared<PlaybackContext>();
+            ctx->update(part->id(), score);
+            it = contexts.emplace(part, ctx).first;
+        }
+        return it->second;
+    };
+
     const RepeatList& repeats = ms->repeatList();
     for (const RepeatSegment* rs : repeats) {
         const int offset = rs->utick - rs->tick;
@@ -56,7 +169,14 @@ std::vector<WatchNote> watchNotes(const mu::notation::INotationPtr& notation, QS
                     if (!staff || !staff->show() || staff->isDrumStaff(chord->tick()) || !staff->part() || !staff->part()->show()) {
                         continue;
                     }
+                    // the hand: the staff the chord is drawn on (a chord moved to the other staff, as in cross-staff
+                    // beaming, is the other hand's)
                     const int hand = int(std::min<staff_idx_t>(chord->vStaffIdx() - staff->part()->startTrack() / VOICES, 2));
+                    if (const auto profile = profileOf(chord)) {
+                        if (renderedNotes(chord, offset, profile, contextOf(staff->part()), hand, out)) {
+                            continue;
+                        }
+                    }
                     const int chordTick = chord->tick().ticks();
                     const int chordTrack = int(chord->track());
                     auto add = [&](Chord* c, int startTick) {
@@ -68,7 +188,7 @@ std::vector<WatchNote> watchNotes(const mu::notation::INotationPtr& notation, QS
                             const int from = startTick + offset;
                             const int to = from + std::max(1, n->playTicks());
                             out.push_back({ ms->utick2utime(from), ms->utick2utime(to), n->ppitch(), hand, chordTick, chordTrack,
-                                             c == chord ? int(ni) : -1 });
+                                            c == chord ? int(ni) : -1 });
                         }
                     };
                     // grace notes before the beat, briefly
@@ -80,7 +200,7 @@ std::vector<WatchNote> watchNotes(const mu::notation::INotationPtr& notation, QS
             }
         }
     }
-    std::sort(out.begin(), out.end(), [](const WatchNote& a, const WatchNote& b) { return a.start < b.start; });
+    std::stable_sort(out.begin(), out.end(), [](const WatchNote& a, const WatchNote& b) { return a.start < b.start; });
     return out;
 }
 
@@ -89,10 +209,18 @@ void WaitFollower::setNotes(const std::vector<WatchNote>& notes, int hands)
     m_hands = hands;
     m_groups.clear();
     m_others.clear();
+    m_extras.clear();
     m_end = 0;
     for (size_t i = 0; i < notes.size(); ++i) {   // (by start)
         const WatchNote& n = notes[i];
         m_end = std::max(m_end, n.end);
+        if (n.extra) {
+            // (1.29.0) a trill's or tremolo's other sounds: not waited for, and not wrong when played
+            if (waitsFor(n)) {
+                m_extras.push_back(n);
+            }
+            continue;
+        }
         if (!waitsFor(n)) {
             m_others.push_back({ n.start, i });
             continue;
@@ -183,6 +311,16 @@ bool WaitFollower::noteOn(int pitch)
         m_wrong[pitch] = false;
         checkDone();
         return true;
+    }
+    for (auto it = std::lower_bound(m_extras.begin(), m_extras.end(), m_clock - 10.0,
+                                    [](const WatchNote& n, double v) { return n.start < v; }); it != m_extras.end(); ++it) {
+        const WatchNote& x = *it;
+        if (x.start - EARLY > m_clock) {
+            break;
+        }
+        if (x.pitch == pitch && m_clock <= x.end + 0.25) {
+            return false;   // (playing the trill: fine)
+        }
     }
     m_wrong[pitch] = true;
     ++m_wrongCount;

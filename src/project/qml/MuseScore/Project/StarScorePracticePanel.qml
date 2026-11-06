@@ -548,6 +548,9 @@ Item {
                 secondsShown: practice.secondsShown
                 dark: ui.theme.isDark
                 externalTime: practice.listenScoreTime
+
+                // (1.29.0) scrolled or dragged: the recording a bar on or back per step
+                onScrollSteps: function(steps) { practice.listenSkip(steps) }
             }
 
             Item {

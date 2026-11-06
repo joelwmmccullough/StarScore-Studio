@@ -13,6 +13,7 @@ Version numbers: the first number changes when files stop being compatible, the 
   - **Demos:** the demos in the song's Sheets and Demos folder, with play and stop right on the page, and a bar showing where it is (click it to jump).
   - **Pictures of the sheets:** opening a folder under "In Sheets and Demos" shows each PDF's first page (on the Mac). Click one to open it.
   - **Songbooks:** the albums of Home › Songbooks the song is on, with its track number (when Songbooks are turned on in Preferences).
+- **Practice undocked can be any size.** Pulled out of the window, the Practice panel now stretches as tall as the screen (it was held to about a third). Docked at the bottom, it keeps the old limit.
 
 ## 1.28.2
 

@@ -15,6 +15,8 @@
 #include "actions/iactionsdispatcher.h"
 #include "context/iglobalcontext.h"
 #include "playback/iplaybackcontroller.h"
+#include "dockwindow/idockwindowprovider.h"
+#include "dockwindow/idockwindow.h"
 #include "project/istarscoreservice.h"
 #include "project/internal/starscore/starscorejam.h"
 #include "project/internal/starscore/starscorelisten.h"
@@ -81,6 +83,7 @@ class PracticePanelModel : public QObject, public muse::Contextable, public muse
     muse::ContextInject<mu::playback::IPlaybackController> playbackController = { this };
     muse::ContextInject<muse::actions::IActionsDispatcher> dispatcher = { this };
     muse::ContextInject<IStarScoreService> starScore = { this };
+    muse::ContextInject<muse::dock::IDockWindowProvider> dockWindowProvider = { this };
 
 public:
     explicit PracticePanelModel(QObject* parent = nullptr);

@@ -83,6 +83,15 @@ public:
 
     void paint(QPainter* painter) override;
 
+protected:
+    //! (1.29.0) scrolling or dragging the notes moves through the music (back: the notes go up again)
+    void wheelEvent(QWheelEvent* event) override;
+    void mousePressEvent(QMouseEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* event) override;
+
+public:
+
     using FallNote = starscore::WatchNote;
 
 signals:
@@ -90,6 +99,8 @@ signals:
     void notesChanged();
     void playingChanged();
     void waitChanged();
+    //! (1.29.0) with an external time (Listen), scrolling asks for this many bars on (or back, < 0) instead
+    void scrollSteps(int steps);
 
 private:
     void listen();
@@ -101,6 +112,8 @@ private:
     void showNextInScore();
     void playOthers(const std::vector<size_t>& noteIndexes);
     QColor keyColor(int key, bool down, const QColor& noteColor) const;
+    void scrollBy(double secs);
+    double fallHeight() const;
 
     std::vector<FallNote> m_notes;
     std::vector<starscore::WatchBar> m_bars;   // (1.27.2) bar lines across the falling notes
@@ -126,5 +139,12 @@ private:
     starscore::WaitFollower m_wait;
     QElapsedTimer m_waitTick;
     double m_loadedSpeed = 1.0;   // the playback speed the notes' seconds were worked out at
+
+    // (1.29.0) scrolling
+    bool m_dragging = false;
+    double m_dragLastY = 0;
+    double m_wheelSteps = 0;      // notches not yet turned into bars (Listen)
+    double m_seekTarget = -1;     // where playback is being sent (seeks are sent at most every 40 ms)
+    QTimer m_seekTimer;
 };
 }

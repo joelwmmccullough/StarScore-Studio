@@ -674,6 +674,12 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         interactive()->open(UriQuery(section.isEmpty() ? std::string("musescore://home")
                                      : ("musescore://home?section=" + section.toStdString())));
         autotestLog("  home " + section);
+    } else if (step == "speed" || step.startsWith("speed:")) {
+        // speed[:<percent>]: playback's speed set (or just logged), as Practice's Speed slider does (1.29.0)
+        if (step.startsWith("speed:")) {
+            playbackController()->setTempoMultiplier(step.mid(6).toDouble() / 100.0);
+        }
+        autotestLog(QString("  speed %1%").arg(playbackController()->tempoMultiplier() * 100.0, 0, 'f', 0));
     } else if (step.startsWith("floatdock:")) {
         // floatdock:<dock name>:<W>:<H>: the panel undocked (if it isn't), its window stretched to W x H; logs the size
         // it ends up (1.29.0: Practice undocked was held to 520 px high)
@@ -3921,8 +3927,10 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         // settings:<key>=<value>: an app setting (StarScore/practice/mode=jam)
         QSettings().setValue(step.mid(9).section('=', 0, 0), step.mid(9).section('=', 1));
         autotestLog("  set " + step.mid(9));
-    } else if (step == "watchnotes") {
-        // watchnotes: the falling notes of the score showing (1.27.0): how many, the range, the first few
+    } else if (step == "watchnotes" || step.startsWith("watchnotes:")) {
+        // watchnotes: the falling notes of the score showing (1.27.0): how many, the range, the first few;
+        // watchnotes:<bar>: also each note in that bar (1.29.0): pitch, hand (R/L), start-end, * for a trill's or
+        // tremolo's added sounds
         QString name;
         std::vector<mu::project::starscore::WatchBar> bars;
         const std::vector<mu::project::starscore::WatchNote> notes = mu::project::starscore::watchNotes(globalContext()->currentNotation(), &name, &bars);
@@ -3946,6 +3954,23 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             barList << QString("%1@%2").arg(bars[i].number).arg(bars[i].start, 0, 'f', 2);
         }
         autotestLog(QString("  bars: %1, first: %2").arg(bars.size()).arg(barList.join(" ")));
+        if (step.startsWith("watchnotes:")) {
+            const int bar = step.mid(11).toInt();
+            mu::engraving::Score* sc = globalContext()->currentNotation()->elements()->msScore();
+            QStringList inBar;
+            int extras = 0;
+            for (const auto& n : notes) {
+                const mu::engraving::Measure* m = sc->tick2measure(mu::engraving::Fraction::fromTicks(n.tick));
+                if (m && m->no() + 1 == bar) {
+                    extras += n.extra ? 1 : 0;
+                    if (inBar.size() < 60) {
+                        inBar << QString("%1%2%3@%4-%5").arg(n.pitch).arg(n.hand == 0 ? "R" : n.hand == 1 ? "L" : "O")
+                                 .arg(n.extra ? "*" : "").arg(n.start, 0, 'f', 3).arg(n.end, 0, 'f', 3);
+                    }
+                }
+            }
+            autotestLog(QString("  bar %1 (%2 added sounds): %3").arg(bar).arg(extras).arg(inBar.join(" ")));
+        }
     } else if (step.startsWith("songtags")) {
         // songtags[:a|b|c]: the song's tags (1.29.0): set them (when given), then log them and the song's facts
         if (step.startsWith("songtags:")) {
