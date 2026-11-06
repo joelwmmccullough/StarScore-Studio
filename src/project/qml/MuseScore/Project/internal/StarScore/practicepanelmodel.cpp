@@ -26,6 +26,68 @@ PracticePanelModel::PracticePanelModel(QObject* parent)
 {
 }
 
+static const char* PRACTICE_WINDOW_URI = "musescore://starscore/practicewindow";
+
+void PracticePanelModel::resetSpeed()
+{
+    if (playbackController() && !qFuzzyCompare(playbackController()->tempoMultiplier(), 1.0)) {
+        playbackController()->setTempoMultiplier(1.0);
+    }
+    if (m_listen && !qFuzzyCompare(m_listen->speed(), 1.0)) {
+        m_listen->setSpeed(1.0);
+        emit listenChanged();
+        emit listenPositionChanged();
+    }
+    emit changed();
+}
+
+void PracticePanelModel::openWindow()
+{
+    if (!interactive()) {
+        return;
+    }
+    QSettings().setValue("StarScore/practice/useWindow", true);
+    if (!interactive()->isOpened(muse::Uri(PRACTICE_WINDOW_URI)).val) {
+        QSettings s;
+        muse::UriQuery q(PRACTICE_WINDOW_URI);
+        q.addParam("sync", muse::Val(false));
+        q.addParam("modal", muse::Val(false));
+        q.addParam("contentWidth", muse::Val(std::clamp(s.value("StarScore/practice/windowWidth", 1200).toInt(), 400, 6000)));
+        q.addParam("contentHeight", muse::Val(std::clamp(s.value("StarScore/practice/windowHeight", 760).toInt(), 250, 4000)));
+        interactive()->open(q);
+    }
+    // the docked (or floating) panel closes: the window has everything it had
+    if (dockWindowProvider() && dockWindowProvider()->window()) {
+        dockWindowProvider()->window()->setDockOpen("starscorePracticePanel", false);
+    }
+}
+
+bool PracticePanelModel::prefersWindow() const
+{
+    return QSettings().value("StarScore/practice/useWindow", false).toBool();
+}
+
+void PracticePanelModel::backToPanel()
+{
+    QSettings().setValue("StarScore/practice/useWindow", false);
+    if (dockWindowProvider() && dockWindowProvider()->window()) {
+        dockWindowProvider()->window()->setDockOpen("starscorePracticePanel", true);
+    }
+    if (interactive()) {
+        interactive()->close(muse::Uri(PRACTICE_WINDOW_URI));
+    }
+}
+
+void PracticePanelModel::windowClosed(int width, int height)
+{
+    QSettings s;
+    if (width > 100 && height > 100) {
+        s.setValue("StarScore/practice/windowWidth", width);
+        s.setValue("StarScore/practice/windowHeight", height);
+    }
+    resetSpeed();
+}
+
 void PracticePanelModel::load()
 {
     // (1.29.0, Joel: a speed set here goes back to normal when Practice is closed) playback's speed and Listen's
@@ -38,15 +100,11 @@ void PracticePanelModel::load()
             if (!names.contains("starscorePracticePanel") || window->isDockOpen("starscorePracticePanel")) {
                 return;
             }
-            if (playbackController() && !qFuzzyCompare(playbackController()->tempoMultiplier(), 1.0)) {
-                playbackController()->setTempoMultiplier(1.0);
+            // (not while Practice is open in its own window: the dock closes when it opens there)
+            if (interactive() && interactive()->isOpened(muse::Uri(PRACTICE_WINDOW_URI)).val) {
+                return;
             }
-            if (m_listen && !qFuzzyCompare(m_listen->speed(), 1.0)) {
-                m_listen->setSpeed(1.0);
-                emit listenChanged();
-                emit listenPositionChanged();
-            }
-            emit changed();
+            resetSpeed();
         });
     });
     if (playbackController()) {

@@ -684,6 +684,41 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             playbackController()->setTempoMultiplier(step.mid(6).toDouble() / 100.0);
         }
         autotestLog(QString("  speed %1%").arg(playbackController()->tempoMultiplier() * 100.0, 0, 'f', 0));
+    } else if (step.startsWith("practicewindow:")) {
+        // practicewindow:<W>:<H>[:<shot name>]: Practice in its own window (1.29.1), stretched to W x H; logs its size and
+        // saves a picture of it
+        const QStringList a = step.mid(15).split(':');
+        muse::UriQuery q("musescore://starscore/practicewindow");
+        q.addParam("sync", muse::Val(false));
+        q.addParam("modal", muse::Val(false));
+        interactive()->open(q);
+        QElapsedTimer t;
+        t.start();
+        while (t.elapsed() < 2500) {
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 25);
+        }
+        QQuickWindow* win = nullptr;
+        for (QWindow* w : QGuiApplication::topLevelWindows()) {
+            if (w->isVisible() && w->title() == "Practice") {
+                win = qobject_cast<QQuickWindow*>(w);
+            }
+        }
+        if (!win) {
+            autotestLog("  no Practice window");
+        } else {
+            const QSize before = win->size();
+            win->resize(a.value(0).toInt(), a.value(1).toInt());
+            t.restart();
+            while (t.elapsed() < 1500) {
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 25);
+            }
+            autotestLog(QString("  Practice window: %1x%2 -> asked %3x%4 -> %5x%6; open %7").arg(before.width()).arg(before.height())
+                        .arg(a.value(0), a.value(1)).arg(win->width()).arg(win->height())
+                        .arg(interactive()->isOpened(muse::Uri("musescore://starscore/practicewindow")).val));
+            if (!a.value(2).isEmpty()) {
+                win->grabWindow().save(autotestDir() + "/" + a.value(2) + ".png");
+            }
+        }
     } else if (step.startsWith("floatdock:")) {
         // floatdock:<dock name>:<W>:<H>: the panel undocked (if it isn't), its window stretched to W x H; logs the size
         // it ends up (1.29.0: Practice undocked was held to 520 px high)

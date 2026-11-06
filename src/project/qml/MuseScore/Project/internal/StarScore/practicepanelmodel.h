@@ -16,6 +16,7 @@
 #include "context/iglobalcontext.h"
 #include "playback/iplaybackcontroller.h"
 #include "dockwindow/idockwindowprovider.h"
+#include "iinteractive.h"
 #include "dockwindow/idockwindow.h"
 #include "project/istarscoreservice.h"
 #include "project/internal/starscore/starscorejam.h"
@@ -84,6 +85,7 @@ class PracticePanelModel : public QObject, public muse::Contextable, public muse
     muse::ContextInject<muse::actions::IActionsDispatcher> dispatcher = { this };
     muse::ContextInject<IStarScoreService> starScore = { this };
     muse::ContextInject<muse::dock::IDockWindowProvider> dockWindowProvider = { this };
+    muse::ContextInject<muse::IInteractive> interactive = { this };
 
 public:
     explicit PracticePanelModel(QObject* parent = nullptr);
@@ -102,6 +104,16 @@ public:
     Q_INVOKABLE void load();
     //! (1.28.0) the Song page's Watch / Jam / Listen: the mode it asked for, once
     Q_INVOKABLE void takeRequestedMode();
+    //! (1.29.1, Joel: the docked/floating panel is "very tough to wrangle") Practice in a window of its own, an ordinary
+    //! resizable window at the size it last had; the dock closes. Closing the window puts the speed back to 100%.
+    Q_INVOKABLE void openWindow();
+    Q_INVOKABLE void windowClosed(int width, int height);
+    //! the window's "Back to the panel": the dock again from now on
+    Q_INVOKABLE void backToPanel();
+    //! the window was the last place Practice was used: opening the panel opens the window instead
+    Q_INVOKABLE bool prefersWindow() const;
+    //! back to 100% (playback's speed and Listen's)
+    Q_INVOKABLE void resetSpeed();
     Q_INVOKABLE void togglePlay();
     Q_INVOKABLE void rewind();
     Q_INVOKABLE void toggleLoop();

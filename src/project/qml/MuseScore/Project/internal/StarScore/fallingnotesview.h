@@ -128,6 +128,12 @@ private:
     double m_externalTime = -1;
     double m_positionSecs = 0;   // the last position playback reported
     QElapsedTimer m_sincePosition;
+    //! (1.29.1, Joel: "it jitters occasionally") the time drawn while playing: moves on smoothly with the clock and is
+    //! eased toward playback's reports (which come in uneven steps), only jumping for a real jump (a seek)
+    double m_smooth = 0;
+    bool m_smoothValid = false;
+    QElapsedTimer m_smoothTick;
+    double reportedNow() const;
     QTimer m_frameTimer;
     QTimer m_reloadTimer;
     mu::notation::INotationPtr m_notation;

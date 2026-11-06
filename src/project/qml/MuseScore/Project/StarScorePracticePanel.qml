@@ -24,6 +24,12 @@ Item {
 
     property NavigationSection navigationSection: null
     property int navigationOrderStart: 1
+    //! (1.29.1) shown in Practice's own window (StarScorePracticeWindow) rather than the dock
+    property bool inWindow: false
+
+    function windowClosed(width, height) {
+        practice.windowClosed(width, height)
+    }
 
     PracticePanelModel {
         id: practice
@@ -32,11 +38,19 @@ Item {
     Component.onCompleted: {
         practice.load()
         practice.takeRequestedMode()
+        handOverToWindow()
     }
     // (1.28.0) the Song page's Watch / Jam / Listen, when the panel was already open
     onVisibleChanged: {
         if (visible) {
             practice.takeRequestedMode()
+            handOverToWindow()
+        }
+    }
+    // (1.29.1) Practice last used in its own window: the panel opens the window instead
+    function handOverToWindow() {
+        if (!root.inWindow && root.visible && practice.prefersWindow()) {
+            Qt.callLater(practice.openWindow)
         }
     }
 
@@ -290,6 +304,22 @@ Item {
             }
 
             Item { Layout.fillWidth: true }
+
+            // (1.29.1) Practice in a window of its own
+            FlatButton {
+                visible: !root.inWindow
+                icon: IconCode.OPEN_LINK
+                text: qsTrc("starscore", "Own window")
+                toolTipTitle: qsTrc("starscore", "Open Practice in its own window")
+                toolTipDescription: qsTrc("starscore", "An ordinary window you can move to any screen and make any size. The panel here closes.")
+                onClicked: practice.openWindow()
+            }
+            FlatButton {
+                visible: root.inWindow
+                text: qsTrc("starscore", "Back to the panel")
+                toolTipTitle: qsTrc("starscore", "Practice in the panel under the score again")
+                onClicked: practice.backToPanel()
+            }
 
             // Watch's look
             RowLayout {

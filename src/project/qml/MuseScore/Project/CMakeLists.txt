@@ -219,6 +219,7 @@ qt_add_qml_module(project_qml
         StarScoreAuditPanel.qml
         StarScoreTodoPanel.qml
         StarScorePracticePanel.qml
+        StarScorePracticeWindow.qml
         AuditLibraryDialog.qml
         StarScoreDashboard.qml
         StarScoreSongHub.qml

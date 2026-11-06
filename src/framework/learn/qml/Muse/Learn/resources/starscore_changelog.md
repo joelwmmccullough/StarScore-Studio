@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.29.1
+- **Practice in its own window.** "Own window" at the top of the Practice panel opens everything the panel has (Watch, Jam, Listen) in an ordinary window: move it to any screen, make it any size. It opens again at the size you last left it. Once you've used the window, opening Practice opens the window; "Back to the panel" in the window returns it to the dock. Closing the window puts the speed back to 100%.
+- **Falling notes move smoothly.** They used to jump a little each time playback reported where it was (the reports come unevenly), and froze then caught up when a report was late. Now they move on steadily and ease toward playback's position, jumping only for a real jump (going to another bar). Their frames are timed more evenly too.
+
 ## 1.29.0
 
 - **Home is now a song library.** Home's right half is "Songs": every song as a card with its kind, where it is (Repertoire, In progress, Sketch), how often it's played, its key, tempo and length, its tags, and a bar showing how many of its arrangements are done. Search by title, tag, key or anything on the card; pick Originals or Covers; click a tag to see only the songs with it. Click a card to open the song on its Song page (or go to its Song page, if it's open already). The progress grid and the to-do list are still below. The first time, StarScore reads every song again for the new facts, which takes a few minutes in the background.

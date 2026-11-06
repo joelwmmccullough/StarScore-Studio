@@ -64,6 +64,7 @@ FallingNotesView::FallingNotesView(QQuickItem* parent)
         m_seekTarget = -1;
     });
     m_frameTimer.setInterval(16);
+    m_frameTimer.setTimerType(Qt::PreciseTimer);   // (a coarse timer's frames come unevenly)
     connect(&m_frameTimer, &QTimer::timeout, this, &FallingNotesView::onFrame);
     m_reloadTimer.setSingleShot(true);
     m_reloadTimer.setInterval(300);
@@ -124,12 +125,14 @@ void FallingNotesView::listen()
         m_positionSecs = double(secs);
         m_sincePosition.restart();
         if (!m_playing) {
+            m_smoothValid = false;
             update();
         }
     });
     playbackController()->isPlayingChanged().onNotify(this, [this]() {
         m_playing = playbackController()->isPlaying();
         m_sincePosition.restart();
+        m_smoothValid = false;
         if (m_playing || m_waitMode) {
             m_frameTimer.start();
         } else {
@@ -167,6 +170,25 @@ void FallingNotesView::listen()
 
 void FallingNotesView::onFrame()
 {
+    if (m_playing && !m_waitMode && m_externalTime < 0) {
+        const double target = reportedNow();
+        const double dt = m_smoothTick.isValid() ? std::min<qint64>(m_smoothTick.restart(), 100) / 1000.0 : 0.0;
+        if (!m_smoothTick.isValid()) {
+            m_smoothTick.start();
+        }
+        if (!m_smoothValid) {
+            m_smooth = target;
+            m_smoothValid = true;
+        } else {
+            m_smooth += dt;
+            const double err = target - m_smooth;
+            if (std::abs(err) > 0.2) {
+                m_smooth = target;   // a seek, or playback far off: jump
+            } else {
+                m_smooth += err * 0.08;   // eased: a few frames to take up a report's step
+            }
+        }
+    }
     if (m_waitMode) {
         const double dt = std::min<qint64>(m_waitTick.restart(), 100) / 1000.0;
         const bool wasHolding = m_wait.holding();
@@ -360,9 +382,14 @@ double FallingNotesView::now() const
     if (!m_playing) {
         return m_positionSecs;
     }
+    return m_smoothValid ? m_smooth : reportedNow();
+}
+
+double FallingNotesView::reportedNow() const
+{
     // between playback's reports, the music moves on at its own speed (the reported seconds already include the
     // playback speed)
-    return m_positionSecs + std::min<qint64>(m_sincePosition.elapsed(), 500) / 1000.0;
+    return m_positionSecs + std::min<qint64>(m_sincePosition.elapsed(), 1000) / 1000.0;
 }
 
 void FallingNotesView::reload()
@@ -432,6 +459,7 @@ void FallingNotesView::scrollBy(double secs)
     } else {
         m_positionSecs = to;
         m_sincePosition.restart();
+        m_smoothValid = false;
         m_seekTarget = to;
         if (!m_seekTimer.isActive()) {
             m_seekTimer.start();
