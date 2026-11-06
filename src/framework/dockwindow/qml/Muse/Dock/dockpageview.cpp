@@ -233,6 +233,12 @@ void DockPageView::setDockOpen(const QString& dockName, bool open)
         return;
     }
 
+    // StarScore (1.28.0): already open as a tab behind another (the To-do panel behind Palettes): brought to the front
+    if (panel->isOpen()) {
+        panel->makeCurrentTab();
+        return;
+    }
+
     DockPanelView* destinationPanel = findPanelForTab(panel);
     if (destinationPanel) {
         destinationPanel->addPanelAsTab(panel);

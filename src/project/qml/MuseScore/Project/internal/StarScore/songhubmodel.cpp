@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <map>
+#include <memory>
 #include <set>
 
 #include <QDateTime>
@@ -451,9 +452,9 @@ void SongHubModel::openSolo(const QString& soloId)
 void SongHubModel::openPanel(const QString& which)
 {
     static const std::map<QString, std::pair<const char*, const char*> > PANELS {
-        { "todo", { "starscoreTodoPanel", "toggle-starscore-todo" } },
-        { "reference", { "starscoreReferencePanel", "toggle-starscore-reference" } },
-        { "practice", { "starscorePracticePanel", "toggle-starscore-practice" } },
+        { "todo", { "starscoreTodoPanel", "" } },
+        { "reference", { "starscoreReferencePanel", "" } },
+        { "practice", { "starscorePracticePanel", "" } },
     };
     const auto it = PANELS.find(which);
     toScore();
@@ -461,13 +462,24 @@ void SongHubModel::openPanel(const QString& which)
         return;
     }
     const QString dock = QString::fromLatin1(it->second.first);
-    const std::string action = it->second.second;
-    // (the panel belongs to the score's page: opened once that page is showing)
-    QTimer::singleShot(300, this, [this, dock, action]() {
-        if (dockWindowProvider() && dockWindowProvider()->window() && !dockWindowProvider()->window()->isDockOpen(dock)) {
-            dispatcher()->dispatch(action);
+    // (the panel belongs to the score's page: opened, or its tab brought to the front, once that page is showing.
+    // This page, and this model with it, is unloaded when the score's page shows, so the timer is on its own.)
+    auto provider = dockWindowProvider();
+    auto tries = std::make_shared<int>(0);
+    auto timer = new QTimer();
+    timer->setInterval(200);
+    QObject::connect(timer, &QTimer::timeout, timer, [provider, dock, tries, timer]() {
+        muse::dock::IDockWindow* window = provider ? provider->window() : nullptr;
+        if (window && window->currentPageUri() == "musescore://notation") {
+            window->setDockOpen(dock, true);
+            timer->stop();
+            timer->deleteLater();
+        } else if (++*tries > 25) {
+            timer->stop();
+            timer->deleteLater();
         }
     });
+    timer->start();
 }
 
 void SongHubModel::openReference(const QString& referenceId)

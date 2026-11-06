@@ -308,6 +308,17 @@ void DockPanelView::addPanelAsTab(DockPanelView* tab)
     tab->setVisible(true);
 }
 
+void DockPanelView::makeCurrentTab()
+{
+    if (!dockWidget()) {
+        return;
+    }
+    KDDockWidgets::Frame* frame = dockWidget()->frame();
+    if (frame) {
+        frame->setCurrentDockWidget(dockWidget());
+    }
+}
+
 void DockPanelView::setCurrentTabIndex(int index)
 {
     IF_ASSERT_FAILED(dockWidget()) {

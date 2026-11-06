@@ -58,6 +58,8 @@ public:
     bool isTabAllowed(const DockPanelView* tab) const;
     void addPanelAsTab(DockPanelView* tab);
     void setCurrentTabIndex(int index);
+    //! StarScore (1.28.0): this panel's tab made the one showing in its tab group
+    void makeCurrentTab();
 
 public slots:
     void setGroupName(const QString& name);
