@@ -13,7 +13,11 @@ Version numbers: the first number changes when files stop being compatible, the 
   - **Demos:** the demos in the song's Sheets and Demos folder, with play and stop right on the page, and a bar showing where it is (click it to jump).
   - **Pictures of the sheets:** opening a folder under "In Sheets and Demos" shows each PDF's first page (on the Mac). Click one to open it.
   - **Songbooks:** the albums of Home › Songbooks the song is on, with its track number (when Songbooks are turned on in Preferences).
-- **Practice undocked can be any size.** Pulled out of the window, the Practice panel now stretches as tall as the screen (it was held to about a third). Docked at the bottom, it keeps the old limit.
+- **Practice:**
+  - **The falling notes are what you hear.** They now come from StarScore's playback itself, so a trill falls as its alternating notes, a tremolo as its repeated notes, a staccato or staccatissimo note is short, an arpeggio rolls, and grace notes, mordents, turns and glissandos fall as they sound. Repeated notes show a small gap between them. Wait for me waits for the written notes only: a trill's other notes fall too, and playing them isn't counted wrong.
+  - **Scroll or drag through the music.** Over the falling notes, scroll up (or drag down) to go on, scroll down (or drag up) to go back; playback and the score's cursor follow. In Listen, each step is a bar.
+  - **Speed goes back to 100% when Practice is closed.**
+  - **Undocked, it can be any size.** Pulled out of the window, the Practice panel now stretches as tall as the screen (it was held to about a third). Docked at the bottom, it keeps the old limit.
 
 ## 1.28.2
 

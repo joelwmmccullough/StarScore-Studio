@@ -674,6 +674,10 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         interactive()->open(UriQuery(section.isEmpty() ? std::string("musescore://home")
                                      : ("musescore://home?section=" + section.toStdString())));
         autotestLog("  home " + section);
+    } else if (step.startsWith("seekbar:")) {
+        // seekbar:<bar>: playback (and the falling notes) to the start of that bar (1-based)
+        playbackController()->seekBeat(step.mid(8).toInt() - 1, 0);
+        autotestLog("  playback at bar " + step.mid(8));
     } else if (step == "speed" || step.startsWith("speed:")) {
         // speed[:<percent>]: playback's speed set (or just logged), as Practice's Speed slider does (1.29.0)
         if (step.startsWith("speed:")) {
