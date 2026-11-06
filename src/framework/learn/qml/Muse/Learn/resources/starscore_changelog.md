@@ -6,6 +6,7 @@ Version numbers: the first number changes when files stop being compatible, the 
 
 ## 1.29.1
 - **Practice in its own window.** "Own window" at the top of the Practice panel opens everything the panel has (Watch, Jam, Listen) in an ordinary window: move it to any screen, make it any size. It opens again at the size you last left it. Once you've used the window, opening Practice opens the window; "Back to the panel" in the window returns it to the dock. Closing the window puts the speed back to 100%.
+- **A solo's twelve keys beam like the main score.** A key's part score kept its own copy of the first time signature, not linked to the main score's, so beam groups changed there (Renaissance's 7/4) didn't reach eleven of the twelve keys, and bars 1–14 beamed differently in them. Every time signature's beam groups are now taken from the main score whenever the keys are set up (when the song opens, and before exporting the sheets).
 - **Falling notes move smoothly.** They used to jump a little each time playback reported where it was (the reports come unevenly), and froze then caught up when a report was late. Now they move on steadily and ease toward playback's position, jumping only for a real jump (going to another bar). Their frames are timed more evenly too.
 
 ## 1.29.0

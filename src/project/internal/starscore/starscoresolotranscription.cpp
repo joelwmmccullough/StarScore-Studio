@@ -53,6 +53,7 @@
 #include "engraving/dom/part.h"
 #include "engraving/dom/pitchspelling.h"
 #include "engraving/dom/segment.h"
+#include "engraving/dom/timesig.h"
 #include "engraving/dom/staff.h"
 #include "engraving/editing/transpose.h"
 #include "engraving/style/style.h"
@@ -1181,6 +1182,34 @@ void StarScoreService::respellSoloKey(engraving::Score* es, const engraving::Int
                 kl->setKey(tick, ev);
             }
         }
+    }
+    // (1.29.1, Joel: "the parts are not matching the beaming of the main score") the time signatures' beam groups as
+    // the main score's: a part score's first time signature isn't linked to the main score's (later ones are), so
+    // Renaissance's 7/4 beam groups, changed in the main score, stayed as they were in eleven of the twelve keys and
+    // bars 1-14 beamed differently there
+    bool regrouped = false;
+    for (Segment* s = es->firstSegment(SegmentType::TimeSig); s; s = s->next1(SegmentType::TimeSig)) {
+        Segment* msSeg = ms->tick2segment(s->tick(), true, SegmentType::TimeSig);
+        if (!msSeg) {
+            continue;
+        }
+        for (staff_idx_t si = 0; si < es->nstaves() && si < ms->nstaves(); ++si) {
+            EngravingItem* e = s->element(si * VOICES);
+            EngravingItem* me = msSeg->element(si * VOICES);
+            if (!e || !e->isTimeSig() || !me || !me->isTimeSig()) {
+                continue;
+            }
+            TimeSig* ts = toTimeSig(e);
+            const TimeSig* mts = toTimeSig(me);
+            if (ts->sig() == mts->sig() && !(ts->groups() == mts->groups())) {
+                ts->setGroups(mts->groups());
+                regrouped = true;
+            }
+        }
+    }
+    if (regrouped) {
+        es->setLayoutAll();
+        LOGI() << "[starscore] solo key part score: time signatures' beam groups set as the main score's";
     }
     for (Segment* s = es->firstSegment(SegmentType::KeySig); s; s = s->next1(SegmentType::KeySig)) {
         for (staff_idx_t si = 0; si < es->nstaves(); ++si) {
