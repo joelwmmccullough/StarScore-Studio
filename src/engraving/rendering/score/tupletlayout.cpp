@@ -21,6 +21,9 @@
  */
 #include "tupletlayout.h"
 
+#include <cstdio>
+#include <cstdlib>
+
 #include "dom/beam.h"
 #include "dom/chord.h"
 #include "dom/note.h"
@@ -165,6 +168,14 @@ void TupletLayout::starscorePlaceNumberAtCrossBeam(Tuplet* item, const ChordRest
             chords.add(cr->ldata()->shape().translated(cr->pagePos()));
         }
     }
+    if (std::getenv("STARSCORE_TUPLET_DEBUG")) {
+        std::fprintf(stderr, "tuplet %d: beam %.2f,%.2f-%.2f,%.2f mid %.2f, staves:", cr1->tick().ticks(), x1 / sp, y1 / sp, x2 / sp,
+                     y2 / sp, midX / sp);
+        for (const auto& band : staffBands) {
+            std::fprintf(stderr, " %.2f-%.2f", band.first / sp, band.second / sp);
+        }
+        std::fprintf(stderr, "\n");
+    }
     auto clear = [&](const RectF& r) {
         for (const auto& band : staffBands) {
             if (r.bottom() > band.first && r.top() < band.second) {
@@ -219,6 +230,15 @@ void TupletLayout::starscorePlaceNumberAtCrossBeam(Tuplet* item, const ChordRest
                     first = false;
                 }
                 const RectF box(cx - 0.5 * nb.width(), cy - 0.5 * nb.height(), nb.width(), nb.height());
+                if (std::getenv("STARSCORE_TUPLET_DEBUG")) {
+                    bool onStaff = false;
+                    for (const auto& band : staffBands) {
+                        onStaff = onStaff || (box.bottom() > band.first && box.top() < band.second);
+                    }
+                    std::fprintf(stderr, "tuplet %d: shift %.2f %s gap %.2f box y %.2f-%.2f x %.2f-%.2f staff %d notes %d\n",
+                                 cr1->tick().ticks(), shifts[si] / sp, up ? "above" : "below", g, box.top() / sp, box.bottom() / sp,
+                                 box.left() / sp, box.right() / sp, int(onStaff), int(chords.intersects(box)));
+                }
                 if (clear(box)) {
                     best = c;
                     found = true;
