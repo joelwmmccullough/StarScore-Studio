@@ -86,6 +86,8 @@
 #include <QSettings>
 
 #include <QCoreApplication>
+#include "engraving/dom/groups.h"
+#include "engraving/dom/timesig.h"
 #include <QGuiApplication>
 #include <QImage>
 #include <QQuickWindow>
@@ -684,6 +686,43 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             playbackController()->setTempoMultiplier(step.mid(6).toDouble() / 100.0);
         }
         autotestLog(QString("  speed %1%").arg(playbackController()->tempoMultiplier() * 100.0, 0, 'f', 0));
+    } else if (step.startsWith("beamdump:")) {
+        // beamdump:<bar>: how the score showing beams that bar (1.29.2): the time signature each staff finds there, its
+        // beam groups, and per chord/rest of voice 1 its beam mode, what the groups say, and its beam's size
+        using namespace mu::engraving;
+        Score* sc = globalContext()->currentNotation()->elements()->msScore();
+        Measure* m = sc->firstMeasure();
+        for (int i = 1; m && i < step.mid(9).toInt(); ++i) {
+            m = m->nextMeasure();
+        }
+        for (staff_idx_t si = 0; m && si < std::min<size_t>(sc->nstaves(), 2); ++si) {
+            Staff* st = sc->staff(si);
+            TimeSig* ts = st->timeSig(m->tick());
+            QString nodes;
+            if (ts) {
+                for (const GroupNode& n : ts->groups().nodes()) {
+                    nodes += QString(" %1:%2").arg(n.pos).arg(n.action);
+                }
+            }
+            autotestLog(QString("  %1 bar %2 staff %3: timesig %4 at %5 %6/%7 groups%8 | staff timesigs list for tick %9; stretch %10")
+                        .arg(sc->isMaster() ? "main" : "part").arg(m->no() + 1).arg(si)
+                        .arg(ts ? "found" : "NONE").arg(ts && ts->segment() ? ts->segment()->tick().ticks() : -1)
+                        .arg(ts ? ts->sig().numerator() : 0).arg(ts ? ts->sig().denominator() : 0).arg(nodes.left(160))
+                        .arg(m->tick().ticks()).arg(st->timeStretch(m->tick()).toString().toQString()));
+            QStringList crs;
+            ChordRest* prev = nullptr;
+            for (Segment* sg = m->first(SegmentType::ChordRest); sg; sg = sg->next(SegmentType::ChordRest)) {
+                EngravingItem* e = sg->element(si * VOICES);
+                if (!e || !e->isChordRest()) {
+                    continue;
+                }
+                ChordRest* cr = toChordRest(e);
+                crs << QString("%1:%2 m%3 g%4 b%5").arg(cr->rtick().ticks()).arg(cr->ticks().ticks()).arg(int(cr->beamMode()))
+                    .arg(int(Groups::actualBeamMode(cr, prev))).arg(cr->beam() ? int(cr->beam()->elements().size()) : 0);
+                prev = cr;
+            }
+            autotestLog("    " + crs.join("  "));
+        }
     } else if (step.startsWith("practicewindow:")) {
         // practicewindow:<W>:<H>[:<shot name>]: Practice in its own window (1.29.1), stretched to W x H; logs its size and
         // saves a picture of it
