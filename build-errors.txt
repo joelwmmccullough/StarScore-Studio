@@ -1,0 +1,155 @@
+run 297 commit 0f0d33c4be22b5827a4196ee57e36ed0df101c5f
+1157:FAILED: [code=1] src/project/CMakeFiles/project.dir/internal/starscore/starscoreautotest.cpp.o 
+1170:../src/project/internal/starscore/starscoreautotest.cpp:826:42: error: ‘starScore’ was not declared in this scope; did you mean ‘hasScore’?
+
+---- tail ----
+[600/3056] Generating .rcc/qmlcache/notationscene_qml_elementpopups/StaffVisibilityPopup_qml.cpp, .rcc/qmlcache/notationscene_qml_elementpopups/StaffVisibilityPopup_qml.cpp.aotstats
+[601/3056] Generating .rcc/qmlcache/notationscene_qml_elementpopups/StringTuningsPopup_qml.cpp, .rcc/qmlcache/notationscene_qml_elementpopups/StringTuningsPopup_qml.cpp.aotstats
+[602/3056] Generating .rcc/qmlcache/notationscene_qml_internal/CustomiseControlPanel_qml.cpp, .rcc/qmlcache/notationscene_qml_internal/CustomiseControlPanel_qml.cpp.aotstats
+[603/3056] Generating .rcc/qmlcache/notationscene_qml_internal/CustomiseView_qml.cpp, .rcc/qmlcache/notationscene_qml_internal/CustomiseView_qml.cpp.aotstats
+[604/3056] Generating .rcc/qmlcache/notationscene_qml_internal/NotationSwitchButton_qml.cpp, .rcc/qmlcache/notationscene_qml_internal/NotationSwitchButton_qml.cpp.aotstats
+[605/3056] Building CXX object src/framework/extensions/CMakeFiles/muse_extensions.dir/Unity/unity_0_cxx.cxx.o
+[606/3056] Generating .rcc/qmlcache/notationscene_qml_internal/NotationSwitchPanel_qml.cpp, .rcc/qmlcache/notationscene_qml_internal/NotationSwitchPanel_qml.cpp.aotstats
+[607/3056] Generating .rcc/qmlcache/notationscene_qml_internal/NotationSwitchScrollArrowButton_qml.cpp, .rcc/qmlcache/notationscene_qml_internal/NotationSwitchScrollArrowButton_qml.cpp.aotstats
+[608/3056] Generating .rcc/qmlcache/notationscene_qml_internal/NoteInputBarActionDelegate_qml.cpp, .rcc/qmlcache/notationscene_qml_internal/NoteInputBarActionDelegate_qml.cpp.aotstats
+[609/3056] Generating .rcc/qmlcache/notationscene_qml_internal/NoteInputBarCustomisePopup_qml.cpp, .rcc/qmlcache/notationscene_qml_internal/NoteInputBarCustomisePopup_qml.cpp.aotstats
+[610/3056] Generating .rcc/qmlcache/notationscene_qml_internal/PartDelegate_qml.cpp, .rcc/qmlcache/notationscene_qml_internal/PartDelegate_qml.cpp.aotstats
+[611/3056] Generating .rcc/qmlcache/notationscene_qml_internal/PartsTopPanel_qml.cpp, .rcc/qmlcache/notationscene_qml_internal/PartsTopPanel_qml.cpp.aotstats
+[612/3056] Generating .rcc/qmlcache/notationscene_qml_internal/PartsView_qml.cpp, .rcc/qmlcache/notationscene_qml_internal/PartsView_qml.cpp.aotstats
+[613/3056] Generating .rcc/qmlcache/notationscene_qml_internal/SearchPopup_qml.cpp, .rcc/qmlcache/notationscene_qml_internal/SearchPopup_qml.cpp.aotstats
+[614/3056] Generating .rcc/qmlcache/notationscene_qml_internal/SelectionFilterSection_qml.cpp, .rcc/qmlcache/notationscene_qml_internal/SelectionFilterSection_qml.cpp.aotstats
+[615/3056] Generating .rcc/qmlcache/notationscene_qml_internal/VoicesPopup_qml.cpp, .rcc/qmlcache/notationscene_qml_internal/VoicesPopup_qml.cpp.aotstats
+[616/3056] Generating .rcc/qmlcache/notationscene_qml_NotationToolBar_qml.cpp, .rcc/qmlcache/notationscene_qml_NotationToolBar_qml.cpp.aotstats
+[617/3056] Generating .rcc/qmlcache/notationscene_qml_NoteInputBar_qml.cpp, .rcc/qmlcache/notationscene_qml_NoteInputBar_qml.cpp.aotstats
+[618/3056] Generating .rcc/qmlcache/notationscene_qml_NotationView_qml.cpp, .rcc/qmlcache/notationscene_qml_NotationView_qml.cpp.aotstats
+[619/3056] Generating .rcc/qmlcache/notationscene_qml_PartsDialog_qml.cpp, .rcc/qmlcache/notationscene_qml_PartsDialog_qml.cpp.aotstats
+[620/3056] Generating .rcc/qmlcache/notationscene_qml_PercussionPanel_qml.cpp, .rcc/qmlcache/notationscene_qml_PercussionPanel_qml.cpp.aotstats
+[621/3056] Generating .rcc/qmlcache/notationscene_qml_percussionpanel/PercussionPanelPad_qml.cpp, .rcc/qmlcache/notationscene_qml_percussionpanel/PercussionPanelPad_qml.cpp.aotstats
+[622/3056] Generating .rcc/qmlcache/notationscene_qml_percussionpanel/PercussionPanelPadContent_qml.cpp, .rcc/qmlcache/notationscene_qml_percussionpanel/PercussionPanelPadContent_qml.cpp.aotstats
+[623/3056] Generating .rcc/qmlcache/notationscene_qml_percussionpanel/PercussionPanelToolBar_qml.cpp, .rcc/qmlcache/notationscene_qml_percussionpanel/PercussionPanelToolBar_qml.cpp.aotstats
+[624/3056] Generating .rcc/qmlcache/notationscene_qml_PercussionPanelPadSwapDialog_qml.cpp, .rcc/qmlcache/notationscene_qml_PercussionPanelPadSwapDialog_qml.cpp.aotstats
+[625/3056] Generating .rcc/qmlcache/notationscene_qml_PianoKeyboardPanel_qml.cpp, .rcc/qmlcache/notationscene_qml_PianoKeyboardPanel_qml.cpp.aotstats
+[626/3056] Generating .rcc/qmlcache/notationscene_qml_SelectionFilterPanel_qml.cpp, .rcc/qmlcache/notationscene_qml_SelectionFilterPanel_qml.cpp.aotstats
+[627/3056] Generating .rcc/qmlcache/notationscene_qml_SelectMeasuresCountDialog_qml.cpp, .rcc/qmlcache/notationscene_qml_SelectMeasuresCountDialog_qml.cpp.aotstats
+[628/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/AccidentalsPage_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/AccidentalsPage_qml.cpp.aotstats
+[629/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/BeamsPage_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/BeamsPage_qml.cpp.aotstats
+[630/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/BendsPage_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/BendsPage_qml.cpp.aotstats
+[631/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/ChordSymbolsPage_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/ChordSymbolsPage_qml.cpp.aotstats
+[632/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/ClefKeyTimeSigPage_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/ClefKeyTimeSigPage_qml.cpp.aotstats
+[633/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/ComboBoxDropdown_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/ComboBoxDropdown_qml.cpp.aotstats
+[634/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/FretboardsPage_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/FretboardsPage_qml.cpp.aotstats
+[635/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/GlissandoSection_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/GlissandoSection_qml.cpp.aotstats
+[636/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/HammerOnPullOffTappingPage_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/HammerOnPullOffTappingPage_qml.cpp.aotstats
+[637/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/IconAndTextButtonSelector_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/IconAndTextButtonSelector_qml.cpp.aotstats
+[638/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/ItemWithTitle_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/ItemWithTitle_qml.cpp.aotstats
+[639/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/LaissezVibrSection_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/LaissezVibrSection_qml.cpp.aotstats
+[640/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/LineStyleSection_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/LineStyleSection_qml.cpp.aotstats
+[641/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/NoteFlagsTypeSelector_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/NoteFlagsTypeSelector_qml.cpp.aotstats
+[642/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/MeasureNumbersPage_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/MeasureNumbersPage_qml.cpp.aotstats
+[643/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/NoteLineSection_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/NoteLineSection_qml.cpp.aotstats
+[644/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/RadioButtonSelectorWithReset_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/RadioButtonSelectorWithReset_qml.cpp.aotstats
+[645/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/RepeatBarlinesSection_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/RepeatBarlinesSection_qml.cpp.aotstats
+[646/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/RepeatPage_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/RepeatPage_qml.cpp.aotstats
+[647/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/RestOffsetSelector_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/RestOffsetSelector_qml.cpp.aotstats
+[648/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/SlursAndTiesPage_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/SlursAndTiesPage_qml.cpp.aotstats
+[649/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/SlursSection_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/SlursSection_qml.cpp.aotstats
+[650/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/StyleControlRowWithReset_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/StyleControlRowWithReset_qml.cpp.aotstats
+[651/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/StyleDialogPage_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/StyleDialogPage_qml.cpp.aotstats
+[652/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/StyledImage_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/StyledImage_qml.cpp.aotstats
+[653/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/StyledXYControllerWithReset_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/StyledXYControllerWithReset_qml.cpp.aotstats
+[654/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/StyleResetButton_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/StyleResetButton_qml.cpp.aotstats
+[655/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/StyleSpinboxWithReset_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/StyleSpinboxWithReset_qml.cpp.aotstats
+[656/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/StyleToggle_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/StyleToggle_qml.cpp.aotstats
+[657/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/StyleToggleWithImage_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/StyleToggleWithImage_qml.cpp.aotstats
+[658/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/TextFieldWithReset_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/TextFieldWithReset_qml.cpp.aotstats
+[659/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/TiesSection_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/TiesSection_qml.cpp.aotstats
+[660/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/TupletCenteringSelector_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/TupletCenteringSelector_qml.cpp.aotstats
+[661/3056] Generating .rcc/qmlcache/notationscene_qml_TempoView_qml.cpp, .rcc/qmlcache/notationscene_qml_TempoView_qml.cpp.aotstats
+[662/3056] Generating .rcc/qmlcache/notationscene_qml_styledialog/VoltasPage_qml.cpp, .rcc/qmlcache/notationscene_qml_styledialog/VoltasPage_qml.cpp.aotstats
+[663/3056] Generating .rcc/qmlcache/notationscene_qml_Timeline_qml.cpp, .rcc/qmlcache/notationscene_qml_Timeline_qml.cpp.aotstats
+[664/3056] Generating .rcc/qmlcache/notationscene_qml_UndoHistoryPanel_qml.cpp, .rcc/qmlcache/notationscene_qml_UndoHistoryPanel_qml.cpp.aotstats
+[665/3056] Generating .rcc/qmlcache/notationscene_qml_UndoRedoToolBar_qml.cpp, .rcc/qmlcache/notationscene_qml_UndoRedoToolBar_qml.cpp.aotstats
+[666/3056] Generating .rcc/qmlcache/notationscene_qml_ViewModeControl_qml.cpp, .rcc/qmlcache/notationscene_qml_ViewModeControl_qml.cpp.aotstats
+[667/3056] Generating .rcc/qmlcache/notationscene_qml_ZoomControl_qml.cpp, .rcc/qmlcache/notationscene_qml_ZoomControl_qml.cpp.aotstats
+[668/3056] Running rcc for resource notationscene_qml_raw_res_0
+[669/3056] Running rcc for resource notationscene_qml_raw_qml_0_extra_qmldirs
+[670/3056] Running rcc for resource notationscene_qml_raw_qml_0
+[671/3056] Automatic MOC and UIC for target notationscene_qmlplugin
+[672/3056] Building CXX object src/musesounds/CMakeFiles/musesounds.dir/Unity/unity_0_cxx.cxx.o
+[673/3056] Building CXX object src/notationscene/qml/MuseScore/NotationScene/CMakeFiles/notationscene_qml.dir/Unity/unity_11_cxx.cxx.o
+[674/3056] Building CXX object src/notationscene/qml/MuseScore/NotationScene/CMakeFiles/notationscene_qml.dir/Unity/unity_10_cxx.cxx.o
+[675/3056] Building CXX object src/instrumentsscene/CMakeFiles/instrumentsscene.dir/Unity/unity_0_cxx.cxx.o
+[676/3056] Building CXX object src/notationscene/qml/MuseScore/NotationScene/CMakeFiles/notationscene_qml.dir/Unity/unity_9_cxx.cxx.o
+[677/3056] Building CXX object src/notationscene/qml/MuseScore/NotationScene/CMakeFiles/notationscene_qml.dir/Unity/unity_7_cxx.cxx.o
+[678/3056] Building CXX object src/notationscene/qml/MuseScore/NotationScene/CMakeFiles/notationscene_qml.dir/Unity/unity_6_cxx.cxx.o
+[679/3056] Building CXX object src/notationscene/qml/MuseScore/NotationScene/CMakeFiles/notationscene_qml.dir/Unity/unity_8_cxx.cxx.o
+[680/3056] Building CXX object src/notationscene/qml/MuseScore/NotationScene/CMakeFiles/notationscene_qml.dir/Unity/unity_4_cxx.cxx.o
+[681/3056] Building CXX object src/notationscene/qml/MuseScore/NotationScene/CMakeFiles/notationscene_qml.dir/Unity/unity_5_cxx.cxx.o
+[682/3056] Building CXX object src/notationscene/qml/MuseScore/NotationScene/CMakeFiles/notationscene_qml.dir/Unity/unity_3_cxx.cxx.o
+[683/3056] Building CXX object src/notationscene/qml/MuseScore/NotationScene/CMakeFiles/notationscene_qml.dir/.qt/rcc/qrc_qmake_MuseScore_NotationScene.cpp.o
+[684/3056] Building CXX object src/notationscene/qml/MuseScore/NotationScene/CMakeFiles/notationscene_qml.dir/.qt/rcc/qrc_notationscene_qml_raw_qml_0.cpp.o
+[685/3056] Building CXX object src/notationscene/qml/MuseScore/NotationScene/CMakeFiles/notationscene_qml.dir/.qt/rcc/qrc_notationscene_qml_raw_res_0.cpp.o
+[686/3056] Building CXX object src/notationscene/qml/MuseScore/NotationScene/CMakeFiles/notationscene_qml.dir/.qt/rcc/qrc_notationscene_qml_raw_qml_0_extra_qmldirs.cpp.o
+[687/3056] Running AUTOMOC file extraction for target notationscene_qmlplugin_init
+[688/3056] Building CXX object src/palette/CMakeFiles/palette.dir/Unity/unity_2_cxx.cxx.o
+[689/3056] Building CXX object src/notationscene/qml/MuseScore/NotationScene/CMakeFiles/notationscene_qml.dir/Unity/unity_1_cxx.cxx.o
+[690/3056] Building CXX object src/notationscene/qml/MuseScore/NotationScene/CMakeFiles/notationscene_qml.dir/Unity/unity_2_cxx.cxx.o
+[691/3056] Building CXX object src/notationscene/qml/MuseScore/NotationScene/CMakeFiles/notationscene_qml.dir/Unity/unity_0_cxx.cxx.o
+[692/3056] Building CXX object src/preferences/CMakeFiles/preferences.dir/Unity/unity_0_cxx.cxx.o
+[693/3056] Building CXX object src/palette/CMakeFiles/palette.dir/Unity/unity_1_cxx.cxx.o
+[694/3056] Building CXX object src/palette/CMakeFiles/palette.dir/Unity/unity_0_cxx.cxx.o
+[695/3056] Building CXX object src/playback/CMakeFiles/playback.dir/Unity/unity_0_cxx.cxx.o
+[696/3056] Building CXX object src/project/CMakeFiles/project.dir/Unity/unity_3_cxx.cxx.o
+[697/3056] Building CXX object src/project/CMakeFiles/project.dir/internal/starscore/starscoresheetrecord.cpp.o
+[698/3056] Building CXX object src/project/CMakeFiles/project.dir/Unity/unity_1_cxx.cxx.o
+[699/3056] Building CXX object src/project/CMakeFiles/project.dir/internal/starscore/starscoretodo.cpp.o
+[700/3056] Building CXX object src/project/CMakeFiles/project.dir/internal/starscore/starscoreautotest.cpp.o
+FAILED: [code=1] src/project/CMakeFiles/project.dir/internal/starscore/starscoreautotest.cpp.o 
+/usr/bin/ccache /usr/bin/g++-10 -DKORS_LOGGER_QT_SUPPORT -DKORS_PROFILER_ENABLED -DNDEBUG -DQT_CONCURRENT_LIB -DQT_CORE_LIB -DQT_GUI_LIB -DQT_NETWORK_LIB -DQT_NO_DEBUG -DQT_OPENGL_LIB -DQT_QMLINTEGRATION_LIB -DQT_QML_LIB -DQT_QUICK_LIB -DQT_WIDGETS_LIB -DQT_XML_LIB -DSTARSCORE_VERSION_STR=\"1.30.0\" -I/home/runner/work/StarScore-Studio/StarScore-Studio/build.release/src/project -I/home/runner/work/StarScore-Studio/StarScore-Studio/src/project -I/home/runner/work/StarScore-Studio/StarScore-Studio/build.release -I/home/runner/work/StarScore-Studio/StarScore-Studio/src -I/home/runner/work/StarScore-Studio/StarScore-Studio -I/home/runner/work/StarScore-Studio/StarScore-Studio/framework -I/home/runner/work/StarScore-Studio/StarScore-Studio/framework/global -I/home/runner/work/StarScore-Studio/StarScore-Studio/framework/testing/thirdparty/googletest/googletest/include -I/home/runner/work/StarScore-Studio/StarScore-Studio/src/framework -I/home/runner/work/StarScore-Studio/StarScore-Studio/src/framework/global -I/home/runner/work/StarScore-Studio/StarScore-Studio/src/framework/testing/thirdparty/googletest/googletest/include -isystem /home/runner/work/StarScore-Studio/StarScore-Studio/build.release/src/project/project_autogen/include -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtCore -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/mkspecs/linux-g++ -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtGui -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtQuick -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtQml -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtQmlIntegration -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtNetwork -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtOpenGL -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtWidgets -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtXml -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtConcurrent -O2 -g -DNDEBUG -std=gnu++17 -Wall -Wextra -fPIC -Winvalid-pch -include /home/runner/work/StarScore-Studio/StarScore-Studio/build.release/src/framework/pch/CMakeFiles/muse_pch.dir/cmake_pch.hxx -MD -MT src/project/CMakeFiles/project.dir/internal/starscore/starscoreautotest.cpp.o -MF src/project/CMakeFiles/project.dir/internal/starscore/starscoreautotest.cpp.o.d -o src/project/CMakeFiles/project.dir/internal/starscore/starscoreautotest.cpp.o -c /home/runner/work/StarScore-Studio/StarScore-Studio/src/project/internal/starscore/starscoreautotest.cpp
+../src/project/internal/starscore/starscoreautotest.cpp: In member function ‘void mu::project::StarScoreService::runAutotestSteps(QStringList, int)’:
+../src/project/internal/starscore/starscoreautotest.cpp:611:19: warning: ignoring return value of ‘virtual bool QFile::open(QIODeviceBase::OpenMode)’, declared with attribute ‘nodiscard’ [-Wunused-result]
+  611 |             f.open(QIODevice::WriteOnly);
+      |             ~~~~~~^~~~~~~~~~~~~~~~~~~~~~
+In file included from /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtCore/QFile:1,
+                 from /home/runner/work/StarScore-Studio/StarScore-Studio/buildscripts/pch/pch.h:96,
+                 from ./src/framework/pch/CMakeFiles/muse_pch.dir/cmake_pch.hxx:5,
+                 from <command-line>:
+/home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtCore/qfile.h:291:32: note: declared here
+  291 |     QFILE_MAYBE_NODISCARD bool open(OpenMode flags) override;
+      |                                ^~~~
+../src/project/internal/starscore/starscoreautotest.cpp:826:42: error: ‘starScore’ was not declared in this scope; did you mean ‘hasScore’?
+  826 |             const QVariantMap chartNow = starScore()->irealChart();
+      |                                          ^~~~~~~~~
+      |                                          hasScore
+../src/project/internal/starscore/starscoreautotest.cpp:3709:19: warning: ignoring return value of ‘virtual bool QFile::open(QIODeviceBase::OpenMode)’, declared with attribute ‘nodiscard’ [-Wunused-result]
+ 3709 |             f.open(QIODevice::ReadWrite);
+      |             ~~~~~~^~~~~~~~~~~~~~~~~~~~~~
+In file included from /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtCore/QFile:1,
+                 from /home/runner/work/StarScore-Studio/StarScore-Studio/buildscripts/pch/pch.h:96,
+                 from ./src/framework/pch/CMakeFiles/muse_pch.dir/cmake_pch.hxx:5,
+                 from <command-line>:
+/home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtCore/qfile.h:291:32: note: declared here
+  291 |     QFILE_MAYBE_NODISCARD bool open(OpenMode flags) override;
+      |                                ^~~~
+[701/3056] Building CXX object src/project/CMakeFiles/project.dir/Unity/unity_2_cxx.cxx.o
+In file included from src/project/CMakeFiles/project.dir/Unity/unity_2_cxx.cxx:10:
+/home/runner/work/StarScore-Studio/StarScore-Studio/src/project/internal/starscore/starscorebandexport.cpp: In lambda function:
+/home/runner/work/StarScore-Studio/StarScore-Studio/src/project/internal/starscore/starscorebandexport.cpp:1014:116: warning: missing initializer for member ‘mu::project::StarScoreBandFile::sourceFile’ [-Wmissing-field-initializers]
+ 1014 |         plan.files.push_back({ folder + "/" + code + " - " + starscoreSafeFileName(name) + ".pdf", parts, isScore });
+      |                                                                                                                    ^
+/home/runner/work/StarScore-Studio/StarScore-Studio/src/project/internal/starscore/starscorebandexport.cpp:1014:116: warning: missing initializer for member ‘mu::project::StarScoreBandFile::header’ [-Wmissing-field-initializers]
+/home/runner/work/StarScore-Studio/StarScore-Studio/src/project/internal/starscore/starscorebandexport.cpp:1014:116: warning: missing initializer for member ‘mu::project::StarScoreBandFile::sheetLeft’ [-Wmissing-field-initializers]
+/home/runner/work/StarScore-Studio/StarScore-Studio/src/project/internal/starscore/starscorebandexport.cpp:1014:116: warning: missing initializer for member ‘mu::project::StarScoreBandFile::sheetRight’ [-Wmissing-field-initializers]
+/home/runner/work/StarScore-Studio/StarScore-Studio/src/project/internal/starscore/starscorebandexport.cpp:1014:116: warning: missing initializer for member ‘mu::project::StarScoreBandFile::flexibleScoreKey’ [-Wmissing-field-initializers]
+/home/runner/work/StarScore-Studio/StarScore-Studio/src/project/internal/starscore/starscorebandexport.cpp:1014:116: warning: missing initializer for member ‘mu::project::StarScoreBandFile::scoreKey’ [-Wmissing-field-initializers]
+/home/runner/work/StarScore-Studio/StarScore-Studio/src/project/internal/starscore/starscorebandexport.cpp:1014:116: warning: missing initializer for member ‘mu::project::StarScoreBandFile::formerPaths’ [-Wmissing-field-initializers]
+In file included from src/project/CMakeFiles/project.dir/Unity/unity_2_cxx.cxx:25:
+/home/runner/work/StarScore-Studio/StarScore-Studio/src/project/internal/starscore/starscoreimport.cpp: At global scope:
+/home/runner/work/StarScore-Studio/StarScore-Studio/src/project/internal/starscore/starscoreimport.cpp:128:6: warning: ‘bool {anonymous}::staffHasNotes(const mu::engraving::MasterScore*, mu::engraving::staff_idx_t)’ defined but not used [-Wunused-function]
+  128 | bool staffHasNotes(const mu::engraving::MasterScore* score, mu::engraving::staff_idx_t staffIdx)
+      |      ^~~~~~~~~~~~~
+[702/3056] Building CXX object src/project/CMakeFiles/project.dir/Unity/unity_0_cxx.cxx.o
+[703/3056] Building CXX object src/project/CMakeFiles/project.dir/internal/starscore/starscoreaudit.cpp.o
+ninja: build stopped: subcommand failed.
+Build failed
+Build failed
