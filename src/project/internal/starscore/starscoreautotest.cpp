@@ -823,7 +823,7 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             const QVariantMap c = model->property("current").toMap();
             autotestLog(QString("  after typing: selected %1, edited %2, message \"%3\"").arg(model->property("selected").toInt())
                         .arg(model->property("edited").toBool()).arg(model->property("message").toString()));
-            const QVariantMap chartNow = starScore()->irealChart();
+            const QVariantMap chartNow = irealChart();
             const QStringList kept = chartNow.value("edited").toStringList();
             autotestLog(QString("  kept in the song: %1 lines").arg(kept.size()));
             for (int i = 0; i < std::min<int>(3, kept.size()); ++i) {
