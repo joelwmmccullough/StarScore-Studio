@@ -580,7 +580,7 @@ StyledDialogView {
                     }
 
                     CheckBox {
-                        text: qsTrc("starscore", "Small (squeezed, as iReal Pro writes 2 chords to a cell)")
+                        text: qsTrc("starscore", "Small chord")
                         checked: root.cur.small === true
                         enabled: root.cur.content !== undefined && root.cur.content !== ""
                         onClicked: chart.setSmall(chart.selected, !checked)
