@@ -4,9 +4,15 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.29.2
+- **A solo's twelve keys beam like the main score.** A key's part score kept its own copy of the first time signature, not linked to the main score's, so beam groups changed there (Renaissance's 7/4) didn't reach eleven of the twelve keys, and bars 1–14 beamed differently in them. Every time signature's beam groups are now taken from the main score whenever the keys are set up (when the song opens, and before exporting the sheets).
+- **iReal Pro charts written the way Joel writes them** (from his own Renaissance chart):
+  - A chord is written small only when the next cell has a chord, so it fits before it; the others stay full size ("E♭-7 A♭-7 E♭-7/G♭ Fø7 B♭7sus" with A♭-7 and Fø7 small).
+  - The boxed letters follow the form: sections that start with the same two bars get the same letter (A, B, C, A, B, D…), the first four different ones A–D and a fifth V. The score's rehearsal letters aren't written; a section named in words ("Solos") is, above the bar.
+  - A long bar (more than four beats) with four chords takes 8 cells, two bars to a line.
+
 ## 1.29.1
 - **Practice in its own window.** "Own window" at the top of the Practice panel opens everything the panel has (Watch, Jam, Listen) in an ordinary window: move it to any screen, make it any size. It opens again at the size you last left it. Once you've used the window, opening Practice opens the window; "Back to the panel" in the window returns it to the dock. Closing the window puts the speed back to 100%.
-- **A solo's twelve keys beam like the main score.** A key's part score kept its own copy of the first time signature, not linked to the main score's, so beam groups changed there (Renaissance's 7/4) didn't reach eleven of the twelve keys, and bars 1–14 beamed differently in them. Every time signature's beam groups are now taken from the main score whenever the keys are set up (when the song opens, and before exporting the sheets).
 - **Falling notes move smoothly.** They used to jump a little each time playback reported where it was (the reports come unevenly), and froze then caught up when a report was late. Now they move on steadily and ease toward playback's position, jumping only for a real jump (going to another bar). Their frames are timed more evenly too.
 
 ## 1.29.0
