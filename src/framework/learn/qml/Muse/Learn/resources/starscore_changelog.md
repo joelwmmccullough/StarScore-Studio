@@ -6,6 +6,7 @@ Version numbers: the first number changes when files stop being compatible, the 
 
 ## 1.29.3
 - **A solo's MIDI file.** Export and Organize on a solo transcription also writes the main score as a MIDI file, "MIDI/<player> - <song>.mid" next to the Sheets folder. Only the written notes are in it: the chord symbols aren't played into it.
+- **MIDI files no longer cut notes short.** In any MIDI export with chord symbols played, a written note was cut to nothing when a chord symbol played the same pitch at the same moment while the chord before it was still holding that pitch (Renaissance: 190 notes, among them the last left-hand note of bar 5 and half of bar 17's last chord). MuseScore ended the chord symbol's old note on every channel instead of only its own. Fixed in the MIDI writer, so File › Export › MIDI is right too.
 
 ## 1.29.2
 - **A solo's twelve keys beam like the main score.** A key's part score kept its own copy of the first time signature, not linked to the main score's, so beam groups changed there (Renaissance's 7/4) didn't reach eleven of the twelve keys, and bars 1–14 beamed differently in them. Every time signature's beam groups are now taken from the main score whenever the keys are set up (when the song opens, and before exporting the sheets).

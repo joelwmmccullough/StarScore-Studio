@@ -302,7 +302,13 @@ bool ExportMidi::write(QIODevice* device, bool midiExpandRepeats, bool exportRPN
                         if (event.isMuted()) {
                             continue;
                         }
-                        if (event.discard() == staffIdx + 1 && event.velo() > 0) {
+                        // StarScore (1.29.3, Joel: "many of the notes are inexplicably shortened"): the restrike's note-off
+                        // only on the channel the restruck note is on. It was put on every channel of the track, so when a
+                        // chord symbol's note restruck a pitch (the chord before still holding it), a written note of that
+                        // pitch starting then was ended at once (Renaissance: 190 notes of no length)
+                        if (event.discard() == staffIdx + 1 && event.velo() > 0
+                            && m_score->masterScore()->midiPort(event.channel()) == port
+                            && m_score->masterScore()->midiChannel(event.channel()) == channel) {
                             // turn note off so we can restrike it in another track
                             track.insert(CompatMidiRender::tick(context, item.first), MidiEvent(ME_NOTEON, channel,
                                                                                                 event.pitch(), 0));
