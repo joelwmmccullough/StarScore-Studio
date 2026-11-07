@@ -4,6 +4,9 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.29.3
+- **A solo's MIDI file.** Export and Organize on a solo transcription also writes the main score as a MIDI file, "MIDI/<player> - <song>.mid" next to the Sheets folder. Only the written notes are in it: the chord symbols aren't played into it.
+
 ## 1.29.2
 - **A solo's twelve keys beam like the main score.** A key's part score kept its own copy of the first time signature, not linked to the main score's, so beam groups changed there (Renaissance's 7/4) didn't reach eleven of the twelve keys, and bars 1–14 beamed differently in them. Every time signature's beam groups are now taken from the main score whenever the keys are set up (when the song opens, and before exporting the sheets).
 - **iReal Pro charts written the way Joel writes them** (from his own Renaissance chart):

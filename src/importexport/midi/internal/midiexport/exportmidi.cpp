@@ -227,7 +227,8 @@ bool ExportMidi::write(QIODevice* device, bool midiExpandRepeats, bool exportRPN
     CompatMidiRendererInternal::Context context;
     context.eachStringHasChannel = false;
     context.instrumentsHaveEffects = false;
-    context.harmonyChannelSetting = CompatMidiRendererInternal::HarmonyChannelSetting::DEFAULT;
+    context.harmonyChannelSetting = m_chordSymbols ? CompatMidiRendererInternal::HarmonyChannelSetting::DEFAULT
+                                    : CompatMidiRendererInternal::HarmonyChannelSetting::DISABLED;
     context.sndController = CompatMidiRender::getControllerForSnd(m_score, synthState.ccToUse());
     context.useDefaultArticulations = false;
     context.applyCaesuras = true;

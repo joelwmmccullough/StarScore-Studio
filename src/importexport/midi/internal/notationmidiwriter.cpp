@@ -46,7 +46,7 @@ bool NotationMidiWriter::supportsUnitType(UnitType unitType) const
     return std::find(unitTypes.cbegin(), unitTypes.cend(), unitType) != unitTypes.cend();
 }
 
-Ret NotationMidiWriter::write(INotationPtr notation, io::IODevice& destinationDevice, const Options&)
+Ret NotationMidiWriter::write(INotationPtr notation, io::IODevice& destinationDevice, const Options& options)
 {
     IF_ASSERT_FAILED(notation) {
         return make_ret(Ret::Code::UnknownError);
@@ -59,6 +59,9 @@ Ret NotationMidiWriter::write(INotationPtr notation, io::IODevice& destinationDe
     }
 
     ExportMidi exportMidi(score);
+    if (const auto it = options.find(OptionKey::MIDI_CHORD_SYMBOLS); it != options.end()) {
+        exportMidi.setExportChordSymbols(it->second.toBool());
+    }
 
     bool isPlayRepeatsEnabled = midiImportExportConfiguration()->isExpandRepeats();
     bool isMidiExportRpns = midiImportExportConfiguration()->isMidiExportRpns();

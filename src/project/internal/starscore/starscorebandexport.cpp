@@ -6527,6 +6527,32 @@ RetVal<QString> StarScoreService::exportSoloSheets()
     // (1.25.0) its chord charts in every key, and its iReal Pro chart (and the playlist of every solo's)
     QStringList irealSongs;
     const int charts = written > 0 ? exportSoloChordCharts(irealSongs, problems) : 0;
+    // (1.29.3, Joel: "please export a midi version of the main score. Do NOT include chord symbol data in the midi
+    // file") the main score as MIDI, its notes only (chord symbols not played into it): "MIDI/<player> - <song>.mid"
+    // beside the Sheets folder
+    QString midiFile;
+    if (written > 0) {
+        const INotationWriterPtr midiWriter = writers()->writer("mid");
+        const QString midiDir = QFileInfo(file).absolutePath() + "/MIDI";
+        const QString midiName = QString("%1 - %2.mid").arg(starscoreSafeFileName(player), starscoreSafeFileName(song));
+        if (!midiWriter) {
+            problems << muse::qtrc("starscore", "%1: not made (no MIDI writer)").arg(midiName);
+        } else {
+            io::Buffer buf;
+            buf.open(io::IODevice::WriteOnly);
+            INotationWriter::Options mo { { INotationWriter::OptionKey::MIDI_CHORD_SYMBOLS, Val(false) } };
+            const Ret mret = midiWriter->write(master->notation(), buf, mo);
+            buf.close();
+            const QByteArray bytes = buf.data().toQByteArray();
+            QDir().mkpath(midiDir);
+            QSaveFile out(midiDir + "/" + midiName);
+            if (!mret || bytes.isEmpty() || !out.open(QIODevice::WriteOnly) || out.write(bytes) != bytes.size() || !out.commit()) {
+                problems << muse::qtrc("starscore", "%1: not made (%2)").arg(midiName, QString::fromStdString(mret.toString()));
+            } else {
+                midiFile = midiDir + "/" + midiName;
+            }
+        }
+    }
     // on Home's list of solos to learn (1.25.0)
     if (written > 0) {
         recordSoloExport(irealSongs);
@@ -6543,6 +6569,9 @@ RetVal<QString> StarScoreService::exportSoloSheets()
     if (charts > 0) {
         summary += " " + muse::qtrc("starscore", "Wrote %1 chord chart file(s) to the Chord Charts folder, and added it to the "
                                                  "solo transcriptions' iReal Pro playlist.").arg(charts);
+    }
+    if (!midiFile.isEmpty()) {
+        summary += " " + muse::qtrc("starscore", "Wrote the main score as MIDI, without chord symbols, to %1.").arg(QDir::toNativeSeparators(midiFile));
     }
     LOGI() << "[starscore] solo sheets: " << summary.toStdString();
     if (!problems.isEmpty()) {

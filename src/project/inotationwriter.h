@@ -55,6 +55,9 @@ public:
 
         LEADING_SILENCE_SEC,
         TRAILING_SILENCE_SEC,
+
+        //! StarScore (1.29.3): MIDI with the chord symbols played or not (true when not given)
+        MIDI_CHORD_SYMBOLS,
     };
 
     using Options = std::map<OptionKey, muse::Val>;
