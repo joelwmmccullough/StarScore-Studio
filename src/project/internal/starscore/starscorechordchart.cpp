@@ -2294,39 +2294,83 @@ QString irealWithTempoText(const QString& line, int bpm)
 std::vector<IRealLink> irealParts(const ChordChartData& song, const Analysis& a, const QString& title, const QString& composer,
                                   std::set<QString>& notes, int maxLines = 12)
 {
-    // (1.30.0) Joel's edited chart: its lines, each taken as a section of its own (so a part ends at any line)
-    std::vector<std::pair<const Group*, QStringList> > edited;
-    for (const QString& line : song.irealEdit) {
-        if (!line.trimmed().isEmpty()) {
-            edited.push_back({ nullptr, QStringList { line } });
-        }
-    }
-    const auto secs = song.irealEdit.isEmpty() ? irealSections(a, notes) : edited;
+    // (1.30.0) Joel's edited chart: as few parts as its lines allow (12 lines each). A part ends where a section starts
+    // (a line with a section box, *A, *B, *i, *V…, near its start) when that still fits in that many parts; else at a
+    // line that doesn't open with a repeat sign (a part can't start with "repeat the bar before")
     std::vector<std::vector<QStringList> > parts;
-    std::vector<QStringList> cur;
-    int used = 0;
-    for (const auto& [g, lines] : secs) {
-        if (used + lines.size() > maxLines && !cur.empty()) {
-            parts.push_back(cur);
-            cur.clear();
-            used = 0;
-        }
-        if (lines.size() > maxLines) {
-            // a section longer than one chart: split it by lines
-            for (int s = 0; s < lines.size(); s += maxLines) {
-                if (!cur.empty()) {
-                    parts.push_back(cur);
-                }
-                cur = { lines.mid(s, maxLines) };
-                used = cur.front().size();
+    if (!song.irealEdit.isEmpty()) {
+        QStringList lines;
+        for (const QString& line : song.irealEdit) {
+            if (!line.trimmed().isEmpty()) {
+                lines << line;
             }
-            continue;
         }
-        cur.push_back(lines);
-        used += lines.size();
-    }
-    if (!cur.empty()) {
-        parts.push_back(cur);
+        static const QRegularExpression markNearStart("^[\\[{|\\s]*(?:T\\d\\d)?\\*[A-DVi]");
+        static const QRegularExpression repeatFirst("^[\\[{|\\s]*(?:\\*[A-DVi])?(?:T\\d\\d)?(?:N\\d)?(?:<[^>]*>)*\\s*[xr]");
+        const int total = int(lines.size());
+        const int count = std::max(1, (total + maxLines - 1) / maxLines);
+        int from = 0;
+        for (int n = 0; n < count && from < total; ++n) {
+            int to = std::min(total, from + maxLines);   // (this part: lines from..to-1)
+            if (to < total) {
+                const int left = count - n - 1;           // parts still to come
+                auto fits = [&](int cut) { return cut > from && total - cut <= left * maxLines; };
+                int cut = -1;
+                for (int c = to; c > from && cut < 0; --c) {
+                    if (fits(c) && markNearStart.match(lines[c]).hasMatch()) {
+                        cut = c;
+                    }
+                }
+                for (int c = to; c > from && cut < 0; --c) {
+                    if (fits(c) && !repeatFirst.match(lines[c]).hasMatch()) {
+                        cut = c;
+                    }
+                }
+                if (cut > 0) {
+                    to = cut;
+                }
+            }
+            std::vector<QStringList> part;
+            for (int i = from; i < to; ++i) {
+                part.push_back(QStringList { lines[i] });
+            }
+            parts.push_back(part);
+            from = to;
+        }
+        if (from < total) {   // (cannot happen: the last part takes the rest)
+            std::vector<QStringList> part;
+            for (int i = from; i < total; ++i) {
+                part.push_back(QStringList { lines[i] });
+            }
+            parts.push_back(part);
+        }
+    } else {
+        const auto secs = irealSections(a, notes);
+        std::vector<QStringList> cur;
+        int used = 0;
+        for (const auto& [g, lines] : secs) {
+            if (used + lines.size() > maxLines && !cur.empty()) {
+                parts.push_back(cur);
+                cur.clear();
+                used = 0;
+            }
+            if (lines.size() > maxLines) {
+                // a section longer than one chart: split it by lines
+                for (int s = 0; s < lines.size(); s += maxLines) {
+                    if (!cur.empty()) {
+                        parts.push_back(cur);
+                    }
+                    cur = { lines.mid(s, maxLines) };
+                    used = cur.front().size();
+                }
+                continue;
+            }
+            cur.push_back(lines);
+            used += lines.size();
+        }
+        if (!cur.empty()) {
+            parts.push_back(cur);
+        }
     }
     const QString key = irealChartKey(song);
     const QString style = irealChartStyle(song);

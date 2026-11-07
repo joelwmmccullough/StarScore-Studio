@@ -92,6 +92,14 @@ StyledDialogView {
         })
     }
 
+    // iReal Pro's key ("Eb-", "F#") as it reads ("E♭ minor", "F♯")
+    function keyText(k) {
+        var minor = k.endsWith("-")
+        var r = minor ? k.slice(0, -1) : k
+        r = r.replace("b", "♭").replace("#", "♯")
+        return minor ? qsTrc("starscore", "%1 minor").arg(r) : r
+    }
+
     function times(n) {
         return n > 0 ? n + "×" : ""
     }
@@ -130,7 +138,7 @@ StyledDialogView {
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignLeft
                     color: ui.theme.fontSecondaryColor
-                    text: [chart.keyName !== "" ? qsTrc("starscore", "Key of %1").arg(chart.keyName) : "",
+                    text: [chart.keyName !== "" ? qsTrc("starscore", "Key of %1").arg(root.keyText(chart.keyName)) : "",
                            chart.style,
                            chart.parts > 1 ? qsTrc("starscore", "%1 parts in iReal Pro").arg(chart.parts) : "",
                            chart.edited ? qsTrc("starscore", "Your version (kept in the song)")
@@ -357,7 +365,7 @@ StyledDialogView {
                                 // the time signature
                                 Column {
                                     visible: cell.c.ts !== ""
-                                    x: cell.c.left === "" ? 2 : (cell.c.left === "|" ? 5 : 9)
+                                    x: cell.c.left === "" ? 2 : (cell.c.left === "|" ? 5 : (cell.c.left === "{" ? 13 : 9))
                                     y: cell.topY + (cell.bottomY - cell.topY - height) / 2
                                     spacing: -4
                                     Text { text: cell.c.ts.split("/")[0] || ""; color: root.ink; font.pixelSize: 13; font.bold: true }
@@ -428,7 +436,7 @@ StyledDialogView {
                                 Row {
                                     id: chordRow
                                     readonly property real big: Math.max(13, Math.min(26, grid.cellW * 0.36)) * (cell.c.small ? 0.72 : 1)
-                                    readonly property real lead: cell.c.ts !== "" ? (cell.c.left === "" || cell.c.left === "|" ? 17 : 21)
+                                    readonly property real lead: cell.c.ts !== "" ? (cell.c.left === "" || cell.c.left === "|" ? 17 : (cell.c.left === "{" ? 25 : 21))
                                                                  : (cell.c.left === "{" ? 12 : 7)
                                     x: lead
                                     width: cell.width - lead - 4
@@ -497,14 +505,17 @@ StyledDialogView {
 
             // what the selected cell has
             StyledFlickable {
+                id: inspectorFlick
                 Layout.preferredWidth: 300
+                Layout.maximumWidth: 300
                 Layout.fillHeight: true
+                contentWidth: width
                 contentHeight: inspector.implicitHeight
                 clip: true
 
                 ColumnLayout {
                     id: inspector
-                    width: parent.width
+                    width: inspectorFlick.width - 10
                     spacing: 8
 
                     StyledTextLabel {
