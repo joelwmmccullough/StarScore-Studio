@@ -64,6 +64,7 @@
 #include "global/serialization/zipreader.h"
 #include "global/serialization/zipwriter.h"
 #include <QElapsedTimer>
+#include <QKeyEvent>
 #include <algorithm>
 #include "engraving/dom/starscoreprogress.h"
 #include "engraving/dom/starscoreannotations.h"
@@ -93,6 +94,7 @@
 #include <QQuickWindow>
 #include <QDir>
 #include <QElapsedTimer>
+#include <QKeyEvent>
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
@@ -756,6 +758,79 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
                         .arg(interactive()->isOpened(muse::Uri("musescore://starscore/practicewindow")).val));
             if (!a.value(2).isEmpty()) {
                 win->grabWindow().save(autotestDir() + "/" + a.value(2) + ".png");
+            }
+        }
+    } else if (step.startsWith("chordchart")) {
+        // chordchart[:<shot>[:<cell>:<keys>]] (1.30.0): the chord chart editor opened; a picture of it; then cell <cell>
+        // picked and <keys> typed on the chart, as Joel would ("Ebm7" then Enter), and the chart kept in the song logged
+        const QStringList a = step.mid(10).split(':');
+        const muse::Uri uri("musescore://starscore/chordcharteditor");
+        muse::UriQuery q(uri);
+        q.addParam("sync", muse::Val(false));
+        q.addParam("modal", muse::Val(false));
+        interactive()->open(q);
+        auto wait = [](int ms) {
+            QElapsedTimer t;
+            t.start();
+            while (t.elapsed() < ms) {
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 25);
+            }
+        };
+        wait(2500);
+        QQuickWindow* win = nullptr;
+        for (QWindow* w : QGuiApplication::topLevelWindows()) {
+            if (w->isVisible() && w->title().startsWith("Chord chart")) {
+                win = qobject_cast<QQuickWindow*>(w);
+            }
+        }
+        QObject* model = nullptr;
+        if (win) {
+            for (QObject* o : win->findChildren<QObject*>()) {
+                if (QString(o->metaObject()->className()).contains("ChordChartEditorModel")) {
+                    model = o;
+                }
+            }
+        }
+        autotestLog(QString("  chord chart window: %1 (%2); model %3; open %4").arg(win ? win->title() : "none")
+                    .arg(win ? QString("%1x%2").arg(win->width()).arg(win->height()) : "-").arg(model ? "found" : "not found")
+                    .arg(interactive()->isOpened(uri).val));
+        if (model) {
+            autotestLog(QString("  possible %1, rows %2, parts %3, edited %4").arg(model->property("possible").toBool())
+                        .arg(model->property("rowCount").toInt()).arg(model->property("parts").toInt())
+                        .arg(model->property("edited").toBool()));
+        }
+        if (win && !a.value(1).isEmpty()) {
+            win->grabWindow().save(autotestDir() + "/" + a.value(1) + ".png");
+        }
+        if (win && model && a.size() >= 4) {
+            QMetaObject::invokeMethod(model, "select", Q_ARG(int, a.value(2).toInt()));
+            wait(300);
+            win->requestActivate();
+            wait(300);
+            for (const QChar ch : a.value(3)) {
+                const int key = ch.isLetter() ? Qt::Key_A + (ch.toUpper().unicode() - 'A') : ch.unicode();
+                QKeyEvent press(QEvent::KeyPress, key, Qt::NoModifier, QString(ch));
+                QKeyEvent release(QEvent::KeyRelease, key, Qt::NoModifier, QString(ch));
+                QCoreApplication::sendEvent(win, &press);
+                QCoreApplication::sendEvent(win, &release);
+                wait(80);
+            }
+            QKeyEvent enter(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier, "\r");
+            QCoreApplication::sendEvent(win, &enter);
+            QKeyEvent enterUp(QEvent::KeyRelease, Qt::Key_Return, Qt::NoModifier, "\r");
+            QCoreApplication::sendEvent(win, &enterUp);
+            wait(800);
+            const QVariantMap c = model->property("current").toMap();
+            autotestLog(QString("  after typing: selected %1, edited %2, message \"%3\"").arg(model->property("selected").toInt())
+                        .arg(model->property("edited").toBool()).arg(model->property("message").toString()));
+            const QVariantMap chartNow = starScore()->irealChart();
+            const QStringList kept = chartNow.value("edited").toStringList();
+            autotestLog(QString("  kept in the song: %1 lines").arg(kept.size()));
+            for (int i = 0; i < std::min<int>(3, kept.size()); ++i) {
+                autotestLog("    " + kept[i]);
+            }
+            if (!a.value(1).isEmpty()) {
+                win->grabWindow().save(autotestDir() + "/" + a.value(1) + "-typed.png");
             }
         }
     } else if (step.startsWith("floatdock:")) {

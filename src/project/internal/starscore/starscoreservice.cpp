@@ -525,6 +525,10 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
     data.scoreSystems = root.value("scoreSystems").toObject();
     data.recordings = root.value("recordings").toObject();
     data.songNotes = root.value("songNotes").toString();
+    for (const QJsonValue& l : root.value("irealEdit").toArray()) {
+        data.irealEdit << l.toString();
+    }
+    data.irealEditBase = root.value("irealEditBase").toString();
     for (const QJsonValue& t : root.value("songTags").toArray()) {
         data.songTags << t.toString();
     }
@@ -708,6 +712,10 @@ QString StarScoreService::toJson(const Data& data)
     }
     if (!data.recordings.isEmpty()) {
         root["recordings"] = data.recordings;
+    }
+    if (!data.irealEdit.isEmpty()) {
+        root["irealEdit"] = QJsonArray::fromStringList(data.irealEdit);
+        root["irealEditBase"] = data.irealEditBase;
     }
     if (!data.songNotes.isEmpty()) {
         root["songNotes"] = data.songNotes;

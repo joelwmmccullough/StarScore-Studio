@@ -5110,7 +5110,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         if (hasLeadSheet && leadStatus == StarScoreStatus::Finished && !wip) {
             chartsTried = true;
             charts = starscore::writeChordCharts(ms, songDir, plan.code, starscoreSongTitle(project), scoreVersion(),
-                                                 supersede, &starscoreSamePdf, problems);
+                                                 supersede, &starscoreSamePdf, problems, loadFrom(ms).irealEdit);
         }
     }
 

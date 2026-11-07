@@ -14,6 +14,8 @@
 #include <QFileInfo>
 #include <QUrl>
 #include <QDesktopServices>
+#include <QSettings>
+#include <algorithm>
 #include <QJsonArray>
 #include <QJsonObject>
 
@@ -705,6 +707,7 @@ QVariantList StarScoreBarModel::moreMenu() const
         const QVariantMap info = soloInfo();
         return {
             item("export-band", muse::qtrc("starscore", "Export and Organize… (the twelve keys' sheets)")),
+            item("chord-chart", muse::qtrc("starscore", "Edit the iReal Pro chord chart…")),
             item("solo-open-tied", info.value("tiedSongTitle").toString().isEmpty()
                  ? muse::qtrc("starscore", "Open the song it's tied to (none)")
                  : muse::qtrc("starscore", "Open %1").arg(info.value("tiedSongTitle").toString()),
@@ -782,6 +785,7 @@ QVariantList StarScoreBarModel::moreMenu() const
                 refItems),
         QVariantMap {},
         item("export-band", muse::qtrc("starscore", "Export and Organize…")),
+        item("chord-chart", muse::qtrc("starscore", "Edit the iReal Pro chord chart…")),
         item("export-arrangements", muse::qtrc("starscore", "Export arrangements as MuseScore files…"), !starScore()->arrangements().empty()),
         item("organize", muse::qtrc("starscore", "Run folder organization…")),
     };
@@ -1361,6 +1365,20 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
         dispatcher()->dispatch("starscore-check-ranges");
     } else if (action == "export-band") {
         dispatcher()->dispatch("starscore-export-band");
+    } else if (action == "chord-chart") {
+        // 1.30.0: the chart's editor, a window of its own beside the score
+        const muse::Uri uri("musescore://starscore/chordcharteditor");
+        if (!interactive()->isOpened(uri).val) {
+            QSettings st;
+            muse::UriQuery q(uri);
+            q.addParam("sync", muse::Val(false));
+            q.addParam("modal", muse::Val(false));
+            q.addParam("contentWidth", muse::Val(std::clamp(st.value("StarScore/chordChart/windowWidth", 1180).toInt(), 600, 6000)));
+            q.addParam("contentHeight", muse::Val(std::clamp(st.value("StarScore/chordChart/windowHeight", 780).toInt(), 400, 4000)));
+            interactive()->open(q);
+        } else {
+            interactive()->raise(muse::UriQuery(uri));
+        }
     } else if (action == "set-version") {
         openEditDialog("version", QString());
     } else if (action == "set-copyright-year") {

@@ -88,6 +88,9 @@ struct ChordChartData {
     bool soloForm = false;               // (1.25.2) one chorus of a solo's form: iReal Pro writes it as it is, in one repeat
     QStringList chordChartHidden;        // element ids of texts left off the chart
     std::vector<ChordChartMeasure> measures;
+    //! (1.30.0) Joel's own iReal Pro chart, edited in StarScore's chart editor: its lines (16 cells each, in iReal
+    //! Pro's notation, the whole song); used instead of the chart made from the chords when not empty
+    QStringList irealEdit;
 
     QJsonObject toJson() const;
 };
@@ -117,6 +120,16 @@ QString chordChartHtml(const ChordChartData& data, const QString& title, const C
 //! The iReal Pro page: one link per part, the "written differently" notes, and the version footer (empty for none)
 QString chordChartIRealHtml(const ChordChartData& data, const QString& title, const QString& version);
 
+//! (1.30.0) The iReal Pro chart made from the chords, as its lines of 16 cells (the whole song, before it's split
+//! into parts; no tempo text): what the chart editor starts from
+QStringList irealChartLines(const ChordChartData& data);
+//! (1.30.0) its key ("Eb-") and style ("Funk") as iReal Pro gets them
+QString irealChartKey(const ChordChartData& data);
+QString irealChartStyle(const ChordChartData& data);
+//! (1.30.0) A solo transcription's iReal Pro chart's data: the concert chords, the soloist as composer, the tempo
+//! marking's words as style, one chorus of the form (`choruses`: how many the solo plays; 0 when not choruses)
+ChordChartData soloIRealData(const mu::engraving::MasterScore* ms, const QString& player, bool minor, int* choruses = nullptr);
+
 //! What writeChordCharts did
 struct ChordChartResult {
     QStringList written;     // paths relative to the song folder ("Chord Charts/BALK - Chord Chart.pdf")
@@ -140,7 +153,8 @@ struct SoloChartKey {
 };
 ChordChartResult writeSoloChordCharts(const mu::engraving::MasterScore* ms, const QString& folder, const QString& base,
                                       const QString& title, const QString& song, const QString& player, bool minor,
-                                      const std::vector<SoloChartKey>& keys, QStringList& irealSongs, QStringList& problems);
+                                      const std::vector<SoloChartKey>& keys, QStringList& irealSongs, QStringList& problems,
+                                      const QStringList& irealEdit = {});
 
 //! (1.25.0) One iReal Pro page holding `songs` (chordChartIRealSongs' form) as one playlist called `name`: opening it
 //! imports them all at once
@@ -150,5 +164,5 @@ ChordChartResult writeChordCharts(const mu::engraving::MasterScore* ms, const QS
                                   const QString& title, const QString& version,
                                   const std::function<bool(const QString& relativePath, QString* archivedTo)>& supersede,
                                   const std::function<bool(const QByteArray& fresh, const QString& existingPath)>& samePdf,
-                                  QStringList& problems);
+                                  QStringList& problems, const QStringList& irealEdit = {});
 }

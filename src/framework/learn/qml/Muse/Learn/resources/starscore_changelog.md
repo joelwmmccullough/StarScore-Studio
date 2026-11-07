@@ -4,6 +4,14 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.30.0
+- **Edit the iReal Pro chord chart.** StarScore bar › More › "Edit the iReal Pro chord chart…" opens the song's chart in a window of its own, laid out the way iReal Pro lays it out: 16 cells to a line, with bar lines, section boxes, time signatures, endings, texts, segno, coda and fermata.
+  - Click a cell (or move with the arrow keys) and change it on the right: the chord, an alternate chord, small or full size, the bar line before and after, section (A–D, Verse, Intro), time signature, ending, how many times a repeat plays, text above and below, segno, coda, fermata.
+  - Type a chord the way you'd write it (Ebm7, Fm7b5, Fø7, BbΔ7, Bbmaj7, Eb7/Bb, C6/9, N.C.); StarScore writes it the way iReal Pro reads it, shows how it reads, and warns about a quality iReal Pro doesn't know. On the chart, a letter A–G starts a chord, Enter keeps it and moves on, % repeats the bar, / is a slash, Delete empties the cell.
+  - Insert or delete a cell, four cells or a line; what comes after moves along. Undo and Redo.
+  - Every change is kept in the song (the .starscore) at once. Export and Organize then writes your chart (both a song's and a solo transcription's), not one made from the chords. "Start again from the score" goes back to the chart made from the chord symbols. If the score's chords change after you edited the chart, the window says so.
+  - "Open in iReal Pro" opens the chart's page; click its link to add it to iReal Pro.
+
 ## 1.29.3
 - **A solo's MIDI file.** Export and Organize on a solo transcription also writes the main score as a MIDI file, "MIDI/<player> - <song>.mid" next to the Sheets folder. Only the written notes are in it: the chord symbols aren't played into it.
 - **MIDI files no longer cut notes short.** In any MIDI export with chord symbols played, a written note was cut to nothing when a chord symbol played the same pitch at the same moment while the chord before it was still holding that pitch (Renaissance: 190 notes, among them the last left-hand note of bar 5 and half of bar 17's last chord). MuseScore ended the chord symbol's old note on every channel instead of only its own. Fixed in the MIDI writer, so File › Export › MIDI is right too.

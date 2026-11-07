@@ -33,6 +33,10 @@
 #include "../../iprojectfilescontroller.h"
 #include "../../irecentfilescontroller.h"
 
+namespace mu::project::starscore {
+struct ChordChartData;
+}
+
 namespace mu::engraving {
 class MasterScore;
 class Part;
@@ -335,6 +339,9 @@ public:
     QStringList songTags() const override;
     void setSongTags(const QStringList& tags) override;
     QVariantMap songFacts() const override;
+    QVariantMap irealChart() const override;
+    void setIRealEdit(const QStringList& lines) override;
+    QString irealChartPage(const QStringList& lines) const override;
     QString scoreVersion() const override;
     StarScoreVersionSuggestion suggestVersionBump(const StarScoreBandExportPlan& plan) const override;
     void setScoreVersion(const QString& version) override;
@@ -449,6 +456,10 @@ public:
         QString songNotes;
         // (1.29.0) the song's tags, as typed ("ballad", "Ichiban", "needs a vocalist")
         QStringList songTags;
+        // (1.30.0) Joel's edited iReal Pro chart: its lines, and the signature of the chart made from the chords it
+        // was edited from (to tell when the chords changed since)
+        QStringList irealEdit;
+        QString irealEditBase;
         // a Solo Transcription (1.24.0): its song, player, band, recording, link, instrument, the song it's tied to,
         // and its twelve key part scores ("keys": [{ "shift", "name" }]); empty for a band song
         QJsonObject solo;
@@ -587,6 +598,8 @@ private:
     void refreshSoloTranscription(const notation::IMasterNotationPtr& master, bool syncLayout);
     void onSoloTranscriptionOpened();
     bool soloKeysLayoutStale(const notation::IMasterNotationPtr& master);
+    //! (1.30.0) the song's iReal Pro chart's data and title, made as the export makes it; false (why) when it has none
+    bool irealChartSource(starscore::ChordChartData& out, QString& title, QString* why) const;
     mu::engraving::Interval soloInstrumentInterval() const;
     //! A key's part score made ready to print: in concert pitch, or written for the instrument. Returns its label.
     QString prepareSoloKeyForSheet(const SoloKeyScore& key, bool written);

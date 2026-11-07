@@ -1989,7 +1989,8 @@ int StarScoreService::exportSoloChordCharts(QStringList& irealSongs, QStringList
     const QString band = data.solo.value("band").toString().trimmed();
     const QString ireal = soloIsAllSolos(player) && !band.isEmpty() ? band : player;
     const starscore::ChordChartResult r = starscore::writeSoloChordCharts(ms, QFileInfo(project->path().toQString()).absolutePath(), base, title,
-                                                    song, ireal, soloMinor(data.solo), keys, irealSongs, problems);
+                                                    song, ireal, soloMinor(data.solo), keys, irealSongs, problems,
+                                                    data.irealEdit);
     return int(r.written.size());
 }
 
@@ -2800,4 +2801,117 @@ bool StarScoreService::autotestSoloStep(const QString& step)
         return true;
     }
     return false;
+}
+
+// --- (1.30.0, Joel 7 Nov 2026: "build an ireal-adjacent interface into starscore so I can directly edit and adjust
+// the chord charts that starscore exports") The song's iReal Pro chart for the chart editor: made the way the export
+// makes it (a solo: its concert chords, one chorus, the soloist as composer; a band song: the Lead Sheet's chords),
+// and Joel's edited version kept in the file, which the export then writes instead.
+
+bool StarScoreService::irealChartSource(starscore::ChordChartData& out, QString& title, QString* why) const
+{
+    INotationProjectPtr project = exportSourceProject();
+    engraving::MasterScore* ms = project ? project->masterNotation()->masterScore() : nullptr;
+    if (!ms) {
+        if (why) {
+            *why = muse::qtrc("starscore", "Open a song first.");
+        }
+        return false;
+    }
+    const Data data = loadFrom(ms);
+    if (!data.solo.isEmpty()) {
+        const QString player = data.solo.value("player").toString();
+        const QString song = data.solo.value("song").toString();
+        title = player.isEmpty() ? song
+                : soloIsAllSolos(player) ? muse::qtrc("starscore", "%1 (all solos)").arg(song)
+                : QString("%1 (%2)").arg(song, player);
+        const QString band = data.solo.value("band").toString().trimmed();
+        const QString ireal = soloIsAllSolos(player) && !band.isEmpty() ? band : player;
+        out = starscore::soloIRealData(ms, ireal, soloMinor(data.solo));
+        int chords = 0;
+        for (const starscore::ChordChartMeasure& m : out.measures) {
+            chords += int(m.chords.size());
+        }
+        if (chords == 0) {
+            if (why) {
+                *why = muse::qtrc("starscore", "The solo has no chord symbols yet.");
+            }
+            return false;
+        }
+        return true;
+    }
+    out = starscore::extractChordChart(ms);
+    title = songTitle();
+    QString reason;
+    if (!starscore::chordChartPossible(out, &reason)) {
+        if (why) {
+            *why = reason;
+        }
+        return false;
+    }
+    return true;
+}
+
+static QString irealLinesSignature(const QStringList& lines)
+{
+    return QString::fromLatin1(QCryptographicHash::hash(lines.join('\n').toUtf8(), QCryptographicHash::Md5).toHex());
+}
+
+QVariantMap StarScoreService::irealChart() const
+{
+    QVariantMap m;
+    starscore::ChordChartData d;
+    QString title;
+    QString why;
+    const bool possible = irealChartSource(d, title, &why);
+    m["possible"] = possible;
+    m["why"] = why;
+    if (!possible) {
+        return m;
+    }
+    const QStringList generated = starscore::irealChartLines(d);
+    INotationProjectPtr project = exportSourceProject();
+    const Data data = loadFrom(project->masterNotation()->masterScore());
+    m["title"] = title;
+    m["key"] = starscore::irealChartKey(d);
+    m["style"] = starscore::irealChartStyle(d);
+    m["generated"] = generated;
+    m["edited"] = data.irealEdit;
+    // the score's chords changed since the chart was edited: the edit was made from another chart
+    m["stale"] = !data.irealEdit.isEmpty() && !data.irealEditBase.isEmpty() && data.irealEditBase != irealLinesSignature(generated);
+    return m;
+}
+
+void StarScoreService::setIRealEdit(const QStringList& lines)
+{
+    INotationProjectPtr project = exportSourceProject();
+    if (!project) {
+        return;
+    }
+    engraving::MasterScore* ms = project->masterNotation()->masterScore();
+    starscore::ChordChartData d;
+    QString title;
+    const QStringList generated = irealChartSource(d, title, nullptr) ? starscore::irealChartLines(d) : QStringList();
+    Data data = loadFrom(ms);
+    // the same as the chart made from the chords: nothing to keep
+    const QStringList keep = lines == generated ? QStringList() : lines;
+    if (data.irealEdit == keep && (keep.isEmpty() || data.irealEditBase == irealLinesSignature(generated))) {
+        return;
+    }
+    data.irealEdit = keep;
+    data.irealEditBase = keep.isEmpty() ? QString() : irealLinesSignature(generated);
+    storeTo(ms, data, project);
+    project->markAsUnsaved();
+    m_changed.notify();
+}
+
+QString StarScoreService::irealChartPage(const QStringList& lines) const
+{
+    starscore::ChordChartData d;
+    QString title;
+    if (!irealChartSource(d, title, nullptr)) {
+        return QString();
+    }
+    d.irealEdit = lines;
+    return starscore::chordChartIRealHtml(d, title, QString());
 }

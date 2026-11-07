@@ -913,6 +913,14 @@ public:
     virtual void setSongTags(const QStringList& tags) = 0;
     //! (1.29.0) the open song's key, time signature, tempo, bars and length (starscoresongfacts.h, as a map)
     virtual QVariantMap songFacts() const = 0;
+    //! (1.30.0) the chart editor: the song's iReal Pro chart as the export makes it ({possible, why, title, key, style,
+    //! generated: lines of 16 cells, edited: Joel's lines kept in the file (empty: none), stale: the chords changed since})
+    virtual QVariantMap irealChart() const = 0;
+    //! keeps Joel's edited chart in the file (the export writes it instead of making one); empty: back to the chart
+    //! made from the chords. Marks the song unsaved.
+    virtual void setIRealEdit(const QStringList& lines) = 0;
+    //! the iReal Pro page (links to import) for these lines, as the export would write it
+    virtual QString irealChartPage(const QStringList& lines) const = 0;
     virtual QString scoreVersion() const = 0;                 // from the score, or the starting version for this song
     //! Which number to raise for the next export, from the bar-by-bar signatures kept at the last export of each
     //! sheet. Major: the song's form changed (bar count, rehearsal marks, key or time signatures), the lead sheet

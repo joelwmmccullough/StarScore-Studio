@@ -2294,7 +2294,14 @@ QString irealWithTempoText(const QString& line, int bpm)
 std::vector<IRealLink> irealParts(const ChordChartData& song, const Analysis& a, const QString& title, const QString& composer,
                                   std::set<QString>& notes, int maxLines = 12)
 {
-    const auto secs = irealSections(a, notes);
+    // (1.30.0) Joel's edited chart: its lines, each taken as a section of its own (so a part ends at any line)
+    std::vector<std::pair<const Group*, QStringList> > edited;
+    for (const QString& line : song.irealEdit) {
+        if (!line.trimmed().isEmpty()) {
+            edited.push_back({ nullptr, QStringList { line } });
+        }
+    }
+    const auto secs = song.irealEdit.isEmpty() ? irealSections(a, notes) : edited;
     std::vector<std::vector<QStringList> > parts;
     std::vector<QStringList> cur;
     int used = 0;
@@ -2321,20 +2328,16 @@ std::vector<IRealLink> irealParts(const ChordChartData& song, const Analysis& a,
     if (!cur.empty()) {
         parts.push_back(cur);
     }
-    const int keyNo = song.key ? *song.key : 0;
-    QString key = KEYS_MAJOR.count(keyNo) ? KEYS_MAJOR.at(keyNo) : "C";
-    if (song.minor && KEYS_MAJOR.count(keyNo + 3)) {
-        key = KEYS_MAJOR.at(keyNo + 3) + "-";   // (the relative minor: A- for no sharps or flats)
-    }
-    // (an empty style would make "===" in a playlist, which iReal Pro reads as the end of the song: a solo whose tempo
-    // marking has no words gets "Medium Swing")
-    const QString style = !song.irealStyle.trimmed().isEmpty() ? song.irealStyle.trimmed()
-                          : song.irealStyleSet ? QString("Medium Swing") : QString("Funk");
+    const QString key = irealChartKey(song);
+    const QString style = irealChartStyle(song);
     std::vector<IRealLink> links;
     const int bpm = soloBpm(song);
     for (std::vector<QStringList>& part : parts) {
         if (!part.empty() && !part.back().isEmpty()) {
-            part.back().last() = irealWithTempoText(part.back().last(), bpm);
+            // (an edited chart keeps its own tempo text, if it has one)
+            if (song.irealEdit.isEmpty() || !QStringList(song.irealEdit).join(QString()).contains("bpm>")) {
+                part.back().last() = irealWithTempoText(part.back().last(), bpm);
+            }
         }
     }
     QString lastTs;   // (the time signature in force at the end of the part before)
@@ -2385,6 +2388,35 @@ QString composerForIReal(const QString& c)
     }
     return first.isEmpty() ? QString("Starsign") : first;
 }
+}
+
+QString irealChartKey(const ChordChartData& song)
+{
+    const int keyNo = song.key ? *song.key : 0;
+    QString key = KEYS_MAJOR.count(keyNo) ? KEYS_MAJOR.at(keyNo) : "C";
+    if (song.minor && KEYS_MAJOR.count(keyNo + 3)) {
+        key = KEYS_MAJOR.at(keyNo + 3) + "-";   // (the relative minor: A- for no sharps or flats)
+    }
+    return key;
+}
+
+QString irealChartStyle(const ChordChartData& song)
+{
+    // (an empty style would make "===" in a playlist, which iReal Pro reads as the end of the song: a solo whose tempo
+    // marking has no words gets "Medium Swing")
+    return !song.irealStyle.trimmed().isEmpty() ? song.irealStyle.trimmed()
+           : song.irealStyleSet ? QString("Medium Swing") : QString("Funk");
+}
+
+QStringList irealChartLines(const ChordChartData& song)
+{
+    const Analysis a = analyse(song);
+    std::set<QString> notes;
+    QStringList lines;
+    for (const auto& [g, sec] : irealSections(a, notes)) {
+        lines << sec;
+    }
+    return lines;
 }
 
 QString chordChartIRealHtml(const ChordChartData& song, const QString& title, const QString& version)
@@ -2561,10 +2593,11 @@ ChordChartResult writeChordCharts(const MasterScore* ms, const QString& folder, 
                                   const QString& version,
                                   const std::function<bool(const QString& relativePath, QString* archivedTo)>& supersede,
                                   const std::function<bool(const QByteArray& fresh, const QString& existingPath)>& samePdf,
-                                  QStringList& problems)
+                                  QStringList& problems, const QStringList& irealEdit)
 {
     ChordChartResult result;
-    const ChordChartData data = extractChordChart(ms);
+    ChordChartData data = extractChordChart(ms);
+    data.irealEdit = irealEdit;   // (1.30.0) Joel's edited iReal Pro chart, when there is one
     QString why;
     if (!chordChartPossible(data, &why)) {
         problems << muse::qtrc("starscore", "Chord chart: %1.").arg(why);
@@ -2969,9 +3002,24 @@ int soloLastBar(const MasterScore* ms)
 }
 }
 
+ChordChartData soloIRealData(const MasterScore* ms, const QString& player, bool minor, int* choruses)
+{
+    ChordChartData data = extractChordChart(ms);
+    data.composer = player;     // (iReal Pro's composer: the soloist, surname first)
+    data.minor = minor;
+    data.irealStyle = soloTempoWords(data);
+    data.irealStyleSet = true;
+    int n = 0;
+    soloOneChorus(data, soloLastBar(ms), n);
+    if (choruses) {
+        *choruses = n;
+    }
+    return data;
+}
+
 ChordChartResult writeSoloChordCharts(const MasterScore* ms, const QString& folder, const QString& base, const QString& title,
                                       const QString& song, const QString& player, bool minor, const std::vector<SoloChartKey>& keys,
-                                      QStringList& irealSongs, QStringList& problems)
+                                      QStringList& irealSongs, QStringList& problems, const QStringList& irealEdit)
 {
     ChordChartResult result;
     ChordChartData concert = extractChordChart(ms);
@@ -2993,10 +3041,10 @@ ChordChartResult writeSoloChordCharts(const MasterScore* ms, const QString& fold
 
     // iReal Pro: the concert key it's written in, once; one chorus of the form when the solo is choruses over one
     {
-        ChordChartData data = concert;
         int choruses = 0;
+        ChordChartData data = soloIRealData(ms, player, minor, &choruses);
+        data.irealEdit = irealEdit;   // (1.30.0) Joel's edited chart, when there is one
         const int bpm = soloBpm(concert);
-        soloOneChorus(data, soloLastBar(ms), choruses);
         const QString rel = stem + " - iReal Pro.html";
         if (placeFile(folder, rel, chordChartIRealHtml(data, title, QString()).toUtf8(), keep, problems)) {
             result.written << rel;
