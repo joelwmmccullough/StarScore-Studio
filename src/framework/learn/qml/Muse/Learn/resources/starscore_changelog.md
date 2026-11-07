@@ -9,7 +9,7 @@ Version numbers: the first number changes when files stop being compatible, the 
 - **iReal Pro charts written the way Joel writes them** (from his own Renaissance chart):
   - A chord is written small only when the next cell has a chord, so it fits before it; the others stay full size ("E♭-7 A♭-7 E♭-7/G♭ Fø7 B♭7sus" with A♭-7 and Fø7 small).
   - The boxed letters follow the form: sections that start with the same two bars get the same letter (A, B, C, A, B, D…), the first four different ones A–D and a fifth V. The score's rehearsal letters aren't written; a section named in words ("Solos") is, above the bar.
-  - A long bar (more than four beats) with four chords takes 8 cells, two bars to a line.
+  - Each bar takes the cells it needs: 4, or 8 for a bar of more than four chords (or four in a bar longer than four beats). A line holds four 4-cell bars, two 8-cell bars, or a mix; a section with one long bar no longer turns all its bars wide.
 
 ## 1.29.1
 - **Practice in its own window.** "Own window" at the top of the Practice panel opens everything the panel has (Watch, Jam, Listen) in an ordinary window: move it to any screen, make it any size. It opens again at the size you last left it. Once you've used the window, opening Practice opens the window; "Back to the panel" in the window returns it to the dock. Closing the window puts the speed back to 100%.
