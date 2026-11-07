@@ -11,6 +11,7 @@ Version numbers: the first number changes when files stop being compatible, the 
   - Insert or delete a cell, four cells or a line; what comes after moves along. Undo and Redo.
   - Every change is kept in the song (the .starscore) at once. Export and Organize then writes your chart (both a song's and a solo transcription's), not one made from the chords. "Start again from the score" goes back to the chart made from the chord symbols. If the score's chords change after you edited the chart, the window says so.
   - "Open in iReal Pro" opens the chart's page; click its link to add it to iReal Pro.
+- **Export and Organize on a solo no longer looks like it failed** when the iReal Pro chart is in 2 parts. That line was counted as a problem, so the message showed the error icon (X). It's now part of the normal message.
 
 ## 1.29.3
 - **A solo's MIDI file.** Export and Organize on a solo transcription also writes the main score as a MIDI file, "MIDI/<player> - <song>.mid" next to the Sheets folder. Only the written notes are in it: the chord symbols aren't played into it.

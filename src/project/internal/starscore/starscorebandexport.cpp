@@ -6526,7 +6526,8 @@ RetVal<QString> StarScoreService::exportSoloSheets()
     refreshSoloTranscription(master, false);
     // (1.25.0) its chord charts in every key, and its iReal Pro chart (and the playlist of every solo's)
     QStringList irealSongs;
-    const int charts = written > 0 ? exportSoloChordCharts(irealSongs, problems) : 0;
+    QStringList chartNotes;
+    const int charts = written > 0 ? exportSoloChordCharts(irealSongs, problems, &chartNotes) : 0;
     // (1.29.3, Joel: "please export a midi version of the main score. Do NOT include chord symbol data in the midi
     // file") the main score as MIDI, its notes only (chord symbols not played into it): "MIDI/<player> - <song>.mid"
     // beside the Sheets folder
@@ -6572,6 +6573,9 @@ RetVal<QString> StarScoreService::exportSoloSheets()
     }
     if (!midiFile.isEmpty()) {
         summary += " " + muse::qtrc("starscore", "Wrote the main score as MIDI, without chord symbols, to %1.").arg(QDir::toNativeSeparators(midiFile));
+    }
+    for (const QString& n : chartNotes) {
+        summary += " " + n;
     }
     LOGI() << "[starscore] solo sheets: " << summary.toStdString();
     if (!problems.isEmpty()) {

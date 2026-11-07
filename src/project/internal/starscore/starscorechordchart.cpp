@@ -3053,8 +3053,9 @@ ChordChartResult writeSoloChordCharts(const MasterScore* ms, const QString& fold
         std::set<QString> notes;
         const std::vector<IRealLink> links = irealParts(data, a, title, composerForIReal(data.composer), notes);
         if (links.size() > 1) {
-            problems << muse::qtrc("starscore", "iReal Pro: the chords are too long for one iReal Pro chart (12 lines), so it's "
-                                                "in %1 parts.").arg(links.size());
+            // (1.30.0, Joel: as a problem it made the export's message look like it failed)
+            result.notes << muse::qtrc("starscore", "The iReal Pro chart is in %1 parts, because iReal Pro holds 12 lines "
+                                                    "per chart.").arg(links.size());
         }
         for (const IRealLink& l : links) {
             // (1.25.3) a chart in parts isn't one chorus: each part played the solo's number of choruses would be

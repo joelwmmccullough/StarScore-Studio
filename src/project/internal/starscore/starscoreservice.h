@@ -608,7 +608,7 @@ private:
     //! The open solo's entry in 8 Solo Transcriptions/.solo-progress.json made or brought up to date after an export
     //! (its key names, the date; what's been learned kept)
     void recordSoloExport(const QStringList& irealSongs);
-    int exportSoloChordCharts(QStringList& irealSongs, QStringList& problems);
+    int exportSoloChordCharts(QStringList& irealSongs, QStringList& problems, QStringList* notes = nullptr);
     void writeSoloIRealPlaylist(const QString& folder, const QJsonObject& solos);
     void watchSoloChordMutes();
     void hideSoloKeyStaves(const notation::IMasterNotationPtr& master);

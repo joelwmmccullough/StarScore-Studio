@@ -1947,7 +1947,7 @@ void StarScoreService::recordSoloExport(const QStringList& irealSongs)
 
 //! (1.25.0, Joel) The chord charts of a solo's export: one per key, numbered like its sheets, in the concert keys;
 //! and its iReal Pro page once, in the key it's written in (iReal Pro transposes it). Returns the files written.
-int StarScoreService::exportSoloChordCharts(QStringList& irealSongs, QStringList& problems)
+int StarScoreService::exportSoloChordCharts(QStringList& irealSongs, QStringList& problems, QStringList* notes)
 {
     INotationProjectPtr project = globalContext()->currentProject();
     engraving::MasterScore* ms = masterScore();
@@ -1991,6 +1991,9 @@ int StarScoreService::exportSoloChordCharts(QStringList& irealSongs, QStringList
     const starscore::ChordChartResult r = starscore::writeSoloChordCharts(ms, QFileInfo(project->path().toQString()).absolutePath(), base, title,
                                                     song, ireal, soloMinor(data.solo), keys, irealSongs, problems,
                                                     data.irealEdit);
+    if (notes) {
+        *notes << r.notes;
+    }
     return int(r.written.size());
 }
 

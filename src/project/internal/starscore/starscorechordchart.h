@@ -134,6 +134,7 @@ ChordChartData soloIRealData(const mu::engraving::MasterScore* ms, const QString
 struct ChordChartResult {
     QStringList written;     // paths relative to the song folder ("Chord Charts/BALK - Chord Chart.pdf")
     QStringList unchanged;   // the same as the file already there
+    QStringList notes;       // (1.30.0) things to know that aren't problems ("the iReal Pro chart is in 2 parts")
 };
 //! Writes "<folder>/Chord Charts/<code> - iReal Pro.html" and "<folder>/Chord Charts/<code> - Chord Chart.pdf" (the
 //! PDF printed by the organizer's WebKit printer; on a system without it, the page is written as
