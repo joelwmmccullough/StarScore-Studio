@@ -284,8 +284,8 @@ StyledDialogView {
                                 width: grid.cellW
                                 height: grid.rowH
 
-                                readonly property real top: 18          // room above for section, ending, texts
-                                readonly property real bottom: height - 12
+                                readonly property real topY: 18          // room above for section, ending, texts
+                                readonly property real bottomY: height - 12
 
                                 Rectangle {
                                     anchors.fill: parent
@@ -357,8 +357,8 @@ StyledDialogView {
                                 // the time signature
                                 Column {
                                     visible: cell.c.ts !== ""
-                                    x: 4
-                                    y: cell.top + (cell.bottom - cell.top - height) / 2
+                                    x: cell.c.left === "" ? 2 : (cell.c.left === "|" ? 5 : 9)
+                                    y: cell.topY + (cell.bottomY - cell.topY - height) / 2
                                     spacing: -4
                                     Text { text: cell.c.ts.split("/")[0] || ""; color: root.ink; font.pixelSize: 13; font.bold: true }
                                     Text { text: cell.c.ts.split("/")[1] || ""; color: root.ink; font.pixelSize: 13; font.bold: true }
@@ -368,9 +368,9 @@ StyledDialogView {
                                 Item {
                                     visible: cell.c.left !== ""
                                     x: 0
-                                    y: cell.top
+                                    y: cell.topY
                                     width: 10
-                                    height: cell.bottom - cell.top
+                                    height: cell.bottomY - cell.topY
                                     Rectangle {   // thick (start of section, start repeat)
                                         visible: cell.c.left === "[" || cell.c.left === "{"
                                         x: 0; width: 3.5; height: parent.height; color: root.ink
@@ -393,9 +393,9 @@ StyledDialogView {
                                 Item {
                                     visible: cell.c.right !== ""
                                     x: cell.width - width
-                                    y: cell.top
+                                    y: cell.topY
                                     width: 12
-                                    height: cell.bottom - cell.top
+                                    height: cell.bottomY - cell.topY
                                     Rectangle {   // thick (end of section, end repeat, end)
                                         visible: cell.c.right !== ""
                                         x: parent.width - 3.5; width: 3.5; height: parent.height; color: root.ink
@@ -418,7 +418,7 @@ StyledDialogView {
                                 Text {
                                     visible: cell.c.alt !== ""
                                     x: 12
-                                    y: cell.top - 2
+                                    y: cell.topY - 2
                                     text: "(" + cell.c.alt + ")"
                                     color: root.ink
                                     font.pixelSize: 10
@@ -428,10 +428,11 @@ StyledDialogView {
                                 Row {
                                     id: chordRow
                                     readonly property real big: Math.max(13, Math.min(26, grid.cellW * 0.36)) * (cell.c.small ? 0.72 : 1)
-                                    readonly property real lead: cell.c.ts !== "" ? 16 : (cell.c.left === "{" ? 12 : 7)
+                                    readonly property real lead: cell.c.ts !== "" ? (cell.c.left === "" || cell.c.left === "|" ? 17 : 21)
+                                                                 : (cell.c.left === "{" ? 12 : 7)
                                     x: lead
                                     width: cell.width - lead - 4
-                                    y: cell.top + (cell.bottom - cell.top - height) / 2 + 2
+                                    y: cell.topY + (cell.bottomY - cell.topY - height) / 2 + 2
                                     clip: false
                                     spacing: 0
 
@@ -470,7 +471,7 @@ StyledDialogView {
                                 Text {
                                     visible: cell.c.below !== "" || cell.c.times > 0
                                     x: 6
-                                    y: cell.bottom - 2
+                                    y: cell.bottomY - 2
                                     text: [cell.c.below, root.times(cell.c.times)].filter(function(s) { return s !== "" }).join("  ")
                                     color: root.ink
                                     font.pixelSize: 10
