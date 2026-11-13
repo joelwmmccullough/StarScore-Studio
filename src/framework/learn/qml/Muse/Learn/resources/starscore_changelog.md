@@ -4,6 +4,9 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.32.0
+- **The Keys sheet as MIDI for Synthesia.** Export and Organize now also writes the Keys sheet as a MIDI file to Google Drive › Music › MIDI Files for Synthesia ("<song> - Keys.mid", replaced on each export). It holds only the notes of the Keys sheet's instruments: no chord-symbol track and no other instruments. It is written whenever the Keys sheet is ticked in the export.
+
 ## 1.31.0
 - **New note colours (Version A, Joel 13 Nov 2026).** The 12 pitch colours now go around the colour wheel in circle-of-fifths order, so a key's notes come from one region of the wheel and neighbouring keys differ by one colour. C stays yellow and A is a true red; every colour is inside the printable (CMYK) range.
   - C #CDCE1D, D♭ #315BA5, D #EE7224, E♭ #20AA92, E #F0848A, F #5EB13B, G♭ #9168A9, G #F1AB27, A♭ #2290CE, A #D7282D, B♭ #1A6D32, B #E2197D.

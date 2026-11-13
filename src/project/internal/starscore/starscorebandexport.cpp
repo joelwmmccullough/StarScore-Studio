@@ -4524,6 +4524,76 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         return ret;
     };
 
+    // The Keys sheet as MIDI for Synthesia too (Joel, 13 Nov 2026: "whenever I export and organize, please export a midi
+    // of the keys sheet and store in Google Drive / Music / MIDI Files for Synthesia", "do NOT include the chord track",
+    // "just the actual notes"): the notes of the Keys sheet's part score only, chord symbols not played into it, as
+    // ".../My Drive/Music/MIDI Files for Synthesia/<song> - Keys.mid" (the folder beside Projects and Sheets)
+    QString keysMidiWritten;
+    auto writeKeysMidi = [&](const StarScoreBandFile& file) {
+        static const QRegularExpression keysSheet(" - Keys\\.pdf$");
+        if (!variant.isEmpty() || m_exportDryRun || !file.sourceFile.isEmpty() || file.isScore || file.isVersion
+            || file.withVoice || !keysSheet.match(file.relativePath).hasMatch()) {
+            return;
+        }
+        // the part score the sheet is printed from (as makeSheet finds it)
+        INotationPtr book;
+        if (file.partIds.size() > 1) {
+            for (const IExcerptNotationPtr& e : excerpts) {
+                INotationPtr n = e->notation();
+                engraving::Score* es = n && n->elements() ? n->elements()->msScore() : nullptr;
+                if (!es || es->parts().size() != size_t(file.partIds.size())) {
+                    continue;
+                }
+                QStringList ids;
+                for (const engraving::Part* p : masterPartsOf(es, ms)) {
+                    ids << idText(p);
+                }
+                if (ids.size() == file.partIds.size()
+                    && std::all_of(ids.begin(), ids.end(), [&](const QString& id) { return file.partIds.contains(id); })) {
+                    book = n;
+                    break;
+                }
+            }
+        } else if (auto it = bookForPart.find(file.partIds.value(0)); it != bookForPart.end()) {
+            book = it->second->notation();
+        }
+        const QString name = starscoreSafeFileName(songTitle().isEmpty() ? plan.code : songTitle()) + " - Keys.mid";
+        if (!book) {
+            problems << muse::qtrc("starscore", "%1: not made (the Keys sheet has no part score)").arg(name);
+            return;
+        }
+        // the folder: "MIDI Files for Synthesia" in the Music folder that holds Projects and Sheets
+        QString dir;
+        const QString projects = projectsFolder();
+        if (!projects.isEmpty()) {
+            dir = QFileInfo(projects).absolutePath() + "/MIDI Files for Synthesia";
+        }
+        if (qEnvironmentVariableIsSet("STARSCORE_AUTOTEST")) {
+            dir = qEnvironmentVariable("STARSCORE_AUTOTEST") + "/MIDI Files for Synthesia";
+        }
+        if (dir.isEmpty() || !QDir().mkpath(dir)) {
+            problems << muse::qtrc("starscore", "%1: not made (no \"MIDI Files for Synthesia\" folder)").arg(name);
+            return;
+        }
+        const INotationWriterPtr midiWriter = writers()->writer("mid");
+        if (!midiWriter) {
+            problems << muse::qtrc("starscore", "%1: not made (no MIDI writer)").arg(name);
+            return;
+        }
+        io::Buffer buf;
+        buf.open(io::IODevice::WriteOnly);
+        INotationWriter::Options mo { { INotationWriter::OptionKey::MIDI_CHORD_SYMBOLS, Val(false) } };
+        const Ret mret = midiWriter->write(book, buf, mo);
+        buf.close();
+        const QByteArray bytes = buf.data().toQByteArray();
+        QSaveFile out(dir + "/" + name);
+        if (!mret || bytes.isEmpty() || !out.open(QIODevice::WriteOnly) || out.write(bytes) != bytes.size() || !out.commit()) {
+            problems << muse::qtrc("starscore", "%1: not made (%2)").arg(name, QString::fromStdString(mret.toString()));
+            return;
+        }
+        keysMidiWritten = dir + "/" + name;
+    };
+
     makeSheetAgain = makeSheet;
     int fileNumber = 0;
     for (const StarScoreBandFile& file : plan.files) {
@@ -4541,6 +4611,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
         }
         writeAnnotated(file);
         writeDark(file);
+        writeKeysMidi(file);
 
         const QString target = songDir + "/" + starscoreVariantPath(file.relativePath, variant);
         // the same pages as the file already there (a re-export with nothing changed in this sheet):
@@ -5161,6 +5232,9 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
     if (combinedWritten + combinedSame > 0) {
         summary += " " + muse::qtrc("starscore", "Combined parts (in %1): %2 written, %3 the same as before.")
                    .arg(starscore::org::songFolderPath(STARSCORE_COMBINED_FOLDER)).arg(combinedWritten).arg(combinedSame);
+    }
+    if (!keysMidiWritten.isEmpty()) {
+        summary += " " + muse::qtrc("starscore", "Keys as MIDI for Synthesia: %1.").arg(keysMidiWritten);
     }
     if (darkWritten + darkSame > 0) {
         summary += " " + muse::qtrc("starscore", "Dark-mode Keys sheets (in %1): %2 written, %3 the same as before.")
