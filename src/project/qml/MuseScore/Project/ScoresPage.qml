@@ -34,6 +34,8 @@ FocusScope {
 
     property string subSection: ""
 
+    signal subSectionApplied()
+
     QtObject {
         id: prv
 
