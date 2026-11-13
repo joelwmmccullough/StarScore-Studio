@@ -4,6 +4,13 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.31.0
+- **New note colours (Version A, Joel 13 Nov 2026).** The 12 pitch colours now go around the colour wheel in circle-of-fifths order, so a key's notes come from one region of the wheel and neighbouring keys differ by one colour. C stays yellow and A is a true red; every colour is inside the printable (CMYK) range.
+  - C #CDCE1D, D♭ #315BA5, D #EE7224, E♭ #20AA92, E #F0848A, F #5EB13B, G♭ #9168A9, G #F1AB27, A♭ #2290CE, A #D7282D, B♭ #1A6D32, B #E2197D.
+  - Used everywhere StarScore colours notes: Note colors on screen, Color notes by pitch, the solo transcription sheets, and the Practice window's falling notes.
+  - Dark mode (the dark-mode solo sheets, Note colors on a dark page, the dark Practice window): D♭, G♭, A, B♭ and B are lightened so they read on the dark page (#6572BA, #B78CCE, #EB313A, #3F844D, #E5097A); the other seven are the same as on paper. The closest two dark-mode colours are now further apart than before (ΔE 17.2, was 11.9).
+- **MuseScore Studio 4.7.7** folded in: updated translations, FFmpeg 9 support for video export, a better range for the Euphonium, clearer names for the plucked Double Bass and Acoustic Bass Guitar, and on macOS a fix for MIDI input adding a second note when a key is released.
+
 ## 1.30.0
 - **Edit the iReal Pro chord chart.** StarScore bar › More › "Edit the iReal Pro chord chart…" opens the song's chart in a window of its own, laid out the way iReal Pro lays it out: 16 cells to a line, with bar lines, section boxes, time signatures, endings, texts, segno, coda and fermata.
   - Click a cell (or move with the arrow keys) and change it on the right: the chord, an alternate chord, small or full size, the bar line before and after, section (A–D, Verse, Intro), time signature, ending, how many times a repeat plays, text above and below, segno, coda, fermata.

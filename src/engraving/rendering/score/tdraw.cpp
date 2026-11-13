@@ -2404,12 +2404,12 @@ void TDraw::draw(const Note* item, Painter* painter, const PaintOptions& opt)
         && item->visible() && !item->fixed() && item->headGroup() != NoteHeadGroup::HEAD_SLASH && !isTabStaff
         && item->staff() && item->chord() && !item->staff()->isDrumStaff(item->chord()->tick())) {
         static const char* COLORS[12] = {
-            "#C7C102", "#FF5DA1", "#028800", "#2DD3C0", "#001CA4", "#CC75F8",
-            "#92D303", "#F47700", "#915700", "#AD000E", "#829EFF", "#770096"
+            "#CDCE1D", "#315BA5", "#EE7224", "#20AA92", "#F0848A", "#5EB13B",
+            "#9168A9", "#F1AB27", "#2290CE", "#D7282D", "#1A6D32", "#E2197D"
         };
         static const char* DARK_COLORS[12] = {
-            "#E6DF2E", "#FF6FAE", "#36C234", "#3FE0CC", "#5072FF", "#E4B2FF",
-            "#A8E621", "#FF8A1F", "#CC8E33", "#F2434F", "#A9BEFF", "#AE45D6"
+            "#CDCE1D", "#6572BA", "#EE7224", "#20AA92", "#F0848A", "#5EB13B",
+            "#B78CCE", "#F1AB27", "#2290CE", "#EB313A", "#3F844D", "#E5097A"
         };
         const int pc = ((item->epitch() % 12) + 12) % 12;
         painter->setPen(Color::fromString(opt.invertColors ? DARK_COLORS[pc] : COLORS[pc]));

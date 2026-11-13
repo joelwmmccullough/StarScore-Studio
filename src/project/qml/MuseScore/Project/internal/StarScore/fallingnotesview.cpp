@@ -23,10 +23,16 @@
 using namespace mu::project;
 
 namespace {
-// C, C#, D, D#, E, F, F#, G, G#, A, A#, B: the solo sheets' note colours (starscoreengraving.cpp)
+// C, C#, D, D#, E, F, F#, G, G#, A, A#, B: the solo sheets' note colours (starscoreengraving.cpp; Joel's Version A,
+// 13 Nov 2026, circle-of-fifths order around the colour wheel)
 const char* PITCH_COLORS[12] = {
-    "#C7C102", "#FF5DA1", "#028800", "#2DD3C0", "#001CA4", "#CC75F8",
-    "#92D303", "#F47700", "#915700", "#AD000E", "#829EFF", "#770096"
+    "#CDCE1D", "#315BA5", "#EE7224", "#20AA92", "#F0848A", "#5EB13B",
+    "#9168A9", "#F1AB27", "#2290CE", "#D7282D", "#1A6D32", "#E2197D"
+};
+//! the same on the dark background (#15120E, as the dark-mode solo sheets): D♭, F♯, A, B♭, B lightened to read on it
+const char* DARK_PITCH_COLORS[12] = {
+    "#CDCE1D", "#6572BA", "#EE7224", "#20AA92", "#F0848A", "#5EB13B",
+    "#B78CCE", "#F1AB27", "#2290CE", "#EB313A", "#3F844D", "#E5097A"
 };
 const char* HAND_COLORS[3] = { "#3FA9F5", "#7CCB4A", "#F5A623" };   // right, left, a third staff
 
@@ -585,7 +591,8 @@ void FallingNotesView::paint(QPainter* p)
         if (n.end < t || n.pitch < m_lowKey || n.pitch > m_highKey) {
             continue;
         }
-        QColor c = m_colors == "pitch" ? QColor(PITCH_COLORS[((n.pitch % 12) + 12) % 12]) : QColor(HAND_COLORS[n.hand]);
+        const int pc = ((n.pitch % 12) + 12) % 12;
+        QColor c = m_colors == "pitch" ? QColor(m_dark ? DARK_PITCH_COLORS[pc] : PITCH_COLORS[pc]) : QColor(HAND_COLORS[n.hand]);
         if (m_waitMode && !m_wait.waitsFor(n)) {
             c.setAlpha(80);   // (Wait for me: the hand not being played, faint)
         }

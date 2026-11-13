@@ -203,8 +203,8 @@ LayoutCopyResult copyLayout(const Score* source, const std::vector<Score*>& targ
 
 // C, C#, D, D#, E, F, F#, G, G#, A, A#, B
 static const char* STARSCORE_PITCH_COLORS[12] = {
-    "#C7C102", "#FF5DA1", "#028800", "#2DD3C0", "#001CA4", "#CC75F8",
-    "#92D303", "#F47700", "#915700", "#AD000E", "#829EFF", "#770096"
+    "#CDCE1D", "#315BA5", "#EE7224", "#20AA92", "#F0848A", "#5EB13B",
+    "#9168A9", "#F1AB27", "#2290CE", "#D7282D", "#1A6D32", "#E2197D"
 };
 
 static void starscoreCollectChordNotes(Chord* chord, std::vector<Note*>& notes)
