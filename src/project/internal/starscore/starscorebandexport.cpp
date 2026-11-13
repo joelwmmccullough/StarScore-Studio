@@ -588,6 +588,17 @@ std::optional<starscore::org::ExportInfo> StarScoreService::takeLastExport()
     return info;
 }
 
+//! (1.32.0) "MIDI Files for Synthesia" in the Music folder that holds Projects and Sheets (Joel's Google Drive › Music);
+//! under the autotest's folder in a test run. Empty when there is no projects folder.
+QString StarScoreService::synthesiaMidiFolder() const
+{
+    if (qEnvironmentVariableIsSet("STARSCORE_AUTOTEST")) {
+        return qEnvironmentVariable("STARSCORE_AUTOTEST") + "/MIDI Files for Synthesia";
+    }
+    const QString projects = projectsFolder();
+    return projects.isEmpty() ? QString() : QFileInfo(projects).absolutePath() + "/MIDI Files for Synthesia";
+}
+
 QString StarScoreService::projectsFolder() const
 {
     const QString saved = QSettings().value("StarScore/projectsFolder").toString();
@@ -4562,15 +4573,7 @@ RetVal<QString> StarScoreService::exportToBandFolder(const QStringList& onlyPath
             problems << muse::qtrc("starscore", "%1: not made (the Keys sheet has no part score)").arg(name);
             return;
         }
-        // the folder: "MIDI Files for Synthesia" in the Music folder that holds Projects and Sheets
-        QString dir;
-        const QString projects = projectsFolder();
-        if (!projects.isEmpty()) {
-            dir = QFileInfo(projects).absolutePath() + "/MIDI Files for Synthesia";
-        }
-        if (qEnvironmentVariableIsSet("STARSCORE_AUTOTEST")) {
-            dir = qEnvironmentVariable("STARSCORE_AUTOTEST") + "/MIDI Files for Synthesia";
-        }
+        const QString dir = synthesiaMidiFolder();
         if (dir.isEmpty() || !QDir().mkpath(dir)) {
             problems << muse::qtrc("starscore", "%1: not made (no \"MIDI Files for Synthesia\" folder)").arg(name);
             return;
@@ -6606,6 +6609,7 @@ RetVal<QString> StarScoreService::exportSoloSheets()
     // file") the main score as MIDI, its notes only (chord symbols not played into it): "MIDI/<player> - <song>.mid"
     // beside the Sheets folder
     QString midiFile;
+    QString synthesiaCopy;
     if (written > 0) {
         const INotationWriterPtr midiWriter = writers()->writer("mid");
         const QString midiDir = QFileInfo(file).absolutePath() + "/MIDI";
@@ -6625,6 +6629,15 @@ RetVal<QString> StarScoreService::exportSoloSheets()
                 problems << muse::qtrc("starscore", "%1: not made (%2)").arg(midiName, QString::fromStdString(mret.toString()));
             } else {
                 midiFile = midiDir + "/" + midiName;
+                // (1.33.0, Joel 13 Nov 2026) and the same file in MIDI Files for Synthesia
+                const QString synth = synthesiaMidiFolder();
+                QSaveFile copy(synth + "/" + midiName);
+                if (synth.isEmpty() || !QDir().mkpath(synth) || !copy.open(QIODevice::WriteOnly)
+                    || copy.write(bytes) != bytes.size() || !copy.commit()) {
+                    problems << muse::qtrc("starscore", "%1: not copied to MIDI Files for Synthesia").arg(midiName);
+                } else {
+                    synthesiaCopy = synth + "/" + midiName;
+                }
             }
         }
     }
@@ -6647,6 +6660,9 @@ RetVal<QString> StarScoreService::exportSoloSheets()
     }
     if (!midiFile.isEmpty()) {
         summary += " " + muse::qtrc("starscore", "Wrote the main score as MIDI, without chord symbols, to %1.").arg(QDir::toNativeSeparators(midiFile));
+        if (!synthesiaCopy.isEmpty()) {
+            summary += " " + muse::qtrc("starscore", "Copied it to %1.").arg(QDir::toNativeSeparators(synthesiaCopy));
+        }
     }
     for (const QString& n : chartNotes) {
         summary += " " + n;

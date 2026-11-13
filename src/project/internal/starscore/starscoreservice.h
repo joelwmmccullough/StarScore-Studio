@@ -266,6 +266,7 @@ public:
     void setBandFolder(const QString& path) override;
     std::optional<starscore::org::ExportInfo> takeLastExport() override;
     QString projectsFolder() const override;
+    QString synthesiaMidiFolder() const;
     void setProjectsFolder(const QString& path) override;
     QString songKind() const override;
     QString songGroup() const override;

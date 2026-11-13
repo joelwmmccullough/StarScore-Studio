@@ -4,6 +4,9 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.33.0
+- **Solo transcriptions' MIDI goes to MIDI Files for Synthesia too.** Export and Organize on a solo transcription still writes "MIDI/<player> - <song>.mid" beside its Sheets folder, and now also puts the same file in Google Drive › Music › MIDI Files for Synthesia (replaced on each export). Notes only, no chord symbols.
+
 ## 1.32.0
 - **The Keys sheet as MIDI for Synthesia.** Export and Organize now also writes the Keys sheet as a MIDI file to Google Drive › Music › MIDI Files for Synthesia ("<song> - Keys.mid", replaced on each export). It holds only the notes of the Keys sheet's instruments: no chord-symbol track and no other instruments. It is written whenever the Keys sheet is ticked in the export.
 
