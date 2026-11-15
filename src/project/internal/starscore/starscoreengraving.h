@@ -162,6 +162,9 @@ int hideEmptyKeysStavesInCopy(mu::engraving::MasterScore* master);
 //! The band's name for a horn ("Trumpet", "Tenor Sax", "Bari Sax", "Bass Trombone"…), or empty when the instrument
 //! is not a horn
 QString bandHornName(const QString& instrumentId);
+//! (1.34.0) An alternative-instrument part's name, part and sheet: "Alto Sax (Soprano Sax part)" for an alto sax
+//! playing the "Soprano Sax" part
+QString alternativeInstrumentName(const QString& instrumentId, const QString& mainName);
 //! The 1-Horn sheets' names (Joel, 5 Oct 2026): "Eb Saxophone" and "Bb Saxophone" for the alto and tenor sax; every
 //! other horn as bandHornName ("Trumpet", "Trombone")
 QString oneHornName(const QString& instrumentId);

@@ -243,6 +243,15 @@ static QString starscoreHornName(const QString& id)
 }
 
 //! The band's name for a horn (shared with the rest of StarScore), or empty when the instrument is not a horn
+QString mu::project::starscore::alternativeInstrumentName(const QString& instrumentId, const QString& mainName)
+{
+    QString horn = bandHornName(instrumentId);
+    if (horn.isEmpty()) {
+        horn = instrumentId;
+    }
+    return QString("%1 (%2 part)").arg(horn, mainName);
+}
+
 QString mu::project::starscore::oneHornName(const QString& instrumentId)
 {
     const QString name = bandHornName(instrumentId);
@@ -1329,6 +1338,9 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExportFor(bool titlesO
             int players = 0;   // stand-in versions (7-Horn Baritone / Bass Saxophone) aren't extra players
             std::map<QString, int> playerCounts;
             for (const auto& h : horns) {
+                if (data.alternativeParts.count(h.first)) {
+                    continue;   // (1.34.0) an alternative instrument: named after its part, never numbered with the players
+                }
                 counts[h.second]++;
                 if (!sec.alternates.count(h.first)) {
                     ++players;
@@ -1377,8 +1389,10 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExportFor(bool titlesO
             std::set<QString> bassHorns;
             if (sec.templateKey == "7-horn" || players == 7) {
                 for (const auto& [alt, main] : sec.alternates) {
-                    bassHorns.insert(alt);
-                    bassHorns.insert(main);
+                    if (!data.alternativeParts.count(alt)) {
+                        bassHorns.insert(alt);
+                        bassHorns.insert(main);
+                    }
                 }
                 // the 7th chair: the last low horn that isn't a stand-in (a Bass Clarinet doubler stays in the main folder)
                 QString seventh;
@@ -1390,6 +1404,12 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExportFor(bool titlesO
                 }
                 if (!seventh.isEmpty()) {
                     bassHorns.insert(seventh);
+                }
+                // an alternative instrument goes where its part goes
+                for (const auto& [alt, main] : sec.alternates) {
+                    if (data.alternativeParts.count(alt) && bassHorns.count(main)) {
+                        bassHorns.insert(alt);
+                    }
                 }
             }
 
@@ -1404,18 +1424,36 @@ RetVal<StarScoreBandExportPlan> StarScoreService::planBandExportFor(bool titlesO
                 const bool flugel = horn == "Trumpet" && data.flugelhornParts.count(pid);
                 anyFlugelhorn |= flugel;
                 printedAs[pid] = flugel ? QString("Flugelhorn") : horn;
-                printedCounts[printedAs[pid]]++;
+                if (!data.alternativeParts.count(pid)) {
+                    printedCounts[printedAs[pid]]++;
+                }
             }
             std::map<QString, int> printedSeen;
             std::map<QString, int> seen;
+            // the players' sheet names first: an alternative instrument is named after its part's ("Alto Sax (Soprano
+            // Sax part)", "Alto Sax (Trumpet 2 part)")
+            std::map<QString, QString> sheetName;
             for (const auto& [pid, horn] : horns) {
-                QString name = horn;
-                if (counts[horn] > 1) {
-                    name += QString(" %1").arg(++seen[horn]);
+                if (!data.alternativeParts.count(pid)) {
+                    sheetName[pid] = counts[horn] > 1 ? QString("%1 %2").arg(horn).arg(++seen[horn]) : horn;
                 }
+            }
+            for (const auto& [pid, horn] : horns) {
+                const auto main = sec.alternates.find(pid);
+                if (data.alternativeParts.count(pid)) {
+                    const QString mainName = main != sec.alternates.end() && sheetName.count(main->second)
+                                             ? sheetName[main->second] : QString("?");
+                    sheetName[pid] = QString("%1 (%2 part)").arg(horn, mainName);
+                }
+            }
+            for (const auto& [pid, horn] : horns) {
+                const QString name = sheetName[pid];
                 addFile(bassHorns.count(pid) ? folder + "/" + STARSCORE_BASS_HORNS_FOLDER : folder, name, { pid }, false);
                 plan.files.back().sheetLeft = starscoreSheetHornName(name);
-                if (anyFlugelhorn && horn == "Trumpet") {
+                if (data.alternativeParts.count(pid)) {
+                    // top left "Alto Saxophone (Soprano Sax part)", "Trumpet in B♭ (Alto Sax part)"
+                    plan.files.back().sheetLeft = starscoreSheetHornName(horn) + name.mid(horn.size());
+                } else if (anyFlugelhorn && horn == "Trumpet") {
                     const QString printed = printedAs[pid];
                     QString label = printed;
                     if (printedCounts[printed] > 1) {

@@ -2760,6 +2760,55 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         autotestLog(QString("  %1: %2 -> %3 (%4)").arg(a.value(0), r ? "ok" : QString::fromStdString(r.toString()),
                                                        p ? p->partName().toQString() : QString("?"),
                                                        p ? p->instrumentId().toQString() : QString("?")));
+    } else if (step.startsWith("alternative:")) {
+        // alternative:<part name>|<instrument id> (1.34.0): an alternative-instrument sheet of that part, as the StarScore
+        // bar's section menu makes it; then the parts' names, the first notes of both, and the export's sheets for it
+        const QStringList a = step.mid(12).split('|');
+        QString pid;
+        for (const engraving::Part* p : ms->parts()) {
+            if (p->partName().toQString() == a.value(0)) {
+                pid = idText(p);
+            }
+        }
+        const RetVal<QString> r = makeAlternativeInstrument(pid, a.value(1));
+        autotestLog(QString("  %1 -> %2: %3").arg(a.value(0), a.value(1), r.ret ? r.val : QString::fromStdString(r.ret.toString())));
+        engraving::MasterScore* m2 = masterScore();
+        auto firstNotes = [&](const engraving::Part* p) {
+            QStringList out;
+            if (!p || p->staves().empty()) {
+                return out;
+            }
+            const engraving::staff_idx_t si = p->staves().front()->idx();
+            for (engraving::Segment* seg = m2->firstSegment(engraving::SegmentType::ChordRest); seg && out.size() < 6;
+                 seg = seg->next1(engraving::SegmentType::ChordRest)) {
+                engraving::EngravingItem* e = seg->element(si * engraving::VOICES);
+                if (e && e->isChord()) {
+                    const engraving::Note* n = engraving::toChord(e)->upNote();
+                    out << QString("%1/%2").arg(n->pitch()).arg(n->pitch() - p->instrument()->transpose().chromatic);
+                }
+            }
+            return out;
+        };
+        const Data d = load();
+        for (const StarScoreSection& sec : d.sections) {
+            if (!sec.partIds.contains(pid)) {
+                continue;
+            }
+            for (const QString& id : sec.partIds) {
+                const engraving::Part* p = m2->partById(ID(id));
+                autotestLog(QString("    %1 %2%3 notes(sounding/written) %4").arg(p ? p->partName().toQString() : id,
+                                                                            p ? p->instrumentId().toQString() : QString(),
+                                                                            d.alternativeParts.count(id) ? " [alternative]" : "",
+                                                                            firstNotes(p).join(' ')));
+            }
+        }
+        const RetVal<StarScoreBandExportPlan> plan = planBandExport();
+        for (const StarScoreBandFile& f : plan.val.files) {
+            if (f.partIds.contains(pid) || std::any_of(f.partIds.begin(), f.partIds.end(),
+                                                       [&](const QString& x) { return d.alternativeParts.count(x) > 0; })) {
+                autotestLog(QString("    sheet %1 | left \"%2\" | right \"%3\"").arg(f.relativePath, f.sheetLeft, f.sheetRight));
+            }
+        }
     } else if (step.startsWith("doubler:")) {
         // doubler:<horns>: what the doubler is recommended to play in a new <horns>-horn section of this song
         autotestLog("  " + songDoublerInstrumentId(step.mid(8).toInt()));

@@ -1332,8 +1332,9 @@ void StarScoreService::removeEmptyVersions(const QStringList& partIds)
 }
 
 RetVal<QStringList> StarScoreService::createLowAlternates(const QString& sectionId, const QString& mainPartId,
-                                                          const QStringList& instrumentIds)
+                                                          const QStringList& instrumentIds, bool anyInstrument)
 {
+    m_alternativeOctaves = 0;
     IMasterNotationPtr master = globalContext()->currentMasterNotation();
     engraving::MasterScore* ms = masterScore();
     if (!master || !ms || !ms->firstMeasure()) {
@@ -1365,7 +1366,17 @@ RetVal<QStringList> StarScoreService::createLowAlternates(const QString& section
     // The versions, in the usual order, never the main part's own horn (a Bass Trombone version of the bass trombone)
     const QString mainInstrument = mainPart->instrumentId().toQString();
     std::vector<StarScoreInstrument> wanted;
-    for (const StarScoreHornChoice& c : versionsFor(mainInstrument, templateKey)) {
+    for (const QString& id : anyInstrument ? instrumentIds : QStringList()) {
+        // an alternative instrument: any horn but the part's own
+        if (id != mainInstrument) {
+            StarScoreInstrument inst;
+            inst.instrumentId = id;
+            inst.partName = starscore::bandHornName(id);
+            inst.hidden = false;
+            wanted.push_back(inst);
+        }
+    }
+    for (const StarScoreHornChoice& c : anyInstrument ? std::vector<StarScoreHornChoice>() : versionsFor(mainInstrument, templateKey)) {
         if (instrumentIds.contains(c.instrumentId)) {
             StarScoreInstrument inst;
             inst.instrumentId = c.instrumentId;
@@ -1481,6 +1492,57 @@ RetVal<QStringList> StarScoreService::createLowAlternates(const QString& section
                 }
             }
         }
+        // An alternative instrument keeps the sounding pitch, unless an octave up or down puts fewer notes outside the
+        // horn's range (a soprano line on tenor sax): then the whole part moves by that octave
+        if (anyInstrument) {
+            for (engraving::Part* to : newParts) {
+                if (to->staves().empty() || !to->instrument()) {
+                    continue;
+                }
+                const int lo = to->instrument()->minPitchP();
+                const int hi = to->instrument()->maxPitchP();
+                const engraving::staff_idx_t dst = to->staves().front()->idx();
+                std::vector<engraving::Note*> notes;
+                for (engraving::Segment* seg = start; seg; seg = seg->next1(engraving::SegmentType::ChordRest)) {
+                    for (engraving::track_idx_t t = dst * engraving::VOICES; t < (dst + 1) * engraving::VOICES; ++t) {
+                        engraving::ChordRest* cr = engraving::toChordRest(seg->element(t));
+                        if (!cr || !cr->isChord()) {
+                            continue;
+                        }
+                        for (engraving::Chord* c : engraving::toChord(cr)->graceNotes()) {
+                            notes.insert(notes.end(), c->notes().begin(), c->notes().end());
+                        }
+                        notes.insert(notes.end(), engraving::toChord(cr)->notes().begin(), engraving::toChord(cr)->notes().end());
+                    }
+                }
+                auto outside = [&](int shift) {
+                    int n = 0;
+                    for (const engraving::Note* note : notes) {
+                        const int pitch = note->pitch() + shift;
+                        n += pitch < lo || pitch > hi;
+                    }
+                    return n;
+                };
+                int best = 0;
+                int bestOut = outside(0);
+                for (int octaves : { -1, 1 }) {
+                    const int out = outside(12 * octaves);
+                    if (out < bestOut) {
+                        best = octaves;
+                        bestOut = out;
+                    }
+                }
+                if (best != 0 && lo < hi) {
+                    for (engraving::Note* n : notes) {
+                        const int pitch = n->pitch() + 12 * best;
+                        if (pitch >= 0 && pitch < 128) {
+                            ms->undoChangePitch(n, pitch, n->tpc1(), n->tpc2());
+                        }
+                    }
+                    m_alternativeOctaves = best;
+                }
+            }
+        }
         // pasting brings the notes, not the barlines: the double barlines (before each repeat) too
         starscore::copyEndBarlines(ms, mainPart, newParts);
         master->notation()->undoStack()->commitChanges();
@@ -1512,6 +1574,9 @@ RetVal<QStringList> StarScoreService::createLowAlternates(const QString& section
             }
             s.alternates[pid] = mainPartId;
             d.partStatus[pid] = statusKey(StarScoreStatus::NeedsReview);   // (the 1-Horn sheets too: Joel, 5 Oct 2026)
+            if (anyInstrument) {
+                d.alternativeParts.insert(pid);
+            }
         }
     }
     d.alternatesInSection = true;
@@ -1925,6 +1990,11 @@ int StarScoreService::standardizeHornNames()
         std::vector<bool> numbered;
         std::map<QString, int> counts;
         for (engraving::Part* p : parts) {
+            if (d.alternativeParts.count(idText(p))) {
+                bases.push_back(QString());   // (1.34.0) named after its main part, below
+                numbered.push_back(false);
+                continue;
+            }
             QString base = flexible ? QString()
                            : s.templateKey == "1-horn" ? starscore::oneHornName(p->instrumentId().toQString())
                            : starscore::bandHornName(p->instrumentId().toQString());
@@ -1939,6 +2009,7 @@ int StarScoreService::standardizeHornNames()
             }
         }
         std::map<QString, int> seen;
+        std::map<QString, QString> nameOf;   // part id -> its name without the prefix
         for (size_t i = 0; i < parts.size(); ++i) {
             QString name = bases[i];
             if (name.isEmpty()) {
@@ -1947,9 +2018,22 @@ int StarScoreService::standardizeHornNames()
             if (numbered[i] && counts[name] > 1) {
                 name += QString(" %1").arg(++seen[bases[i]]);
             }
+            nameOf[idText(parts[i])] = name;
             const QString full = prefix + ": " + name;
             if (parts[i]->partName().toQString() != full) {
                 renames.emplace_back(parts[i], full);
+            }
+        }
+        // (1.34.0) an alternative instrument: "3H: Alto Sax (Soprano Sax part)"
+        for (engraving::Part* p : parts) {
+            const QString pid = idText(p);
+            const auto main = s.alternates.find(pid);
+            if (!d.alternativeParts.count(pid) || main == s.alternates.end() || !nameOf.count(main->second)) {
+                continue;
+            }
+            const QString full = prefix + ": " + starscore::alternativeInstrumentName(p->instrumentId().toQString(), nameOf[main->second]);
+            if (p->partName().toQString() != full) {
+                renames.emplace_back(p, full);
             }
         }
     }

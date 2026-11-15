@@ -372,6 +372,7 @@ public:
     QString unmarkPlayerAnnotations() override;
     void offerMatchingHornParts(const QStringList& sectionIdsBefore) override;
     muse::Ret changePartInstrument(const QString& partId, const QString& instrumentId) override;
+    muse::RetVal<QString> makeAlternativeInstrument(const QString& partId, const QString& instrumentId) override;
     //! (source part id, new part id) pairs, instrument by instrument in score order
     std::vector<std::pair<QString, QString> > matchingHornParts(const QString& fromSectionId, const QString& toSectionId) const;
     int copyHornParts(const std::vector<std::pair<QString, QString> >& pairs);
@@ -424,6 +425,8 @@ public:
         std::map<QString, QString> partStatus;   // part id -> status key
         std::map<QString, QStringList> partMutes;   // part id -> its mutes as the sheet names them ("Harmon Mute")
         std::set<QString> flugelhornParts;   // trumpet parts (and Flexible chairs) played on flugelhorn
+        //! (1.34.0) alternative-instrument parts (makeAlternativeInstrument); each is also in its section's alternates
+        std::set<QString> alternativeParts;
         // Big Band, Orchestra and Marching Band: their full score has a status of its own (arrangement id ->
         // status key); the arrangement is finished only when its full score is marked Finished too
         std::map<QString, QString> scoreStatus;
@@ -711,7 +714,11 @@ private:
     //! Legacy audit: marks (or unmarks) these sheets as no longer needing auditing, with a fingerprint of their music
     void markPartsAudited(Data& data, const mu::engraving::MasterScore* ms, const QStringList& partIds, bool audited) const;
     //! instrumentIds: which of the main part's versions (versionsFor ids) to make
-    muse::RetVal<QStringList> createLowAlternates(const QString& sectionId, const QString& mainPartId, const QStringList& instrumentIds);
+    //! anyInstrument (1.34.0): instrumentIds are any horns (an alternative instrument), not versionsFor's; the copy may
+    //! move by an octave to fit the horn's range (m_alternativeOctaves says by how many)
+    muse::RetVal<QStringList> createLowAlternates(const QString& sectionId, const QString& mainPartId, const QStringList& instrumentIds,
+                                                  bool anyInstrument = false);
+    int m_alternativeOctaves = 0;
     //! The low horns a 7-Horn main part's stand-in versions can be made on: everything in lowHornChoices() except
     //! the main part's own instrument (the versions are made in this order)
     std::vector<StarScoreHornChoice> lowVersionsFor(const QString& mainInstrumentId) const;

@@ -554,6 +554,11 @@ StarScoreService::Data StarScoreService::fromJson(const QString& json)
             data.flugelhornParts.insert(v.toString());
         }
     }
+    for (const QJsonValue& v : root.value("alternativeParts").toArray()) {
+        if (!v.toString().isEmpty()) {
+            data.alternativeParts.insert(v.toString());
+        }
+    }
     const QJsonObject scoreStatus = root.value("scoreStatus").toObject();
     for (auto it = scoreStatus.begin(); it != scoreStatus.end(); ++it) {
         data.scoreStatus[it.key()] = it.value().toString();
@@ -745,6 +750,13 @@ QString StarScoreService::toJson(const Data& data)
             flugel.append(pid);
         }
         root["flugelhornParts"] = flugel;
+    }
+    if (!data.alternativeParts.empty()) {
+        QJsonArray alts;
+        for (const QString& pid : data.alternativeParts) {
+            alts.append(pid);
+        }
+        root["alternativeParts"] = alts;
     }
     QJsonObject scoreStatus;
     for (const auto& [aid, key] : data.scoreStatus) {
@@ -3321,6 +3333,7 @@ bool StarScoreService::forgetPartIds(Data& data, const QStringList& partIds)
         changed |= data.partStatus.erase(id) > 0;
         changed |= data.partMutes.erase(id) > 0;
         changed |= data.flugelhornParts.erase(id) > 0;
+        changed |= data.alternativeParts.erase(id) > 0;
         changed |= data.auditPartAudited.erase(id) > 0;
     }
     for (StarScoreSection& s : data.sections) {

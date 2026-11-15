@@ -1008,6 +1008,11 @@ public:
     //! instead of Alto Sax): the same music at the same sounding pitch, written for the new instrument; the part and
     //! its part score named after it; mutes and the flugelhorn mark only where they still fit. Undoable.
     virtual muse::Ret changePartInstrument(const QString& partId, const QString& instrumentId) = 0;
+    //! (1.34.0, Joel 15 Nov 2026: "create an 'alternative instrument' for any horn sheet", e.g. the 3H Soprano Sax part
+    //! on Alto Sax) A copy of a Standard horn section's part on another horn: a stand-in for that part in the section,
+    //! named "3H: Alto Sax (Soprano Sax part)", with its own part score and sheet. When one on that horn exists, its part
+    //! score opens instead. Returns what to tell Joel.
+    virtual muse::RetVal<QString> makeAlternativeInstrument(const QString& partId, const QString& instrumentId) = 0;
 
     //! Save a .mscz holding only the instruments and part books of this arrangement's sections.
     virtual muse::Ret exportArrangement(const QString& arrangementId, const muse::io::path_t& msczPath) = 0;

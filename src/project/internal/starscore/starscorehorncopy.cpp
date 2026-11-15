@@ -563,6 +563,80 @@ int StarScoreService::copyHornParts(const std::vector<std::pair<QString, QString
     return copied;
 }
 
+RetVal<QString> StarScoreService::makeAlternativeInstrument(const QString& partId, const QString& instrumentId)
+{
+    IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    engraving::MasterScore* ms = masterScore();
+    const engraving::Part* part = ms ? ms->partById(ID(partId)) : nullptr;
+    if (!master || !part) {
+        return RetVal<QString>::make_ret(Ret::Code::InternalError);
+    }
+    if (instrumentsRepository()->instrumentTemplate(String::fromQString(instrumentId)).id.isEmpty()) {
+        return RetVal<QString>::make_ret(Ret::Code::UnknownError, muse::trc("starscore", "Unknown instrument"));
+    }
+    if (part->instrumentId().toQString() == instrumentId) {
+        return RetVal<QString>::make_ret(Ret::Code::UnknownError, muse::trc("starscore", "The part is already on that instrument."));
+    }
+    // its Standard horn section (a player's part, not a stand-in)
+    const Data d = load();
+    const StarScoreSection* section = nullptr;
+    for (const StarScoreSection& s : d.sections) {
+        if (s.partIds.contains(partId) && !s.alternates.count(partId) && starscore::hornSectionSize(s.templateKey) > 1) {
+            section = &s;
+        }
+    }
+    if (!section) {
+        return RetVal<QString>::make_ret(Ret::Code::UnknownError,
+                                         muse::trc("starscore", "Alternative instruments are made for the parts of a Standard "
+                                                                "horn section (2- to 7-Horn)."));
+    }
+    const QString mainName = part->partName().toQString().section(": ", -1);
+    const QString horn = starscore::bandHornName(instrumentId).isEmpty() ? instrumentId : starscore::bandHornName(instrumentId);
+
+    // one there already: its part score opens
+    for (const auto& [alt, main] : section->alternates) {
+        const engraving::Part* a = ms->partById(ID(alt));
+        if (main == partId && d.alternativeParts.count(alt) && a && a->instrumentId().toQString() == instrumentId) {
+            for (const IExcerptNotationPtr& e : master->excerpts()) {
+                engraving::Score* es = e->notation() && e->notation()->elements() ? e->notation()->elements()->msScore() : nullptr;
+                const std::vector<engraving::Part*> ps = es ? masterPartsOf(es, ms) : std::vector<engraving::Part*>();
+                if (ps.size() == 1 && ps.front() == a) {
+                    master->setExcerptIsOpen(e->notation(), true);
+                    globalContext()->setCurrentNotation(e->notation());
+                    break;
+                }
+            }
+            return RetVal<QString>::make_ok(muse::qtrc("starscore", "%1 is already there; its part score is open. To make it "
+                                                                    "again from the %2 part as it is now, delete it (its "
+                                                                    "instrument) and choose this again.")
+                                            .arg(a->partName().toQString(), mainName));
+        }
+    }
+
+    const RetVal<QStringList> made = createLowAlternates(section->id, partId, { instrumentId }, true);
+    if (!made.ret || made.val.isEmpty()) {
+        return RetVal<QString>::make_ret(made.ret ? Ret(Ret::Code::UnknownError) : made.ret);
+    }
+    const engraving::Part* alt = ms->partById(ID(made.val.first()));
+    QString text = muse::qtrc("starscore", "%1 is made: the %2 part's music on %3, right below it in the section, with its "
+                                           "own part score (open now, with the %2 part score's formatting). Its status is "
+                                           "Needs review. It shows and hides with the section, and Export and Organize "
+                                           "prints it as \"%4\" in the arrangement's folder; it doesn't change the "
+                                           "arrangement's players or its folder name.")
+                   .arg(alt ? alt->partName().toQString() : horn, mainName, horn,
+                        starscore::alternativeInstrumentName(instrumentId, mainName));
+    if (m_alternativeOctaves != 0) {
+        text += " " + (m_alternativeOctaves > 0
+                       ? muse::qtrc("starscore", "It is an octave higher than the %1 part sounds, so more of it is in the %2's range.")
+                       : muse::qtrc("starscore", "It is an octave lower than the %1 part sounds, so more of it is in the %2's range."))
+                .arg(mainName, horn);
+    } else {
+        text += " " + muse::qtrc("starscore", "It sounds at the same pitch as the %1 part.").arg(mainName);
+    }
+    text += " " + muse::qtrc("starscore", "Notes outside the %1's range are colored.").arg(horn);
+    return RetVal<QString>::make_ok(text);
+}
+
 Ret StarScoreService::changePartInstrument(const QString& partId, const QString& instrumentId)
 {
     IMasterNotationPtr master = globalContext()->currentMasterNotation();

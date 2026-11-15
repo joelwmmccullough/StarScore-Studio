@@ -576,6 +576,37 @@ QVariantList StarScoreBarModel::sectionMenu(const QString& id) const
             items.insert(4, QVariantMap { { "title", muse::qtrc("starscore", "Change an instrument") }, { "subitems", changeItems },
                                           { "enabled", true } });
         }
+        // (1.34.0, Joel 15 Nov 2026) an alternative instrument for any of its sheets: a copy of the part on another horn
+        // ("3H: Alto Sax (Soprano Sax part)"), its own sheet; a tick on the horns it already has one on
+        if (starscore::hornSectionSize(templateKey) > 1) {
+            QVariantList altItems;
+            for (const QString& pid : partIds) {
+                if (alternates.count(pid)) {
+                    continue;
+                }
+                std::set<QString> has;
+                for (const auto& [alt, main] : alternates) {
+                    if (main == pid && instruments.count(alt)) {
+                        has.insert(instruments[alt]);
+                    }
+                }
+                QVariantList choices;
+                for (const auto& [instrumentId, name] : HORNS) {
+                    if (instruments[pid] == instrumentId) {
+                        continue;
+                    }
+                    choices << QVariantMap { { "id", "part-alternative:" + pid + ":" + instrumentId },
+                                             { "title", muse::qtrc("starscore", name) },
+                                             { "checkable", true }, { "checked", has.count(instrumentId) > 0 }, { "enabled", true } };
+                }
+                altItems << QVariantMap { { "title", names.count(pid) ? names[pid] : pid }, { "subitems", choices },
+                                          { "enabled", true } };
+            }
+            if (!altItems.isEmpty()) {
+                items.insert(5, QVariantMap { { "title", muse::qtrc("starscore", "Make an alternative-instrument sheet") },
+                                              { "subitems", altItems }, { "enabled", true } });
+            }
+        }
     }
     if (!versionMains.isEmpty()) {
         // the other versions (Bari Sax, Bass Sax, Bassoon… of the low horn; a Flute of a piccolo): only the ones the
@@ -1019,6 +1050,15 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
         const muse::RetVal<QString> r = starScore()->addVoiceToPartScore(arg);
         if (!r.ret) {
             interactive()->error(muse::trc("starscore", "The Voice wasn't added"), r.ret.toString());
+        }
+    } else if (action == "part-alternative") {
+        // part-alternative:<part id>:<instrument id>
+        const int at = arg.lastIndexOf(':');
+        const muse::RetVal<QString> r = starScore()->makeAlternativeInstrument(arg.left(at), arg.mid(at + 1));
+        if (!r.ret) {
+            interactive()->error(muse::trc("starscore", "The alternative-instrument sheet wasn't made"), r.ret.toString());
+        } else if (!r.val.isEmpty()) {
+            interactive()->info(muse::trc("starscore", "Alternative-instrument sheet"), r.val.toStdString());
         }
     } else if (action == "part-instrument") {
         // part-instrument:<part id>:<instrument id>
