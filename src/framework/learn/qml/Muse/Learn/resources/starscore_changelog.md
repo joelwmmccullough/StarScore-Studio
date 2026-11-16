@@ -4,6 +4,9 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.35.0
+- **Hide any of the StarScore panel's rows.** Right-click a row's name (Arrangements, Sections, Progress, Audio, Solos) or an empty part of the panel, and untick the rows you don't want; the menu stays open so you can untick several. The same list is in the panel's "…" menu under "Rows in this panel", with "Show all rows". The choice is kept for every song. If every row is hidden, the panel keeps one line you can right-click to bring them back.
+
 ## 1.34.0
 - **Alternative-instrument sheets.** Any part of a Standard horn section (2- to 7-Horn) can get a copy on another horn, e.g. the 3-Horn Soprano Sax part on Alto Sax, so a player can try the arrangement on a different instrument. StarScore bar › right-click the section › "Make an alternative-instrument sheet" › the part › the horn.
   - The copy goes right below the part, named "3H: Alto Sax (Soprano Sax part)", with its own part score (opened, with the part score's formatting) and status Needs review. It shows and hides with its section and is in the arrangement's score.

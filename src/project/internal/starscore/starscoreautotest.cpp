@@ -2760,6 +2760,12 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         autotestLog(QString("  %1: %2 -> %3 (%4)").arg(a.value(0), r ? "ok" : QString::fromStdString(r.toString()),
                                                        p ? p->partName().toQString() : QString("?"),
                                                        p ? p->instrumentId().toQString() : QString("?")));
+    } else if (step.startsWith("panelrows:")) {
+        // panelrows:<row>;<row>… (1.35.0): those rows of the StarScore panel hidden (none: "panelrows:")
+        QStringList rows = step.mid(10).split(';', Qt::SkipEmptyParts);
+        QSettings().setValue("StarScore/panel/hiddenRows", rows);
+        m_changed.notify();
+        autotestLog("  hidden rows: " + rows.join(", "));
     } else if (step.startsWith("alternative:")) {
         // alternative:<part name>|<instrument id> (1.34.0): an alternative-instrument sheet of that part, as the StarScore
         // bar's section menu makes it; then the parts' names, the first notes of both, and the export's sheets for it

@@ -28,6 +28,8 @@ class StarScoreBarModel : public QObject, public muse::Contextable, public muse:
 
     Q_PROPERTY(bool hasScore READ hasScore NOTIFY changed)
     Q_PROPERTY(bool panelVisible READ panelVisible NOTIFY changed)
+    //! (1.35.0) the panel's rows Joel hid: "arrangements", "sections", "progress", "audio", "solos" (app-wide)
+    Q_PROPERTY(QStringList hiddenRows READ hiddenRows NOTIFY rowsChanged)
     Q_PROPERTY(bool isStarScoreFile READ isStarScoreFile NOTIFY changed)
     // Each chip list has its own signal, fired only when that list is different: one changed() used to rebuild
     // every chip (and close its menu) on any undo-stack change
@@ -101,6 +103,9 @@ public:
     Q_INVOKABLE QVariantList addArrangementMenu() const;
     Q_INVOKABLE QVariantList addSectionMenu() const;
     Q_INVOKABLE QVariantList moreMenu() const;
+    //! which rows show: a tick each (the right-click menu of a row's name and of the panel, and in "…")
+    Q_INVOKABLE QVariantList rowsMenu() const;
+    QStringList hiddenRows() const;
     Q_INVOKABLE void handleMenuItem(const QString& itemId);
 
     //! Colour for a status value (0 = empty … 4 = finished)
@@ -109,6 +114,7 @@ public:
 
 signals:
     void changed();
+    void rowsChanged();
     void arrangementsChanged();
     void sectionsChanged();
     void solosChanged();

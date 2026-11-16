@@ -42,6 +42,7 @@ void StarScoreBarModel::load()
         emit changed();
     });
     starScore()->changed().onNotify(this, [this]() {
+        emit rowsChanged();   // (a row hidden from elsewhere: the autotest)
         if (m_holdUpdates) {
             m_pendingUpdate = true;
             return;
@@ -747,6 +748,8 @@ QVariantList StarScoreBarModel::moreMenu() const
             QVariantMap {},
             item("color-notes", muse::qtrc("starscore", "Color notes by pitch")),
             item("uncolor-notes", muse::qtrc("starscore", "Remove note colors")),
+            QVariantMap {},
+            QVariantMap { { "title", muse::qtrc("starscore", "Rows in this panel") }, { "subitems", rowsMenu() }, { "enabled", true } },
         };
     }
     auto checkItem = [](const QString& id, const QString& title, bool checked) {
@@ -819,7 +822,39 @@ QVariantList StarScoreBarModel::moreMenu() const
         item("chord-chart", muse::qtrc("starscore", "Edit the iReal Pro chord chart…")),
         item("export-arrangements", muse::qtrc("starscore", "Export arrangements as MuseScore files…"), !starScore()->arrangements().empty()),
         item("organize", muse::qtrc("starscore", "Run folder organization…")),
+        QVariantMap {},
+        submenu(muse::qtrc("starscore", "Rows in this panel"), rowsMenu()),
     };
+}
+
+// (1.35.0, Joel 15 Nov 2026: "Allow for me to hide any of these 5 groups so that I can reduce the size of the starscore
+// panel") Kept app-wide, like the panel itself.
+static const char* HIDDEN_ROWS_KEY = "StarScore/panel/hiddenRows";
+
+QStringList StarScoreBarModel::hiddenRows() const
+{
+    return QSettings().value(HIDDEN_ROWS_KEY).toStringList();
+}
+
+QVariantList StarScoreBarModel::rowsMenu() const
+{
+    const QStringList hidden = hiddenRows();
+    const bool solo = starScore()->isSoloTranscription();
+    const std::vector<std::pair<QString, QString> > rows {
+        { "arrangements", solo ? muse::qtrc("starscore", "Solo") : muse::qtrc("starscore", "Arrangements") },
+        { "sections", muse::qtrc("starscore", "Sections") },
+        { "progress", muse::qtrc("starscore", "Progress") },
+        { "audio", muse::qtrc("starscore", "Audio") },
+        { "solos", muse::qtrc("starscore", "Solos") },
+    };
+    QVariantList items;
+    for (const auto& [key, title] : rows) {
+        items << QVariantMap { { "id", "panel-row:" + key }, { "title", title }, { "checkable", true },
+                               { "checked", !hidden.contains(key) }, { "enabled", true }, { "keepOpen", true } };
+    }
+    items << QVariantMap {};
+    items << QVariantMap { { "id", "panel-row:all" }, { "title", muse::qtrc("starscore", "Show all rows") }, { "enabled", !hidden.isEmpty() } };
+    return items;
 }
 
 void StarScoreBarModel::openEditDialog(const QString& mode, const QString& id, const QString& extra)
@@ -988,6 +1023,19 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
         return -1;
     };
 
+    if (action == "panel-row") {
+        QStringList hidden = hiddenRows();
+        if (arg == "all") {
+            hidden.clear();
+        } else if (hidden.contains(arg)) {
+            hidden.removeAll(arg);
+        } else {
+            hidden << arg;
+        }
+        QSettings().setValue(HIDDEN_ROWS_KEY, hidden);
+        emit rowsChanged();
+        return;
+    }
     if (action == "arr-show") {
         starScore()->showArrangement(arg);
     } else if (action == "arr-score") {

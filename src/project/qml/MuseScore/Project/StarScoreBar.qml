@@ -26,6 +26,33 @@ Rectangle {
         id: barModel
     }
 
+    // (1.35.0, Joel 15 Nov 2026) rows he hid to make the panel smaller; right-click a row's name, the panel, or "…"
+    function rowShown(key) {
+        return barModel.hiddenRows.indexOf(key) < 0
+    }
+
+    readonly property bool anyRowShowing: arrangementsRow.visible || sectionsRow.visible || progressRow.visible
+                                          || audioRow.visible || solosRow.visible
+
+    // right-click the panel where nothing else is: which rows show
+    MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.RightButton
+        onClicked: rowsMenu.toggleOpened(barModel.rowsMenu())
+    }
+
+    StyledMenuLoader {
+        id: rowsMenu
+
+        onHandleMenuItem: function(itemId) {
+            barModel.handleMenuItem(itemId)
+        }
+        onKeepOpenItemChosen: function(itemId) {
+            barModel.handleMenuItem(itemId)
+            rowsMenu.refreshOpen(barModel.rowsMenu())
+        }
+    }
+
     Component.onCompleted: {
         barModel.load()
     }
@@ -146,9 +173,20 @@ Rectangle {
 
         spacing: 6
 
+        StyledTextLabel {
+            visible: !root.anyRowShowing
+            Layout.fillWidth: true
+            Layout.topMargin: 2
+            horizontalAlignment: Text.AlignLeft
+            color: ui.theme.fontSecondaryColor
+            text: qsTrc("starscore", "All of this panel's rows are hidden. Right-click here to show them.")
+        }
+
         // --- Arrangements ---
         RowLayout {
+            id: arrangementsRow
             Layout.fillWidth: true
+            visible: root.rowShown("arrangements")
             spacing: 8
 
             StyledTextLabel {
@@ -156,6 +194,13 @@ Rectangle {
                 Layout.alignment: Qt.AlignTop | Qt.AlignLeft
                 Layout.topMargin: 5
                 horizontalAlignment: Text.AlignLeft
+
+                // (1.35.0) right-click: which rows show
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.RightButton
+                    onClicked: rowsMenu.toggleOpened(barModel.rowsMenu())
+                }
                 text: barModel.isSoloTranscription ? qsTrc("starscore", "Solo") : qsTrc("starscore", "Arrangements")
                 font: ui.theme.bodyBoldFont
             }
@@ -256,6 +301,11 @@ Rectangle {
                     onHandleMenuItem: function(itemId) {
                         barModel.handleMenuItem(itemId)
                     }
+                    // the panel's row ticks: the menu stays open
+                    onKeepOpenItemChosen: function(itemId) {
+                        barModel.handleMenuItem(itemId)
+                        moreMenu.refreshOpen(barModel.moreMenu())
+                    }
                 }
             }
 
@@ -285,8 +335,9 @@ Rectangle {
 
         // --- Sections ---
         RowLayout {
+            id: sectionsRow
             Layout.fillWidth: true
-            visible: !root.collapsed && !barModel.isSoloTranscription
+            visible: root.rowShown("sections") && !root.collapsed && !barModel.isSoloTranscription
             spacing: 8
 
             StyledTextLabel {
@@ -294,6 +345,13 @@ Rectangle {
                 Layout.alignment: Qt.AlignTop | Qt.AlignLeft
                 Layout.topMargin: 5
                 horizontalAlignment: Text.AlignLeft
+
+                // (1.35.0) right-click: which rows show
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.RightButton
+                    onClicked: rowsMenu.toggleOpened(barModel.rowsMenu())
+                }
                 text: qsTrc("starscore", "Sections")
                 font: ui.theme.bodyBoldFont
             }
@@ -378,8 +436,9 @@ Rectangle {
 
         // --- Progress colors (Joel, 7 Oct 2026): select measures, then click a color ---
         RowLayout {
+            id: progressRow
             Layout.fillWidth: true
-            visible: !root.collapsed
+            visible: root.rowShown("progress") && !root.collapsed
             spacing: 8
 
             StyledTextLabel {
@@ -387,6 +446,13 @@ Rectangle {
                 Layout.alignment: Qt.AlignTop | Qt.AlignLeft
                 Layout.topMargin: 5
                 horizontalAlignment: Text.AlignLeft
+
+                // (1.35.0) right-click: which rows show
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.RightButton
+                    onClicked: rowsMenu.toggleOpened(barModel.rowsMenu())
+                }
                 text: qsTrc("starscore", "Progress")
                 font: ui.theme.bodyBoldFont
             }
@@ -432,8 +498,9 @@ Rectangle {
         // --- Audio: the score's recordings, video and Transcribe! files, stored inside the .starscore (1.26.0; in 1.25.0
         // they were in an Audio folder beside it, still shown until moved in) ---
         RowLayout {
+            id: audioRow
             Layout.fillWidth: true
-            visible: !root.collapsed && (barModel.audioFiles.length > 0 || barModel.canAddAudio)
+            visible: root.rowShown("audio") && !root.collapsed && (barModel.audioFiles.length > 0 || barModel.canAddAudio)
             spacing: 8
 
             StyledTextLabel {
@@ -441,6 +508,13 @@ Rectangle {
                 Layout.alignment: Qt.AlignTop | Qt.AlignLeft
                 Layout.topMargin: 5
                 horizontalAlignment: Text.AlignLeft
+
+                // (1.35.0) right-click: which rows show
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.RightButton
+                    onClicked: rowsMenu.toggleOpened(barModel.rowsMenu())
+                }
                 text: qsTrc("starscore", "Audio")
                 font: ui.theme.bodyBoldFont
             }
@@ -492,8 +566,9 @@ Rectangle {
 
         // --- Solos ---
         RowLayout {
+            id: solosRow
             Layout.fillWidth: true
-            visible: !root.collapsed && !barModel.isSoloTranscription
+            visible: root.rowShown("solos") && !root.collapsed && !barModel.isSoloTranscription
                      && (barModel.solos.length > 0 || barModel.canAddSolos || barModel.tiedSolos.length > 0)
             spacing: 8
 
@@ -502,6 +577,13 @@ Rectangle {
                 Layout.alignment: Qt.AlignTop | Qt.AlignLeft
                 Layout.topMargin: 5
                 horizontalAlignment: Text.AlignLeft
+
+                // (1.35.0) right-click: which rows show
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.RightButton
+                    onClicked: rowsMenu.toggleOpened(barModel.rowsMenu())
+                }
                 text: qsTrc("starscore", "Solos")
                 font: ui.theme.bodyBoldFont
             }
