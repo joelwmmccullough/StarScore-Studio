@@ -1979,19 +1979,7 @@
     0.3
    ],
    "in": {
-    "attributes": {
-     "museCategory": "Muse Percussion",
-     "museName": "GM Drum Kit",
-     "musePack": "Muse Percussion",
-     "museUID": "188",
-     "museVendorName": "Muse",
-     "playbackSetupData": "percussions.synthesizer.percussive:electric"
-    },
-    "hasNativeEditorSupport": false,
-    "id": "188",
-    "type": "muse_sampler_sound_pack",
-    "vendor": "MuseSounds"
-   }
+"attributes": {"playbackSetupData": "last.last.last", "soundFontName": "MS Basic"}, "hasNativeEditorSupport": false, "id": "MS Basic", "type": "fluid_soundfont", "vendor": "Fluid"}
   },
   "rhythm|congas|1": {
    "volumeDb": 0,

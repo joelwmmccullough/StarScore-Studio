@@ -4,6 +4,9 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.35.1
+- **The drum kit's default sound is MS Basic** (was the Muse Sounds GM Drum Kit). New songs and new Rhythm Sections get it, at the same level, pan and reverb as before. Songs you already have keep the sound they have; change one in the Mixer.
+
 ## 1.35.0
 - **Hide any of the StarScore panel's rows.** Right-click a row's name (Arrangements, Sections, Progress, Audio, Solos) or an empty part of the panel, and untick the rows you don't want; the menu stays open so you can untick several. The same list is in the panel's "…" menu under "Rows in this panel", with "Show all rows". The choice is kept for every song. If every row is hidden, the panel keeps one line you can right-click to bring them back.
 
