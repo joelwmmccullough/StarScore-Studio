@@ -4,6 +4,12 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.36.0
+- **Autosaves go to the Autosave Archive too.** Until now the archive only kept a song when you pressed Save; the 5-minute autosaves (the hidden "<song>.starscore.autosave" file beside the song) weren't kept, so when StarScore closed without quitting and the next start removed the autosave, that work was gone (Citrus Suspicions, 22 Nov 2026).
+  - While you work, an autosave is kept at most once every 10 minutes, like saves.
+  - Whenever an autosave file is about to be removed (you answered No to "restore the session?", chose Don't save, closed the song, or an update quit StarScore), it is kept first, unless the song file was saved after it or the archive already has it.
+  - It is kept at the time the autosave was made, so it shows in File › Autosave archive… at the time you were working, even when it was kept later. Open it from there like any other version.
+
 ## 1.35.1
 - **The drum kit's default sound is MS Basic** (was the Muse Sounds GM Drum Kit). New songs and new Rhythm Sections get it, at the same level, pan and reverb as before. Songs you already have keep the sound they have; change one in the Mixer.
 

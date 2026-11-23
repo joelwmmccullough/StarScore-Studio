@@ -6,7 +6,13 @@
  * Autosave archive (Joel, 7 Oct 2026).
  *
  * Before a save replaces a .starscore file, the version on disk is kept: at most once every 10 minutes per song, and
- * only when it differs from the newest kept version. The copy goes to ~/StarScore Studio/Autosave Archive/Incoming
+ * only when it differs from the newest kept version.
+ *
+ * (1.36.0, Joel 22 Nov 2026: an evening of unsaved work on Citrus Suspicions was lost when StarScore closed without
+ * quitting and the next start removed MuseScore's autosave.) MuseScore's 5-minute autosaves ("<song>.starscore.autosave"
+ * beside the song) are kept too: after each autosave at most once every 10 minutes, and always just before an
+ * autosave file is removed (Don't save, "restore the session?" answered No, the song saved) unless the song file is
+ * newer than it or the archive already has it. Each is kept at the autosave's own time. The copy goes to ~/StarScore Studio/Autosave Archive/Incoming
  * (a plain file copy, so saving doesn't slow down), and a background job packs it into the song's history file,
  * Autosave Archive/<song>.starhistory, then deletes the plain copy.
  *
@@ -753,6 +759,55 @@ void notifyBeforeSave(const void* project)
     }
 }
 
+//! The newest version kept of a song: waiting in Incoming, else the newest in the history file
+static void newestKept(const QString& base, QDateTime& newest, QByteArray& newestSha1)
+{
+    const auto waiting = waitingCopies();
+    if (auto it = waiting.find(base); it != waiting.end() && !it->second.empty()) {
+        newest = it->second.back().time;
+        newestSha1 = fileSha1(it->second.back().path);
+    } else {
+        std::vector<Version> versions;
+        if (readHistoryIndex(historyPath(base), versions) && !versions.empty()) {
+            newest = versions.back().time;
+            newestSha1 = versions.back().fileSha1;
+        }
+    }
+}
+
+//! Copies source into Incoming as a version of song base at the given time. When that minute's name is taken by a
+//! different copy (two versions in one minute), the next free minute is used. Returns the copy's path, or nothing.
+static QString copyIntoIncoming(const QString& source, const QString& base, const QDateTime& time, bool background)
+{
+    if (!QDir().mkpath(incomingDir())) {
+        LOGW() << "autosave archive: couldn't make " << incomingDir().toStdString();
+        return QString();
+    }
+    const QByteArray sourceSha1 = fileSha1(source);
+    for (int extra = 0; extra < 10; ++extra) {
+        const QString target = incomingDir() + "/" + base + " " + time.addSecs(60 * extra).toString(TIME_FORMAT) + ".starscore";
+        if (QFile::exists(target)) {
+            if (fileSha1(target) == sourceSha1) {
+                return target;   // already there
+            }
+            continue;
+        }
+        const QString part = target + ".part";
+        QFile::remove(part);
+        if (!QFile::copy(source, part) || !QFile::rename(part, target)) {
+            LOGW() << "autosave archive: couldn't copy to " << target.toStdString();
+            QFile::remove(part);
+            return QString();
+        }
+        if (background) {
+            packIncomingInBackground();
+        }
+        return target;
+    }
+    LOGW() << "autosave archive: no free name for " << base.toStdString() << " near " << time.toString(TIME_FORMAT).toStdString();
+    return QString();
+}
+
 QString archiveBeforeSave(const QString& songPath, const QDateTime& now, bool background)
 {
     if (!autosaveArchiveEnabled() || !songPath.endsWith(".starscore", Qt::CaseInsensitive)) {
@@ -770,20 +825,9 @@ QString archiveBeforeSave(const QString& songPath, const QDateTime& now, bool ba
     const QString base = song.completeBaseName();
     adoptHistoryOfRenamedSong(base);
 
-    // the newest version kept: waiting in Incoming, else the newest in the history file
     QDateTime newest;
     QByteArray newestSha1;
-    const auto waiting = waitingCopies();
-    if (auto it = waiting.find(base); it != waiting.end() && !it->second.empty()) {
-        newest = it->second.back().time;
-        newestSha1 = fileSha1(it->second.back().path);
-    } else {
-        std::vector<Version> versions;
-        if (readHistoryIndex(historyPath(base), versions) && !versions.empty()) {
-            newest = versions.back().time;
-            newestSha1 = versions.back().fileSha1;
-        }
-    }
+    newestKept(base, newest, newestSha1);
     if (newest.isValid()) {
         if (newest.secsTo(now) < 10 * 60) {
             return QString();   // one version per 10 minutes at most
@@ -792,23 +836,53 @@ QString archiveBeforeSave(const QString& songPath, const QDateTime& now, bool ba
             return QString();   // nothing changed since then
         }
     }
+    return copyIntoIncoming(songPath, base, now, background);
+}
 
-    if (!QDir().mkpath(incomingDir())) {
-        LOGW() << "autosave archive: couldn't make " << incomingDir().toStdString();
+QString archiveAutosave(const QString& autosavePath, const QString& songPath, bool force, const QDateTime& now, bool background)
+{
+    if (!autosaveArchiveEnabled() || !songPath.endsWith(".starscore", Qt::CaseInsensitive)) {
         return QString();
     }
-    const QString target = incomingDir() + "/" + base + " " + now.toString(TIME_FORMAT) + ".starscore";
-    const QString part = target + ".part";
-    QFile::remove(part);
-    if (QFile::exists(target) || !QFile::copy(songPath, part) || !QFile::rename(part, target)) {
-        LOGW() << "autosave archive: couldn't copy to " << target.toStdString();
-        QFile::remove(part);
+    const QFileInfo autosave(autosavePath);
+    if (!autosave.exists() || autosave.size() == 0) {
         return QString();
     }
-    if (background) {
-        packIncomingInBackground();
+    const QFileInfo song(songPath);
+    const QString root = autosaveArchiveRoot();
+    if (song.absoluteFilePath().startsWith(root + "/")) {
+        return QString();   // a version opened from the archive: not archived again
     }
-    return target;
+    // The autosave's own time: when that work was done (it may be kept much later, e.g. at the next start)
+    QDateTime time = autosave.lastModified();
+    if (!time.isValid() || time > now) {
+        time = now;
+    }
+    // An autosave older than the song file (the usual case after Save) holds nothing the song file doesn't
+    if (force && song.exists() && song.lastModified() >= time) {
+        return QString();
+    }
+
+    const QString base = song.completeBaseName();
+    adoptHistoryOfRenamedSong(base);
+
+    QDateTime newest;
+    QByteArray newestSha1;
+    newestKept(base, newest, newestSha1);
+    if (newest.isValid()) {
+        if (!force && newest.secsTo(time) < 10 * 60) {
+            return QString();   // while working: one version per 10 minutes at most, like saves
+        }
+        if (newestSha1 == fileSha1(autosavePath)) {
+            return QString();   // already kept
+        }
+    }
+    const QString copy = copyIntoIncoming(autosavePath, base, time, background);
+    if (!copy.isEmpty()) {
+        LOGI() << "autosave archive: kept the autosave of " << base.toStdString() << " from "
+               << time.toString(TIME_FORMAT).toStdString() << (force ? " (before it was removed)" : "");
+    }
+    return copy;
 }
 
 //! (1.26.0) Media no version of any song lists, and no copy waiting in Incoming holds, removed from the Media store

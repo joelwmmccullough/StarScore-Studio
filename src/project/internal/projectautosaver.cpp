@@ -23,6 +23,8 @@
 
 #include "engraving/infrastructure/mscio.h"
 
+#include "starscore/starscoreautoarchive.h"
+
 #include "defer.h"
 #include "log.h"
 
@@ -91,6 +93,10 @@ void ProjectAutoSaver::removeProjectUnsavedChanges(const muse::io::path_t& proje
     muse::io::path_t path = projectPath;
     if (!isAutosaveOfNewlyCreatedProject(projectPath)) {
         path = projectAutoSavePath(projectPath);
+        // StarScore (1.36.0): the unsaved work goes to the autosave archive before the autosave file is removed
+        if (fileSystem()->exists(path)) {
+            mu::project::starscore::archiveAutosave(path.toQString(), projectPath.toQString(), true);
+        }
     }
 
     fileSystem()->remove(path);
@@ -177,6 +183,11 @@ void ProjectAutoSaver::onTrySave()
     }
 
     project->setNeedAutoSave(false);
+
+    // StarScore (1.36.0): the autosave also goes to the autosave archive (at most every 10 minutes)
+    if (!project->isNewlyCreated()) {
+        mu::project::starscore::archiveAutosave(savePath.toQString(), projectPath.toQString(), false);
+    }
 
     LOGD() << "[autosave] successfully saved project";
 }

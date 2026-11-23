@@ -26,6 +26,13 @@ bool autosaveArchiveEnabled();
 //! (background false: not packed now; for tests)
 QString archiveBeforeSave(const QString& songPath, const QDateTime& now = QDateTime::currentDateTime(), bool background = true);
 
+//! (1.36.0) Keeps MuseScore's autosave of songPath (autosavePath, "<song>.starscore.autosave") as a version of the song,
+//! at the autosave file's own time. force false (after each autosave): at most once per 10 minutes, like saves.
+//! force true (just before the autosave file is removed): always, unless the song file is newer than the autosave or
+//! the newest kept version is the same file. Returns the copy's path, or nothing.
+QString archiveAutosave(const QString& autosavePath, const QString& songPath, bool force,
+                        const QDateTime& now = QDateTime::currentDateTime(), bool background = true);
+
 //! (1.24.0) Called by NotationProject::save just before a project is saved to a file (not an autosave), with the
 //! project (as const INotationProject*): StarScore first puts back what it shows only for the moment (the audit
 //! listen-through's instruments), so the file doesn't keep that. One hook; an empty function removes it.
