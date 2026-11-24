@@ -26,12 +26,12 @@
 #include "log.h"
 
 namespace mu::project::starscore {
-static QByteArray sha1Of(const QByteArray& bytes)
+static QByteArray driveSha1Of(const QByteArray& bytes)
 {
     return QCryptographicHash::hash(bytes, QCryptographicHash::Sha1);
 }
 
-static QByteArray fileSha1(const QString& path)
+static QByteArray driveFileSha1(const QString& path)
 {
     QFile f(path);
     if (!f.open(QIODevice::ReadOnly)) {
@@ -77,7 +77,7 @@ bool replaceFileContents(const QString& src, const QString& dst, QString* error)
 #endif
     out.close();
 
-    if (fileSha1(dst) != sha1Of(bytes)) {
+    if (driveFileSha1(dst) != driveSha1Of(bytes)) {
         return fail(QString("%1 doesn't read back as what was written").arg(dst));
     }
     return true;
@@ -211,7 +211,7 @@ std::optional<DriveRemovedCopy> driveRemovedCopyFor(const QString& songPath)
             if (c.time <= song.lastModified().addSecs(2)) {
                 continue;
             }
-            if (fileSha1(c.path) == fileSha1(songPath)) {
+            if (driveFileSha1(c.path) == driveFileSha1(songPath)) {
                 continue;
             }
         }
