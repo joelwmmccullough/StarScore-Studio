@@ -25,6 +25,7 @@
 #include "starscore/starscorezip.h"
 
 #include "starscore/starscoreengraving.h"
+#include "starscore/starscoredrivesafety.h"
 #include "notation/inotationelements.h"
 
 #include <map>
@@ -38,6 +39,7 @@
 #include <QEventLoop>
 #include <QFileInfo>
 #include <QTemporaryFile>
+#include <QLocale>
 #include <QUrl>
 #include <QUrlQuery>
 #include <QTimer>
@@ -638,6 +640,13 @@ Ret ProjectActionsController::doOpenProject(const muse::io::path_t& filePath)
 {
     TRACEFUNC;
 
+    // StarScore (1.37.0): a newer copy of this song that Google Drive took out of its folder (its canceled_uploads)
+    // is offered back before the song is opened
+    const std::string openSuffix = io::suffix(filePath);
+    if ((openSuffix == "starscore" || openSuffix == "mscz") && qEnvironmentVariable("STARSCORE_AUTOTEST").isEmpty()) {
+        offerDriveCopyBack(filePath.toQString());
+    }
+
     RetVal<INotationProjectPtr> rv = loadProject(filePath);
     if (!rv.ret) {
         return rv.ret;
@@ -671,6 +680,45 @@ Ret ProjectActionsController::doOpenProject(const muse::io::path_t& filePath)
     }
 
     return ret;
+}
+
+void ProjectActionsController::offerDriveCopyBack(const QString& songPath)
+{
+    const std::optional<mu::project::starscore::DriveRemovedCopy> copy = mu::project::starscore::driveRemovedCopyFor(songPath);
+    if (!copy) {
+        return;
+    }
+    const QFileInfo song(songPath);
+    const QLocale locale;
+    const QString saved = locale.toString(copy->time, QLocale::ShortFormat);
+    QString text = song.exists()
+                   ? muse::qtrc("project", "Google Drive has a newer copy of “%1” (saved %2) in its canceled_uploads folder. "
+                                           "The file in the song's folder is from %3.")
+                   .arg(song.fileName(), saved, locale.toString(song.lastModified(), QLocale::ShortFormat))
+                   : muse::qtrc("project", "“%1” isn't in its folder, but Google Drive has a copy of it (saved %2) in its "
+                                           "canceled_uploads folder.").arg(song.fileName(), saved);
+    text += "\n\n" + muse::qtrc("project", "Google Drive moves a file there when it cancels the file's upload. “Put it back” "
+                                            "writes that copy to the song's folder and opens it")
+            + (song.exists() ? muse::qtrc("project", " (the file there now is first kept in Autosave Archive › Replaced).")
+               : QString("."));
+
+    enum { PutBack = int(IInteractive::Button::CustomButton) + 1, Show, Leave };
+    const IInteractive::Result answer = interactive()->questionSync(
+        muse::trc("project", "Google Drive took this song out of its folder"), text.toStdString(),
+        { IInteractive::ButtonData(Leave, muse::trc("project", "Don't put it back")),
+          IInteractive::ButtonData(Show, muse::trc("project", "Show it in Finder")),
+          IInteractive::ButtonData(PutBack, muse::trc("project", "Put it back"), true) }, PutBack);
+
+    if (answer.button() == PutBack) {
+        QString error;
+        if (!mu::project::starscore::putBackDriveCopy(*copy, songPath, &error)) {
+            interactive()->error(muse::trc("project", "The song couldn't be put back"), error.toStdString());
+        }
+    } else if (answer.button() == Show) {
+        interactive()->revealInFileBrowser(io::path_t(copy->path));
+    } else if (answer.button() == Leave) {
+        mu::project::starscore::markDriveCopyAnswered(*copy);
+    }
 }
 
 Ret ProjectActionsController::doOpenCloudProject(const muse::io::path_t& filePath, const CloudProjectInfo& info, bool isOwner)

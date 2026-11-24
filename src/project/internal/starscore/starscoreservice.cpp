@@ -12,6 +12,7 @@
 #include "engraving/editing/editbrackets.h"
 #include "engraving/dom/starscoreprogress.h"
 #include "starscoreautoarchive.h"
+#include "starscoredrivesafety.h"
 #include "settings.h"
 #include "starscorehornkeys.h"
 #include "starscorehouse.h"
@@ -41,6 +42,7 @@
 #include <QSaveFile>
 #include <QUuid>
 #include <QStandardPaths>
+#include <QLocale>
 #include <cmath>
 
 #include "engraving/dom/masterscore.h"
@@ -100,6 +102,28 @@ void StarScoreService::init()
     QTimer::singleShot(4000, &m_timerGuard, [this]() { renameLibraryFilesToCodes(); });
     // copies left in the autosave archive's Incoming folder (StarScore quit while packing them)
     QTimer::singleShot(15000, &m_timerGuard, []() { starscore::packIncomingInBackground(); });
+    // (1.37.0) a song file that disappears after a save is written back, and the user told (starscoredrivesafety.h)
+    {
+        QPointer<QObject> watchAlive(&m_timerGuard);
+        starscore::SaveWatchHooks watch;
+        watch.isOpenAt = [this, watchAlive](const QString& path) {
+            if (!watchAlive) {
+                return false;
+            }
+            INotationProjectPtr p = globalContext()->currentProject();
+            return p && p->path().toQString() == path;
+        };
+        watch.tell = [this, watchAlive](const QString& title, const QString& text) {
+            if (watchAlive) {
+                interactive()->warning(title.toStdString(), text.toStdString());
+            }
+        };
+        starscore::setSaveWatchHooks(watch);
+    }
+    // (1.37.0) songs Google Drive took out of their folders, offered back
+    if (qEnvironmentVariable("STARSCORE_AUTOTEST").isEmpty()) {
+        QTimer::singleShot(20000, &m_timerGuard, [this]() { checkDriveRemovedCopies(); });
+    }
 
     // One handler per channel: muse async keeps the first callback set for a receiver and silently drops a
     // second onNotify(this, ...) on the same channel, so the reference-panel part of this used to never run
@@ -5820,5 +5844,113 @@ void StarScoreService::openPartBooks(const QStringList& partIds)
     }
     if (!books.empty()) {
         globalContext()->setCurrentNotation(books.front());
+    }
+}
+
+void StarScoreService::checkDriveRemovedCopies()
+{
+    const std::vector<starscore::DriveRemovedCopy> copies = starscore::unansweredDriveRemovedCopies();
+    if (copies.empty()) {
+        return;
+    }
+    INotationProjectPtr open = globalContext()->currentProject();
+    const QString openPath = open ? open->path().toQString() : QString();
+
+    struct Found {
+        starscore::DriveRemovedCopy copy;
+        QString home;   // the recent file it belongs to (empty: not known)
+    };
+    std::vector<Found> putBack, unknown;
+    for (const starscore::DriveRemovedCopy& c : copies) {
+        const QString name = QFileInfo(c.path).fileName();
+        QString home;
+        for (const RecentFile& r : recentFilesController()->recentFilesList()) {
+            if (QFileInfo(r.path.toQString()).fileName() == name) {
+                home = r.path.toQString();
+                break;
+            }
+        }
+        if (home.isEmpty()) {
+            unknown.push_back({ c, {} });
+            continue;
+        }
+        if (home == openPath) {
+            continue;   // asked about when it was opened
+        }
+        if (starscore::driveRemovedCopyFor(home)) {
+            putBack.push_back({ c, home });
+        } else {
+            starscore::markDriveCopyAnswered(c);   // the file in its folder is as new (Drive uploaded it after all)
+        }
+    }
+    if (putBack.empty() && unknown.empty()) {
+        return;
+    }
+
+    const QLocale locale;
+    QStringList lines;
+    for (const Found& f : putBack) {
+        const bool missing = !QFileInfo::exists(f.home);
+        lines << muse::qtrc("starscore", "• “%1”, saved %2 — %3")
+            .arg(QFileInfo(f.copy.path).fileName(), locale.toString(f.copy.time, QLocale::ShortFormat),
+                 missing ? muse::qtrc("starscore", "missing from %1").arg(QFileInfo(f.home).absolutePath())
+                 : muse::qtrc("starscore", "newer than the one in %1").arg(QFileInfo(f.home).absolutePath()));
+    }
+    for (const Found& f : unknown) {
+        lines << muse::qtrc("starscore", "• “%1”, saved %2 — not one of your recent songs")
+            .arg(QFileInfo(f.copy.path).fileName(), locale.toString(f.copy.time, QLocale::ShortFormat));
+    }
+
+    QString text = muse::qtrc("starscore", "Google Drive took these StarScore files out of their folders (it moves a file "
+                                           "into its canceled_uploads folder when it cancels the file's upload):")
+                   + "\n\n" + lines.join("\n");
+    if (!putBack.empty()) {
+        text += "\n\n" + muse::qtrc("starscore", "“Put back” writes each recent song back to its folder. A file that is "
+                                                  "there now is first kept in Autosave Archive › Replaced.");
+    }
+
+    enum { PutBack = int(IInteractive::Button::CustomButton) + 1, Show, Leave };
+    std::vector<IInteractive::ButtonData> buttons;
+    buttons.push_back(IInteractive::ButtonData(Leave, muse::trc("starscore", "Leave them")));
+    buttons.push_back(IInteractive::ButtonData(Show, muse::trc("starscore", "Show in Finder")));
+    if (!putBack.empty()) {
+        buttons.push_back(IInteractive::ButtonData(PutBack, muse::trc("starscore", "Put back"), true));
+    }
+    const IInteractive::Result answer = interactive()->questionSync(
+        muse::trc("starscore", "Google Drive took songs out of their folders"), text.toStdString(), buttons,
+        putBack.empty() ? int(Show) : int(PutBack));
+
+    if (answer.button() == Show) {
+        interactive()->revealInFileBrowser(io::path_t((putBack.empty() ? unknown.front() : putBack.front()).copy.path));
+        return;   // asked again next time
+    }
+    QStringList done, failed;
+    if (answer.button() == PutBack) {
+        for (const Found& f : putBack) {
+            QString error;
+            if (starscore::putBackDriveCopy(f.copy, f.home, &error)) {
+                done << QFileInfo(f.home).fileName();
+            } else {
+                failed << QFileInfo(f.home).fileName() + " (" + error + ")";
+            }
+        }
+    }
+    if (answer.button() == PutBack || answer.button() == Leave) {
+        for (const Found& f : putBack) {
+            starscore::markDriveCopyAnswered(f.copy);
+        }
+        for (const Found& f : unknown) {
+            starscore::markDriveCopyAnswered(f.copy);
+        }
+    }
+    if (!done.isEmpty() || !failed.isEmpty()) {
+        QString report;
+        if (!done.isEmpty()) {
+            report += muse::qtrc("starscore", "Put back: %1").arg(done.join(", "));
+        }
+        if (!failed.isEmpty()) {
+            report += (report.isEmpty() ? "" : "\n\n") + muse::qtrc("starscore", "Not put back: %1").arg(failed.join("; "));
+        }
+        interactive()->info(muse::trc("starscore", "Songs put back"), report.toStdString());
     }
 }

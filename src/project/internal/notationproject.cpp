@@ -51,6 +51,7 @@
 #include "projectfileinfoprovider.h"
 #include "projecterrors.h"
 #include "starscore/starscoreautoarchive.h"
+#include "starscore/starscoredrivesafety.h"
 
 #include "defer.h"
 #include "log.h"
@@ -549,6 +550,10 @@ Ret NotationProject::save(const muse::io::path_t& path, SaveMode saveMode, bool 
         if (ret) {
             if (saveMode != SaveMode::SaveCopy) {
                 markAsSaved(savePath);
+                // StarScore (1.37.0): a copy of the save kept locally, and the file checked to still be there later
+                if (suffix == engraving::STARSCORE || suffix == engraving::MSCZ) {
+                    mu::project::starscore::afterSave(savePath.toQString());
+                }
             }
 
             // Re-compute headers and footers on save, to force timestamps update (if any)
@@ -692,7 +697,11 @@ Ret NotationProject::doSave(const muse::io::path_t& path, engraving::MscIoMode i
     QString targetContainerPath = engraving::containerPath(path).toQString();
     muse::io::path_t targetMainFilePath = engraving::mainFilePath(path);
     muse::io::path_t targetMainFileName = engraving::mainFileName(path);
-    QString savePath = targetContainerPath + "_saving";
+    // StarScore (1.37.0): the temporary file is written in a local folder, not beside the song: in a Google Drive folder,
+    // creating and deleting files beside the song while Drive uploads it can make Drive cancel the upload and move the
+    // song out of the folder (see starscore/starscoredrivesafety.h)
+    QString savePath = ioMode == engraving::MscIoMode::Dir ? targetContainerPath + "_saving"
+                       : mu::project::starscore::localSavingPath(targetContainerPath);
 
     // Step 1: check writable
     {
@@ -797,9 +806,12 @@ Ret NotationProject::doSave(const muse::io::path_t& path, engraving::MscIoMode i
         } else {
             Ret ret = muse::make_ok();
 
-            ret = fileSystem()->copy(savePath, targetContainerPath, true);
-            if (!ret) {
-                return ret;
+            // StarScore (1.37.0): the song file is overwritten in place. MuseScore deleted it and copied the new file
+            // to its name, which Google Drive can take as a new file whose upload it then cancels.
+            QString replaceError;
+            if (!mu::project::starscore::replaceFileContents(savePath, targetContainerPath, &replaceError)) {
+                LOGE() << "failed to write the saved file: " << replaceError.toStdString();
+                return make_ret(io::Err::FSWriteError);
             }
 
             if (!isAutosave) {
@@ -856,10 +868,10 @@ Ret NotationProject::makeBackup(muse::io::path_t filePath)
 
     fileSystem()->setAttribute(backupDir, io::IFileSystem::Attribute::Hidden);
 
-    ret = fileSystem()->copy(filePath, backupPath, true);
-    if (!ret) {
+    // StarScore (1.37.0): written in place too (no delete and new file in the song's Google Drive folder)
+    if (!mu::project::starscore::replaceFileContents(filePath.toQString(), backupPath.toQString())) {
         LOGE() << "failed to copy: " << filePath << " to: " << backupPath;
-        return ret;
+        return make_ret(io::Err::FSWriteError);
     }
 
     fileSystem()->setAttribute(backupPath, io::IFileSystem::Attribute::Hidden);

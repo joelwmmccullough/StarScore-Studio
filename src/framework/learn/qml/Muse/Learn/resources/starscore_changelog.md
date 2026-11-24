@@ -4,6 +4,13 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.37.0
+- **Saving no longer makes Google Drive pull the song out of its folder.** On 23 Nov 2026, cisu2.starscore disappeared from its folder right after a save and turned up in Google Drive's own "canceled_uploads" folder (~/Library/Application Support/Google/DriveFS). Saving (from MuseScore) deleted the song file and wrote a new file under the same name, and wrote and deleted a temporary "_saving" file beside it. Google Drive can take that as a new file and cancel its upload, and then it moves the file out of the folder.
+  - Now the temporary file is written in a local folder, and the song file is overwritten in place: it is never deleted. The hidden backup in .mscbackup and the 5-minute autosave are written the same way.
+  - After each save, a copy of the saved song is kept in Autosave Archive › Last Saved (outside Google Drive), and StarScore checks 5 seconds, 1 minute and 5 minutes later that the song file is still in its folder. If Google Drive took it, StarScore writes it back and tells you. (It doesn't when you moved or renamed the song yourself.)
+  - Opening a song: if Google Drive's canceled_uploads or lost_and_found folder has a newer copy of it (or the song is missing and Drive has it), StarScore offers to put it back. The file in the folder is first kept in Autosave Archive › Replaced.
+  - When StarScore starts, it lists any other StarScore files Google Drive took out of their folders (once each), and offers to put back the ones that are your recent songs.
+
 ## 1.36.0
 - **Autosaves go to the Autosave Archive too.** Until now the archive only kept a song when you pressed Save; the 5-minute autosaves (the hidden "<song>.starscore.autosave" file beside the song) weren't kept, so when StarScore closed without quitting and the next start removed the autosave, that work was gone (Citrus Suspicions, 22 Nov 2026).
   - While you work, an autosave is kept at most once every 10 minutes, like saves.

@@ -48,6 +48,8 @@
 #include "engraving/editing/editproperty.h"
 #include "starscorehornkeys.h"
 #include "starscoreautoarchive.h"
+#include "starscoredrivesafety.h"
+#include <sys/stat.h>
 #include "starscorewatch.h"
 #include "starscoresongfacts.h"
 #include "engraving/dom/mscore.h"
@@ -64,6 +66,7 @@
 #include "global/serialization/zipreader.h"
 #include "global/serialization/zipwriter.h"
 #include <QElapsedTimer>
+#include <QCryptographicHash>
 #include <QKeyEvent>
 #include <algorithm>
 #include "engraving/dom/starscoreprogress.h"
@@ -94,6 +97,7 @@
 #include <QQuickWindow>
 #include <QDir>
 #include <QElapsedTimer>
+#include <QCryptographicHash>
 #include <QKeyEvent>
 #include <QFile>
 #include <QFileInfo>
@@ -4272,6 +4276,69 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         // filesave: File › Save, in place (a .starscore keeps its solos and reference PDFs)
         dispatcher()->dispatch("file-save");
         autotestLog("  file-save dispatched");
+    } else if (step == "drivesafety") {
+        // drivesafety (1.37.0): Save As into a song folder, then Save: the song file is written in place (the same file),
+        // nothing else is made beside it, and a Last Saved copy is kept. Then a fake Google Drive takes the file into
+        // its canceled_uploads: the check after a save writes it back. Then a newer copy there is found and put back.
+        INotationProjectPtr project = globalContext()->currentProject();
+        const QString song = autotestDir() + "/drive/Test Song/drive test.starscore";
+        const QString folder = QFileInfo(song).absolutePath();
+        QDir().mkpath(folder);
+        const QString fakeDrive = autotestDir() + "/DriveFS";
+        const QString canceled = fakeDrive + "/canceled_uploads/1234/drive test.starscore";
+        qputenv("STARSCORE_DRIVEFS_DIR", fakeDrive.toUtf8());
+        QDir().mkpath(QFileInfo(canceled).absolutePath());
+        auto inode = [](const QString& path) {
+            struct stat st;
+            return ::stat(QFile::encodeName(path).constData(), &st) == 0 ? qulonglong(st.st_ino) : 0ULL;
+        };
+        auto sha = [](const QString& path) {
+            QFile f(path);
+            return f.open(QIODevice::ReadOnly) ? QCryptographicHash::hash(f.readAll(), QCryptographicHash::Sha1).toHex().left(8)
+                   : QByteArray("none");
+        };
+        Ret r = project->save(io::path_t(song), SaveMode::SaveAs, true);
+        const qulonglong ino1 = inode(song);
+        autotestLog(QString("  save as: %1").arg(r ? "ok" : QString::fromStdString(r.toString())));
+        project->markAsUnsaved();
+        r = project->save(io::path_t(song), SaveMode::Save, true);
+        autotestLog(QString("  save: %1; same file: %2").arg(r ? "ok" : QString::fromStdString(r.toString()))
+                    .arg(ino1 != 0 && ino1 == inode(song) ? "yes" : "no"));
+        autotestLog("  in the song folder: " + QDir(folder).entryList(QDir::AllEntries | QDir::Hidden | QDir::NoDotAndDotDot).join(", "));
+        autotestLog(QString("  last saved copy: %1, same as the song: %2")
+                    .arg(QFileInfo(starscore::lastSavedCopyPath(song)).fileName())
+                    .arg(sha(starscore::lastSavedCopyPath(song)) == sha(song) ? "yes" : "no"));
+        const QByteArray savedSha = sha(song);
+
+        QFile::rename(song, canceled);   // Drive takes it
+        autotestLog(QString("  taken: song there %1; drive folders: %2").arg(QFileInfo::exists(song) ? "yes" : "no")
+                    .arg(starscore::driveRemovedFolders().size()));
+        starscore::checkSavedFile(song, QDateTime::currentDateTime().addSecs(-3));
+        autotestLog(QString("  after the check: song there %1, same as saved %2")
+                    .arg(QFileInfo::exists(song) ? "yes" : "no").arg(sha(song) == savedSha ? "yes" : "no"));
+        autotestLog(QString("  offered again: %1").arg(starscore::driveRemovedCopyFor(song) ? "yes" : "no"));
+
+        // a newer, different copy in Drive's folder
+        {
+            QFile f(canceled);
+            if (f.open(QIODevice::Append)) {
+                f.write("x");
+                f.close();
+            }
+            f.open(QIODevice::ReadWrite);
+            f.setFileTime(QDateTime::currentDateTime().addSecs(120), QFileDevice::FileModificationTime);
+            f.close();
+        }
+        const std::optional<starscore::DriveRemovedCopy> c = starscore::driveRemovedCopyFor(song);
+        autotestLog(QString("  newer copy found: %1").arg(c ? QFileInfo(c->path).fileName() : QString("no")));
+        if (c) {
+            QString error;
+            const bool ok = starscore::putBackDriveCopy(*c, song, &error);
+            autotestLog(QString("  put back: %1; song is the copy: %2; replaced kept: %3; offered again: %4")
+                        .arg(ok ? "ok" : error).arg(sha(song) == sha(canceled) ? "yes" : "no")
+                        .arg(QDir(starscore::autosaveArchiveRoot() + "/Replaced").entryList(QDir::Files).size())
+                        .arg(starscore::driveRemovedCopyFor(song) ? "yes" : "no"));
+        }
     } else if (step == "save") {
         INotationProjectPtr project = globalContext()->currentProject();
         const Ret r = project ? project->save(io::path_t(autotestDir() + "/saved.starscore"), SaveMode::SaveCopy, false)

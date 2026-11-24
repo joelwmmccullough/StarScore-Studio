@@ -133,6 +133,7 @@ target_sources(project PRIVATE
     internal/starscore/starscorehorncopy.cpp
     internal/starscore/starscorevoice.cpp
     internal/starscore/starscoreautoarchive.cpp
+    internal/starscore/starscoredrivesafety.cpp
     internal/starscore/starscorezip.cpp
     internal/starscore/starscoremedia.cpp
     internal/starscore/starscorewatch.cpp
@@ -148,6 +149,7 @@ target_sources(project PRIVATE
     internal/starscore/starscorewatch.h
     internal/starscore/starscorezip.h
     internal/starscore/starscoreautoarchive.h
+    internal/starscore/starscoredrivesafety.h
     internal/starscore/starscorepdf.cpp
     internal/starscore/starscorepdf.h
     internal/starscore/starscoreengraving.h

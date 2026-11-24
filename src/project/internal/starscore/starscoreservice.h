@@ -849,6 +849,8 @@ private:
     bool m_bulkStyles = false;   // the run applies part styles instead of updating sheets
     //! When StarScore starts: songs' files named "Title.starscore" renamed "CODE - Title.starscore"; how many
     int renameLibraryFilesToCodes();
+    //! (1.37.0) Songs Google Drive took out of their folders (its canceled_uploads, lost_and_found): offered back once
+    void checkDriveRemovedCopies();
     //! Part scores named after a player ("Harley", "Percussionist", "Guest Player: Bassoon") renamed after their
     //! instrument ("Bass (5-String)", "Percussion Lead", "Bassoon"); how many
     int renamePersonNamedPartScores();

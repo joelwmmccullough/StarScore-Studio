@@ -217,6 +217,7 @@ private:
     muse::Ret loadWithFallback(const std::shared_ptr<INotationProject>& project, const muse::io::path_t& loadPath,
                                const std::string& format);
     muse::Ret doOpenProject(const muse::io::path_t& filePath);
+    void offerDriveCopyBack(const QString& songPath);   // StarScore (1.37.0)
     muse::Ret doOpenCloudProject(const muse::io::path_t& filePath, const CloudProjectInfo& info, bool isOwner = true);
     muse::Ret doOpenCloudProjectOffline(const muse::io::path_t& filePath, const QString& displayNameOverride);
 
