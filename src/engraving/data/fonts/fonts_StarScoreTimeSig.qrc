@@ -1,5 +1,13 @@
 <RCC>
     <qresource prefix="/">
-        <file alias="fonts/starscoretimesig/StarScoreTimeSig.otf">../../../../fonts/starscoretimesig/StarScoreTimeSig.otf</file>
+        <file alias="fonts/starscoretimesig/StarScoreTimeSig-Leland.otf">../../../../fonts/starscoretimesig/StarScoreTimeSig-Leland.otf</file>
+        <file alias="fonts/starscoretimesig/StarScoreTimeSig-Bravura.otf">../../../../fonts/starscoretimesig/StarScoreTimeSig-Bravura.otf</file>
+        <file alias="fonts/starscoretimesig/StarScoreTimeSig-Petaluma.otf">../../../../fonts/starscoretimesig/StarScoreTimeSig-Petaluma.otf</file>
+        <file alias="fonts/starscoretimesig/StarScoreTimeSig-StarScoreDeco.otf">../../../../fonts/starscoretimesig/StarScoreTimeSig-StarScoreDeco.otf</file>
+        <file alias="fonts/starscoretimesig/StarScoreTimeSig-MuseJazz.otf">../../../../fonts/starscoretimesig/StarScoreTimeSig-MuseJazz.otf</file>
+        <file alias="fonts/starscoretimesig/StarScoreTimeSig-Gonville.otf">../../../../fonts/starscoretimesig/StarScoreTimeSig-Gonville.otf</file>
+        <file alias="fonts/starscoretimesig/StarScoreTimeSig-Emmentaler.otf">../../../../fonts/starscoretimesig/StarScoreTimeSig-Emmentaler.otf</file>
+        <file alias="fonts/starscoretimesig/StarScoreTimeSig-FinaleMaestro.otf">../../../../fonts/starscoretimesig/StarScoreTimeSig-FinaleMaestro.otf</file>
+        <file alias="fonts/starscoretimesig/StarScoreTimeSig-FinaleBroadway.otf">../../../../fonts/starscoretimesig/StarScoreTimeSig-FinaleBroadway.otf</file>
     </qresource>
 </RCC>

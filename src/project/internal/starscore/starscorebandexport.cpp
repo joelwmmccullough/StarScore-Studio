@@ -17,6 +17,7 @@
 #include "starscoresongfacts.h"
 #include "starscorehornkeys.h"
 #include "starscorelayoutcheck.h"
+#include "starscoretimesigwidths.h"
 
 #include <algorithm>
 #include <cmath>
@@ -2978,18 +2979,26 @@ static int starscoreKeepRepeatsOnOnePage(const INotationPtr& n, bool laidOut = f
 //! minor-major 7 chord." Set as score meta tags that the footer layout reads (see HeaderFooterLayout), only while the
 //! sheet is printed. Returns whether a note was set (the score is then laid out again). (1.38.0) Also additive time
 //! signatures, below.
-//! (1.38.0, Joel 25 Nov 2026: "render the time signatures in line as actual time signatures") A stacked time signature
-//! for a line of text, in the StarScore TimeSig font (fonts/starscoretimesig): each digit (and the plus of an additive
-//! top number) is a zero-width glyph already raised to its row, placed by spacer glyphs; the shorter row centred.
-static muse::String starscoreInlineTimeSig(const muse::String& num, const muse::String& den)
+//! (1.38.0, Joel 25 Nov 2026: "render the time signatures in line as actual time signatures"; "use the same font that
+//! is used for the 'actual' time signatures on the sheet") A stacked time signature for a line of text, in the
+//! StarScore TimeSig font made from the sheet's music font (fonts/starscoretimesig): each digit (and the plus of an
+//! additive top number) is a zero-width glyph already raised to its row, placed by spacer glyphs; the shorter row
+//! centred. Returns the font's family name in family.
+static muse::String starscoreInlineTimeSig(const muse::String& musicFont, const muse::String& num, const muse::String& den,
+                                           muse::String& family)
 {
     using muse::String;
-    // Bravura's advance widths, in the font's units (1 em = 1000 = the time signature's height)
-    auto width = [](char16_t c) -> int {
-        static const int digits[10] = { 470, 334, 446, 421, 470, 403, 434, 441, 436, 434 };
-        return c == u'+' ? 254 : (c >= u'0' && c <= u'9') ? digits[c - u'0'] : 0;
+    const StarScoreTimeSigWidths* font = &STARSCORE_TIMESIG_WIDTHS[0];   // Leland, when the sheet's font has none
+    for (const StarScoreTimeSigWidths& f : STARSCORE_TIMESIG_WIDTHS) {
+        if (musicFont == String(f.musicFont)) {
+            font = &f;
+        }
+    }
+    family = u"StarScore TimeSig " + String(font->musicFont);
+    auto width = [font](char16_t c) -> int {
+        return c == u'+' ? font->widths[10] : (c >= u'0' && c <= u'9') ? font->widths[c - u'0'] : 0;
     };
-    constexpr int GAP = 40;    // between the glyphs of a row
+    constexpr int GAP = 40;    // between the glyphs of a row (1 em = 1000 = the time signature's height)
     constexpr int SIDE = 60;   // before and after it
     auto rowWidth = [&](const String& row) {
         int w = 0;
@@ -2998,9 +3007,7 @@ static muse::String starscoreInlineTimeSig(const muse::String& num, const muse::
         }
         return w;
     };
-    const int wn = rowWidth(num);
-    const int wd = rowWidth(den);
-    const int w = std::max(wn, wd);
+    const int w = std::max(rowWidth(num), rowWidth(den));
     struct Glyph {
         int x;
         char16_t code;
@@ -3103,10 +3110,12 @@ static bool starscoreSetMinMajNote(mu::engraving::Score* score)
     // a time signature drawn as one, a little larger than the footer's text so its digits read at the text's size
     const String footFace = score->style().styleSt(Sid::footerFontFace);
     const double footSize = score->style().styleD(Sid::footerFontSize);
+    const String musicFont = score->style().styleSt(Sid::musicalSymbolFont);
     auto inlineSig = [&](const String& num, const String& den) {
-        return u"<font face=\"StarScore TimeSig\"/><font size=\"" + String::number(footSize * 1.4, 1) + u"\"/>"
-               + starscoreInlineTimeSig(num, den) + u"<font size=\"" + String::number(footSize, 1) + u"\"/><font face=\""
-               + footFace + u"\"/>";
+        String family;
+        const String glyphs = starscoreInlineTimeSig(musicFont, num, den, family);
+        return u"<font face=\"" + family + u"\"/><font size=\"" + String::number(footSize * 1.4, 1) + u"\"/>"
+               + glyphs + u"<font size=\"" + String::number(footSize, 1) + u"\"/><font face=\"" + footFace + u"\"/>";
     };
     for (size_t pi = 0; pi < score->pages().size(); ++pi) {
         for (const System* sys : score->pages().at(pi)->systems()) {

@@ -221,8 +221,16 @@ void EngravingModule::onInit(const IApplication::RunMode&)
         // StarScore: StarScore Deco, an art deco SMuFL font drawn to match TT Modernoir (fonts/starscoredeco)
         addMusicFont("StarScore Deco", FontDataKey(u"StarScore Deco"), ":/fonts/starscoredeco/StarScoreDeco.otf");
         fdb->addFont(FontDataKey(u"StarScore Deco Text"), ":/fonts/starscoredeco/StarScoreDecoText.otf");
-        // StarScore (1.38.0): stacked time signatures inside a line of text (fonts/starscoretimesig)
-        fdb->addFont(FontDataKey(u"StarScore TimeSig"), ":/fonts/starscoretimesig/StarScoreTimeSig.otf");
+        // StarScore (1.38.0): stacked time signatures inside a line of text, one font per music font (fonts/starscoretimesig)
+        fdb->addFont(FontDataKey(u"StarScore TimeSig Leland"), ":/fonts/starscoretimesig/StarScoreTimeSig-Leland.otf");
+        fdb->addFont(FontDataKey(u"StarScore TimeSig Bravura"), ":/fonts/starscoretimesig/StarScoreTimeSig-Bravura.otf");
+        fdb->addFont(FontDataKey(u"StarScore TimeSig Petaluma"), ":/fonts/starscoretimesig/StarScoreTimeSig-Petaluma.otf");
+        fdb->addFont(FontDataKey(u"StarScore TimeSig StarScore Deco"), ":/fonts/starscoretimesig/StarScoreTimeSig-StarScoreDeco.otf");
+        fdb->addFont(FontDataKey(u"StarScore TimeSig MuseJazz"), ":/fonts/starscoretimesig/StarScoreTimeSig-MuseJazz.otf");
+        fdb->addFont(FontDataKey(u"StarScore TimeSig Gonville"), ":/fonts/starscoretimesig/StarScoreTimeSig-Gonville.otf");
+        fdb->addFont(FontDataKey(u"StarScore TimeSig Emmentaler"), ":/fonts/starscoretimesig/StarScoreTimeSig-Emmentaler.otf");
+        fdb->addFont(FontDataKey(u"StarScore TimeSig Finale Maestro"), ":/fonts/starscoretimesig/StarScoreTimeSig-FinaleMaestro.otf");
+        fdb->addFont(FontDataKey(u"StarScore TimeSig Finale Broadway"), ":/fonts/starscoretimesig/StarScoreTimeSig-FinaleBroadway.otf");
 
         // Tabulature
         fdb->addFont(FontDataKey(u"FreeSerif"), ":/fonts/FreeSerif.ttf");
