@@ -26,36 +26,47 @@ Rectangle {
         id: barModel
     }
 
-    // (1.35.0, Joel 15 Nov 2026) rows he hid to make the panel smaller; right-click a row's name, the panel, or "…"
+    // (1.35.0, Joel 15 Nov 2026) rows he hid to make the panel smaller. (1.38.0, Joel 25 Nov: "instead of putting it in
+    // the dropdown menu, just add a little eye icon next to each row") the eye before a row's name hides it; the
+    // "Hidden:" line at the bottom shows it again
     function rowShown(key) {
         return barModel.hiddenRows.indexOf(key) < 0
-    }
-
-    readonly property bool anyRowShowing: arrangementsRow.visible || sectionsRow.visible || progressRow.visible
-                                          || audioRow.visible || solosRow.visible
-
-    // right-click the panel where nothing else is: which rows show
-    MouseArea {
-        anchors.fill: parent
-        acceptedButtons: Qt.RightButton
-        onClicked: rowsMenu.toggleOpened(barModel.rowsMenu())
-    }
-
-    StyledMenuLoader {
-        id: rowsMenu
-
-        onHandleMenuItem: function(itemId) {
-            barModel.handleMenuItem(itemId)
-        }
-        onKeepOpenItemChosen: function(itemId) {
-            barModel.handleMenuItem(itemId)
-            rowsMenu.refreshOpen(barModel.rowsMenu())
-        }
     }
 
     Component.onCompleted: {
         barModel.load()
     }
+
+    //! (1.38.0) the eye before a row's name: hides the row
+    component RowEye: FlatButton {
+        property string rowKey: ""
+
+        Layout.alignment: Qt.AlignTop
+        Layout.preferredWidth: 22
+        Layout.preferredHeight: 26
+        icon: IconCode.EYE_OPEN
+        transparent: true
+        opacity: mouseArea.containsMouse ? 1.0 : 0.45
+        toolTipTitle: qsTrc("starscore", "Hide this row")
+
+        onClicked: barModel.handleMenuItem("panel-row:" + rowKey)
+    }
+
+    function rowTitle(key) {
+        switch (key) {
+        case "arrangements": return barModel.isSoloTranscription ? qsTrc("starscore", "Solo") : qsTrc("starscore", "Arrangements")
+        case "sections": return qsTrc("starscore", "Sections")
+        case "progress": return qsTrc("starscore", "Progress")
+        case "audio": return qsTrc("starscore", "Audio")
+        case "solos": return qsTrc("starscore", "Solos")
+        }
+        return key
+    }
+
+    //! hidden rows that this song would show (a solo transcription has no Sections or Solos row)
+    readonly property var hiddenShown: barModel.hiddenRows.filter(function(key) {
+        return !(barModel.isSoloTranscription && (key === "sections" || key === "solos"))
+    })
 
     //! One pill-shaped button: an arrangement or a section
     component StarScoreChip: Rectangle {
@@ -173,15 +184,6 @@ Rectangle {
 
         spacing: 6
 
-        StyledTextLabel {
-            visible: !root.anyRowShowing
-            Layout.fillWidth: true
-            Layout.topMargin: 2
-            horizontalAlignment: Text.AlignLeft
-            color: ui.theme.fontSecondaryColor
-            text: qsTrc("starscore", "All of this panel's rows are hidden. Right-click here to show them.")
-        }
-
         // --- Arrangements ---
         RowLayout {
             id: arrangementsRow
@@ -189,18 +191,16 @@ Rectangle {
             visible: root.rowShown("arrangements")
             spacing: 8
 
+            RowEye {
+                rowKey: "arrangements"
+            }
+
             StyledTextLabel {
-                Layout.preferredWidth: 96
+                Layout.preferredWidth: 88
                 Layout.alignment: Qt.AlignTop | Qt.AlignLeft
                 Layout.topMargin: 5
                 horizontalAlignment: Text.AlignLeft
 
-                // (1.35.0) right-click: which rows show
-                MouseArea {
-                    anchors.fill: parent
-                    acceptedButtons: Qt.RightButton
-                    onClicked: rowsMenu.toggleOpened(barModel.rowsMenu())
-                }
                 text: barModel.isSoloTranscription ? qsTrc("starscore", "Solo") : qsTrc("starscore", "Arrangements")
                 font: ui.theme.bodyBoldFont
             }
@@ -340,18 +340,16 @@ Rectangle {
             visible: root.rowShown("sections") && !root.collapsed && !barModel.isSoloTranscription
             spacing: 8
 
+            RowEye {
+                rowKey: "sections"
+            }
+
             StyledTextLabel {
-                Layout.preferredWidth: 96
+                Layout.preferredWidth: 88
                 Layout.alignment: Qt.AlignTop | Qt.AlignLeft
                 Layout.topMargin: 5
                 horizontalAlignment: Text.AlignLeft
 
-                // (1.35.0) right-click: which rows show
-                MouseArea {
-                    anchors.fill: parent
-                    acceptedButtons: Qt.RightButton
-                    onClicked: rowsMenu.toggleOpened(barModel.rowsMenu())
-                }
                 text: qsTrc("starscore", "Sections")
                 font: ui.theme.bodyBoldFont
             }
@@ -441,18 +439,16 @@ Rectangle {
             visible: root.rowShown("progress") && !root.collapsed
             spacing: 8
 
+            RowEye {
+                rowKey: "progress"
+            }
+
             StyledTextLabel {
-                Layout.preferredWidth: 96
+                Layout.preferredWidth: 88
                 Layout.alignment: Qt.AlignTop | Qt.AlignLeft
                 Layout.topMargin: 5
                 horizontalAlignment: Text.AlignLeft
 
-                // (1.35.0) right-click: which rows show
-                MouseArea {
-                    anchors.fill: parent
-                    acceptedButtons: Qt.RightButton
-                    onClicked: rowsMenu.toggleOpened(barModel.rowsMenu())
-                }
                 text: qsTrc("starscore", "Progress")
                 font: ui.theme.bodyBoldFont
             }
@@ -503,18 +499,16 @@ Rectangle {
             visible: root.rowShown("audio") && !root.collapsed && (barModel.audioFiles.length > 0 || barModel.canAddAudio)
             spacing: 8
 
+            RowEye {
+                rowKey: "audio"
+            }
+
             StyledTextLabel {
-                Layout.preferredWidth: 96
+                Layout.preferredWidth: 88
                 Layout.alignment: Qt.AlignTop | Qt.AlignLeft
                 Layout.topMargin: 5
                 horizontalAlignment: Text.AlignLeft
 
-                // (1.35.0) right-click: which rows show
-                MouseArea {
-                    anchors.fill: parent
-                    acceptedButtons: Qt.RightButton
-                    onClicked: rowsMenu.toggleOpened(barModel.rowsMenu())
-                }
                 text: qsTrc("starscore", "Audio")
                 font: ui.theme.bodyBoldFont
             }
@@ -572,18 +566,16 @@ Rectangle {
                      && (barModel.solos.length > 0 || barModel.canAddSolos || barModel.tiedSolos.length > 0)
             spacing: 8
 
+            RowEye {
+                rowKey: "solos"
+            }
+
             StyledTextLabel {
-                Layout.preferredWidth: 96
+                Layout.preferredWidth: 88
                 Layout.alignment: Qt.AlignTop | Qt.AlignLeft
                 Layout.topMargin: 5
                 horizontalAlignment: Text.AlignLeft
 
-                // (1.35.0) right-click: which rows show
-                MouseArea {
-                    anchors.fill: parent
-                    acceptedButtons: Qt.RightButton
-                    onClicked: rowsMenu.toggleOpened(barModel.rowsMenu())
-                }
                 text: qsTrc("starscore", "Solos")
                 font: ui.theme.bodyBoldFont
             }
@@ -657,6 +649,41 @@ Rectangle {
                     }
                     onMenuItemChosen: function(itemId) {
                         barModel.handleMenuItem(itemId)
+                    }
+                }
+            }
+        }
+
+        // --- (1.38.0) the hidden rows: click one to show it again ---
+        RowLayout {
+            id: hiddenRowsStrip
+            Layout.fillWidth: true
+            visible: root.hiddenShown.length > 0
+            spacing: 6
+
+            StyledTextLabel {
+                Layout.preferredWidth: 118
+                horizontalAlignment: Text.AlignLeft
+                color: ui.theme.fontSecondaryColor
+                text: qsTrc("starscore", "Hidden:")
+            }
+
+            Flow {
+                Layout.fillWidth: true
+                Layout.preferredWidth: 1
+                spacing: 6
+
+                Repeater {
+                    model: root.hiddenShown
+
+                    StarScoreChip {
+                        text: root.rowTitle(modelData)
+                        showDot: false
+                        showCheck: true
+                        toolTip: qsTrc("starscore", "Show this row")
+                        onLeftClicked: function(mouse) {
+                            barModel.handleMenuItem("panel-row:" + modelData)
+                        }
                     }
                 }
             }

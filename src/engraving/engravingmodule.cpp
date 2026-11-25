@@ -97,6 +97,11 @@ static void engraving_init_qrc()
     Q_INIT_RESOURCE(fonts_FinaleMaestro);
     Q_INIT_RESOURCE(fonts_FinaleBroadway);
     Q_INIT_RESOURCE(fonts_Tabulature);
+    // StarScore (1.38.0): its own fonts' resources were never registered, so "StarScore Deco" failed to load on
+    // every start ("cannot load internal font")
+    Q_INIT_RESOURCE(fonts_StarScoreDeco);
+    Q_INIT_RESOURCE(fonts_StarScoreJost);
+    Q_INIT_RESOURCE(fonts_Starsign);
 #endif
 }
 

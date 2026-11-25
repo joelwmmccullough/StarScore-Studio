@@ -104,7 +104,6 @@ public:
     Q_INVOKABLE QVariantList addSectionMenu() const;
     Q_INVOKABLE QVariantList moreMenu() const;
     //! which rows show: a tick each (the right-click menu of a row's name and of the panel, and in "…")
-    Q_INVOKABLE QVariantList rowsMenu() const;
     QStringList hiddenRows() const;
     Q_INVOKABLE void handleMenuItem(const QString& itemId);
 
