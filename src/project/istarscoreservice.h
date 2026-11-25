@@ -44,7 +44,8 @@ class INotationProject;
 //! 2: 1.18.18, the six Scores, their names top left, multimeasure rests, the minor-major 7 footnote.
 //! 3: 1.18.19, the Scores renamed "CODE - Section Score (Concert).pdf"… (renamed in place, not made again).
 //! 4: 1.18.20, the minor-major 7 footnote says "denotes" (was "indicates").
-inline constexpr int STARSCORE_SHEET_FORMAT = 4;
+//! 5: 1.38.0, additive time signatures explained in a footnote.
+inline constexpr int STARSCORE_SHEET_FORMAT = 5;
 
 //! A song whose sheets were made before the sheet format last changed ("Update all sheets")
 struct StarScoreOutdatedSong {

@@ -2976,7 +2976,10 @@ static int starscoreKeepRepeatsOnOnePage(const INotationPtr& n, bool laidOut = f
 //! Joel, 6 Oct 2026: a sheet that uses StarScore's minor-major 7 symbol (the triangle or diamond with a bar) explains
 //! it in the left footer of the first page where it appears, in the symbol's own font: "The △ symbol indicates a
 //! minor-major 7 chord." Set as score meta tags that the footer layout reads (see HeaderFooterLayout), only while the
-//! sheet is printed. Returns whether a note was set (the score is then laid out again).
+//! sheet is printed. Returns whether a note was set (the score is then laid out again). (1.38.0) Also additive time
+//! signatures, below.
+static constexpr size_t STARSCORE_FOOTER_NOTES = 9;   // the most footnotes on one sheet (headerfooterlayout.cpp reads as many)
+
 static bool starscoreSetMinMajNote(mu::engraving::Score* score)
 {
     using namespace mu::engraving;
@@ -3029,7 +3032,52 @@ static bool starscoreSetMinMajNote(mu::engraving::Score* score)
             }
         }
     }
-    if (mmPage < 0 && dmPage < 0) {
+    // (1.38.0, Joel 25 Nov 2026: "similar logic for additive time signature notation") each additive time signature
+    // ("4+4+4+3" over 8) explained on the first page where it appears: "The 4+4+4+3/8 time signature denotes bars of
+    // 4/8, 4/8, 4/8 and 3/8, repeating." A courtesy one at the end of a line counts: it's where the player first sees it.
+    std::vector<std::pair<String, int> > notes;   // text, page
+    std::set<String> seenSigs;
+    for (size_t pi = 0; pi < score->pages().size(); ++pi) {
+        for (const System* sys : score->pages().at(pi)->systems()) {
+            for (const MeasureBase* mb : sys->measures()) {
+                if (!mb->isMeasure()) {
+                    continue;
+                }
+                for (const Segment* seg = toMeasure(mb)->first(); seg; seg = seg->next()) {
+                    if (!seg->isType(SegmentType::TimeSigType)) {
+                        continue;
+                    }
+                    for (const EngravingItem* e : seg->elist()) {
+                        if (!e || !e->isTimeSig() || !e->visible() || !e->staff() || !e->staff()->show()) {
+                            continue;
+                        }
+                        const TimeSig* ts = toTimeSig(e);
+                        const String num = ts->numeratorString().trimmed();
+                        if (!num.contains(u'+')) {
+                            continue;
+                        }
+                        const String den = String::number(ts->sig().denominator());
+                        const String sig = num + u"/" + den;
+                        if (!seenSigs.insert(sig).second) {
+                            continue;
+                        }
+                        StringList bars;
+                        for (const String& part : num.split(u'+')) {
+                            if (!part.trimmed().empty()) {
+                                bars.push_back(part.trimmed() + u"/" + den);
+                            }
+                        }
+                        String list;
+                        for (size_t i = 0; i < bars.size(); ++i) {
+                            list += (i == 0 ? String() : i + 1 == bars.size() ? String(u" and ") : String(u", ")) + bars.at(i);
+                        }
+                        notes.push_back({ u"The " + sig + u" time signature denotes bars of " + list + u", repeating.", int(pi) });
+                    }
+                }
+            }
+        }
+    }
+    if (mmPage < 0 && dmPage < 0 && notes.empty()) {
         return false;
     }
     const String footerFace = score->style().styleSt(Sid::footerFontFace);
@@ -3039,17 +3087,23 @@ static bool starscoreSetMinMajNote(mu::engraving::Score* score)
     const String mmNote = mmPage < 0 ? String() : u"The " + sym(mmFace, mmChar) + u" symbol denotes a minor-major 7 chord.";
     const String dmNote = dmPage < 0 ? String() : u"The " + sym(dmFace, dmChar)
                           + u" symbol denotes a diminished-major 7 chord.";
+    std::vector<std::pair<String, int> > chordNotes;
     if (mmPage >= 0 && mmPage == dmPage) {
-        score->setMetaTag(u"starscoreFooterNote", sym(mmFace, mmChar) + u" = minor-major 7; "
-                          + sym(dmFace, dmChar) + u" = diminished-major 7.");
-        score->setMetaTag(u"starscoreFooterNotePage", String::number(mmPage));
+        chordNotes.push_back({ sym(mmFace, mmChar) + u" = minor-major 7; " + sym(dmFace, dmChar) + u" = diminished-major 7.", mmPage });
     } else {
-        score->setMetaTag(u"starscoreFooterNote", mmPage >= 0 ? mmNote : dmNote);
-        score->setMetaTag(u"starscoreFooterNotePage", String::number(mmPage >= 0 ? mmPage : dmPage));
-        if (mmPage >= 0 && dmPage >= 0) {
-            score->setMetaTag(u"starscoreFooterNote2", dmNote);
-            score->setMetaTag(u"starscoreFooterNotePage2", String::number(dmPage));
+        if (mmPage >= 0) {
+            chordNotes.push_back({ mmNote, mmPage });
         }
+        if (dmPage >= 0) {
+            chordNotes.push_back({ dmNote, dmPage });
+        }
+    }
+    notes.insert(notes.begin(), chordNotes.begin(), chordNotes.end());
+    // the footer layout reads "starscoreFooterNote"/"starscoreFooterNotePage", then "…2", "…3"… (headerfooterlayout.cpp)
+    for (size_t k = 0; k < notes.size() && k < STARSCORE_FOOTER_NOTES; ++k) {
+        const String suffix = k == 0 ? String() : String::number(int(k + 1));
+        score->setMetaTag(u"starscoreFooterNote" + suffix, notes[k].first);
+        score->setMetaTag(u"starscoreFooterNotePage" + suffix, String::number(notes[k].second));
     }
     score->setLayoutAll();
     score->doLayout();
@@ -3059,10 +3113,11 @@ static bool starscoreSetMinMajNote(mu::engraving::Score* score)
 static void starscoreClearMinMajNote(mu::engraving::Score* score)
 {
     // taken out entirely, so a part score saved after the export carries no trace of them
-    score->metaTags().erase(u"starscoreFooterNote");
-    score->metaTags().erase(u"starscoreFooterNotePage");
-    score->metaTags().erase(u"starscoreFooterNote2");
-    score->metaTags().erase(u"starscoreFooterNotePage2");
+    for (size_t k = 0; k < STARSCORE_FOOTER_NOTES; ++k) {
+        const String suffix = k == 0 ? String() : String::number(int(k + 1));
+        score->metaTags().erase(u"starscoreFooterNote" + suffix);
+        score->metaTags().erase(u"starscoreFooterNotePage" + suffix);
+    }
 }
 
 //! restoreView false: the sheet stays in page view afterwards (a throwaway copy nobody looks at; going back to

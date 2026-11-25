@@ -140,14 +140,18 @@ void HeaderFooterLayout::layoutHeaderFooter(LayoutContext& ctx, Page* page)
 
     // StarScore: a note for one page's footer, on the left (score meta tags "starscoreFooterNote" and
     // "starscoreFooterNotePage", the page index), set only while a sheet is exported (the minor-major 7 symbol, 1.18.17)
+    // More notes: "starscoreFooterNote2"… (diminished-major 7, 1.18.25; additive time signatures, 1.38.0), each on the
+    // page it names; the ones for this page one per line
     String note;
-    if (page->score()->metaTag(u"starscoreFooterNotePage") == String::number(int(page->pageNumber()))) {
-        note = page->score()->metaTag(u"starscoreFooterNote");
-    }
-    // a second note (diminished-major 7, 1.18.25) when its symbol first appears on a different page
-    if (page->score()->metaTag(u"starscoreFooterNotePage2") == String::number(int(page->pageNumber()))) {
-        const String note2 = page->score()->metaTag(u"starscoreFooterNote2");
-        note = note.empty() ? note2 : note + u"\n" + note2;
+    const String thisPage = String::number(int(page->pageNumber()));
+    for (int k = 1; k <= 9; ++k) {
+        const String suffix = k == 1 ? String() : String::number(k);
+        if (page->score()->metaTag(u"starscoreFooterNotePage" + suffix) == thisPage) {
+            const String text = page->score()->metaTag(u"starscoreFooterNote" + suffix);
+            if (!text.empty()) {
+                note = note.empty() ? text : note + u"\n" + text;
+            }
+        }
     }
     const bool footer = ctx.conf().styleB(Sid::showFooter) && (page->pageNumber() || ctx.conf().styleB(Sid::footerFirstPage));
     if (footer || !note.empty()) {
