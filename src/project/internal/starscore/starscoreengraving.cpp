@@ -1146,6 +1146,40 @@ bool mu::project::starscore::isWoodwindInstrument(const QString& id)
     return ww.match(id).hasMatch();
 }
 
+bool mu::project::starscore::partHasMuteMarkings(const mu::engraving::Score* score, const mu::engraving::Part* part)
+{
+    using namespace mu::engraving;
+    if (!score || !part) {
+        return false;
+    }
+    const track_idx_t first = part->startTrack();
+    const track_idx_t last = part->endTrack();
+    for (const Segment* seg = score->firstSegment(SegmentType::ChordRest); seg; seg = seg->next1(SegmentType::ChordRest)) {
+        for (const EngravingItem* e : seg->annotations()) {
+            if (!e || !e->visible() || e->track() < first || e->track() >= last
+                || !(e->isStaffText() || e->isExpression() || e->isPlayTechAnnotation())) {
+                continue;
+            }
+            if (isMuteMarking(toTextBase(e)->plainText().toQString())) {
+                return true;
+            }
+        }
+        for (track_idx_t t = first; t < last; ++t) {
+            const EngravingItem* e = seg->element(t);
+            if (!e || !e->isChord()) {
+                continue;
+            }
+            for (const Articulation* a : toChord(e)->articulations()) {
+                const std::string name = SymNames::nameForSymId(a->symId()).ascii();
+                if (a->visible() && (name.rfind("brassMute", 0) == 0 || name.rfind("brassHarmonMute", 0) == 0)) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
 //! Hides the mute and open markings in a sheet for an instrument that has no mute: every text that is only such a
 //! marking (isMuteMarking), and the brass mute symbols on notes (plunger +/o, Harmon stem). Undoable (inside a
 //! command). Returns how many were hidden; `hidden` gets them, for showing them again.

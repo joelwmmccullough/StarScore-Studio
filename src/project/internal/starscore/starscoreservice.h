@@ -371,6 +371,11 @@ public:
     QString markProgress(char code) override;
     StarScoreAnnotationTarget annotationTarget() const override;
     StarScoreMuteTarget muteTarget() const override;
+    void setNextMuteTarget(const QString& partId) override { m_nextMuteTarget = partId; }
+    //! (1.38.0, Joel 25 Nov 2026) Before trumpet or trombone parts are marked Finished: a part with mute instructions
+    //! but no mute assigned is offered the Mutes dialog. False: don't mark them Finished.
+    bool checkMutesBeforeFinished(const QStringList& partIds);
+    mutable QString m_nextMuteTarget;
     QString addPlayerAnnotation(const QString& player, const QString& text) override;
     QString markPlayerAnnotations(const QString& player) override;
     QString unmarkPlayerAnnotations() override;

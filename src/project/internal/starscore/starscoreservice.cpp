@@ -2906,6 +2906,13 @@ Ret StarScoreService::newStarScore(const StarScoreNewOptions& options)
 
 void StarScoreService::setSectionStatus(const QString& sectionId, StarScoreStatus status)
 {
+    if (status == StarScoreStatus::Finished) {
+        for (const StarScoreSection& s : load().sections) {
+            if (s.id == sectionId && !checkMutesBeforeFinished(s.partIds)) {
+                return;
+            }
+        }
+    }
     Data data = load();
     QStringList partIds;
     for (StarScoreSection& s : data.sections) {
@@ -2965,7 +2972,13 @@ StarScoreMuteTarget StarScoreService::muteTarget() const
         return t;
     }
     const engraving::Part* part = nullptr;
-    if (score != ms) {
+    if (!m_nextMuteTarget.isEmpty()) {
+        // (1.38.0) the part a dialog was opened for (marking it Finished)
+        part = ms->partById(ID(m_nextMuteTarget));
+        m_nextMuteTarget.clear();
+    }
+    if (part) {
+    } else if (score != ms) {
         const std::vector<engraving::Part*> ps = masterPartsOf(score, ms);
         if (ps.size() == 1) {
             part = ps.front();
@@ -3014,6 +3027,51 @@ StarScoreMuteTarget StarScoreService::muteTarget() const
         t.chosen = it->second;
     }
     return t;
+}
+
+bool StarScoreService::checkMutesBeforeFinished(const QStringList& partIds)
+{
+    engraving::MasterScore* ms = masterScore();
+    if (!ms) {
+        return true;
+    }
+    const Data data = load();
+    for (const QString& pid : partIds) {
+        const engraving::Part* part = ms->partById(ID(pid));
+        if (!part) {
+            continue;
+        }
+        const QString instrument = part->instrumentId().toQString();
+        if (!instrument.contains("trumpet") && !instrument.contains("trombone")) {
+            continue;
+        }
+        auto mutes = data.partMutes.find(pid);
+        if (mutes != data.partMutes.end() && !mutes->second.isEmpty()) {
+            continue;
+        }
+        if (!starscore::partHasMuteMarkings(ms, part)) {
+            continue;
+        }
+        if (autotestRequested()) {
+            LOGI() << "[starscore] " << part->partName().toStdString() << ": mute instructions but no mute assigned (asked)";
+            continue;
+        }
+        enum { Assign = int(IInteractive::Button::CustomButton) + 1, Anyway };
+        const IInteractive::Result answer = interactive()->questionSync(
+            muse::trc("starscore", "No mute assigned"),
+            muse::qtrc("starscore", "%1 has mute instructions, but there is no mute assigned to this part. Would you like to "
+                                    "assign one?").arg(part->partName().toQString()).toStdString(),
+            { IInteractive::ButtonData(int(IInteractive::Button::Cancel), muse::trc("global", "Cancel")),
+              IInteractive::ButtonData(Anyway, muse::trc("starscore", "Mark Finished without one")),
+              IInteractive::ButtonData(Assign, muse::trc("starscore", "Assign a mute…"), true) }, Assign);
+        if (answer.button() == Assign) {
+            setNextMuteTarget(pid);
+            interactive()->openSync(Uri("musescore://starscore/mutes"));
+        } else if (answer.button() != Anyway) {
+            return false;   // cancelled: not marked Finished
+        }
+    }
+    return true;
 }
 
 void StarScoreService::setPartMutes(const QString& partId, const QStringList& mutes)
@@ -3208,6 +3266,9 @@ void StarScoreService::setPartScoreStatus(const engraving::Score* score, int sta
     if (idsIn.isEmpty()) {
         return;
     }
+    if (status == int(StarScoreStatus::Finished) && !checkMutesBeforeFinished(idsIn)) {
+        return;
+    }
     Data data = loadFrom(ms);
     // a Big Band / Orchestra / Marching Band full score: its own status, the parts keep theirs
     const QString family = starscoreFamilyArrangementOfScore(score, ms, data.arrangements);
@@ -3285,6 +3346,9 @@ void StarScoreService::lockFinishedParts(const QStringList& partIds)
 
 void StarScoreService::setPartStatus(const QString& partId, int status)
 {
+    if (status == int(StarScoreStatus::Finished) && !checkMutesBeforeFinished({ partId })) {
+        return;
+    }
     Data data = load();
     if (status < 0) {
         data.partStatus.erase(partId);

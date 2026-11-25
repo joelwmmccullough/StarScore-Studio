@@ -992,6 +992,8 @@ public:
     virtual StarScoreAnnotationTarget annotationTarget() const = 0;
     //! The brass part open (its part score, or the part of the selection in the full score) for the Mutes dialog
     virtual StarScoreMuteTarget muteTarget() const = 0;
+    //! (1.38.0) The next Mutes dialog is for this part (not the part open or selected)
+    virtual void setNextMuteTarget(const QString& partId) = 0;
     //! A staff text with these words at the selected note or rest, as the player's annotation. Returns a problem
     //! to show, or nothing.
     virtual QString addPlayerAnnotation(const QString& player, const QString& text) = 0;

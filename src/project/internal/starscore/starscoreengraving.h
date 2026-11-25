@@ -96,6 +96,9 @@ constexpr int FLUTE_HIGHEST = 96;
 //! Whether a text is only a mute or open marking: "mute", "(open)", "harmon", "(plunger)", "Harmon (stem out)",
 //! "w/ plunger", "con sord.", "+ o"… ("Open solos" and "straight 8ths" are not)
 bool isMuteMarking(const QString& text);
+//! (1.38.0) The part has a mute instruction somewhere: a visible text on its staves that is a mute marking
+//! (isMuteMarking), or a brass mute symbol on one of its notes (plunger +/o, Harmon stem)
+bool partHasMuteMarkings(const mu::engraving::Score* score, const mu::engraving::Part* part);
 //! Whether an instrument is a woodwind (a saxophone, clarinet, flute, double reed…), which takes no mute
 bool isWoodwindInstrument(const QString& instrumentId);
 //! Hides the mute and open markings in a sheet for an instrument without a mute: the texts that are only such a

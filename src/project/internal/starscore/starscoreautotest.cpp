@@ -1397,6 +1397,45 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             out.close();
         }
         autotestLog(QString("  written %1").arg(written));
+    } else if (step.startsWith("mutecheck")) {
+        // mutecheck[:<part name>|<text>] (1.38.0): (with a text: that staff text added at the part's first note first)
+        // each trumpet and trombone part: mute instructions, mutes assigned, and whether marking it Finished would ask
+        const QString addTo = step.section(':', 1).section('|', 0, 0);
+        const QString text = step.section(':', 1).section('|', 1);
+        if (!addTo.isEmpty() && !text.isEmpty()) {
+            for (engraving::Part* p : ms->parts()) {
+                if (p->partName().toQString() != addTo) {
+                    continue;
+                }
+                for (engraving::Segment* seg = ms->firstSegment(engraving::SegmentType::ChordRest); seg;
+                     seg = seg->next1(engraving::SegmentType::ChordRest)) {
+                    engraving::EngravingItem* e = seg->element(p->startTrack());
+                    if (e && e->isChord()) {
+                        master->notation()->undoStack()->prepareChanges(TranslatableString::untranslatable("test"));
+                        engraving::StaffText* st = engraving::Factory::createStaffText(seg);
+                        st->setTrack(p->startTrack());
+                        st->setParent(seg);
+                        st->setXmlText(String::fromQString(text));
+                        ms->undoAddElement(st);
+                        master->notation()->undoStack()->commitChanges();
+                        break;
+                    }
+                }
+            }
+        }
+        const Data d = load();
+        for (engraving::Part* p : ms->parts()) {
+            const QString id = p->instrumentId().toQString();
+            if (!id.contains("trumpet") && !id.contains("trombone")) {
+                continue;
+            }
+            auto m = d.partMutes.find(idText(p));
+            const bool hasMutes = m != d.partMutes.end() && !m->second.isEmpty();
+            const bool marks = starscore::partHasMuteMarkings(ms, p);
+            autotestLog(QString("  %1: mute instructions %2, mutes %3 -> %4").arg(p->partName().toQString())
+                        .arg(marks ? "yes" : "no").arg(hasMutes ? m->second.join("/") : QString("none"))
+                        .arg(marks && !hasMutes ? "asks" : "doesn't ask"));
+        }
     } else if (step.startsWith("mutetext:")) {
         // mutetext:<text>|<text>…: whether each counts as a mute marking (hidden on woodwind sheets)
         for (const QString& t : step.mid(9).split('|')) {
