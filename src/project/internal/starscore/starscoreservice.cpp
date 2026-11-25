@@ -13,6 +13,7 @@
 #include "engraving/dom/starscoreprogress.h"
 #include "starscoreautoarchive.h"
 #include "starscoredrivesafety.h"
+#include "starscorezip.h"
 
 namespace mu::project::starscore {
 void soloForgetStyles();   // starscoresolotranscription.cpp
