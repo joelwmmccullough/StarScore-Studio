@@ -1151,6 +1151,20 @@ bool StarScoreService::autotestMediaStep(const QString& step)
         }
         return true;
     }
+    if (step == "mediapurge") {
+        // mediapurge (1.38.0): every working copy deleted, as macOS did to old files in the temporary folder; the next
+        // save must take them from the song file again
+        int removed = 0;
+        for (const StarScoreMedia& m : m_media) {
+            removed += QFile::remove(mediaWorkPath(m)) ? 1 : 0;
+        }
+        for (const StarScoreReference& ref : references()) {
+            removed += QFile::remove(referencePath(ref.id).toQString()) ? 1 : 0;
+        }
+        mediaTestLog(QString("  working copies removed: %1 (working folder in %2)").arg(removed)
+                     .arg(m_workDir.startsWith(QDir::tempPath()) ? "the temporary folder" : "StarScore's own folder"));
+        return true;
+    }
     if (step == "mediaunsaved") {
         mediaTestLog(QString("  needs saving: %1").arg(m_mainProject && m_mainProject->needSave().val ? "yes" : "no"));
         return true;
