@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/">
+        <file alias="fonts/starscoretimesig/StarScoreTimeSig.otf">../../../../fonts/starscoretimesig/StarScoreTimeSig.otf</file>
+    </qresource>
+</RCC>

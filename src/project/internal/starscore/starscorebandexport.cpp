@@ -2978,6 +2978,69 @@ static int starscoreKeepRepeatsOnOnePage(const INotationPtr& n, bool laidOut = f
 //! minor-major 7 chord." Set as score meta tags that the footer layout reads (see HeaderFooterLayout), only while the
 //! sheet is printed. Returns whether a note was set (the score is then laid out again). (1.38.0) Also additive time
 //! signatures, below.
+//! (1.38.0, Joel 25 Nov 2026: "render the time signatures in line as actual time signatures") A stacked time signature
+//! for a line of text, in the StarScore TimeSig font (fonts/starscoretimesig): each digit (and the plus of an additive
+//! top number) is a zero-width glyph already raised to its row, placed by spacer glyphs; the shorter row centred.
+static muse::String starscoreInlineTimeSig(const muse::String& num, const muse::String& den)
+{
+    using muse::String;
+    // Bravura's advance widths, in the font's units (1 em = 1000 = the time signature's height)
+    auto width = [](char16_t c) -> int {
+        static const int digits[10] = { 470, 334, 446, 421, 470, 403, 434, 441, 436, 434 };
+        return c == u'+' ? 254 : (c >= u'0' && c <= u'9') ? digits[c - u'0'] : 0;
+    };
+    constexpr int GAP = 40;    // between the glyphs of a row
+    constexpr int SIDE = 60;   // before and after it
+    auto rowWidth = [&](const String& row) {
+        int w = 0;
+        for (size_t i = 0; i < row.size(); ++i) {
+            w += width(row.at(i).unicode()) + (i > 0 ? GAP : 0);
+        }
+        return w;
+    };
+    const int wn = rowWidth(num);
+    const int wd = rowWidth(den);
+    const int w = std::max(wn, wd);
+    struct Glyph {
+        int x;
+        char16_t code;
+    };
+    std::vector<Glyph> glyphs;
+    for (const auto& [row, top] : { std::pair<const String&, bool>(num, true), std::pair<const String&, bool>(den, false) }) {
+        int x = SIDE + (w - rowWidth(row)) / 2;
+        for (size_t i = 0; i < row.size(); ++i) {
+            const char16_t c = row.at(i).unicode();
+            if (c == u'+' && top) {
+                glyphs.push_back({ x, 0xF70A });
+            } else if (c >= u'0' && c <= u'9') {
+                glyphs.push_back({ x, char16_t((top ? 0xF700 : 0xF710) + (c - u'0')) });
+            }
+            x += width(c) + GAP;
+        }
+    }
+    std::stable_sort(glyphs.begin(), glyphs.end(), [](const Glyph& a, const Glyph& b) { return a.x < b.x; });
+    String out;
+    int at = 0;
+    auto advance = [&](int to) {
+        static const std::pair<char16_t, int> spacers[] = { { 0xF720, 250 }, { 0xF721, 125 }, { 0xF722, 50 }, { 0xF723, 25 },
+                                                            { 0xF724, 10 } };
+        int dx = to - at;
+        for (const auto& [code, units] : spacers) {
+            while (dx >= units) {
+                out += String(Char(code));
+                dx -= units;
+                at += units;
+            }
+        }
+    };
+    for (const Glyph& g : glyphs) {
+        advance(g.x);
+        out += String(Char(g.code));
+    }
+    advance(w + 2 * SIDE);
+    return out;
+}
+
 static constexpr size_t STARSCORE_FOOTER_NOTES = 9;   // the most footnotes on one sheet (headerfooterlayout.cpp reads as many)
 
 static bool starscoreSetMinMajNote(mu::engraving::Score* score)
@@ -3037,6 +3100,14 @@ static bool starscoreSetMinMajNote(mu::engraving::Score* score)
     // 4/8, 4/8, 4/8 and 3/8, repeating." A courtesy one at the end of a line counts: it's where the player first sees it.
     std::vector<std::pair<String, int> > notes;   // text, page
     std::set<String> seenSigs;
+    // a time signature drawn as one, a little larger than the footer's text so its digits read at the text's size
+    const String footFace = score->style().styleSt(Sid::footerFontFace);
+    const double footSize = score->style().styleD(Sid::footerFontSize);
+    auto inlineSig = [&](const String& num, const String& den) {
+        return u"<font face=\"StarScore TimeSig\"/><font size=\"" + String::number(footSize * 1.4, 1) + u"\"/>"
+               + starscoreInlineTimeSig(num, den) + u"<font size=\"" + String::number(footSize, 1) + u"\"/><font face=\""
+               + footFace + u"\"/>";
+    };
     for (size_t pi = 0; pi < score->pages().size(); ++pi) {
         for (const System* sys : score->pages().at(pi)->systems()) {
             for (const MeasureBase* mb : sys->measures()) {
@@ -3064,14 +3135,15 @@ static bool starscoreSetMinMajNote(mu::engraving::Score* score)
                         StringList bars;
                         for (const String& part : num.split(u'+')) {
                             if (!part.trimmed().empty()) {
-                                bars.push_back(part.trimmed() + u"/" + den);
+                                bars.push_back(inlineSig(part.trimmed(), den));
                             }
                         }
                         String list;
                         for (size_t i = 0; i < bars.size(); ++i) {
                             list += (i == 0 ? String() : i + 1 == bars.size() ? String(u" and ") : String(u", ")) + bars.at(i);
                         }
-                        notes.push_back({ u"The " + sig + u" time signature denotes bars of " + list + u", repeating.", int(pi) });
+                        notes.push_back({ u"The " + inlineSig(num, den) + u" time signature denotes bars of " + list + u", repeating.",
+                                          int(pi) });
                     }
                 }
             }

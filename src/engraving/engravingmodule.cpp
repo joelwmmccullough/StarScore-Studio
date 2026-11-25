@@ -102,6 +102,7 @@ static void engraving_init_qrc()
     Q_INIT_RESOURCE(fonts_StarScoreDeco);
     Q_INIT_RESOURCE(fonts_StarScoreJost);
     Q_INIT_RESOURCE(fonts_Starsign);
+    Q_INIT_RESOURCE(fonts_StarScoreTimeSig);
 #endif
 }
 
@@ -220,6 +221,8 @@ void EngravingModule::onInit(const IApplication::RunMode&)
         // StarScore: StarScore Deco, an art deco SMuFL font drawn to match TT Modernoir (fonts/starscoredeco)
         addMusicFont("StarScore Deco", FontDataKey(u"StarScore Deco"), ":/fonts/starscoredeco/StarScoreDeco.otf");
         fdb->addFont(FontDataKey(u"StarScore Deco Text"), ":/fonts/starscoredeco/StarScoreDecoText.otf");
+        // StarScore (1.38.0): stacked time signatures inside a line of text (fonts/starscoretimesig)
+        fdb->addFont(FontDataKey(u"StarScore TimeSig"), ":/fonts/starscoretimesig/StarScoreTimeSig.otf");
 
         // Tabulature
         fdb->addFont(FontDataKey(u"FreeSerif"), ":/fonts/FreeSerif.ttf");
