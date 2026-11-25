@@ -116,7 +116,12 @@ QString AdditiveTimeSigModel::apply(const QString& numeratorsText, int denominat
 
     master->notation()->undoStack()->prepareChanges(muse::TranslatableString::untranslatable("Additive time signature"));
     const QString err = starscore::applyAdditiveTimeSig(ms, first, last, numerators, denominator);
-    master->notation()->undoStack()->commitChanges();
+    // (1.38.0) a failure part-way is undone, not kept half-done
+    if (err.isEmpty()) {
+        master->notation()->undoStack()->commitChanges();
+    } else {
+        master->notation()->undoStack()->rollbackChanges();
+    }
     master->notation()->notationChanged().notify();
     notation->notationChanged().notify();
 

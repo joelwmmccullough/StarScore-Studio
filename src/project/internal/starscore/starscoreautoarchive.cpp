@@ -202,6 +202,11 @@ QByteArray compress(const QByteArray& src, const QByteArray* ref)
 
 bool decompress(const QByteArray& frame, const QByteArray* ref, qint64 rawSize, QByteArray& out)
 {
+    // (1.38.0) a damaged history can't ask for an impossible size (it crashed before the repair could run)
+    if (rawSize < 0 || rawSize > qint64(1) << 31) {
+        LOGE() << "autosave archive: a version's size is damaged: " << rawSize;
+        return false;
+    }
     ZSTD_DCtx* d = ZSTD_createDCtx();
     if (!d) {
         return false;
@@ -783,10 +788,14 @@ static QString copyIntoIncoming(const QString& source, const QString& base, cons
         LOGW() << "autosave archive: couldn't make " << incomingDir().toStdString();
         return QString();
     }
-    const QByteArray sourceSha1 = fileSha1(source);
+    // (1.38.0) the source's checksum only when a copy with that name is there already (it read the whole song every save)
+    QByteArray sourceSha1;
     for (int extra = 0; extra < 10; ++extra) {
         const QString target = incomingDir() + "/" + base + " " + time.addSecs(60 * extra).toString(TIME_FORMAT) + ".starscore";
         if (QFile::exists(target)) {
+            if (sourceSha1.isEmpty()) {
+                sourceSha1 = fileSha1(source);
+            }
             if (fileSha1(target) == sourceSha1) {
                 return target;   // already there
             }

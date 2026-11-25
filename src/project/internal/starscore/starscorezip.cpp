@@ -161,6 +161,11 @@ const char* Reader::rawData(const Entry& e) const
     if (start + e.compressedSize > m_size) {
         return nullptr;
     }
+    // (1.38.0) a damaged entry can't read past the file or ask for an impossible size: a stored entry's size is its
+    // stored size, and no entry is bigger than a .starscore may be
+    if (e.size < 0 || e.compressedSize < 0 || e.size > MAX_FILE_BYTES || (e.method == 0 && e.size != e.compressedSize)) {
+        return nullptr;
+    }
     return reinterpret_cast<const char*>(m_map + start);
 }
 

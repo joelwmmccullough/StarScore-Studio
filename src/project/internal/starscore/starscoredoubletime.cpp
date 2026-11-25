@@ -872,7 +872,6 @@ RetVal<QString> StarScoreService::convertTimeOf(const INotationProjectPtr& proje
     }
     n->undoStack()->commitChanges();
     ms->setLayoutAll();
-    ms->setLayoutAll();
     ms->doLayout();
     project->markAsUnsaved();
     n->notationChanged().notify();

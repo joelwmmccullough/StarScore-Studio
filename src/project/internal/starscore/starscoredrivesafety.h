@@ -31,6 +31,11 @@ namespace mu::project::starscore {
 //! created when it doesn't exist), then reads dst back to check it. False (and error) when something failed.
 bool replaceFileContents(const QString& src, const QString& dst, QString* error = nullptr);
 
+//! (1.38.0) ~/Library/Application Support/…/Working: the open songs' working copies of their solos, reference PDFs and
+//! recordings (not the system's temporary folder, which macOS empties of old files). Folders left there more than
+//! 30 days are removed the first time this is called.
+QString workingFoldersRoot();
+
 //! Where a save writes its temporary file for target: a local temporary folder (not the song's cloud folder)
 QString localSavingPath(const QString& target);
 

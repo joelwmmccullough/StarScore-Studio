@@ -33,6 +33,10 @@
 #include "../../iprojectfilescontroller.h"
 #include "../../irecentfilescontroller.h"
 
+namespace mu::project::starscore::zip {
+class Reader;
+}
+
 namespace mu::project::starscore {
 struct ChordChartData;
 }
@@ -644,7 +648,7 @@ private:
     bool autotestMediaStep(const QString& step);
     QString soloFileKeyName(int keyIndex, bool written) const;
     QString soloVersionForExport();
-    bool m_soloRefreshQueued = false;
+    int m_soloRefreshGeneration = 0;   // (1.38.0) the solo refresh waits for a pause in editing
     bool m_soloUndoRedo = false;
     bool m_soloRefreshing = false;
     bool m_soloMuteSyncing = false;
@@ -658,6 +662,8 @@ private:
     void onCurrentProjectChanged();
     void clearSolos();
     void extractSolos();
+    void restoreMissingWorkingCopies();   // (1.38.0)
+    bool unpackWorkingCopy(const starscore::zip::Reader& zip, const QString& entry, const QString& work);
     muse::io::path_t soloWorkPath(const QString& soloId) const;
     muse::RetVal<std::shared_ptr<INotationProject> > loadSoloProject(const QString& soloId);
     muse::Ret buildSoloBand(const std::shared_ptr<INotationProject>& soloProject, const StarScoreSolo& solo);

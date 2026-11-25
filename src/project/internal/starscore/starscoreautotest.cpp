@@ -67,6 +67,7 @@
 #include "global/serialization/zipwriter.h"
 #include <QElapsedTimer>
 #include <QCryptographicHash>
+#include <QThreadPool>
 #include <QKeyEvent>
 #include <algorithm>
 #include "engraving/dom/starscoreprogress.h"
@@ -4305,6 +4306,7 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         autotestLog(QString("  save: %1; same file: %2").arg(r ? "ok" : QString::fromStdString(r.toString()))
                     .arg(ino1 != 0 && ino1 == inode(song) ? "yes" : "no"));
         autotestLog("  in the song folder: " + QDir(folder).entryList(QDir::AllEntries | QDir::Hidden | QDir::NoDotAndDotDot).join(", "));
+        QThreadPool::globalInstance()->waitForDone(10000);   // (the Last Saved copy is made in the background)
         autotestLog(QString("  last saved copy: %1, same as the song: %2")
                     .arg(QFileInfo(starscore::lastSavedCopyPath(song)).fileName())
                     .arg(sha(starscore::lastSavedCopyPath(song)) == sha(song) ? "yes" : "no"));

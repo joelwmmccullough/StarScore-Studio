@@ -13,6 +13,10 @@
 #include "engraving/dom/starscoreprogress.h"
 #include "starscoreautoarchive.h"
 #include "starscoredrivesafety.h"
+
+namespace mu::project::starscore {
+void soloForgetStyles();   // starscoresolotranscription.cpp
+}
 #include "settings.h"
 #include "starscorehornkeys.h"
 #include "starscorehouse.h"
@@ -175,6 +179,11 @@ void StarScoreService::init()
         if (alive && m_listening && m_mainProject && project == static_cast<const void*>(m_mainProject.get())) {
             LOGI() << "[starscore] saving: the listen-through stopped first";
             stopListening();
+        }
+        // (1.38.0) the solos, reference PDFs and recordings are put back into the song from their working copies after
+        // MuseScore writes it: a working copy that's gone is taken from the song file again now, while it still has it
+        if (alive && m_mainProject && project == static_cast<const void*>(m_mainProject.get())) {
+            restoreMissingWorkingCopies();
         }
         // (1.24.0) a Solo Transcription saved with each key's notes spelled for it: a part score note spelled for
         // another key would be "fixed" when the file is opened, by changing its pitch (Note::setupAfterRead)
@@ -4881,6 +4890,7 @@ void StarScoreService::onCurrentProjectChanged()
 
 void StarScoreService::clearSolos()
 {
+    starscore::soloForgetStyles();   // (1.38.0)
     if (m_mainProject) {
         m_mainProject->saveComplited().disconnect(this);
     }
@@ -4917,7 +4927,9 @@ void StarScoreService::extractSolos()
         return;
     }
 
-    m_workDir = QDir::tempPath() + "/StarScoreSolos-" + QUuid::createUuid().toString(QUuid::Id128);
+    // (1.38.0) not in the system's temporary folder: macOS empties files there it thinks are old (3 days), and a song
+    // left open that long lost its solos, reference PDFs and recordings at the next save
+    m_workDir = starscore::workingFoldersRoot() + "/StarScoreSolos-" + QUuid::createUuid().toString(QUuid::Id128);
     QDir().mkpath(m_workDir);
 
     // (1.26.0) the recordings, video and Transcribe! files inside the file
@@ -4930,28 +4942,62 @@ void StarScoreService::extractSolos()
         return;
     }
 
-    ZipReader zip(m_mainProject->path());
+    const starscore::zip::Reader zip(m_mainProject->path().toQString());
     for (const StarScoreReference& ref : refs) {
-        ByteArray data = zip.fileData(ref.file.toStdString());
-        if (data.empty()) {
-            LOGW() << "[starscore] reference file missing from the .starscore: " << ref.file;
-            continue;
-        }
-        QFile out(referencePath(ref.id).toQString());
-        if (out.open(QIODevice::WriteOnly)) {
-            out.write(data.toQByteArrayNoCopy());
-        }
+        unpackWorkingCopy(zip, ref.file, referencePath(ref.id).toQString());
     }
     for (const StarScoreSolo& solo : list) {
-        ByteArray data = zip.fileData(solo.file.toStdString());
-        if (data.empty()) {
-            LOGW() << "[starscore] solo file missing from the .starscore: " << solo.file;
-            continue;
+        unpackWorkingCopy(zip, solo.file, soloWorkPath(solo.id).toQString());
+    }
+}
+
+//! (1.38.0) One entry of the song file to its working copy; a copy that couldn't be written completely is removed
+//! (it was written unchecked, and a short copy replaced the good one in the file at the next save)
+bool StarScoreService::unpackWorkingCopy(const starscore::zip::Reader& zip, const QString& entry, const QString& work)
+{
+    const starscore::zip::Entry* e = zip.find(entry);
+    if (!e) {
+        LOGW() << "[starscore] " << entry << " is missing from the .starscore";
+        return false;
+    }
+    QDir().mkpath(QFileInfo(work).absolutePath());
+    if (!zip.copyTo(*e, work) || QFileInfo(work).size() != qint64(e->size)) {
+        LOGE() << "[starscore] couldn't unpack " << entry << " to " << work;
+        QFile::remove(work);
+        return false;
+    }
+    return true;
+}
+
+void StarScoreService::restoreMissingWorkingCopies()
+{
+    if (!m_mainProject || m_workDir.isEmpty() || !QFileInfo::exists(m_mainProject->path().toQString())) {
+        return;
+    }
+    std::vector<std::pair<QString, QString> > missing;   // entry, working copy
+    for (const StarScoreSolo& solo : solos()) {
+        if (!m_soloProjects.count(solo.id) && !QFileInfo::exists(soloWorkPath(solo.id).toQString())) {
+            missing.push_back({ solo.file, soloWorkPath(solo.id).toQString() });
         }
-        QFile out(soloWorkPath(solo.id).toQString());
-        if (out.open(QIODevice::WriteOnly)) {
-            out.write(data.toQByteArrayNoCopy());
+    }
+    for (const StarScoreReference& ref : references()) {
+        if (!QFileInfo::exists(referencePath(ref.id).toQString())) {
+            missing.push_back({ ref.file, referencePath(ref.id).toQString() });
         }
+    }
+    for (const StarScoreMedia& m : m_media) {
+        if (!QFileInfo::exists(mediaWorkPath(m))) {
+            missing.push_back({ m.entry(), mediaWorkPath(m) });
+        }
+    }
+    if (missing.empty()) {
+        return;
+    }
+    QDir().mkpath(m_workDir);
+    const starscore::zip::Reader zip(m_mainProject->path().toQString());
+    for (const auto& [entry, work] : missing) {
+        const bool ok = unpackWorkingCopy(zip, entry, work);
+        LOGW() << "[starscore] the working copy of " << entry << " was gone; taken from the song file again: " << (ok ? "yes" : "no");
     }
 }
 

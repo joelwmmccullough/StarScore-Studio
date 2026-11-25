@@ -4,6 +4,10 @@
  * StarScore Studio — Practice › Listen (see starscorelisten.h)
  */
 #include "starscorelisten.h"
+
+#include <QCoreApplication>
+
+#include <QTimer>
 #include "starscoredecode.h"
 #include "starscorevideo.h"
 
@@ -136,7 +140,15 @@ void ListenPlayer::clear()
         playback()->removeSequence(m_sequence);
     }
     m_sequence = -1;
-    // (the decoded sound goes once the engine's tracks are gone: removing the sequence above)
+    // (1.38.0) removing the sequence reaches the audio engine a moment later, and until then it may still read the
+    // decoded sound: the old tracks are kept for a few seconds before they're freed (freeing them at once let the engine
+    // read freed memory when a song was reloaded mid-load)
+    if (!m_tracks.empty()) {
+        auto old = std::make_shared<std::vector<std::unique_ptr<Track> > >(std::move(m_tracks));
+        if (qApp) {
+            QTimer::singleShot(5000, qApp, [old]() { old->clear(); });
+        }
+    }
     m_tracks.clear();
     m_stems.clear();
     m_errors.clear();
@@ -214,16 +226,26 @@ void ListenPlayer::load(const std::vector<ListenStem>& stems)
                     return;
                 }
                 track->id = tid;
-                if (--*remaining == 0) {
+                if (--*remaining == 0 && m_player) {
                     m_player->setDuration(msecs_t((m_length / m_speed + 1.0) * 1000.0));
                     applyParams();
                     m_ready = true;
                     emit readyChanged();
                 }
             })
-            .onReject(this, [this, remaining, track](int code, const std::string& text) {
-                m_errors << QString("%1: %2 (%3)").arg(track->stem.name, QString::fromStdString(text)).arg(code);
-                --*remaining;
+            // (1.38.0) the name copied (the track may be gone by now), the generation checked, and the last answer
+            // finishes the load whether it was a yes or a no (a failed last track left Listen never ready)
+            .onReject(this, [this, remaining, generation, name = track->stem.name](int code, const std::string& text) {
+                if (generation != m_generation) {
+                    return;
+                }
+                m_errors << QString("%1: %2 (%3)").arg(name, QString::fromStdString(text)).arg(code);
+                if (--*remaining == 0 && m_player) {
+                    m_player->setDuration(msecs_t((m_length / m_speed + 1.0) * 1000.0));
+                    applyParams();
+                    m_ready = true;
+                    emit readyChanged();
+                }
             });
         }
     });

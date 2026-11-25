@@ -42,11 +42,11 @@ class StarScoreBarModel : public QObject, public muse::Contextable, public muse:
     Q_PROPERTY(bool progressShown READ progressShown NOTIFY changed)
     //! (1.24.0) The open score is a Solo Transcription: its song, player, instrument and the song it's tied to
     Q_PROPERTY(bool isSoloTranscription READ isSoloTranscription NOTIFY changed)
-    Q_PROPERTY(QVariantMap soloInfo READ soloInfo NOTIFY changed)
+    Q_PROPERTY(QVariantMap soloInfo READ soloInfo NOTIFY folderInfoChanged)
     //! A song's Solo Transcriptions (tied to it): name and file
-    Q_PROPERTY(QVariantList tiedSolos READ tiedSolos NOTIFY changed)
+    Q_PROPERTY(QVariantList tiedSolos READ tiedSolos NOTIFY folderInfoChanged)
     //! (1.25.0) The score's audio and Transcribe! files (the Audio folder beside the .starscore): [{ name, path, kind }]
-    Q_PROPERTY(QVariantList audioFiles READ audioFiles NOTIFY changed)
+    Q_PROPERTY(QVariantList audioFiles READ audioFiles NOTIFY folderInfoChanged)
     Q_PROPERTY(bool canAddAudio READ canAddAudio NOTIFY changed)
 
     QML_ELEMENT
@@ -69,9 +69,12 @@ public:
     bool isSoloView() const;
     bool canAddSolos() const;
     bool isSoloTranscription() const;
-    QVariantMap soloInfo() const;
-    QVariantList tiedSolos() const;
-    QVariantList audioFiles() const;
+    QVariantMap soloInfo() const { return m_soloInfo; }
+    QVariantList tiedSolos() const { return m_tiedSolos; }
+    QVariantList audioFiles() const { return m_audioFiles; }
+    QVariantMap readSoloInfo() const;
+    QVariantList readTiedSolos() const;
+    QVariantList readAudioFiles() const;
     bool canAddAudio() const;
     //! One audio or Transcribe! file's menu: Play (Open in Transcribe!) / Show in Finder / Remove
     Q_INVOKABLE QVariantList audioFileMenu(const QVariantMap& item) const;
@@ -117,6 +120,7 @@ signals:
     void arrangementsChanged();
     void sectionsChanged();
     void solosChanged();
+    void folderInfoChanged();
 
 private:
     QString askTwoTrumpetSources();
@@ -128,6 +132,16 @@ private:
     QVariantList m_arrangements;
     QVariantList m_sections;
     QVariantList m_solos;
+    // (1.38.0) the parts of the panel read from folders (the song's solo transcriptions, its recordings, a solo's tied
+    // song): kept here and read again only when the song changes, after a panel action, or every 30 seconds. They were
+    // read from Google Drive folders on every edit, twice.
+    void refreshFolderInfo(bool force);
+    QVariantMap m_soloInfo;
+    QVariantList m_tiedSolos;
+    QVariantList m_audioFiles;
+    QString m_folderInfoKey;
+    qint64 m_folderInfoAt = 0;
+    bool m_folderInfoDirty = true;
 
     QString leadSheetText(const QStringList& kinds) const;
     QVariantList statusSubmenu(const QString& prefix, int current, bool rhythm = false) const;

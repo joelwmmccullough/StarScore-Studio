@@ -20,6 +20,7 @@
  *   does (its previous state goes to the Autosave Archive first).
  */
 #include "starscoreservice.h"
+#include "starscoredrivesafety.h"
 #include "starscoreautoarchive.h"
 #include "starscorezip.h"
 
@@ -80,7 +81,8 @@ QString safeFileName(QString name)
 {
     static const QRegularExpression unsafe("[/:\\\\\\x00-\\x1f]");
     name.replace(unsafe, "-");
-    return name.trimmed().isEmpty() ? QString("file") : name.trimmed();
+    name = name.trimmed();
+    return name.isEmpty() || name == "." || name == ".." ? QString("file") : name;
 }
 
 QJsonObject mediaJson(const StarScoreMedia& m)
@@ -275,7 +277,9 @@ std::vector<StarScoreMedia> StarScoreService::media() const
 
 QString StarScoreService::mediaWorkPath(const StarScoreMedia& m) const
 {
-    return m_workDir.isEmpty() ? QString() : m_workDir + "/media/" + m.id + "/" + m.fileName;
+    // (1.38.0) the names come from inside the song file: made safe, so a damaged or shared song can't put a working copy
+    // outside the working folder ("..", "/")
+    return m_workDir.isEmpty() ? QString() : m_workDir + "/media/" + safeFileName(m.id) + "/" + safeFileName(m.fileName);
 }
 
 QString StarScoreService::mediaPath(const QString& mediaId) const
@@ -309,9 +313,15 @@ void StarScoreService::extractMedia()
         const starscore::zip::Entry* e = zip.find(m.entry());
         const QString work = mediaWorkPath(m);
         QDir().mkpath(QFileInfo(work).absolutePath());
-        if (!e || !zip.copyTo(*e, work)) {
-            LOGE() << "[starscore] couldn't unpack " << m.entry() << " from " << m_mainProject->path();
+        if (!e) {
+            LOGE() << "[starscore] " << m.entry() << " is listed but not in " << m_mainProject->path();
             continue;
+        }
+        // (1.38.0) one that couldn't be unpacked now stays listed: dropping it removed the recording from the song at
+        // the next save. The save unpacks it again first (restoreMissingWorkingCopies).
+        if (!zip.copyTo(*e, work) || QFileInfo(work).size() != e->size) {
+            LOGE() << "[starscore] couldn't unpack " << m.entry() << " from " << m_mainProject->path();
+            QFile::remove(work);
         }
         kept.push_back(m);
     }
@@ -914,8 +924,34 @@ Ret StarScoreService::injectSolos(const io::path_t& starscorePath)
         }
     }
 
+    // (1.38.0) a working copy that's gone means that solo, PDF or recording would drop out of the song: the save stops
+    // here instead (and the song stays unsaved, with a message), after one more try at taking it from the song file
+    restoreMissingWorkingCopies();
+    QStringList missing;
+    for (const StarScoreSolo& solo : solos()) {
+        if (!QFileInfo::exists(soloWorkPath(solo.id).toQString())) {
+            missing << solo.file;
+        }
+    }
+    for (const StarScoreReference& ref : references()) {
+        if (!QFileInfo::exists(referencePath(ref.id).toQString())) {
+            missing << ref.file;
+        }
+    }
+    for (const StarScoreMedia& m : m_media) {
+        if (!QFileInfo::exists(mediaWorkPath(m))) {
+            missing << m.entry();
+        }
+    }
+    if (!missing.isEmpty()) {
+        LOGE() << "[starscore] working copies missing: " << missing.join(", ").toStdString();
+        return make_ret(Ret::Code::UnknownError, ("these working copies are missing: " + missing.join(", ")).toStdString());
+    }
+
     const QString target = starscorePath.toQString();
-    const QString tmp = target + ".solos-tmp";
+    // (1.38.0) built in the local working folder, then written into the song file in place: renaming a new file over
+    // the song in its Google Drive folder is what can make Drive cancel the upload and take the song away
+    const QString tmp = m_workDir + "/song-save.tmp";
     {
         const starscore::zip::Reader reader(target);
         if (!reader.ok()) {
@@ -944,28 +980,27 @@ Ret StarScoreService::injectSolos(const io::path_t& starscorePath)
             }
         }
         for (const StarScoreSolo& solo : solos()) {
-            if (!QFileInfo::exists(soloWorkPath(solo.id).toQString())) {
-                LOGW() << "[starscore] missing working copy of solo " << solo.id;
-                continue;
+            if (!writer.addFile(solo.file, soloWorkPath(solo.id).toQString())) {
+                writer.close();
+                QFile::remove(tmp);
+                return make_ret(Ret::Code::UnknownError, ("couldn't add " + solo.file).toStdString());
             }
-            writer.addFile(solo.file, soloWorkPath(solo.id).toQString());
         }
         for (const StarScoreReference& ref : references()) {
-            if (!QFileInfo::exists(referencePath(ref.id).toQString())) {
-                LOGW() << "[starscore] missing working copy of reference " << ref.id;
-                continue;
+            if (!writer.addFile(ref.file, referencePath(ref.id).toQString())) {
+                writer.close();
+                QFile::remove(tmp);
+                return make_ret(Ret::Code::UnknownError, ("couldn't add " + ref.file).toStdString());
             }
-            writer.addFile(ref.file, referencePath(ref.id).toQString());
         }
         std::vector<StarScoreMedia> written;
         for (StarScoreMedia& m : m_media) {
-            if (!QFileInfo::exists(mediaWorkPath(m))) {
-                LOGE() << "[starscore] missing working copy of " << m.entry();
-                continue;
+            if (!writer.addFile(m.entry(), mediaWorkPath(m))) {
+                writer.close();
+                QFile::remove(tmp);
+                return make_ret(Ret::Code::UnknownError, ("couldn't add " + m.entry()).toStdString());
             }
-            if (writer.addFile(m.entry(), mediaWorkPath(m))) {
-                m.crc = writer.lastCrc();
-            }
+            m.crc = writer.lastCrc();
             written.push_back(m);
         }
         if (!written.empty()) {
@@ -977,21 +1012,13 @@ Ret StarScoreService::injectSolos(const io::path_t& starscorePath)
         }
     }
 
-    // The song file is never gone from disk: the saved file steps aside under a temporary name, the new one takes its
-    // place, and only then is the old one removed. (Removing the target first and then renaming left no song file at
-    // all if the rename failed.)
-    const QString old = target + ".solos-old";
-    QFile::remove(old);
-    if (!QFile::rename(target, old)) {
-        QFile::remove(tmp);
-        return make_ret(Ret::Code::UnknownError);
+    QString error;
+    if (!starscore::replaceFileContents(tmp, target, &error)) {
+        // the song file may be part-written: the full song is in tmp (kept, in the working folder, which isn't removed
+        // while the save failed)
+        return make_ret(Ret::Code::UnknownError, error.toStdString());
     }
-    if (!QFile::rename(tmp, target)) {
-        QFile::rename(old, target);   // the saved file back where it was
-        QFile::remove(tmp);
-        return make_ret(Ret::Code::UnknownError);
-    }
-    QFile::remove(old);
+    QFile::remove(tmp);
     return make_ok();
 }
 

@@ -17,6 +17,8 @@
 #include <QFileInfo>
 #include <QSettings>
 #include <QStandardPaths>
+#include <QThreadPool>
+#include <QUuid>
 #include <QTimer>
 
 #ifdef Q_OS_UNIX
@@ -26,11 +28,6 @@
 #include "log.h"
 
 namespace mu::project::starscore {
-static QByteArray driveSha1Of(const QByteArray& bytes)
-{
-    return QCryptographicHash::hash(bytes, QCryptographicHash::Sha1);
-}
-
 static QByteArray driveFileSha1(const QString& path)
 {
     QFile f(path);
@@ -42,45 +39,70 @@ static QByteArray driveFileSha1(const QString& path)
     return h.result();
 }
 
-bool replaceFileContents(const QString& src, const QString& dst, QString* error)
+// Copies src's bytes into dst itself, in 4 MB pieces (a song with recordings can be large), then cuts dst to length.
+// The hash of what was read is returned for the check.
+static bool writeInto(const QString& src, const QString& dst, QByteArray* srcHash, QString* why)
 {
-    auto fail = [error](const QString& why) {
-        if (error) {
-            *error = why;
-        }
-        LOGE() << "[starscore] " << why.toStdString();
-        return false;
-    };
-
     QFile in(src);
     if (!in.open(QIODevice::ReadOnly)) {
-        return fail(QString("couldn't read %1: %2").arg(src, in.errorString()));
+        *why = QString("couldn't read %1: %2").arg(src, in.errorString());
+        return false;
     }
-    const QByteArray bytes = in.readAll();
-    in.close();
-
     // ReadWrite: an existing file is opened as it is (not emptied first), written from the start and then cut to the
     // new length, so it's the same file all along
     QFile out(dst);
     if (!out.open(QIODevice::ReadWrite)) {
-        return fail(QString("couldn't open %1 for writing: %2").arg(dst, out.errorString()));
+        *why = QString("couldn't open %1 for writing: %2").arg(dst, out.errorString());
+        return false;
     }
-    if (out.write(bytes) != bytes.size()) {
-        return fail(QString("couldn't write %1: %2").arg(dst, out.errorString()));
+    QCryptographicHash h(QCryptographicHash::Sha1);
+    constexpr qint64 CHUNK = 4 * 1024 * 1024;
+    qint64 total = 0;
+    while (!in.atEnd()) {
+        const QByteArray piece = in.read(CHUNK);
+        if (piece.isEmpty() && in.error() != QFileDevice::NoError) {
+            *why = QString("couldn't read %1: %2").arg(src, in.errorString());
+            return false;
+        }
+        h.addData(piece);
+        if (out.write(piece) != piece.size()) {
+            *why = QString("couldn't write %1: %2").arg(dst, out.errorString());
+            return false;
+        }
+        total += piece.size();
     }
-    if (out.size() != bytes.size() && !out.resize(bytes.size())) {
-        return fail(QString("couldn't set the length of %1: %2").arg(dst, out.errorString()));
+    if (out.size() != total && !out.resize(total)) {
+        *why = QString("couldn't set the length of %1: %2").arg(dst, out.errorString());
+        return false;
     }
     out.flush();
 #ifdef Q_OS_UNIX
     ::fsync(out.handle());
 #endif
-    out.close();
-
-    if (driveFileSha1(dst) != driveSha1Of(bytes)) {
-        return fail(QString("%1 doesn't read back as what was written").arg(dst));
-    }
+    *srcHash = h.result();
     return true;
+}
+
+bool replaceFileContents(const QString& src, const QString& dst, QString* error)
+{
+    // (1.38.0) streamed, and tried a second time when the first write fails part-way (a Drive hiccup): dst is never
+    // left half-written by a single failure, and src (a local file) is kept for the caller when both fail
+    QString why;
+    for (int attempt = 1; attempt <= 2; ++attempt) {
+        QByteArray srcHash;
+        if (writeInto(src, dst, &srcHash, &why)) {
+            if (driveFileSha1(dst) == srcHash) {
+                return true;
+            }
+            why = QString("%1 doesn't read back as what was written").arg(dst);
+        }
+        LOGW() << "[starscore] writing " << dst.toStdString() << " (try " << attempt << "): " << why.toStdString();
+    }
+    if (error) {
+        *error = why;
+    }
+    LOGE() << "[starscore] " << why.toStdString() << "; the new content is kept in " << src.toStdString();
+    return false;
 }
 
 QString localSavingPath(const QString& target)
@@ -95,12 +117,38 @@ QString localSavingPath(const QString& target)
     return dir + "/" + key + " " + QFileInfo(target).fileName() + "_saving";
 }
 
+QString workingFoldersRoot()
+{
+    QString base = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+    if (base.isEmpty()) {
+        base = QDir::tempPath();
+    }
+    const QString root = base + "/Working";
+    static bool swept = false;
+    if (!swept) {
+        swept = true;
+        QDir().mkpath(root);
+        const QDateTime old = QDateTime::currentDateTime().addDays(-30);
+        for (const QFileInfo& d : QDir(root).entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+            if (d.lastModified() < old) {
+                LOGI() << "[starscore] removing an old working folder: " << d.absoluteFilePath().toStdString();
+                QDir(d.absoluteFilePath()).removeRecursively();
+            }
+        }
+    }
+    return root;
+}
+
 QString lastSavedCopyPath(const QString& songPath)
 {
     const QFileInfo fi(songPath);
     const QString folder = fi.absoluteDir().dirName();
     const QString suffix = fi.suffix().isEmpty() ? QString() : "." + fi.suffix();
-    return autosaveArchiveRoot() + "/Last Saved/" + fi.completeBaseName() + " (" + folder + ")" + suffix;
+    // (1.38.0) with a short hash of the whole folder path: two songs with the same name in folders with the same name
+    // don't share one copy
+    const QString key = QString::fromLatin1(QCryptographicHash::hash(fi.absolutePath().toUtf8(), QCryptographicHash::Sha1)
+                                            .toHex().left(6));
+    return autosaveArchiveRoot() + "/Last Saved/" + fi.completeBaseName() + " (" + folder + " " + key + ")" + suffix;
 }
 
 static SaveWatchHooks& hooks()
@@ -170,9 +218,14 @@ static QString answerKey(const DriveRemovedCopy& c)
     return c.path + "|" + QString::number(c.time.toSecsSinceEpoch()) + "|" + QString::number(c.bytes);
 }
 
-static bool answered(const DriveRemovedCopy& c)
+static QStringList answeredList()
 {
-    return QSettings().value("StarScore/driveRemoved/answered").toStringList().contains(answerKey(c));
+    return QSettings().value("StarScore/driveRemoved/answered").toStringList();
+}
+
+static bool answered(const DriveRemovedCopy& c, const QStringList& list)
+{
+    return list.contains(answerKey(c));
 }
 
 void markDriveCopyAnswered(const DriveRemovedCopy& c)
@@ -191,8 +244,9 @@ void markDriveCopyAnswered(const DriveRemovedCopy& c)
 std::vector<DriveRemovedCopy> unansweredDriveRemovedCopies()
 {
     std::vector<DriveRemovedCopy> out;
+    const QStringList list = answeredList();
     for (const DriveRemovedCopy& c : driveRemovedCopies()) {
-        if (!answered(c)) {
+        if (!answered(c, list)) {
             out.push_back(c);
         }
     }
@@ -203,8 +257,9 @@ std::optional<DriveRemovedCopy> driveRemovedCopyFor(const QString& songPath)
 {
     const QFileInfo song(songPath);
     const QString name = song.fileName();
+    const QStringList list = answeredList();
     for (const DriveRemovedCopy& c : driveRemovedCopies()) {   // newest first
-        if (QFileInfo(c.path).fileName() != name || answered(c)) {
+        if (QFileInfo(c.path).fileName() != name || answered(c, list)) {
             continue;
         }
         if (song.exists()) {
@@ -313,14 +368,17 @@ void afterSave(const QString& songPath)
     const QDateTime savedAt = QDateTime::currentDateTime();
     const QString copy = lastSavedCopyPath(songPath);
     QDir().mkpath(QFileInfo(copy).absolutePath());
-    const QString part = copy + ".part";
-    QFile::remove(part);
-    if (QFile::copy(songPath, part)) {
-        QFile::remove(copy);
-        QFile::rename(part, copy);
-    } else {
-        LOGW() << "[starscore] couldn't keep the Last Saved copy of " << songPath.toStdString();
-    }
+    // (1.38.0) copied on a background thread: a song with recordings can be large, and the save already waited for it
+    QThreadPool::globalInstance()->start([songPath, copy]() {
+        const QString part = copy + ".part-" + QUuid::createUuid().toString(QUuid::Id128).left(8);
+        QFile::remove(part);
+        if (QFile::copy(songPath, part)) {
+            QFile::remove(copy);
+            QFile::rename(part, copy);
+        } else {
+            LOGW() << "[starscore] couldn't keep the Last Saved copy of " << songPath.toStdString();
+        }
+    });
 
     if (!qApp) {
         return;

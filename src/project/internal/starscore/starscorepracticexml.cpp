@@ -285,7 +285,13 @@ QString mu::project::practice::sliceExercise(const QString& musicXml, int from, 
     if (!src.ok) {
         return QString();
     }
+    if (src.parts.empty()) {
+        return QString();
+    }
     const int n = int(childElements(src.parts.front(), "measure").size());
+    if (n == 0) {
+        return QString();   // (1.38.0) no bars: nothing to slice (the range maths below needs at least one)
+    }
     from = from <= 0 ? 1 : std::min(from, n);
     to = to <= 0 ? n : std::clamp(to, from, n);
     std::map<QString, QDomElement> newParts;

@@ -72,7 +72,23 @@ inline ModeName modeName(const muse::String& extension)
     if (s.isEmpty()) {
         return out;
     }
+    // (1.38.0) runs for every chord symbol at every layout: most aren't mode names, so a text whose first letter no
+    // name starts with is turned away before any of the names is built as a String
+    const char16_t first = s.at(0).unicode();
+    bool possible = false;
     for (const auto& [key, words] : NAMES) {
+        if (key[0] == first) {
+            possible = true;
+            break;
+        }
+    }
+    if (!possible) {
+        return out;
+    }
+    for (const auto& [key, words] : NAMES) {
+        if (key[0] != first) {
+            continue;
+        }
         const muse::String k(key);
         if (!s.startsWith(k)) {
             continue;

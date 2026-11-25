@@ -876,11 +876,14 @@ void BeamLayout::clearBeamedRestsOfNotes(System* system)
             continue;
         }
         Measure* m = toMeasure(mb);
+        // (1.38.0) a bar that no longer has a rest in a beam gives back the room it was given (it kept it for ever)
+        bool anyBeamedRest = false;
         for (Segment* seg = m->first(SegmentType::ChordRest); seg; seg = seg->next(SegmentType::ChordRest)) {
             for (EngravingItem* e : seg->elist()) {
                 if (!e || !e->isRest() || !e->visible() || !toRest(e)->beam() || toRest(e)->isGap()) {
                     continue;
                 }
+                anyBeamedRest = true;
                 Rest* rest = toRest(e);
                 const staff_idx_t restStaff = rest->vStaffIdx();
                 Shape around;
@@ -972,6 +975,9 @@ void BeamLayout::clearBeamedRestsOfNotes(System* system)
                     seg->createShape(restStaff);
                 }
             }
+        }
+        if (!anyBeamedRest && score->starscoreRestRoom().erase(m->tick().ticks())) {
+            score->setStarscoreRestRoomGrew();   // (laid out again at its own width)
         }
     }
 }

@@ -125,6 +125,7 @@ private:
     bool m_refreshing = false;
     QStringList m_scanQueue;
     size_t m_buildIndex = 0;
+    int m_buildGeneration = 0;   // (1.38.0) a stopped build's queued steps do nothing
     QString m_workDir;
     QString m_outFile;
     QString m_status;

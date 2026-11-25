@@ -635,7 +635,12 @@ void SongbookModel::refresh()
     m_refreshing = true;
     const int total = m_scanQueue.size();
     auto scanOne = std::make_shared<std::function<void()> >();
-    *scanOne = [this, total, scanOne]() {
+    std::weak_ptr<std::function<void()> > weakScan = scanOne;   // (1.38.0) not itself: that kept it alive for ever
+    *scanOne = [this, total, weakScan]() {
+        auto scanOne = weakScan.lock();
+        if (!scanOne) {
+            return;
+        }
         if (!m_refreshing) {
             return;
         }
@@ -656,6 +661,10 @@ void SongbookModel::refresh()
 void SongbookModel::cancel()
 {
     m_refreshing = false;
+    if (m_busy) {
+        ++m_buildGeneration;
+        QDir(m_workDir).removeRecursively();
+    }
     m_busy = false;
     m_status = muse::qtrc("starscore", "Stopped.");
     emit changed();
@@ -667,6 +676,7 @@ void SongbookModel::build()
         return;
     }
     const BookDef& b = bookDef(m_bookId);
+    ++m_buildGeneration;
     m_busy = true;
     m_report.clear();
     m_lastOutput.clear();
@@ -685,7 +695,12 @@ void SongbookModel::build()
                 ? outputFolder() + "/Charts/" + asciiName(m_songs.front().title) + "/" + asciiName(m_songs.front().title + " - " + b.title)
                 : outputFolder() + "/" + asciiName(m_album) + "/" + asciiName(m_album + " Songbook - " + b.instrument) + ".pdf";
     emit changed();
-    QTimer::singleShot(0, this, [this]() { step(); });
+    const int gen = m_buildGeneration;
+    QTimer::singleShot(0, this, [this, gen]() {
+        if (gen == m_buildGeneration) {
+            step();
+        }
+    });
 }
 
 void SongbookModel::step()
@@ -704,16 +719,23 @@ void SongbookModel::step()
     emit changed();
 
     // let the status show before the (slow) rendering
-    QTimer::singleShot(30, this, [this, &b]() {
+    // (1.38.0) a build stopped (or stopped and started again) in those 30 ms doesn't render into the new one
+    const int gen = m_buildGeneration;
+    QTimer::singleShot(30, this, [this, &b, gen]() {
+        if (gen != m_buildGeneration || !m_busy || m_buildIndex >= m_buildSongs.size()) {
+            return;
+        }
         const size_t songIdx = m_buildSongs[m_buildIndex];
         const Song& song = m_songs[songIdx];
         std::vector<StarScoreSongbookSheet> sheets;
         if (b.chart) {
-            deprecate(outputFolder(), m_outFile);
+            // (1.38.0) the old chart moves to Deprecated only once the new one can be made (it was moved first, and a
+            // chart that couldn't be planned left none)
             const auto planned = starScore()->songbookChartSheets(song.path, b.arrangement, b.chartTitle, m_outFile);
             if (!planned.ret) {
                 m_report += song.title + ": " + QString::fromStdString(planned.ret.toString()) + "\n";
             } else {
+                deprecate(outputFolder(), m_outFile);
                 sheets = planned.val;
             }
         } else {
@@ -732,7 +754,11 @@ void SongbookModel::step()
         }
         m_rendered.push_back(sheets);
         ++m_buildIndex;
-        QTimer::singleShot(10, this, [this]() { step(); });
+        QTimer::singleShot(10, this, [this, gen]() {
+            if (gen == m_buildGeneration) {
+                step();
+            }
+        });
     });
 }
 

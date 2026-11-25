@@ -1302,13 +1302,16 @@ void StarScoreService::respellSoloKey(engraving::Score* es, const engraving::Int
 
 void StarScoreService::scheduleSoloRefresh()
 {
-    if (m_soloRefreshQueued || !isSoloTranscription()) {
+    if (!isSoloTranscription()) {
         return;
     }
-    m_soloRefreshQueued = true;
+    // (1.38.0) 500 ms after the last edit, not every 250 ms while editing: each run respells all twelve keys
+    const int gen = ++m_soloRefreshGeneration;
     const std::function<bool()> stillCurrent = currentSongCheck();
-    QTimer::singleShot(250, &m_timerGuard, [this, stillCurrent]() {
-        m_soloRefreshQueued = false;
+    QTimer::singleShot(500, &m_timerGuard, [this, stillCurrent, gen]() {
+        if (gen != m_soloRefreshGeneration) {
+            return;
+        }
         const bool undoRedo = m_soloUndoRedo;
         m_soloUndoRedo = false;
         if (stillCurrent && !stillCurrent()) {
@@ -2917,4 +2920,13 @@ QString StarScoreService::irealChartPage(const QStringList& lines) const
     }
     d.irealEdit = lines;
     return starscore::chordChartIRealHtml(d, title, QString());
+}
+
+namespace mu::project::starscore {
+//! (1.38.0) forgotten when the song closes (StarScoreService::clearSolos): the map kept every solo ever opened, and a
+//! new score at a freed score's address got that score's styles as its baseline
+void soloForgetStyles()
+{
+    s_soloStyleBase.clear();
+}
 }

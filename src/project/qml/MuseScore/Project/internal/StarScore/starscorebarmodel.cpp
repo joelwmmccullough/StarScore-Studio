@@ -25,6 +25,9 @@
 #include "types/uri.h"
 #include "log.h"
 
+#include <QDateTime>
+#include <QTimer>
+
 using namespace mu::project;
 using namespace muse;
 
@@ -64,6 +67,8 @@ void StarScoreBarModel::refresh()
     m_sections = std::move(sections);
     m_solos = std::move(solos);
 
+    refreshFolderInfo(false);
+
     emit changed();
     if (arrangementsDiffer) {
         emit arrangementsChanged();
@@ -73,6 +78,28 @@ void StarScoreBarModel::refresh()
     }
     if (solosDiffer) {
         emit solosChanged();
+    }
+}
+
+void StarScoreBarModel::refreshFolderInfo(bool force)
+{
+    const QString key = starScore()->mainProjectPath().toQString() + "|" + starScore()->songCode() + "|"
+                        + (starScore()->isSoloTranscription() ? "solo" : "") + (isSoloView() ? "|view" : "");
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    if (!force && !m_folderInfoDirty && key == m_folderInfoKey && now - m_folderInfoAt < 30000) {
+        return;
+    }
+    m_folderInfoKey = key;
+    m_folderInfoAt = now;
+    m_folderInfoDirty = false;
+    QVariantMap info = readSoloInfo();
+    QVariantList tied = readTiedSolos();
+    QVariantList audio = readAudioFiles();
+    if (info != m_soloInfo || tied != m_tiedSolos || audio != m_audioFiles) {
+        m_soloInfo = std::move(info);
+        m_tiedSolos = std::move(tied);
+        m_audioFiles = std::move(audio);
+        emit folderInfoChanged();
     }
 }
 
@@ -204,7 +231,7 @@ bool StarScoreBarModel::isSoloTranscription() const
     return starScore()->isSoloTranscription();
 }
 
-QVariantMap StarScoreBarModel::soloInfo() const
+QVariantMap StarScoreBarModel::readSoloInfo() const
 {
     const QJsonObject info = starScore()->soloTranscriptionInfo();
     if (info.isEmpty()) {
@@ -259,7 +286,7 @@ QVariantList StarScoreBarModel::soloKeysMenu() const
     return items;
 }
 
-QVariantList StarScoreBarModel::audioFiles() const
+QVariantList StarScoreBarModel::readAudioFiles() const
 {
     return starScore()->scoreAudioFiles(starScore()->mainProjectPath().toQString()).toVariantList();
 }
@@ -291,7 +318,7 @@ QVariantList StarScoreBarModel::audioFileMenu(const QVariantMap& item) const
     return menu;
 }
 
-QVariantList StarScoreBarModel::tiedSolos() const
+QVariantList StarScoreBarModel::readTiedSolos() const
 {
     QVariantList list;
     if (starScore()->isSoloTranscription() || isSoloView()) {
@@ -736,7 +763,7 @@ QVariantList StarScoreBarModel::moreMenu() const
         return QVariantMap { { "id", id }, { "title", title }, { "enabled", enabled } };
     };
     if (starScore()->isSoloTranscription()) {
-        const QVariantMap info = soloInfo();
+        const QVariantMap info = readSoloInfo();
         return {
             item("export-band", muse::qtrc("starscore", "Export and Organize… (the twelve keys' sheets)")),
             item("chord-chart", muse::qtrc("starscore", "Edit the iReal Pro chord chart…")),
@@ -975,6 +1002,9 @@ QString StarScoreBarModel::askTwoTrumpetSources()
 
 void StarScoreBarModel::handleMenuItem(const QString& itemId)
 {
+    // (1.38.0) an action here may add or remove recordings or solos: read again once it's done
+    m_folderInfoDirty = true;
+    QTimer::singleShot(0, this, [this]() { refreshFolderInfo(true); });
     const int colon = itemId.indexOf(':');
     const QString action = colon >= 0 ? itemId.left(colon) : itemId;
     const QString arg = colon >= 0 ? itemId.mid(colon + 1) : QString();
@@ -1343,12 +1373,12 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
     } else if (action == "solo-open-file") {
         dispatcher()->dispatch("file-open", muse::actions::ActionData::make_arg1<QUrl>(QUrl::fromLocalFile(arg)));
     } else if (action == "solo-open-tied") {
-        const QString path = soloInfo().value("tiedSongPath").toString();
+        const QString path = readSoloInfo().value("tiedSongPath").toString();
         if (!path.isEmpty()) {
             dispatcher()->dispatch("file-open", muse::actions::ActionData::make_arg1<QUrl>(QUrl::fromLocalFile(path)));
         }
     } else if (action == "solo-open-link") {
-        const QString link = soloInfo().value("link").toString();
+        const QString link = readSoloInfo().value("link").toString();
         if (!link.isEmpty()) {
             QDesktopServices::openUrl(QUrl::fromUserInput(link));
         }

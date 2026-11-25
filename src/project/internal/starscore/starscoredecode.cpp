@@ -152,9 +152,19 @@ bool decodeAiff(const QByteArray& b, DecodedAudio& out)
                 little = std::memcmp(d + p + 26, "sowt", 4) == 0;
             }
         } else if (std::memcmp(d + p, "SSND", 4) == 0 && ch > 0) {
+            // (1.38.0) a damaged or unusual file can't divide by zero or read outside the data
+            if (bits < 8 || p + 16 > n) {
+                return false;
+            }
             const quint32 offset = be32(d + p + 8);
             const qint64 start = p + 16 + offset;
+            if (start > n) {
+                return false;
+            }
             const qint64 len = std::min<qint64>(qint64(size) - 8 - offset, n - start);
+            if (len <= 0) {
+                return false;
+            }
             out.sampleRate = int(std::lround(rate));
             pcmToFloat(d + start, len / (ch * (bits / 8)), ch, bits, isFloat, !little, out);
             return true;

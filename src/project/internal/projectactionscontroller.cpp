@@ -168,7 +168,18 @@ void ProjectActionsController::init()
             QDir().mkpath(dir);
             const QString copy = dir + "/" + fi.fileName();
             if (!QFileInfo::exists(copy)) {
-                mu::project::starscore::zip::copyWithoutMedia(path, copy);   // (1.26.0: its recordings stay in the song)
+                // (1.38.0) written under a temporary name and checked: a failed copy stops the standardizing (it went
+                // ahead with no copy), and a half-written one isn't taken for a good one next time
+                const QString part = copy + ".part";
+                QFile::remove(part);
+                if (!mu::project::starscore::zip::copyWithoutMedia(path, part)   // (1.26.0: its recordings stay in the song)
+                    || !mu::project::starscore::zip::Reader(part).ok() || !QFile::rename(part, copy)) {
+                    QFile::remove(part);
+                    interactive()->error(muse::trc("starscore", "Standardize this song"),
+                                         muse::qtrc("starscore", "The song couldn't be copied to Version History first, so "
+                                                                 "nothing was changed:\n\n%1").arg(copy).toStdString());
+                    return;
+                }
             }
         }
         const QStringList done = starScoreService()->standardizeSong(true);

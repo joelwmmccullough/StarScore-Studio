@@ -1828,7 +1828,7 @@ int StarScoreService::labelPartBooks()
     // part score by part: one instrument, preferably the one named like the part
     std::map<QString, IExcerptNotationPtr> bookForPart;
     for (const IExcerptNotationPtr& e : master->excerpts()) {
-        INotationPtr n = e->notation();
+        INotationPtr n = e ? e->notation() : nullptr;
         engraving::Score* es = n && n->elements() ? n->elements()->msScore() : nullptr;
         if (!es || es->parts().size() != 1) {
             continue;

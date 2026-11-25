@@ -381,7 +381,7 @@ QString applyAdditiveTimeSig(MasterScore* score, Measure* start, Measure* last, 
             return QString("Each number must be between 1 and 64");
         }
     }
-    if (denominator & (denominator - 1)) {
+    if (denominator <= 0 || denominator > 64 || (denominator & (denominator - 1))) {
         return QString("The bottom number must be 1, 2, 4, 8, 16, 32 or 64");
     }
 
