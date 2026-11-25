@@ -103,7 +103,9 @@ Rectangle {
                 visible: chip.showCheck
                 anchors.verticalCenter: parent.verticalCenter
                 iconCode: chip.active ? IconCode.EYE_OPEN : IconCode.EYE_CLOSED
-                color: chip.active ? ui.theme.fontPrimaryColor : ui.theme.fontSecondaryColor
+                // (1.38.0) the closed eye in the main text colour, a little lighter (the secondary colour was too faint)
+                color: ui.theme.fontPrimaryColor
+                opacity: chip.active ? 1.0 : 0.6
             }
 
             Rectangle {
@@ -664,7 +666,8 @@ Rectangle {
             StyledTextLabel {
                 Layout.preferredWidth: 118
                 horizontalAlignment: Text.AlignLeft
-                color: ui.theme.fontSecondaryColor
+                color: ui.theme.fontPrimaryColor
+                opacity: 0.7
                 text: qsTrc("starscore", "Hidden:")
             }
 

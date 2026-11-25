@@ -22,6 +22,8 @@
 
 #include "headerfooterlayout.h"
 
+#include <cmath>
+
 #include "dom/factory.h"
 #include "dom/masterscore.h"
 #include "dom/mscore.h"
@@ -176,11 +178,11 @@ void HeaderFooterLayout::layoutHeaderFooter(LayoutContext& ctx, Page* page)
             const double width = page->width() - page->lm() - page->rm();
             const double gap = 2.0 * page->spatium();
             double side = 0.0;
-            size_t sideRows = 0;
+            double sideHeight = 0.0;
             for (int area : { 0, 2 }) {
                 if (const Text* t = page->footerText(area)) {
                     side = std::max(side, t->ldata()->bbox().width());
-                    sideRows = std::max(sideRows, t->ldata()->rows());
+                    sideHeight = std::max(sideHeight, t->ldata()->bbox().height());
                 }
             }
             bool placed = false;
@@ -194,8 +196,15 @@ void HeaderFooterLayout::layoutHeaderFooter(LayoutContext& ctx, Page* page)
                     s_copyrightOverride = &wrapped;
                     String text = centre;
                     if (raised) {
-                        for (size_t i = 0; i < sideRows; ++i) {
-                            text += u"\n";   // (empty lines under it, as many as the side texts have)
+                        // empty lines under it, enough to clear the side texts' height (1.38.0: by height, not by their
+                        // number of lines: a footnote with a time signature in it has a taller line)
+                        createUpdateFooterText(ctx, page, 1, text);
+                        const Text* plain = page->footerText(1);
+                        const size_t rows = plain ? std::max<size_t>(1, plain->ldata()->rows()) : 1;
+                        const double lineHeight = plain ? plain->ldata()->bbox().height() / double(rows) : 0.0;
+                        const int pads = lineHeight > 0.0 ? int(std::ceil(sideHeight / lineHeight - 0.05)) : 1;
+                        for (int i = 0; i < pads; ++i) {
+                            text += u"\n";
                         }
                     }
                     createUpdateFooterText(ctx, page, 1, text);

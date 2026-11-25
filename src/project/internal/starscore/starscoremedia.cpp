@@ -1162,7 +1162,7 @@ bool StarScoreService::autotestMediaStep(const QString& step)
             removed += QFile::remove(referencePath(ref.id).toQString()) ? 1 : 0;
         }
         mediaTestLog(QString("  working copies removed: %1 (working folder in %2)").arg(removed)
-                     .arg(m_workDir.startsWith(QDir::tempPath()) ? "the temporary folder" : "StarScore's own folder"));
+                     .arg(m_workDir.startsWith(starscore::workingFoldersRoot()) ? "StarScore's own folder" : "the temporary folder"));
         return true;
     }
     if (step == "mediaunsaved") {
