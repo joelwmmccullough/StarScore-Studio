@@ -202,7 +202,13 @@ void HeaderFooterLayout::layoutHeaderFooter(LayoutContext& ctx, Page* page)
                         const Text* plain = page->footerText(1);
                         const size_t rows = plain ? std::max<size_t>(1, plain->ldata()->rows()) : 1;
                         const double lineHeight = plain ? plain->ldata()->bbox().height() / double(rows) : 0.0;
-                        const int pads = lineHeight > 0.0 ? int(std::ceil(sideHeight / lineHeight - 0.05)) : 1;
+                        int pads = lineHeight > 0.0 ? int(std::ceil(sideHeight / lineHeight - 0.05)) : 1;
+                        // (the raised digits of a time signature in a footnote reach above what its line's box says)
+                        if (const Text* l = page->footerText(0)) {
+                            for (const String& line : l->xmlText().split(u'\n')) {
+                                pads += line.contains(u"StarScore TimeSig") ? 1 : 0;
+                            }
+                        }
                         for (int i = 0; i < pads; ++i) {
                             text += u"\n";
                         }
