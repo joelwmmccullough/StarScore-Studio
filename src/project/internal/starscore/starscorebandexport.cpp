@@ -6622,7 +6622,29 @@ RetVal<QString> StarScoreService::exportSoloSheets()
                     return;
                 }
                 QDir().mkpath(folder);
-                QSaveFile out(folder + "/" + file);
+                const QString path = folder + "/" + file;
+                // (1.38.0) a sheet already there: left alone when it's the same, else kept in the solo's Version History
+                // first (it was overwritten, unlike every other sheet StarScore replaces)
+                if (QFileInfo::exists(path)) {
+                    if (starscoreSamePdf(bytes, path)) {   // the same pages (the bytes differ in ways that don't show)
+                        ++written;
+                        return;
+                    }
+                    const QString soloRoot = QFileInfo(sheets).absolutePath();
+                    QString kept = soloRoot + "/Version History/" + QDate::currentDate().toString("yyyy-MM-dd") + " Superseded/"
+                                   + QDir(soloRoot).relativeFilePath(path);
+                    QDir().mkpath(QFileInfo(kept).absolutePath());
+                    const QString base = kept.left(kept.length() - 4);
+                    for (int i = 2; QFileInfo::exists(kept); ++i) {
+                        kept = QString("%1 (%2).pdf").arg(base).arg(i);
+                    }
+                    if (!QFile::copy(path, kept)) {
+                        problems << muse::qtrc("starscore", "%1: the sheet already there couldn't be kept in Version History, "
+                                                            "so it was left as it was").arg(file);
+                        return;
+                    }
+                }
+                QSaveFile out(path);
                 if (!out.open(QIODevice::WriteOnly) || out.write(bytes) != bytes.size() || !out.commit()) {
                     problems << muse::qtrc("starscore", "%1: couldn't be written").arg(file);
                     return;

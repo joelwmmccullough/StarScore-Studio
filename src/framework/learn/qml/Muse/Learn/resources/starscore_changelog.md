@@ -4,6 +4,26 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.38.0
+- **Hiding panel rows: an eye beside each row.** Each of the StarScore panel's rows (Arrangements, Sections, Progress, Audio, Solos) has an eye before its name: click it to hide the row. Hidden rows are listed on a "Hidden:" line at the bottom of the panel; click one to show it again. The "Rows in this panel" menu and the right-clicks are gone.
+- **Solos, reference PDFs and recordings can no longer drop out of a song when it's saved.** StarScore keeps working copies of them while a song is open. These were in the system's temporary folder, which macOS empties of files it thinks are old, so a song left open for days could lose them at the next save. The working copies are now kept in StarScore's own folder. A missing one is taken from the song file again before the save. If one still can't be found, the save stops with a message instead of leaving it out.
+- **Saving a song that has solos, PDFs or recordings no longer renames a new file over it.** That was the same kind of file swap that could make Google Drive take the song away (1.37.0). The song is now written in place. Writing in place is also more careful: it's done in pieces and tried a second time if it fails part-way.
+- **The StarScore Deco font now loads.** Its built-in files were never registered, so it failed on every start ("cannot load internal font").
+- **Faster editing:**
+  - The panel no longer reads your Google Drive folders (the song's solo transcriptions, its recordings) after every edit. It reads them when the song changes, after a panel action, and every 30 seconds.
+  - A solo transcription updates its twelve keys half a second after you stop editing, instead of every quarter second while you edit.
+  - Chord symbols that aren't mode names are now skipped quickly.
+  - Saves no longer read the whole song an extra time for the Autosave Archive, and the Last Saved copy is made in the background.
+- **Fixes:**
+  - Listen: loading another song while recordings were still loading could crash it, and a recording that failed to load left Listen stuck.
+  - A bar widened to make room for a rest inside a beam stays that wide only while it has one.
+  - Songbook charts: the old chart moves to Deprecated only once the new one can be made. Stopping a build and starting again right away no longer runs two builds at once.
+  - Standardize: if the song can't be copied to Version History first, nothing is changed.
+  - Additive time signatures: one that fails part-way is undone instead of kept half-done. A bottom number above 64 is refused.
+  - Solo transcription export: a key sheet that changed is now kept in the solo's Version History before it's replaced, like every other sheet. An unchanged one is left alone.
+  - Damaged files: a damaged song, recording (AIFF) or Autosave Archive history is now refused instead of crashing StarScore.
+  - Last Saved copies now include a short code for their folder, so two songs with the same name in same-named folders don't share one.
+
 ## 1.37.0
 - **Saving no longer makes Google Drive pull the song out of its folder.** On 23 Nov 2026, cisu2.starscore disappeared from its folder right after a save and turned up in Google Drive's own "canceled_uploads" folder (~/Library/Application Support/Google/DriveFS). Saving (from MuseScore) deleted the song file and wrote a new file under the same name, and wrote and deleted a temporary "_saving" file beside it. Google Drive can take that as a new file and cancel its upload, and then it moves the file out of the folder.
   - Now the temporary file is written in a local folder, and the song file is overwritten in place: it is never deleted. The hidden backup in .mscbackup and the 5-minute autosave are written the same way.
