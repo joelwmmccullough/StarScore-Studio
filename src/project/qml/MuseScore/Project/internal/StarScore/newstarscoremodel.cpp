@@ -170,7 +170,7 @@ bool NewStarScoreModel::create(const QVariantMap& o)
     options.timeSigNumerator = o.value("timeSigNumerator", 4).toInt();
     options.timeSigDenominator = o.value("timeSigDenominator", 4).toInt();
     options.tempoBpm = o.value("tempoBpm", 120).toInt();
-    options.measures = o.value("measures", 32).toInt();
+    options.measures = o.value("measures", 512).toInt();
     options.arrangementTemplateKey = o.value("arrangementTemplateKey", "3-horn-standard").toString();
     // only the choices the arrangement has: a doubler for Standard 3+ horns, a 7th horn for 7-Horn Standard
     if (hasDoubler(options.arrangementTemplateKey)) {
@@ -347,7 +347,7 @@ bool NewStarScoreModel::createSolo(const QVariantMap& o, bool convert)
     options.timeSigNumerator = o.value("timeSigNumerator", 4).toInt();
     options.timeSigDenominator = o.value("timeSigDenominator", 4).toInt();
     options.tempoBpm = o.value("tempoBpm", 120).toInt();
-    options.measures = o.value("measures", 32).toInt();
+    options.measures = o.value("measures", 512).toInt();
 
     const muse::Ret ret = convert ? starScore()->convertToSoloTranscription(options) : starScore()->newSoloTranscription(options);
     if (!ret) {

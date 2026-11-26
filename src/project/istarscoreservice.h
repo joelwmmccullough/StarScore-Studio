@@ -214,7 +214,7 @@ struct StarScoreNewOptions
     int timeSigNumerator = 4;
     int timeSigDenominator = 4;
     int tempoBpm = 120;
-    int measures = 32;
+    int measures = 512;
     QString arrangementTemplateKey = "3-horn-standard";
     //! Standard sections of 3 or more horns: what the woodwind doubler plays (a doublerChoices() instrument id).
     //! It takes the alto saxophone chair in the 3/4/5-Horn sections and the soprano saxophone chair in 6/7-Horn.
@@ -241,7 +241,7 @@ struct StarScoreSoloTranscriptionOptions
     int timeSigNumerator = 4;
     int timeSigDenominator = 4;
     int tempoBpm = 120;
-    int measures = 32;
+    int measures = 512;
     //! With a song open in this window the new file is made and saved on its own, then opened (in a window of its
     //! own); true (the autotest) makes it this window's score instead
     bool replaceOpenScore = false;

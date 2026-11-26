@@ -110,7 +110,7 @@ void AdditionalInfoModel::init()
     setTempo(defaultTempo.toMap());
 
     setWithPickupMeasure(false);
-    setMeasureCount(32);
+    setMeasureCount(512);   // StarScore (1.41.0, Joel: 512 bars for every new score)
     setPickupTimeSignature(DEFAULT_PICKUP_TIME_SIGNATURE);
 }
 

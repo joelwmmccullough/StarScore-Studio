@@ -34,8 +34,9 @@ StyledDialogView {
     property string scoreTitle: ""
     // what the song is (Joel, 19 Oct 2026): where it's filed in Projects and Sheets, and a vocal cover gets a Voice part
     property string songKind: "original"
-    property string subtitle: ""
-    property string composer: ""
+    // (1.41.0, Joel 26 Nov 2026) a new Starsign score's defaults
+    property string subtitle: "Starsign"
+    property string composer: "Joel McCullough"
     property int keyFifths: 0
     property int timeNum: 4
     property int timeDen: 4
@@ -53,7 +54,7 @@ StyledDialogView {
         var name = names[Math.min(16, Math.max(1, value))] || qsTrc("starscore", "16th")
         return qsTrc("starscore", "Tempo (%1 =)").arg(dotted ? qsTrc("starscore", "dotted %1").arg(name) : name)
     }
-    property int measures: 32
+    property int measures: 512   // (1.41.0, Joel: 512 bars for every new score)
     // the last choices, remembered in settings
     property string arrangementKey: newModel.lastArrangementKey
     property string doublerId: newModel.lastDoublerId
@@ -290,6 +291,7 @@ StyledDialogView {
         TextInputField {
             Layout.fillWidth: true
             hint: qsTrc("starscore", "Subtitle (optional)")
+            currentText: root.subtitle
             onTextEdited: function(t) { root.subtitle = t }
             onAccepted: root.create()
         }
@@ -298,6 +300,7 @@ StyledDialogView {
         TextInputField {
             Layout.fillWidth: true
             hint: qsTrc("starscore", "Composer")
+            currentText: root.composer
             onTextEdited: function(t) { root.composer = t }
             onAccepted: root.create()
         }
