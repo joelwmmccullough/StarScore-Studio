@@ -506,28 +506,32 @@ const std::vector<const ChordDescription*> Harmony::parseHarmony(const String& s
     }
 
     // StarScore (1.41.0, Joel 26 Nov 2026: "I want to be able to write an E/D/C (where E and D are triads but C is a bass
-    // note)") Typed with slashes: the note after the last slash is the bass, and every earlier slash that comes before a
-    // note stacks one chord on the next, as "|" does: "E/D/C" = E over D, C in the bass ("E|D/C"); "E/D" stays E with D in
-    // the bass. A slash not followed by a note ("C6/9") is part of the chord.
-    if (m_harmonyType == HarmonyType::STANDARD && !s.contains(u'|')) {
+    // note)") A slash before a note means the bass only after the bottom chord: the note after the last slash is the bass,
+    // and every other slash that comes before a note stacks one chord on the next, as "|" does. "E/D/C" = "E|D/C" = E
+    // over D, C in the bass; "Bb/Ab|D/C" = Bb over Ab over D, C in the bass; "E/D" stays E with D in the bass; "E|D" is
+    // E over D. A slash not followed by a note ("C6/9", "Cadd9", "/alt") is part of the chord.
+    if (m_harmonyType == HarmonyType::STANDARD) {
         std::vector<size_t> noteSlashes;
+        size_t lastBar = 0;
+        bool hasBar = false;
         for (size_t i = 0; i + 1 < s.size(); ++i) {
+            if (s.at(i) == u'|') {
+                lastBar = i;
+                hasBar = true;
+                continue;
+            }
             const char16_t next = s.at(i + 1).unicode();
-            // (a lowercase note, but not "/add9" or "/alt")
             const bool word = s.mid(i + 1, 3) == u"add" || s.mid(i + 1, 3) == u"alt";
             if (s.at(i) == u'/' && ((next >= u'A' && next <= u'G') || (next >= u'a' && next <= u'g' && !word))) {
                 noteSlashes.push_back(i);
             }
         }
-        if (noteSlashes.size() >= 2) {
-            String stacked;
-            size_t from = 0;
-            for (size_t k = 0; k + 1 < noteSlashes.size(); ++k) {
-                stacked += s.mid(from, noteSlashes[k] - from) + u"|";
-                from = noteSlashes[k] + 1;
-            }
-            stacked += s.mid(from);
-            s = stacked;
+        // the last note slash is the bass when it's in the bottom chord (after the last "|")
+        if (!noteSlashes.empty() && (!hasBar || noteSlashes.back() > lastBar)) {
+            noteSlashes.pop_back();
+        }
+        for (size_t i : noteSlashes) {
+            s = s.left(i) + u"|" + s.mid(i + 1);
         }
     }
 
