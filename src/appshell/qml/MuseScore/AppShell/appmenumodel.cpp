@@ -384,24 +384,30 @@ MenuItem* AppMenuModel::makeFormatMenu()
     MenuItemList formatItems {
         makeMenuItem("edit-style"),
         makeMenuItem("page-settings"),
-        makeMenuItem("starscore-layout-to"),
-        makeMenuItem("starscore-additive-timesig"),
-        makeMenuItem("starscore-convert-double-time"),
-        makeMenuItem("starscore-standardize"),
-        makeMenuItem("starscore-add-solo"),
-        makeMenuItem("starscore-part-mutes"),
-        makeMenuItem("starscore-part-flugelhorn"),
-        makeMenuItem("starscore-rhythm-above"),
-        makeMenuItem("starscore-rhythm-below"),
-        makeMenuItem("starscore-rhythm-normal"),
-        makeMenuItem("starscore-make-keys"),
-        makeMenuItem("starscore-compare-parts"),
-        makeMenuItem("starscore-voice-order"),
-        makeMenuItem("starscore-audit-library"),
-        makeMenuItem("starscore-toggle-minmaj"),
-        makeMenuItem("starscore-check-ranges"),
-        makeMenuItem("starscore-color-notes"),
-        makeMenuItem("starscore-uncolor-notes"),
+        // (1.40.0) StarScore's own items in one submenu (they were 17 lines of this menu), grouped
+        makeMenu(TranslatableString("appshell/menu/format", "StarScore"), {
+            makeMenuItem("starscore-layout-to"),
+            makeMenuItem("starscore-part-styles"),
+            makeMenuItem("starscore-apply-styles"),
+            makeMenuItem("starscore-toggle-deco"),
+            makeSeparator(),
+            makeMenuItem("starscore-additive-timesig"),
+            makeMenuItem("starscore-convert-double-time"),
+            makeMenuItem("starscore-rhythm-above"),
+            makeMenuItem("starscore-rhythm-below"),
+            makeMenuItem("starscore-rhythm-normal"),
+            makeSeparator(),
+            makeMenuItem("starscore-part-mutes"),
+            makeMenuItem("starscore-part-flugelhorn"),
+            makeMenuItem("starscore-toggle-minmaj"),
+            makeMenuItem("starscore-make-keys"),
+            makeMenuItem("starscore-add-solo"),
+            makeSeparator(),
+            makeMenuItem("starscore-color-notes"),
+            makeMenuItem("starscore-uncolor-notes"),
+            makeSeparator(),
+            makeMenuItem("starscore-standardize"),
+        }, "menu-starscore-format"),
         makeSeparator(),
         makeMenuItem("measures-per-system"),
         makeMenu(TranslatableString("appshell/menu/format", "Str&etch"), stretchItems, "menu-stretch"),
@@ -413,8 +419,6 @@ MenuItem* AppMenuModel::makeFormatMenu()
         makeSeparator(),
         makeMenuItem("load-style"),
         makeMenuItem("save-style"),
-        // with Load and Save style (Joel, 7 Oct 2026)
-        makeMenuItem("starscore-part-styles")
     };
 
     return makeMenu(TranslatableString("appshell/menu/format", "F&ormat"), formatItems, "menu-format");
@@ -443,6 +447,14 @@ MenuItem* AppMenuModel::makeToolsMenu()
     };
 
     MenuItemList toolsItems {
+        // (1.40.0) StarScore's checks, also buttons in the Audit panel
+        makeMenu(TranslatableString("appshell/menu/tools", "StarScore checks"), {
+            makeMenuItem("starscore-compare-parts"),
+            makeMenuItem("starscore-voice-order"),
+            makeMenuItem("starscore-check-ranges"),
+            makeMenuItem("starscore-audit-library"),
+        }, "menu-starscore-checks"),
+        makeSeparator(),
         makeMenuItem("transpose"),
         makeSeparator(),
         makeMenuItem("explode"),

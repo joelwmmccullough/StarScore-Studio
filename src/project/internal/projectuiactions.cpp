@@ -233,6 +233,18 @@ const UiActionList ProjectUiActions::m_actions = {
              TranslatableString("action", "Make the selected rhythm markings normal notes again: normal size, played, normal "
                                           "heads, at their own pitch")
              ),
+    UiAction("starscore-toggle-deco",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "StarScore Deco font on/off"),
+             TranslatableString("action", "The art-deco look for the whole song: its music font and text styles")
+             ),
+    UiAction("starscore-apply-styles",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Apply default style settings now"),
+             TranslatableString("action", "Put the default style settings on every part score now")
+             ),
     UiAction("starscore-make-keys",
              mu::context::UiCtxProjectOpened,
              mu::context::CTX_ANY,

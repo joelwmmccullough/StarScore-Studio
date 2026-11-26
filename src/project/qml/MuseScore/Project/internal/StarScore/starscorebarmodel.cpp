@@ -419,28 +419,43 @@ QVariantList StarScoreBarModel::statusSubmenu(const QString& prefix, int current
     return items;
 }
 
-QVariantList StarScoreBarModel::arrangementMenu(const QString& id) const
+//! (1.40.0) The section chip's dot: its Status and Parts submenus as one menu
+QVariantList StarScoreBarModel::sectionStatusMenu(const QString& id) const
 {
-    // Move left / right only where there's somewhere to move to
-    int index = -1;
-    const auto arrangements = starScore()->arrangements();
-    for (size_t i = 0; i < arrangements.size(); ++i) {
-        if (arrangements[i].id == id) {
-            index = int(i);
+    QVariantList out;
+    for (const QVariant& v : sectionMenu(id)) {
+        const QVariantMap m = v.toMap();
+        const QString title = m.value("title").toString();
+        if (title == muse::qtrc("starscore", "Status")) {
+            out << m.value("subitems").toList();
+        } else if (title == muse::qtrc("starscore", "Parts") && m.value("enabled").toBool()) {
+            out << QVariantMap {};
+            out << m;
         }
     }
-    const bool canLeft = index > 0;
-    const bool canRight = index >= 0 && index + 1 < int(arrangements.size());
+    return out;
+}
+
+void StarScoreBarModel::moveArrangementTo(const QString& id, int index)
+{
+    starScore()->moveArrangement(id, index);
+}
+
+void StarScoreBarModel::moveSectionTo(const QString& id, int index)
+{
+    starScore()->moveSection(id, index);
+}
+
+QVariantList StarScoreBarModel::arrangementMenu(const QString& id) const
+{
+    // (1.40.0) moved by dragging the chip, renamed by double-clicking it
     return {
         QVariantMap { { "id", "arr-show:" + id }, { "title", muse::qtrc("starscore", "Show this arrangement") }, { "enabled", true } },
         QVariantMap { { "id", "arr-score:" + id }, { "title", muse::qtrc("starscore", "Open this arrangement's score") }, { "enabled", true } },
         QVariantMap {},
         QVariantMap { { "id", "arr-edit:" + id }, { "title", muse::qtrc("starscore", "Choose sections…") }, { "enabled", true } },
-        QVariantMap { { "id", "arr-rename:" + id }, { "title", muse::qtrc("starscore", "Rename…") }, { "enabled", true } },
+        QVariantMap { { "id", "arr-rename:" + id }, { "title", muse::qtrc("starscore", "Rename… (or double-click)") }, { "enabled", true } },
         QVariantMap { { "id", "arr-export:" + id }, { "title", muse::qtrc("starscore", "Export as MuseScore file (.mscz)…") }, { "enabled", true } },
-        QVariantMap {},
-        QVariantMap { { "id", "arr-left:" + id }, { "title", muse::qtrc("starscore", "Move left") }, { "enabled", canLeft } },
-        QVariantMap { { "id", "arr-right:" + id }, { "title", muse::qtrc("starscore", "Move right") }, { "enabled", canRight } },
         QVariantMap {},
         QVariantMap { { "id", "arr-delete:" + id }, { "title", muse::qtrc("starscore", "Delete arrangement (keeps its sections)") }, { "enabled", true } },
     };
@@ -448,14 +463,6 @@ QVariantList StarScoreBarModel::arrangementMenu(const QString& id) const
 
 QVariantList StarScoreBarModel::sectionMenu(const QString& id) const
 {
-    int sectionIndex = -1;
-    const auto allSections = starScore()->sections();
-    const int sectionCount = int(allSections.size());
-    for (int i = 0; i < sectionCount; ++i) {
-        if (allSections[size_t(i)].id == id) {
-            sectionIndex = i;
-        }
-    }
     int status = 0;
     bool rhythm = false;
     bool autoStatus = false;
@@ -520,6 +527,13 @@ QVariantList StarScoreBarModel::sectionMenu(const QString& id) const
         for (QVariant& v : statusSubmenu("part-status:" + pid + ":", current, false)) {
             tagItems << v;
         }
+        // (1.40.0) the part's own things, from the old "…" › This part: its mutes (brass)
+        const QString inst = instruments.count(pid) ? instruments[pid] : QString();
+        if (inst.contains("trumpet") || inst.contains("trombone") || inst.contains("flugelhorn") || inst.contains("cornet")
+            || inst.contains("horn") || inst.contains("tuba")) {
+            tagItems << QVariantMap {};
+            tagItems << QVariantMap { { "id", "part-mutes-for:" + pid }, { "title", muse::qtrc("starscore", "Mutes…") }, { "enabled", true } };
+        }
         partItems << QVariantMap { { "title", title }, { "subitems", tagItems }, { "enabled", true } };
     }
     if (rhythm) {
@@ -551,19 +565,22 @@ QVariantList StarScoreBarModel::sectionMenu(const QString& id) const
         QVariantMap { { "id", "sec-solo:" + id }, { "title", muse::qtrc("starscore", "Show only this section") }, { "enabled", true } },
         QVariantMap { { "title", muse::qtrc("starscore", "Status") }, { "subitems", statusItems },
                       { "enabled", true } },
-        QVariantMap { { "title", muse::qtrc("starscore", "Part status") }, { "subitems", partItems },
+        QVariantMap { { "title", muse::qtrc("starscore", "Parts") }, { "subitems", partItems },
                       { "enabled", !partItems.isEmpty() } },
         QVariantMap {},
         QVariantMap { { "id", "sec-edit:" + id }, { "title", muse::qtrc("starscore", "Choose instruments…") }, { "enabled", true } },
-        QVariantMap { { "id", "sec-rename:" + id }, { "title", muse::qtrc("starscore", "Rename…") }, { "enabled", true } },
-        QVariantMap { { "id", "sec-left:" + id }, { "title", muse::qtrc("starscore", "Move left") }, { "enabled", sectionIndex > 0 } },
-        QVariantMap { { "id", "sec-right:" + id }, { "title", muse::qtrc("starscore", "Move right") }, { "enabled", sectionIndex >= 0 && sectionIndex + 1 < sectionCount } },
+        QVariantMap { { "id", "sec-rename:" + id }, { "title", muse::qtrc("starscore", "Rename… (or double-click)") }, { "enabled", true } },
         QVariantMap {},
         QVariantMap { { "id", "sec-delete:" + id }, { "title", muse::qtrc("starscore", "Delete section (keeps its instruments)") },
                       { "enabled", true } },
         QVariantMap { { "id", "sec-delete-all:" + id }, { "title", muse::qtrc("starscore", "Delete section and its instruments") },
                       { "enabled", true } },
     };
+    // (1.40.0) the rhythm section's keyboard parts combined, from the old "…" › This part
+    if (rhythm) {
+        items.insert(4, QVariantMap { { "id", "make-keys" }, { "title", muse::qtrc("starscore", "Combine keyboard parts into a Keys part") },
+                                      { "enabled", true } });
+    }
     // Flexible sections: any of their sheets made into a part of its own, to edit by hand
     QVariantList flexItems;
     for (const StarScoreFlexibleSheet& sheet : starScore()->flexibleSheets(id)) {
@@ -712,53 +729,17 @@ QVariantList StarScoreBarModel::addSectionMenu() const
     items << QVariantMap { { "id", "sec-new-custom" }, { "title", muse::qtrc("starscore", "New instruments…") }, { "enabled", true } };
     items << QVariantMap { { "id", "sec-new-existing" }, { "title", muse::qtrc("starscore", "From instruments already in the score…") },
                            { "enabled", true } };
+    // (1.40.0) from the old "…" › Sections
+    items << QVariantMap {};
+    items << QVariantMap { { "id", "detect" }, { "title", muse::qtrc("starscore", "Make sections from existing part scores") },
+                           { "enabled", true } };
+    items << QVariantMap { { "id", "sync-scores" }, { "title", muse::qtrc("starscore", "Make / update arrangement scores") },
+                           { "enabled", true } };
     return items;
 }
 
 QVariantList StarScoreBarModel::moreMenu() const
 {
-    // Reference PDFs (e.g. the original chart of a cover), kept inside the .starscore
-    QVariantList refItems;
-    refItems << QVariantMap { { "id", "ref-add" }, { "title", muse::qtrc("starscore", "Add reference PDF…") }, { "enabled", true } };
-    const std::vector<StarScoreReference> refs = starScore()->references();
-    if (!refs.empty()) {
-        refItems << QVariantMap {};
-    }
-    for (const StarScoreReference& r : refs) {
-        refItems << QVariantMap {
-            { "title", r.name }, { "enabled", true },
-            { "subitems", QVariantList {
-                  QVariantMap { { "id", "ref-open:" + r.id }, { "title", muse::qtrc("starscore", "Show beside the score") },
-                                { "enabled", true } },
-                  QVariantMap { { "id", "ref-external:" + r.id }, { "title", muse::qtrc("starscore", "Open in another app") },
-                                { "enabled", true } },
-                  QVariantMap { { "id", "ref-remove:" + r.id }, { "title", muse::qtrc("starscore", "Remove from this score") },
-                                { "enabled", true } },
-              } }
-        };
-    }
-
-    // Where the song is kept in Projects and Sheets (Joel, 19 Oct 2026): Originals / Covers / Vocal Covers, each in
-    // Repertoire (ready to play) or In Progress, the originals also in Sketches
-    QVariantList moveItems;
-    const QString group = starScore()->songGroup();
-    for (const QString& g : starscore::org::starsignSongGroups()) {
-        const QStringList seg = g.split('/');
-        auto plain = [](QString n) { return n.mid(n.indexOf(' ') + 1); };   // "1 Originals" -> "Originals"
-        moveItems << QVariantMap { { "id", "song-move:" + g }, { "title", plain(seg.value(1)) + " › " + plain(seg.value(2)) },
-                                   { "checkable", true }, { "checked", g == group }, { "enabled", !group.isEmpty() && g != group } };
-    }
-
-    // Add Voice to a part… (Joel, 19 Oct 2026): "Bass Guitar + Voice", the Voice in a small staff above the part
-    QVariantList voiceItems;
-    const bool hasVoice = starScore()->hasVoiceSection();
-    if (hasVoice) {
-        for (const QString& name : starScore()->voicePartScoreChoices()) {
-            voiceItems << QVariantMap { { "id", "voice-add:" + name }, { "title", name }, { "enabled", true } };
-        }
-    }
-
-    // Grouped by what they act on (1.24.0): it was one list of 33 entries
     auto item = [](const QString& id, const QString& title, bool enabled = true) {
         return QVariantMap { { "id", id }, { "title", title }, { "enabled", enabled } };
     };
@@ -770,90 +751,30 @@ QVariantList StarScoreBarModel::moreMenu() const
 #ifdef Q_OS_MACOS
             item("voice-memos", muse::qtrc("starscore", "Export to Voice Memos")),   // (1.39.0)
 #endif
-            item("solo-open-tied", info.value("tiedSongTitle").toString().isEmpty()
-                 ? muse::qtrc("starscore", "Open the song it's tied to (none)")
-                 : muse::qtrc("starscore", "Open %1").arg(info.value("tiedSongTitle").toString()),
-                 !info.value("tiedSongPath").toString().isEmpty()),
             item("solo-open-link", muse::qtrc("starscore", "Open the recording's link"), !info.value("link").toString().isEmpty()),
-            QVariantMap {},
-            item("color-notes", muse::qtrc("starscore", "Color notes by pitch")),
-            item("uncolor-notes", muse::qtrc("starscore", "Remove note colors")),
         };
     }
-    auto checkItem = [](const QString& id, const QString& title, bool checked) {
-        return QVariantMap { { "id", id }, { "title", title }, { "checkable", true }, { "checked", checked }, { "enabled", true } };
-    };
-    auto submenu = [](const QString& title, const QVariantList& items, bool enabled = true) {
-        return QVariantMap { { "title", title }, { "subitems", items }, { "enabled", enabled } };
-    };
-
-    const QVariantList songItems {
-        submenu(group.isEmpty() ? muse::qtrc("starscore", "Move to (only for songs in 1 Starsign)") : muse::qtrc("starscore", "Move to"),
-                moveItems, !group.isEmpty()),
-        item("set-version", muse::qtrc("starscore", "Version number (%1)…").arg(starScore()->scoreVersion())),
-        item("set-copyright-year", starScore()->copyrightYear() > 0
-             ? muse::qtrc("starscore", "Copyright year (%1)…").arg(starScore()->copyrightYear())
-             : muse::qtrc("starscore", "Copyright year (none for a cover)"), starScore()->copyrightYear() > 0),
-        item("recordings", muse::qtrc("starscore", "Recordings…")),
-    };
-    const QVariantList sectionItems {
-        item("all-on", muse::qtrc("starscore", "Show all sections")),
-        item("all-off", muse::qtrc("starscore", "Hide all sections")),
-        checkItem("toggle-section-scores", muse::qtrc("starscore", "Section scores visible"), starScore()->sectionScoresShown()),
-        checkItem("toggle-percussion-score", muse::qtrc("starscore", "Percussion score visible"), starScore()->percussionScoreShown()),
-        QVariantMap {},
-        item("detect", muse::qtrc("starscore", "Make sections from existing part scores")),
-        item("sync-scores", muse::qtrc("starscore", "Make / update arrangement scores")),
-    };
-    const QVariantList partItems {
-        item("part-mutes", muse::qtrc("starscore", "Mutes for this part…")),
-        item("part-flugelhorn", muse::qtrc("starscore", "Flugelhorn part on/off")),
-        item("toggle-minmaj", starScore()->minMajSymbolInCurrentScore()
-             ? muse::qtrc("starscore", "Minor-major / diminished-major symbols in this part: on (switch off)")
-             : muse::qtrc("starscore", "Minor-major / diminished-major symbols in this part: off (switch on)")),
-        submenu(!hasVoice ? muse::qtrc("starscore", "Add Voice to a part… (needs a Voice section)")
-                : voiceItems.isEmpty() ? muse::qtrc("starscore", "Add Voice to a part… (every part has it)")
-                : muse::qtrc("starscore", "Add Voice to a part…"), voiceItems, hasVoice && !voiceItems.isEmpty()),
-        item("make-keys", muse::qtrc("starscore", "Combine keyboard parts into a Keys part")),
-    };
-    const QVariantList formatItems {
-        item("layout-to", muse::qtrc("starscore", "Copy part formatting…")),
-        item("part-styles", muse::qtrc("starscore", "Apply default style settings…")),
-        item("apply-styles", muse::qtrc("starscore", "Apply default style settings now")),
-        QVariantMap {},
-        checkItem("toggle-deco", muse::qtrc("starscore", "StarScore Deco font"), starScore()->decoOn()),
-        QVariantMap {},
-        item("color-notes", muse::qtrc("starscore", "Color notes by pitch")),
-        item("uncolor-notes", muse::qtrc("starscore", "Remove note colors")),
-    };
-    const QVariantList checkItems {
-        item("audit", muse::qtrc("starscore", "Audit this song")),
-        item("audit-library", muse::qtrc("starscore", "Audit library…")),
-        QVariantMap {},
-        item("compare-parts", muse::qtrc("starscore", "Compare parts…")),
-        item("voice-order", muse::qtrc("starscore", "Check voice order…")),
-        item("check-ranges", muse::qtrc("starscore", "Check instrument ranges")),
-        QVariantMap {},
-        item("practice-flags", muse::qtrc("starscore", "Flag bars for practice…")),
-    };
-
-    return {
-        submenu(muse::qtrc("starscore", "Song"), songItems),
-        submenu(muse::qtrc("starscore", "Sections"), sectionItems),
-        submenu(muse::qtrc("starscore", "This part"), partItems),
-        submenu(muse::qtrc("starscore", "Formatting"), formatItems),
-        submenu(muse::qtrc("starscore", "Check"), checkItems),
-        submenu(refs.empty() ? muse::qtrc("starscore", "Reference PDFs") : muse::qtrc("starscore", "Reference PDFs (%1)").arg(refs.size()),
-                refItems),
-        QVariantMap {},
+    // (1.40.0, Joel 25 Nov 2026: "go through every starscore menu option … decluttering the dropdown in favor of a more
+    // user friendly UI") Only the exports and the song's settings are here now. Moved:
+    //  - Song (Move to, Version number, Copyright year) -> the Song settings window (the gear beside "…")
+    //  - Sections (Show/Hide all, section and percussion scores) -> chips at the end of the Sections row; Make sections
+    //    from part scores, Make / update arrangement scores -> "+ New section"
+    //  - This part (Mutes, Flugelhorn, minor-major symbols, Add Voice) -> the part score tab's right-click menu and a
+    //    section chip's Parts menu; Combine keyboard parts -> the rhythm section chip's menu
+    //  - Formatting -> Format › StarScore; Check -> buttons in the Audit panel (and Tools › StarScore checks)
+    //  - Reference PDFs -> the Reference PDFs panel (a chip in the Audio row opens it); Recordings… -> the Audio row
+    QVariantList items {
         item("export-band", muse::qtrc("starscore", "Export and Organize…")),
-        item("chord-chart", muse::qtrc("starscore", "Edit the iReal Pro chord chart…")),
-        item("export-arrangements", muse::qtrc("starscore", "Export arrangements as MuseScore files…"), !starScore()->arrangements().empty()),
 #ifdef Q_OS_MACOS
         item("voice-memos", muse::qtrc("starscore", "Export to Voice Memos")),   // (1.39.0)
 #endif
+        item("export-arrangements", muse::qtrc("starscore", "Export arrangements as MuseScore files…"), !starScore()->arrangements().empty()),
+        item("chord-chart", muse::qtrc("starscore", "Edit the iReal Pro chord chart…")),
         item("organize", muse::qtrc("starscore", "Run folder organization…")),
+        QVariantMap {},
+        item("song-settings", muse::qtrc("starscore", "Song settings…")),
     };
+    return items;
 }
 
 // (1.35.0, Joel 15 Nov 2026: "Allow for me to hide any of these 5 groups so that I can reduce the size of the starscore
@@ -1458,6 +1379,16 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
         dispatcher()->dispatch("starscore-make-keys");
     } else if (action == "part-mutes") {
         dispatcher()->dispatch("starscore-part-mutes");
+    } else if (action == "part-mutes-for") {
+        // part-mutes-for:<part id> (1.40.0): the Mutes dialog for that part, from a section chip's Parts menu
+        starScore()->setNextMuteTarget(arg);
+        dispatcher()->dispatch("starscore-part-mutes");
+    } else if (action == "song-settings") {
+        interactive()->open(UriQuery("musescore://starscore/songsettings"));
+    } else if (action == "ref-panel") {
+        if (dockWindowProvider()->window() && !dockWindowProvider()->window()->isDockOpen("starscoreReferencePanel")) {
+            dispatcher()->dispatch("toggle-starscore-reference");
+        }
     } else if (action == "part-flugelhorn") {
         dispatcher()->dispatch("starscore-part-flugelhorn");
     } else if (action == "check-ranges") {

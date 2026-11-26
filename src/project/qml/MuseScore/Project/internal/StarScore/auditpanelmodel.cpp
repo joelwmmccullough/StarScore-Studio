@@ -386,6 +386,15 @@ void AuditPanelModel::markArrangementAudited(bool audited)
     refresh();
 }
 
+void AuditPanelModel::runCheck(const QString& id)
+{
+    if (id == "practice-flags") {
+        interactive()->open(muse::UriQuery("musescore://starscore/practiceflags?modal=false&floating=true"));
+    } else if (id == "compare-parts" || id == "voice-order" || id == "check-ranges") {
+        dispatcher()->dispatch(muse::actions::ActionCode("starscore-" + id.toStdString()));
+    }
+}
+
 void AuditPanelModel::openLibrary()
 {
     dispatcher()->dispatch("starscore-audit-library");

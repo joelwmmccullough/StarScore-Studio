@@ -251,6 +251,13 @@ void ProjectActionsController::init()
                                 muse::trc("starscore", "Select the rhythm markings to make normal notes first."));
         }
     });
+    // (1.40.0) from the StarScore panel's old "…" › Formatting, for Format › StarScore
+    dispatcher()->reg(this, "starscore-toggle-deco", [this]() {
+        starScoreService()->toggleDeco();
+    });
+    dispatcher()->reg(this, "starscore-apply-styles", [this]() {
+        starScoreService()->applyStyles();
+    });
     dispatcher()->reg(this, "starscore-make-keys", [this]() {
         interactive()->info(muse::trc("starscore", "Keys part"), starScoreService()->makeKeysPart().toStdString());
     });

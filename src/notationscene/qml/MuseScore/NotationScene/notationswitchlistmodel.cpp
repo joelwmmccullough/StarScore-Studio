@@ -25,6 +25,8 @@
 #include "notation/inotationparts.h"
 #include "notation/inotationelements.h"
 #include "project/internal/starscore/starscorestatus.h"
+#include "engraving/dom/part.h"
+#include "engraving/dom/masterscore.h"
 #include "translation.h"
 
 #include "log.h"
@@ -360,6 +362,31 @@ QVariantList NotationSwitchListModel::contextMenuItems(int index) const
                                      { "checkable", true }, { "checked", current < 0 }, { "enabled", true } };
         result << QVariantMap {};
         result << QVariantMap { { "title", muse::qtrc("starscore", "Part status") }, { "subitems", statusItems }, { "enabled", true } };
+        // (1.40.0) the part's own things, from the StarScore panel's old "…" › This part
+        const INotationPtr pn = m_notations[index];
+        bool brass = false;
+        bool trumpet = false;
+        if (pn->elements() && pn->elements()->msScore()) {
+            for (const mu::engraving::Part* p : pn->elements()->msScore()->parts()) {
+                const QString inst = p->instrumentId().toQString();
+                trumpet = trumpet || inst.contains("trumpet") || inst.contains("flugelhorn") || inst.contains("cornet");
+                brass = brass || trumpet || inst.contains("trombone") || inst.contains("horn") || inst.contains("tuba");
+            }
+        }
+        if (brass) {
+            result << QVariantMap { { "id", "starscore-part-mutes" }, { "title", muse::qtrc("starscore", "Mutes for this part…") },
+                                    { "enabled", true } };
+        }
+        if (trumpet) {
+            result << QVariantMap { { "id", "starscore-part-flugelhorn" }, { "title", muse::qtrc("starscore", "Flugelhorn part on/off") },
+                                    { "enabled", true } };
+        }
+        result << QVariantMap { { "id", "starscore-toggle-minmaj" },
+                                { "title", muse::qtrc("starscore", "Minor-major / diminished-major symbols on/off") }, { "enabled", true } };
+        if (starScore()->voicePartScoreChoices().contains(pn->name())) {
+            result << QVariantMap { { "id", "starscore-voice-add" }, { "title", muse::qtrc("starscore", "Add Voice to this part") },
+                                    { "enabled", true } };
+        }
         // the Parts dialog's Reset (the dialog is hidden in StarScore; Joel, 21 Oct 2026)
         result << QVariantMap { { "id", "starscore-reset-part" }, { "title", muse::qtrc("starscore", "Reset part score…") }, { "enabled", true } };
         // the lyrics given room, without a reset (Joel, 21 Oct 2026)
@@ -384,6 +411,16 @@ void NotationSwitchListModel::handleContextMenuItem(int index, const QString& it
         const INotationPtr notation = m_notations[index];
         if (notation->elements()) {
             starScore()->respaceLyrics(notation->elements()->msScore());
+        }
+    } else if ((itemId == "starscore-part-mutes" || itemId == "starscore-part-flugelhorn" || itemId == "starscore-toggle-minmaj")
+               && isIndexValid(index)) {
+        // (1.40.0) these act on the part being viewed: this tab first
+        setCurrentNotation(index);
+        dispatcher()->dispatch(itemId.toStdString());
+    } else if (itemId == "starscore-voice-add" && isIndexValid(index)) {
+        const muse::RetVal<QString> r = starScore()->addVoiceToPartScore(m_notations[index]->name());
+        if (!r.ret) {
+            LOGW() << "[starscore] the Voice wasn't added: " << r.ret.toString();
         }
     } else if (itemId == "starscore-reset-part" && isIndexValid(index)) {
         const INotationPtr notation = m_notations[index];

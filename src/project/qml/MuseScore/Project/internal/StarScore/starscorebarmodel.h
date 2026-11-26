@@ -47,6 +47,9 @@ class StarScoreBarModel : public QObject, public muse::Contextable, public muse:
     Q_PROPERTY(QVariantList tiedSolos READ tiedSolos NOTIFY folderInfoChanged)
     //! (1.25.0) The score's audio and Transcribe! files (the Audio folder beside the .starscore): [{ name, path, kind }]
     Q_PROPERTY(QVariantList audioFiles READ audioFiles NOTIFY folderInfoChanged)
+    Q_PROPERTY(int referenceCount READ referenceCount NOTIFY changed)
+    Q_PROPERTY(bool sectionScoresShown READ sectionScoresShown NOTIFY changed)
+    Q_PROPERTY(bool percussionScoreShown READ percussionScoreShown NOTIFY changed)
     Q_PROPERTY(bool canAddAudio READ canAddAudio NOTIFY changed)
 
     QML_ELEMENT
@@ -103,6 +106,12 @@ public:
 
     Q_INVOKABLE QVariantList arrangementMenu(const QString& id) const;
     Q_INVOKABLE QVariantList sectionMenu(const QString& id) const;
+    Q_INVOKABLE QVariantList sectionStatusMenu(const QString& id) const;   // (1.40.0) the chip's dot
+    Q_INVOKABLE void moveArrangementTo(const QString& id, int index);      // (1.40.0) a chip dragged
+    Q_INVOKABLE void moveSectionTo(const QString& id, int index);
+    int referenceCount() const { return int(starScore()->references().size()); }
+    bool sectionScoresShown() const { return starScore()->sectionScoresShown(); }
+    bool percussionScoreShown() const { return starScore()->percussionScoreShown(); }
     Q_INVOKABLE QVariantList addArrangementMenu() const;
     Q_INVOKABLE QVariantList addSectionMenu() const;
     Q_INVOKABLE QVariantList moreMenu() const;

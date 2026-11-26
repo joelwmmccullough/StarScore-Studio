@@ -112,6 +112,33 @@ Item {
             }
         }
 
+        // (1.40.0) the other checks, from the StarScore panel's old "…" › Check
+        Flow {
+            Layout.fillWidth: true
+            spacing: 6
+
+            FlatButton {
+                text: qsTrc("starscore", "Compare parts…")
+                toolTipTitle: qsTrc("starscore", "Compare two parts bar by bar")
+                onClicked: auditModel.runCheck("compare-parts")
+            }
+            FlatButton {
+                text: qsTrc("starscore", "Voice order…")
+                toolTipTitle: qsTrc("starscore", "Check that each section's voices are in order, high to low")
+                onClicked: auditModel.runCheck("voice-order")
+            }
+            FlatButton {
+                text: qsTrc("starscore", "Ranges")
+                toolTipTitle: qsTrc("starscore", "Check every part's notes against its instrument's range")
+                onClicked: auditModel.runCheck("check-ranges")
+            }
+            FlatButton {
+                text: qsTrc("starscore", "Practice flags…")
+                toolTipTitle: qsTrc("starscore", "Flag bars for the players to practice")
+                onClicked: auditModel.runCheck("practice-flags")
+            }
+        }
+
         StyledTextLabel {
             Layout.fillWidth: true
             visible: !auditModel.hasScore

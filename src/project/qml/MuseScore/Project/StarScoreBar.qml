@@ -85,6 +85,38 @@ Rectangle {
         signal menuItemChosen(string itemId)
         signal menuOpenChanged(bool isOpen)
 
+        // (1.40.0) chips with the same reorderGroup can be dragged to a new place among each other (reordered gives
+        // the new index); double-clicking and clicking the dot are signals of their own
+        property string reorderGroup: ""
+        property bool dotClickable: false
+        signal reordered(int newIndex)
+        signal doubleClicked()
+        signal dotClicked()
+        property bool dragging: false
+        property bool justDragged: false
+        property point pressPoint: Qt.point(0, 0)
+        transform: Translate { id: dragShift }
+        z: dragging ? 100 : 0
+
+        //! Where this chip would go if dropped here: how many of its group's other chips come before the point
+        function dropIndex(px, py) {
+            let index = 0
+            const siblings = chip.parent ? chip.parent.children : []
+            for (let i = 0; i < siblings.length; ++i) {
+                const c = siblings[i]
+                if (c === chip || !c.visible || c.reorderGroup !== chip.reorderGroup) {
+                    continue
+                }
+                const cx = c.x + c.width / 2
+                const cy = c.y + c.height / 2
+                const sameRow = Math.abs(cy - py) < c.height / 2
+                if (cy < py - c.height / 2 || (sameRow && cx < px)) {
+                    ++index
+                }
+            }
+            return index
+        }
+
         implicitHeight: 26
         implicitWidth: chipRow.implicitWidth + 20
         radius: height / 2
@@ -109,11 +141,12 @@ Rectangle {
             }
 
             Rectangle {
+                id: chipDot
                 visible: chip.showDot
                 anchors.verticalCenter: parent.verticalCenter
-                width: 9
-                height: 9
-                radius: 4.5
+                width: chip.dotClickable && chipMouse.containsMouse ? 11 : 9
+                height: width
+                radius: width / 2
                 color: chip.dotColor
                 border.width: 1
                 border.color: chip.active ? ui.theme.fontPrimaryColor : Qt.darker(chip.dotColor, 1.3)
@@ -134,13 +167,62 @@ Rectangle {
             anchors.fill: parent
             hoverEnabled: true
             acceptedButtons: Qt.LeftButton | Qt.RightButton
+            cursorShape: chip.dragging ? Qt.ClosedHandCursor : Qt.ArrowCursor
+
+            onPressed: function(mouse) {
+                chip.pressPoint = Qt.point(mouse.x, mouse.y)
+                chip.justDragged = false
+            }
+            onPositionChanged: function(mouse) {
+                if (!pressed || chip.reorderGroup === "" || mouse.buttons !== Qt.LeftButton) {
+                    return
+                }
+                const dx = mouse.x - chip.pressPoint.x
+                const dy = mouse.y - chip.pressPoint.y
+                if (!chip.dragging && Math.abs(dx) + Math.abs(dy) > 8) {
+                    chip.dragging = true
+                }
+                if (chip.dragging) {
+                    dragShift.x = dx
+                    dragShift.y = dy
+                }
+            }
+            onReleased: function(mouse) {
+                if (!chip.dragging) {
+                    return
+                }
+                const p = chip.mapToItem(chip.parent, mouse.x, mouse.y)   // (the pointer, the drag included)
+                const index = chip.dropIndex(p.x, p.y)
+                chip.dragging = false
+                chip.justDragged = true
+                dragShift.x = 0
+                dragShift.y = 0
+                chip.reordered(index)
+            }
+            onDoubleClicked: function(mouse) {
+                if (mouse.button === Qt.LeftButton) {
+                    chip.doubleClicked()
+                }
+            }
 
             onClicked: function(mouse) {
+                if (chip.justDragged) {
+                    chip.justDragged = false
+                    return
+                }
                 if (mouse.button === Qt.RightButton) {
                     if (chip.menuItemsProvider) {
+                        chip.openProvider = null
                         chipMenu.toggleOpened(chip.menuItemsProvider())
                     }
                     return
+                }
+                if (chip.dotClickable && chip.showDot) {
+                    const d = chipDot.mapFromItem(chipMouse, mouse.x, mouse.y)
+                    if (d.x >= -4 && d.x <= chipDot.width + 4 && d.y >= -6 && d.y <= chipDot.height + 6) {
+                        chip.dotClicked()
+                        return
+                    }
                 }
                 chip.leftClicked(mouse)
             }
@@ -160,8 +242,9 @@ Rectangle {
             // Status items: the menu stays open and shows the new ticks
             onKeepOpenItemChosen: function(itemId) {
                 chip.menuItemChosen(itemId)
-                if (chip.menuItemsProvider) {
-                    chipMenu.refreshOpen(chip.menuItemsProvider())
+                const provider = chip.openProvider || chip.menuItemsProvider
+                if (provider) {
+                    chipMenu.refreshOpen(provider())
                 }
             }
 
@@ -169,7 +252,10 @@ Rectangle {
             onClosed: chip.menuOpenChanged(false)
         }
 
-        function openMenu(items) {
+        //! provider: what the open menu is read again from after a tick (the right-click menu when not given)
+        property var openProvider: null
+        function openMenu(items, provider) {
+            chip.openProvider = provider || null
             chipMenu.toggleOpened(items)
         }
     }
@@ -259,11 +345,18 @@ Rectangle {
                         active: modelData.active
                         dotColor: barModel.statusColor(modelData.status)
                         toolTip: modelData.sections + "\n" + qsTrc("starscore", "Status: ") + barModel.statusName(modelData.status)
-                                 + "\n" + qsTrc("starscore", "Right-click for options")
+                                 + "\n" + qsTrc("starscore", "Click: show · Double-click: rename · Drag: move · Right-click: options")
                         menuItemsProvider: function() { return barModel.arrangementMenu(modelData.id) }
+                        reorderGroup: "arrangements"
 
                         onLeftClicked: function(mouse) {
                             barModel.showArrangement(modelData.id)
+                        }
+                        onDoubleClicked: {
+                            barModel.handleMenuItem("arr-rename:" + modelData.id)
+                        }
+                        onReordered: function(newIndex) {
+                            barModel.moveArrangementTo(modelData.id, newIndex)
                         }
                         onMenuItemChosen: function(itemId) {
                             barModel.handleMenuItem(itemId)
@@ -284,6 +377,20 @@ Rectangle {
                     onMenuItemChosen: function(itemId) {
                         barModel.handleMenuItem(itemId)
                     }
+                }
+            }
+
+            // (1.40.0) the song's version, copyright year and where it's kept
+            FlatButton {
+                Layout.alignment: Qt.AlignTop
+                visible: !barModel.isSoloTranscription
+                icon: IconCode.SETTINGS_COG
+                transparent: true
+                toolTipTitle: qsTrc("starscore", "Song settings")
+                toolTipDescription: qsTrc("starscore", "Version number, copyright year, and where the song is kept")
+
+                onClicked: {
+                    barModel.handleMenuItem("song-settings")
                 }
             }
 
@@ -376,8 +483,23 @@ Rectangle {
                         dotColor: modelData.leadSheet ? "#2FB5A8" : barModel.statusColor(modelData.status)
                         toolTip: qsTrc("starscore", "%1 instrument(s)").arg(modelData.instrumentCount)
                                  + "\n" + qsTrc("starscore", "Status: ") + modelData.statusText
-                                 + "\n" + qsTrc("starscore", "Click: show/hide · Alt-click: show only this · Right-click: options")
+                                 + "\n" + qsTrc("starscore", "Click: show/hide · Alt-click: show only this · Double-click: rename")
+                                 + "\n" + qsTrc("starscore", "Click the dot: status · Drag: move · Right-click: options")
                         menuItemsProvider: function() { return barModel.sectionMenu(modelData.id) }
+                        reorderGroup: "sections"
+                        dotClickable: true
+
+                        onDotClicked: {
+                            const sid = modelData.id
+                            openMenu(barModel.sectionStatusMenu(sid), function() { return barModel.sectionStatusMenu(sid) })
+                        }
+                        onDoubleClicked: {
+                            barModel.toggleSection(modelData.id)   // (the first click of the two showed or hid it)
+                            barModel.handleMenuItem("sec-rename:" + modelData.id)
+                        }
+                        onReordered: function(newIndex) {
+                            barModel.moveSectionTo(modelData.id, newIndex)
+                        }
                         // the chips are rebuilt when the panel updates, which would close the open menu
                         onMenuOpenChanged: function(isOpen) { barModel.setHoldUpdates(isOpen) }
                         Component.onDestruction: barModel.setHoldUpdates(false)
@@ -429,6 +551,31 @@ Rectangle {
 
                     onLeftClicked: function(mouse) {
                         barModel.handleMenuItem("all-off")
+                    }
+                }
+
+                // (1.40.0, from the old "…" › Sections) whether the section scores and the percussion score are tabs
+                StarScoreChip {
+                    text: qsTrc("starscore", "Section scores")
+                    showDot: false
+                    showCheck: true
+                    active: barModel.sectionScoresShown
+                    toolTip: qsTrc("starscore", "Show or hide each section's own score as a tab")
+
+                    onLeftClicked: function(mouse) {
+                        barModel.handleMenuItem("toggle-section-scores")
+                    }
+                }
+
+                StarScoreChip {
+                    text: qsTrc("starscore", "Percussion score")
+                    showDot: false
+                    showCheck: true
+                    active: barModel.percussionScoreShown
+                    toolTip: qsTrc("starscore", "Show or hide the percussion score as a tab")
+
+                    onLeftClicked: function(mouse) {
+                        barModel.handleMenuItem("toggle-percussion-score")
                     }
                 }
             }
@@ -555,6 +702,29 @@ Rectangle {
                                    + "stored inside this score, so it's all in one file")
                     onLeftClicked: function(mouse) {
                         barModel.handleMenuItem("audio-add")
+                    }
+                }
+
+                // (1.40.0, from the old "…") the song's recordings list, and its reference PDFs
+                StarScoreChip {
+                    text: qsTrc("starscore", "Recordings…")
+                    dashed: true
+                    showDot: false
+                    toolTip: qsTrc("starscore", "The song's live and studio recordings, and their ratings")
+                    onLeftClicked: function(mouse) {
+                        barModel.handleMenuItem("recordings")
+                    }
+                }
+
+                StarScoreChip {
+                    text: barModel.referenceCount > 0 ? qsTrc("starscore", "Reference PDFs (%1)").arg(barModel.referenceCount)
+                                                      : qsTrc("starscore", "+ Reference PDF")
+                    dashed: true
+                    showDot: false
+                    toolTip: barModel.referenceCount > 0 ? qsTrc("starscore", "Show the reference PDFs beside the score")
+                                                         : qsTrc("starscore", "Add a PDF (an original chart, say), kept inside this score")
+                    onLeftClicked: function(mouse) {
+                        barModel.handleMenuItem(barModel.referenceCount > 0 ? "ref-panel" : "ref-add")
                     }
                 }
             }

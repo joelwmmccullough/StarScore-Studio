@@ -4,6 +4,23 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.40.0
+- **The StarScore menus, tidied up.** The panel's "…" menu had about 35 items in six submenus, and most of them were also in the top menus. Each item now sits where it's used, and "…" keeps only the exports.
+  - **Arrangement and section chips:**
+    - Drag a chip to move it. This replaces "Move left" and "Move right".
+    - Double-click a chip to rename it.
+    - Click a section chip's colored dot to set its status and its parts' tags.
+  - **Song settings:** the gear button beside "…" opens one window for the song's version number, copyright year and where it's kept ("Kept in": Originals › Repertoire…). These were three "…" items.
+  - **Sections row:** "Section scores" and "Percussion score" are now chips you click to show or hide those tabs, beside Show all and Hide all. "Make sections from existing part scores" and "Make / update arrangement scores" are now in "+ New section".
+  - **Part items:**
+    - Right-click a part score's tab: "Mutes for this part…" (brass), "Flugelhorn part on/off" (trumpets), the minor-major / diminished-major symbols, and "Add Voice to this part".
+    - A section chip's menu now has "Parts" (each part's tag, and Mutes… for brass).
+    - The rhythm section chip's menu has "Combine keyboard parts into a Keys part".
+  - **Audio row:** "Recordings…", and "Reference PDFs" (opens the Reference panel; "+ Reference PDF" when there are none).
+  - **Audit panel:** buttons for Compare parts…, Voice order…, Ranges and Practice flags…, under Checks / Listen / Library….
+  - **Top menus:** Format has one "StarScore" submenu, grouped (formatting, time and rhythm, part items, note colors, Standardize), instead of 17 lines. It now also has "StarScore Deco font on/off" and "Apply default style settings now". Tools has a "StarScore checks" submenu.
+  - **"…" now has:** Export and Organize…, Export to Voice Memos, Export arrangements as MuseScore files…, Edit the iReal Pro chord chart…, Run folder organization… and Song settings….
+
 ## 1.39.0
 - **Export to Voice Memos (Mac).** In the StarScore panel's "…" menu, "Export to Voice Memos" renders the score you're looking at (the main score, or an arrangement's or part's tab), as it plays now with the mixer as it is. It's made into an AAC recording (.m4a, the kind Voice Memos takes), kept in Music › StarScore Voice Memos, and sent to Voice Memos, which syncs it to your iPhone. Its name in Voice Memos is the song's title, plus the score's name when it isn't the main score. Voice Memos doesn't let other apps add recordings directly, so the file is opened with it. If it doesn't appear there, the message has a "Show in Finder" button so you can drag it into Voice Memos.
 

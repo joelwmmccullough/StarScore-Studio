@@ -64,6 +64,8 @@ qt_add_qml_module(project_qml
         internal/StarScore/starscorebarmodel.h
         internal/StarScore/starscoreeditmodel.cpp
         internal/StarScore/starscoreeditmodel.h
+        internal/StarScore/songsettingsmodel.cpp
+        internal/StarScore/songsettingsmodel.h
         internal/StarScore/copylayoutmodel.cpp
         internal/StarScore/copylayoutmodel.h
         internal/StarScore/newstarscoremodel.cpp
@@ -232,6 +234,7 @@ qt_add_qml_module(project_qml
         PracticeRunnerDialog.qml
         PracticeFlagDialog.qml
         StarScoreEditDialog.qml
+        StarScoreSongSettingsDialog.qml
         CopyLayoutDialog.qml
         NewStarScoreDialog.qml
         AddArrangementDialog.qml

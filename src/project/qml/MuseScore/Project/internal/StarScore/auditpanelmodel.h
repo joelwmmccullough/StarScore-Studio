@@ -106,6 +106,8 @@ public:
     Q_INVOKABLE void setShowIntentional(bool show);
     Q_INVOKABLE void markArrangementAudited(bool audited);
     Q_INVOKABLE void openLibrary();
+    //! (1.40.0) the checks that were in the panel's "…" › Check: compare-parts, voice-order, check-ranges, practice-flags
+    Q_INVOKABLE void runCheck(const QString& id);
 
     Q_INVOKABLE void selectStep(int index);
     Q_INVOKABLE void playStep();
