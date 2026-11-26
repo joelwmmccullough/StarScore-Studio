@@ -262,7 +262,9 @@ QJsonObject ChordChartData::toJson() const
         for (const ChordChartChord& c : m.chords) {
             chords.append(QJsonObject { { "root", c.root.isEmpty() ? QJsonValue(QJsonValue::Null) : QJsonValue(c.root) },
                                         { "bass", c.bass.isEmpty() ? QJsonValue(QJsonValue::Null) : QJsonValue(c.bass) },
-                                        { "q", c.q }, { "hidden", c.hidden }, { "t", c.t } });
+                                        { "q", c.q }, { "hidden", c.hidden }, { "t", c.t },
+                                        { "altRoot", c.altRoot.isEmpty() ? QJsonValue(QJsonValue::Null) : QJsonValue(c.altRoot) },
+                                        { "altQ", c.altQ } });
         }
         o["chords"] = chords;
         o["mmrTag"] = m.mmrTag;
@@ -459,13 +461,19 @@ ChordChartData extractChordChart(const MasterScore* ms)
                             if (h->chords().empty() || h->harmonyType() != HarmonyType::STANDARD) {
                                 continue;   // not written / Roman numerals and Nashville numbers
                             }
-                            const HarmonyInfo* info = h->chords().front();
+                            // (1.41.0) a polychord: its bottom chord (and bass), with the top chord as the alternate
+                            const HarmonyInfo* info = h->chords().back();
                             RawChord rc;
                             rc.t = tick;
                             rc.staff = int(staff) + 1;
                             rc.chord.root = info->rootTpc() != Tpc::TPC_INVALID ? tpcName(info->rootTpc()) : QString();
                             rc.chord.bass = info->bassTpc() != Tpc::TPC_INVALID ? tpcName(info->bassTpc()) : QString();
                             rc.chord.q = harmonyWrittenName(info);
+                            if (h->chords().size() > 1) {
+                                const HarmonyInfo* top = h->chords().front();
+                                rc.chord.altRoot = top->rootTpc() != Tpc::TPC_INVALID ? tpcName(top->rootTpc()) : QString();
+                                rc.chord.altQ = harmonyWrittenName(top);
+                            }
                             rc.chord.hidden = !h->visible();
                             rc.chord.t = fracStr(tick);
                             rawChords.push_back(rc);
@@ -598,7 +606,8 @@ QString chordKey(const ChordChartChord& c)
     if (c.root.isEmpty()) {
         return "NC";
     }
-    return c.root + "|" + c.q + "|" + c.bass;
+    // (1.41.0) a polychord's top chord after them: "root|quality|bass|top root|top quality"
+    return c.root + "|" + c.q + "|" + c.bass + (c.altRoot.isEmpty() ? QString() : "|" + c.altRoot + "|" + c.altQ);
 }
 
 //! [(position in the bar, chord key)]
@@ -1921,7 +1930,10 @@ QString irealChord(const QString& key, std::set<QString>& notes)
             bass = b;
         }
     }
-    return root + iq + (bass.isEmpty() ? QString() : "/" + bass);
+    // (1.41.0) a polychord's top chord as iReal Pro's alternate chord, written small above: "D/C(E)"
+    const QString alt = parts.size() >= 5 && !parts.value(3).isEmpty()
+                        ? "(" + irealChord(parts.value(3) + "|" + parts.value(4) + "|", notes) + ")" : QString();
+    return root + iq + (bass.isEmpty() ? QString() : "/" + bass) + alt;
 }
 
 const std::map<QString, QString> IREAL_TS {
@@ -3120,6 +3132,7 @@ ChordChartResult writeSoloChordCharts(const MasterScore* ms, const QString& fold
             for (ChordChartChord& c : m.chords) {
                 c.root = chartTranspose(c.root, iv);
                 c.bass = chartTranspose(c.bass, iv);
+                c.altRoot = chartTranspose(c.altRoot, iv);   // (1.41.0) a polychord's top chord
             }
         }
         data.key = k.fifths;

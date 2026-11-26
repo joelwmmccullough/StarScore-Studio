@@ -36,6 +36,10 @@ struct ChordChartChord {
     QString q;
     bool hidden = false;   // not shown on the lead sheet (a repeat of the chord for playback)
     QString t;
+    // (1.41.0) a polychord: root, q and bass are its bottom chord and bass; altRoot/altQ the chord on top (iReal Pro
+    // has no polychords: it's written as the alternate chord, small above: "D/C(E)")
+    QString altRoot;
+    QString altQ;
 };
 //! A text on the lead sheet: k = "SystemText", "StaffText" or "Tempo"; lead = on a lead staff; eid = the element's
 //! id in the main score (the "Visible on chord chart" box in the inspector keeps a list of hidden ids)

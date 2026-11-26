@@ -217,6 +217,35 @@ void RealizedHarmony::update(int rootTpc, int bassTpc, int transposeOffset /*= 0
 
     if (tpcIsValid(rootTpc)) {
         m_notes = generateNotes(rootTpc, bassTpc, m_literal, m_voicing, transposeOffset);
+        // StarScore (1.41.0): a polychord sounds every chord in it, each an octave below the one above it (the top chord
+        // is above middle C; the bass, from Harmony::getRealizedHarmony, two octaves below)
+        if (m_harmony && m_harmony->isPolychord() && m_voicing != Voicing::ROOT_ONLY) {
+            const std::vector<HarmonyInfo*> chords = m_harmony->chords();
+            const int offset = transposeOffset % PITCH_DELTA_OCTAVE;
+            for (size_t i = 1; i < chords.size(); ++i) {
+                HarmonyInfo* info = chords[i];
+                const ParsedChord* parsed = info ? info->getParsedChord() : nullptr;
+                if (!info || !tpcIsValid(info->rootTpc())) {
+                    continue;
+                }
+                int rootPitch = (tpc2pitch(info->rootTpc()) + offset) % PITCH_DELTA_OCTAVE;
+                if (rootPitch < 0) {
+                    rootPitch += PITCH_DELTA_OCTAVE;
+                }
+                const int octave = std::max(4, 5 - int(i)) * PITCH_DELTA_OCTAVE;
+                auto add = [this](int pitch, int tpc) {
+                    if (m_notes.find(pitch) == m_notes.end()) {   // (a note the chords share sounds once)
+                        m_notes.insert({ pitch, tpc });
+                    }
+                };
+                add(rootPitch + octave, info->rootTpc());
+                if (parsed && parsed->understandable()) {
+                    for (const auto& n : getIntervals(info->rootTpc(), m_literal, parsed)) {
+                        add((rootPitch + (n.first % 128)) % PITCH_DELTA_OCTAVE + octave, n.second);
+                    }
+                }
+            }
+        }
     }
     m_dirty = false;
 }
@@ -289,7 +318,7 @@ Fraction RealizedHarmony::getActualDuration(int utick, HDuration durationType) c
 ///   - Rank 3: Other alterations and additions
 ///   - Rank 4: 5th and (in major/dominant chords) 11th
 //---------------------------------------------------
-RealizedHarmony::PitchMap RealizedHarmony::getIntervals(int rootTpc, bool literal) const
+RealizedHarmony::PitchMap RealizedHarmony::getIntervals(int rootTpc, bool literal, const ParsedChord* parsed) const
 {
     //RANKING SYSTEM
     static const int RANK_MULT = 128;   //used as multiplier and mod since MIDI pitch goes from 0-127
@@ -303,7 +332,7 @@ RealizedHarmony::PitchMap RealizedHarmony::getIntervals(int rootTpc, bool litera
 
     PitchMap ret;
 
-    const ParsedChord* p = m_harmony->parsedForm();
+    const ParsedChord* p = parsed ? parsed : m_harmony->parsedForm();
     String quality = p->quality();
     int ext = p->extension().toInt();
     const StringList& modList = p->modifierList();

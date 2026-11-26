@@ -30,6 +30,7 @@
 
 namespace mu::engraving {
 class Harmony;
+class ParsedChord;
 
 //voicing modes to use
 enum class Voicing : signed char {
@@ -89,7 +90,7 @@ public:
     Fraction getActualDuration(int utick, HDuration durationType = HDuration::INVALID) const;
 
 private:
-    PitchMap getIntervals(int rootTpc, bool literal = true) const;
+    PitchMap getIntervals(int rootTpc, bool literal = true, const ParsedChord* parsed = nullptr) const;
     PitchMap normalizeNoteMap(const PitchMap& intervals, int rootTpc, int rootPitch, size_t max = 128, bool enforceMaxAsGoal = false) const;
     void cascadeDirty(bool dirty);
 

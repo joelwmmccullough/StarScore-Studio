@@ -3085,7 +3085,9 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
         // (…@<staff>: then copies those bars of the staff and pastes them onto that staff, as copy and paste do)
         const int staff = step.section(':', 1, 1).toInt() - 1;
         const QString rest = step.section(':', 2);
-        const QStringList chords = rest.section('@', 0, 0).split('|');
+        // (1.41.0) separated by ";" when one of them is a polychord written with "|"
+        const QString list = rest.section('@', 0, 0);
+        const QStringList chords = list.contains(';') ? list.split(';') : list.split('|');
         const int pasteTo = rest.contains('@') ? rest.section('@', 1).toInt() - 1 : -1;
         engraving::Measure* m = ms->firstMeasure();
         std::vector<engraving::Harmony*> made;
@@ -3141,6 +3143,15 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
             if (e->notation()) {
                 scores.push_back(e->notation()->elements()->msScore());
             }
+        }
+        // (1.41.0) the notes each chord plays (MIDI pitches)
+        for (engraving::Harmony* h : made) {
+            QStringList pitches;
+            for (const auto& [pitch, tpc] : h->getRealizedHarmony().notes()) {
+                pitches << QString::number(pitch);
+            }
+            autotestLog(QString("  %1 plays: %2 (%3 chord(s))").arg(h->harmonyName().toQString(), pitches.join(" "))
+                        .arg(h->chords().size()));
         }
         for (engraving::Score* sc : scores) {
             sc->setLayoutAll();

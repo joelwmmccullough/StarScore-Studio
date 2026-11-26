@@ -505,6 +505,30 @@ const std::vector<const ChordDescription*> Harmony::parseHarmony(const String& s
         return descriptions;
     }
 
+    // StarScore (1.41.0, Joel 26 Nov 2026: "I want to be able to write an E/D/C (where E and D are triads but C is a bass
+    // note)") Typed with slashes: the note after the last slash is the bass, and every earlier slash that comes before a
+    // note stacks one chord on the next, as "|" does: "E/D/C" = E over D, C in the bass ("E|D/C"); "E/D" stays E with D in
+    // the bass. A slash not followed by a note ("C6/9") is part of the chord.
+    if (m_harmonyType == HarmonyType::STANDARD && !s.contains(u'|')) {
+        std::vector<size_t> noteSlashes;
+        for (size_t i = 0; i + 1 < s.size(); ++i) {
+            const char16_t next = s.at(i + 1).unicode();
+            if (s.at(i) == u'/' && ((next >= u'A' && next <= u'G') || (next >= u'a' && next <= u'g'))) {
+                noteSlashes.push_back(i);
+            }
+        }
+        if (noteSlashes.size() >= 2) {
+            String stacked;
+            size_t from = 0;
+            for (size_t k = 0; k + 1 < noteSlashes.size(); ++k) {
+                stacked += s.mid(from, noteSlashes[k] - from) + u"|";
+                from = noteSlashes[k] + 1;
+            }
+            stacked += s.mid(from);
+            s = stacked;
+        }
+    }
+
     StringList chords = s.split('|');
 
     for (const String& subChord : chords) {
@@ -1137,6 +1161,12 @@ const RealizedHarmony& Harmony::getRealizedHarmony() const
     HarmonyInfo* info = m_chords.empty() ? nullptr : m_chords.front();
     int root = info ? info->rootTpc() : Tpc::TPC_INVALID;
     int bass = info ? info->bassTpc() : Tpc::TPC_INVALID;
+    // StarScore (1.41.0): a polychord's bass is the bottom chord's bass note, or else that chord's root (it played the
+    // top chord's root in the bass); the other chords are added by RealizedHarmony::update
+    if (m_chords.size() > 1) {
+        const HarmonyInfo* bottom = m_chords.back();
+        bass = tpcIsValid(bottom->bassTpc()) ? bottom->bassTpc() : bottom->rootTpc();
+    }
 
     m_realizedHarmony.update(root, bass, offset);
 
