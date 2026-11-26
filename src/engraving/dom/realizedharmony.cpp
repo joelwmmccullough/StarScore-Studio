@@ -232,7 +232,7 @@ void RealizedHarmony::update(int rootTpc, int bassTpc, int transposeOffset /*= 0
                 if (rootPitch < 0) {
                     rootPitch += PITCH_DELTA_OCTAVE;
                 }
-                const int octave = std::max(4, 5 - int(i)) * PITCH_DELTA_OCTAVE;
+                const int octave = std::max(3, 5 - int(i)) * PITCH_DELTA_OCTAVE;
                 auto add = [this](int pitch, int tpc) {
                     if (m_notes.find(pitch) == m_notes.end()) {   // (a note the chords share sounds once)
                         m_notes.insert({ pitch, tpc });

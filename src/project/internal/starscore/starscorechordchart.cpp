@@ -1145,6 +1145,9 @@ h1 .tacc { font-family: BravuraText; font-size: 1.4em; line-height: 0; margin: 0
 .bs { position: absolute; left: 0.95em; top: 1.95em; font-size: 0.46em; }
 .bs .sl { margin-right: 0.04em; }
 .bs .acc { font-size: 0.9em; position: relative; top: -0.3em; margin-left: 0.03em; }
+/* (1.41.0) a polychord's top chord: small, above the bottom chord, over a line */
+.pt { position: absolute; left: 0; bottom: 100%%; padding-bottom: 0.04em; border-bottom: 0.05em solid currentColor; line-height: 1; }
+.pt .c { font-size: calc(var(--R) * var(--fs, 1) * 0.5); transform: none; }
 .c.nc { font-size: calc(var(--R) * var(--fs, 1) * 0.62); font-weight: 500; top: 0.35em; }
 .sim { position: absolute; left: 50%%; top: 50%%; transform: translate(-50%%, -50%%); font-family: BravuraText; font-size: 30pt; color: #333; }
 .ts { position: absolute; left: 4pt; top: 50%%; transform: translateY(-50%%); display: flex; flex-direction: column;
@@ -1390,6 +1393,10 @@ QString chordHtml(const QString& key)
     if (!bass.isEmpty()) {
         s += QString("<span class=\"bs\"><span class=\"sl\">%1</span>%2%3</span>").arg(QString::fromUtf8("\xe2\x88\x95"),
                                                                                       esc(bass.left(1)), accHtml(bass.mid(1)));
+    }
+    // (1.41.0) a polychord: its top chord small above the bottom one, over a line
+    if (parts.size() >= 5 && !parts.value(3).isEmpty()) {
+        s += "<span class=\"pt\">" + chordHtml(parts.value(3) + "|" + parts.value(4) + "|") + "</span>";
     }
     return s + "</span>";
 }
