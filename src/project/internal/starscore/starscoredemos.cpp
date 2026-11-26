@@ -14,7 +14,10 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QProcess>
 #include <QRegularExpression>
+#include <QStandardPaths>
+#include <QUuid>
 
 #include "engraving/dom/masterscore.h"
 #include "engraving/dom/excerpt.h"
@@ -264,4 +267,90 @@ RetVal<QString> StarScoreService::exportAudioDemos()
         summary += "\n" + muse::qtrc("starscore", "Couldn't make the demo of: %1.").arg(failed.join(", "));
     }
     return RetVal<QString>::make_ok(summary);
+}
+
+//! (1.39.0, Joel 25 Nov 2026: "add an 'export to voice memos' on the mac build, similar to what logic pro has") The
+//! score in view (the main score or an arrangement's or part's tab), as it plays now with the mixer as it is, made into
+//! an AAC recording (.m4a: what Voice Memos takes in) in ~/Music/StarScore Voice Memos and sent to Voice Memos.
+//! Voice Memos has no way for other apps to add a recording, so the file is opened with it; in case it doesn't take
+//! it in that way, the message offers the file in Finder to drag into Voice Memos.
+void StarScoreService::exportToVoiceMemos()
+{
+    // (built on every platform so the Linux test build compiles it; the menu item is Mac only)
+    INotationPtr n = globalContext()->currentNotation();
+    INotationWriterPtr writer = writers()->writer("wav");
+    mu::engraving::Score* sc = n ? n->elements()->msScore() : nullptr;
+    if (!n || !writer || !sc) {
+        interactive()->error(muse::trc("starscore", "Export to Voice Memos"), muse::trc("starscore", "Open a song first."));
+        return;
+    }
+
+    // its name in Voice Memos: the song's title, and the score's when it isn't the main score
+    QString title = songTitle();
+    if (title.isEmpty()) {
+        title = m_mainProject ? m_mainProject->displayName() : QString("StarScore");
+    }
+    if (!sc->isMaster()) {
+        title += " - " + n->name();
+    }
+    title.replace(QRegularExpression(R"([/\\:*?"<>|])"), "-");
+    const QString dir = QStandardPaths::writableLocation(QStandardPaths::MusicLocation) + "/StarScore Voice Memos";
+    QDir().mkpath(dir);
+    const QString m4a = dir + "/" + title + ".m4a";
+    const QString wav = QDir::tempPath() + "/StarScore Voice Memo " + QUuid::createUuid().toString(QUuid::Id128).left(8) + ".wav";
+
+    // rendered as the demos are (48 kHz, 24-bit), the export settings put back afterwards
+    Ret ret = make_ret(Ret::Code::InternalError);
+    {
+        const ExportProgressScope progressScope(this);
+        reportExportProgress(muse::qtrc("starscore", "Export to Voice Memos"), 0, 2, title + ".m4a");
+        const int oldRate = audioExportConfiguration()->exportSampleRate();
+        const audio::AudioSampleFormat oldFormat = audioExportConfiguration()->exportWavSampleFormat();
+        audioExportConfiguration()->setExportSampleRate(48000);
+        audioExportConfiguration()->setExportWavSampleFormat(audio::AudioSampleFormat::Int24);
+        {
+            io::FileStream out(wav);
+            out.setMeta("file_path", wav.toStdString());
+            if (out.open(io::IODevice::WriteOnly)) {
+                ret = writer->write(n, out, {});
+                out.close();
+            }
+        }
+        audioExportConfiguration()->setExportSampleRate(oldRate);
+        audioExportConfiguration()->setExportWavSampleFormat(oldFormat);
+
+        // AAC in an .m4a, by macOS's own converter
+        if (ret && QFileInfo(wav).size() > 0) {
+            reportExportProgress(muse::qtrc("starscore", "Export to Voice Memos"), 1, 2, title + ".m4a");
+            QFile::remove(m4a);
+            QProcess convert;
+            convert.start("/usr/bin/afconvert", { "-f", "m4af", "-d", "aac", "-b", "256000", wav, m4a });
+            const bool done = convert.waitForFinished(10 * 60 * 1000);
+            if (!done || convert.exitCode() != 0 || QFileInfo(m4a).size() == 0) {
+                LOGE() << "[starscore] voice memo: afconvert failed: " << convert.readAllStandardError().toStdString();
+                ret = make_ret(Ret::Code::InternalError, muse::trc("starscore", "The recording couldn't be made into an .m4a file."));
+            }
+        }
+        QFile::remove(wav);
+    }
+    if (!ret) {
+        interactive()->error(muse::trc("starscore", "Export to Voice Memos"),
+                             muse::qtrc("starscore", "“%1” couldn't be exported: %2").arg(title, QString::fromStdString(ret.text()))
+                             .toStdString());
+        return;
+    }
+
+    const bool sent = QProcess::startDetached("/usr/bin/open", { "-b", "com.apple.VoiceMemos", m4a });
+    LOGI() << "[starscore] voice memo: " << m4a.toStdString() << (sent ? " sent to Voice Memos" : " (Voice Memos didn't open)");
+    enum { Show = int(IInteractive::Button::CustomButton) + 1 };
+    const IInteractive::Result answer = interactive()->questionSync(
+        muse::trc("starscore", "Export to Voice Memos"),
+        muse::qtrc("starscore", "“%1.m4a” was sent to Voice Memos.\n\nIf it doesn't appear there, drag it from Finder into "
+                                "Voice Memos. It's kept in Music › StarScore Voice Memos.").arg(title).toStdString(),
+        { IInteractive::ButtonData(Show, muse::trc("starscore", "Show in Finder")),
+          IInteractive::ButtonData(int(IInteractive::Button::Ok), muse::trc("global", "OK"), true) },
+        int(IInteractive::Button::Ok));
+    if (answer.button() == Show) {
+        interactive()->revealInFileBrowser(io::path_t(m4a));
+    }
 }

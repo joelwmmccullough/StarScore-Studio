@@ -333,6 +333,7 @@ public:
     muse::RetVal<QString> exportArrangementsAsMscz(const QString& folder) override;
     muse::RetVal<QString> exportToBandFolder(const QStringList& onlyPaths) override;
     muse::RetVal<QString> exportAudioDemos() override;
+    void exportToVoiceMemos() override;
     muse::RetVal<QString> exportTimeVariants(const QStringList& onlyPaths, bool halfTime, bool doubleTime) override;
     QStringList bandExportUnticked(const QString& code) const override;
     void setBandExportUnticked(const QString& code, const QStringList& paths) override;

@@ -767,6 +767,9 @@ QVariantList StarScoreBarModel::moreMenu() const
         return {
             item("export-band", muse::qtrc("starscore", "Export and Organize… (the twelve keys' sheets)")),
             item("chord-chart", muse::qtrc("starscore", "Edit the iReal Pro chord chart…")),
+#ifdef Q_OS_MACOS
+            item("voice-memos", muse::qtrc("starscore", "Export to Voice Memos")),   // (1.39.0)
+#endif
             item("solo-open-tied", info.value("tiedSongTitle").toString().isEmpty()
                  ? muse::qtrc("starscore", "Open the song it's tied to (none)")
                  : muse::qtrc("starscore", "Open %1").arg(info.value("tiedSongTitle").toString()),
@@ -846,6 +849,9 @@ QVariantList StarScoreBarModel::moreMenu() const
         item("export-band", muse::qtrc("starscore", "Export and Organize…")),
         item("chord-chart", muse::qtrc("starscore", "Edit the iReal Pro chord chart…")),
         item("export-arrangements", muse::qtrc("starscore", "Export arrangements as MuseScore files…"), !starScore()->arrangements().empty()),
+#ifdef Q_OS_MACOS
+        item("voice-memos", muse::qtrc("starscore", "Export to Voice Memos")),   // (1.39.0)
+#endif
         item("organize", muse::qtrc("starscore", "Run folder organization…")),
     };
 }
@@ -1478,6 +1484,9 @@ void StarScoreBarModel::handleMenuItem(const QString& itemId)
         openEditDialog("copyright-year", QString());
     } else if (action == "export-arrangements") {
         dispatcher()->dispatch("starscore-export-arrangements");
+    } else if (action == "voice-memos") {
+        // (after the menu has closed)
+        QTimer::singleShot(0, this, [this]() { starScore()->exportToVoiceMemos(); });
     } else if (action == "recordings") {
         dispatcher()->dispatch("starscore-recordings");
     } else if (action == "organize") {
