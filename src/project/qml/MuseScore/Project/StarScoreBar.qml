@@ -64,8 +64,10 @@ Rectangle {
     }
 
     //! hidden rows that this song would show (a solo transcription has no Sections or Solos row)
-    readonly property var hiddenShown: barModel.hiddenRows.filter(function(key) {
-        return !(barModel.isSoloTranscription && (key === "sections" || key === "solos"))
+    //! (1.41.0, Joel: "they should always be in the same order") in the panel's order, not the order they were hidden
+    readonly property var hiddenShown: ["arrangements", "sections", "progress", "audio", "solos"].filter(function(key) {
+        return barModel.hiddenRows.indexOf(key) >= 0
+               && !(barModel.isSoloTranscription && (key === "sections" || key === "solos"))
     })
 
     //! One pill-shaped button: an arrangement or a section
