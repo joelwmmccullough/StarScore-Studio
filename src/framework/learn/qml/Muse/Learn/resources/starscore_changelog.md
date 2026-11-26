@@ -4,6 +4,15 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.41.0
+- **Polychords.** How they're written:
+  - **A horizontal line stacks chords.** The top chord is above the line and the next one below it. A stack can have more than two chords.
+  - **A slash only ever means a bass note,** and only after the bottom chord.
+  - So E/D/C is shown as E over a line over D/C: an E triad on top of a D triad, with C in the bass. E/D is still an E chord with D in the bass.
+- **How to type them:** "E/D/C", or "E|D/C" ("|" is the line). With slashes, the note after the last slash is the bass, and each earlier slash before a note starts the next chord down. A slash that isn't followed by a note stays in the chord, so C6/9 and C6/9/E work as before. Every chord in the stack can have its own quality: "Ebmaj7/Dm/G" is Ebmaj7 over Dm, with G in the bass.
+- **Playback plays every chord.** Before, only the top chord sounded. Now the top chord plays above middle C, each chord below it an octave lower, and the bass note two octaves lower. With no bass note, the bottom chord's root is the bass.
+- **iReal Pro charts.** iReal Pro has no polychords, so the chart writes the bottom chord and bass as the chord and the top chord as iReal Pro's small alternate chord above it: E/D/C is written D/C with (E) above.
+
 ## 1.40.0
 - **The StarScore menus, tidied up.** The panel's "…" menu had about 35 items in six submenus, and most of them were also in the top menus. Each item now sits where it's used, and "…" keeps only the exports.
   - **Arrangement and section chips:**

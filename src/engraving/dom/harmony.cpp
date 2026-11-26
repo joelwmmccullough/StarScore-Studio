@@ -513,7 +513,9 @@ const std::vector<const ChordDescription*> Harmony::parseHarmony(const String& s
         std::vector<size_t> noteSlashes;
         for (size_t i = 0; i + 1 < s.size(); ++i) {
             const char16_t next = s.at(i + 1).unicode();
-            if (s.at(i) == u'/' && ((next >= u'A' && next <= u'G') || (next >= u'a' && next <= u'g'))) {
+            // (a lowercase note, but not "/add9" or "/alt")
+            const bool word = s.mid(i + 1, 3) == u"add" || s.mid(i + 1, 3) == u"alt";
+            if (s.at(i) == u'/' && ((next >= u'A' && next <= u'G') || (next >= u'a' && next <= u'g' && !word))) {
                 noteSlashes.push_back(i);
             }
         }
