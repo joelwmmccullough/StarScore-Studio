@@ -1146,8 +1146,9 @@ h1 .tacc { font-family: BravuraText; font-size: 1.4em; line-height: 0; margin: 0
 .bs .sl { margin-right: 0.04em; }
 .bs .acc { font-size: 0.9em; position: relative; top: -0.3em; margin-left: 0.03em; }
 /* (1.41.0) a polychord's top chord: small, above the bottom chord, over a line */
-.pt { position: absolute; left: 0; bottom: 100%%; padding-bottom: 0.04em; border-bottom: 0.05em solid currentColor; line-height: 1; }
-.pt .c { font-size: calc(var(--R) * var(--fs, 1) * 0.5); transform: none; }
+.pt { position: absolute; left: 0; bottom: calc(100%% + 0.03em); min-width: 100%%; padding-bottom: 0.05em;
+      border-bottom: 0.06em solid currentColor; line-height: 1; }
+.pt .c { font-size: calc(var(--R) * var(--fs, 1) * 0.68); transform: none; }
 .c.nc { font-size: calc(var(--R) * var(--fs, 1) * 0.62); font-weight: 500; top: 0.35em; }
 .sim { position: absolute; left: 50%%; top: 50%%; transform: translate(-50%%, -50%%); font-family: BravuraText; font-size: 30pt; color: #333; }
 .ts { position: absolute; left: 4pt; top: 50%%; transform: translateY(-50%%); display: flex; flex-direction: column;
@@ -1167,7 +1168,7 @@ const char* PDF_JS = R"JS(
 // could be another font's)
 function starscoreLayout() {
   const PX = 96 / 72;
-  function chordsOf(bar) { return Array.from(bar.querySelectorAll('.c')); }
+  function chordsOf(bar) { return Array.from(bar.querySelectorAll('.c')).filter(function(e) { return !e.closest('.pt'); }); }
   function crowded(bar) {
     const cs = chordsOf(bar);
     if (!cs.length) return false;
