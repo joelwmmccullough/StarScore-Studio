@@ -1,0 +1,155 @@
+run 343 commit f6de2caa78f8e66669155d6c15b6c284531e8c0c
+2572:FAILED: [code=1] src/project/qml/MuseScore/Project/CMakeFiles/project_qml.dir/Unity/unity_1_cxx.cxx.o 
+2581:/home/runner/work/StarScore-Studio/StarScore-Studio/src/project/qml/MuseScore/Project/internal/StarScore/songsettingsmodel.cpp:18:21: error: no matching function for call to ‘kors::modularity::Contextable::Contextable()’
+
+---- tail ----
+[1922/3064] Building CXX object src/framework/diagnostics/qml/Muse/Diagnostics/CMakeFiles/muse_diagnostics_qml.dir/Unity/unity_1_cxx.cxx.o
+[1923/3064] Building CXX object src/framework/autobot/CMakeFiles/muse_autobot.dir/Unity/unity_0_cxx.cxx.o
+[1924/3064] Building CXX object src/framework/mpe/qml/Muse/Mpe/CMakeFiles/muse_mpe_qml.dir/Unity/unity_1_cxx.cxx.o
+[1925/3064] Building CXX object src/framework/mpe/qml/Muse/Mpe/CMakeFiles/muse_mpe_qml.dir/.qt/rcc/qrc_qmake_Muse_Mpe.cpp.o
+[1926/3064] Building CXX object src/framework/mpe/qml/Muse/Mpe/CMakeFiles/muse_mpe_qml.dir/.qt/rcc/qrc_muse_mpe_qml_raw_qml_0.cpp.o
+[1927/3064] Building CXX object src/framework/shortcuts/qml/Muse/Shortcuts/CMakeFiles/muse_shortcuts_qml.dir/Unity/unity_1_cxx.cxx.o
+[1928/3064] Building CXX object src/framework/midiremote/CMakeFiles/muse_midiremote.dir/Unity/unity_0_cxx.cxx.o
+[1929/3064] Building CXX object src/framework/shortcuts/qml/Muse/Shortcuts/CMakeFiles/muse_shortcuts_qml.dir/.qt/rcc/qrc_qmake_Muse_Shortcuts.cpp.o
+[1930/3064] Building CXX object src/framework/shortcuts/qml/Muse/Shortcuts/CMakeFiles/muse_shortcuts_qml.dir/.qt/rcc/qrc_muse_shortcuts_qml_raw_qml_0.cpp.o
+[1931/3064] Building CXX object src/framework/shortcuts/qml/Muse/Shortcuts/CMakeFiles/muse_shortcuts_qml.dir/.qt/rcc/qrc_muse_shortcuts_qml_raw_qml_0_extra_qmldirs.cpp.o
+[1932/3064] Building CXX object src/framework/diagnostics/qml/Muse/Diagnostics/CMakeFiles/muse_diagnostics_qml.dir/Unity/unity_0_cxx.cxx.o
+[1933/3064] Building CXX object src/framework/toast/qml/Muse/Toast/CMakeFiles/muse_toast_qml.dir/.qt/rcc/qrc_qmake_Muse_Toast.cpp.o
+[1934/3064] Building CXX object src/framework/toast/qml/Muse/Toast/CMakeFiles/muse_toast_qml.dir/.qt/rcc/qrc_muse_toast_qml_raw_qml_0.cpp.o
+[1935/3064] Building CXX object src/framework/toast/qml/Muse/Toast/CMakeFiles/muse_toast_qml.dir/.qt/rcc/qrc_muse_toast_qml_raw_qml_0_extra_qmldirs.cpp.o
+[1936/3064] Building CXX object src/framework/tours/qml/Muse/Tours/CMakeFiles/muse_tours_qml.dir/Unity/unity_0_cxx.cxx.o
+[1937/3064] Building CXX object src/framework/tours/qml/Muse/Tours/CMakeFiles/muse_tours_qml.dir/.qt/rcc/qrc_qmake_Muse_Tours.cpp.o
+[1938/3064] Building CXX object src/framework/tours/qml/Muse/Tours/CMakeFiles/muse_tours_qml.dir/.qt/rcc/qrc_muse_tours_qml_raw_qml_0.cpp.o
+[1939/3064] Building CXX object src/framework/tours/qml/Muse/Tours/CMakeFiles/muse_tours_qml.dir/.qt/rcc/qrc_muse_tours_qml_raw_qml_0_extra_qmldirs.cpp.o
+[1940/3064] Building CXX object src/framework/shortcuts/qml/Muse/Shortcuts/CMakeFiles/muse_shortcuts_qml.dir/Unity/unity_0_cxx.cxx.o
+[1941/3064] Building CXX object src/framework/mpe/qml/Muse/Mpe/CMakeFiles/muse_mpe_qml.dir/Unity/unity_0_cxx.cxx.o
+[1942/3064] Building CXX object src/framework/learn/qml/Muse/Learn/CMakeFiles/muse_learn_qml.dir/.qt/rcc/qrc_qmake_Muse_Learn.cpp.o
+[1943/3064] Building CXX object src/framework/learn/qml/Muse/Learn/CMakeFiles/muse_learn_qml.dir/.qt/rcc/qrc_muse_learn_qml_raw_qml_0.cpp.o
+[1944/3064] Building CXX object src/framework/learn/qml/Muse/Learn/CMakeFiles/muse_learn_qml.dir/.qt/rcc/qrc_muse_learn_qml_raw_res_0.cpp.o
+[1945/3064] Building CXX object src/framework/learn/qml/Muse/Learn/CMakeFiles/muse_learn_qml.dir/.qt/rcc/qrc_muse_learn_qml_raw_qml_0_extra_qmldirs.cpp.o
+[1946/3064] Running AUTOMOC file extraction for target muse_media
+[1947/3064] Building CXX object src/framework/extensions/qml/Muse/Extensions/CMakeFiles/muse_extensions_qml.dir/Unity/unity_1_cxx.cxx.o
+[1948/3064] Building CXX object src/framework/toast/qml/Muse/Toast/CMakeFiles/muse_toast_qml.dir/Unity/unity_0_cxx.cxx.o
+[1949/3064] Building CXX object src/framework/extensions/qml/Muse/Extensions/CMakeFiles/muse_extensions_qml.dir/.qt/rcc/qrc_qmake_Muse_Extensions.cpp.o
+[1950/3064] Building CXX object src/framework/extensions/qml/Muse/Extensions/CMakeFiles/muse_extensions_qml.dir/.qt/rcc/qrc_muse_extensions_qml_raw_qml_0.cpp.o
+[1951/3064] Building CXX object src/framework/extensions/qml/Muse/Extensions/CMakeFiles/muse_extensions_qml.dir/.qt/rcc/qrc_muse_extensions_qml_raw_res_0.cpp.o
+[1952/3064] Building CXX object src/framework/extensions/qml/Muse/Extensions/CMakeFiles/muse_extensions_qml.dir/.qt/rcc/qrc_muse_extensions_qml_raw_qml_0_extra_qmldirs.cpp.o
+[1953/3064] Building CXX object src/framework/learn/qml/Muse/Learn/CMakeFiles/muse_learn_qml.dir/Unity/unity_0_cxx.cxx.o
+[1954/3064] Building CXX object src/framework/multiwindows/CMakeFiles/muse_multiwindows.dir/Unity/unity_0_cxx.cxx.o
+[1955/3064] Building CXX object src/framework/extensions/qml/Muse/Extensions/CMakeFiles/muse_extensions_qml.dir/Unity/unity_0_cxx.cxx.o
+[1956/3064] Building CXX object src/framework/workspace/CMakeFiles/muse_workspace.dir/Unity/unity_0_cxx.cxx.o
+[1957/3064] Building CXX object src/engraving/qml/MuseScore/Engraving/CMakeFiles/engraving_qml.dir/Unity/unity_1_cxx.cxx.o
+[1958/3064] Building CXX object src/framework/vst/CMakeFiles/muse_vst.dir/Unity/unity_1_cxx.cxx.o
+[1959/3064] Building CXX object src/engraving/qml/MuseScore/Engraving/CMakeFiles/engraving_qml.dir/.qt/rcc/qrc_qmake_MuseScore_Engraving.cpp.o
+[1960/3064] Building CXX object src/engraving/qml/MuseScore/Engraving/CMakeFiles/engraving_qml.dir/.qt/rcc/qrc_engraving_qml_raw_qml_0.cpp.o
+[1961/3064] Building CXX object src/engraving/qml/MuseScore/Engraving/CMakeFiles/engraving_qml.dir/.qt/rcc/qrc_engraving_qml_raw_qml_0_extra_qmldirs.cpp.o
+[1962/3064] Linking CXX static library _deps/json_schema_validator-build/libnlohmann_json_schema_validator.a
+[1963/3064] Building CXX object src/framework/vst/CMakeFiles/muse_vst.dir/Unity/unity_0_cxx.cxx.o
+[1964/3064] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_18_cxx.cxx.o
+[1965/3064] Building CXX object src/engraving/qml/MuseScore/Engraving/CMakeFiles/engraving_qml.dir/Unity/unity_0_cxx.cxx.o
+[1966/3064] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_17_cxx.cxx.o
+[1967/3064] Building CXX object src/framework/update/CMakeFiles/muse_update.dir/Unity/unity_0_cxx.cxx.o
+[1968/3064] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_15_cxx.cxx.o
+[1969/3064] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_16_cxx.cxx.o
+[1970/3064] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_14_cxx.cxx.o
+[1971/3064] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_13_cxx.cxx.o
+[1972/3064] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_12_cxx.cxx.o
+[1973/3064] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_10_cxx.cxx.o
+[1974/3064] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_11_cxx.cxx.o
+[1975/3064] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_9_cxx.cxx.o
+[1976/3064] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_8_cxx.cxx.o
+[1977/3064] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_6_cxx.cxx.o
+[1978/3064] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_4_cxx.cxx.o
+[1979/3064] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_5_cxx.cxx.o
+[1980/3064] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_7_cxx.cxx.o
+[1981/3064] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_3_cxx.cxx.o
+[1982/3064] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/.qt/rcc/qrc_qmake_MuseScore_Inspector.cpp.o
+[1983/3064] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/.qt/rcc/qrc_inspector_qml_raw_qml_0.cpp.o
+[1984/3064] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/.qt/rcc/qrc_inspector_qml_raw_qml_0_extra_qmldirs.cpp.o
+[1985/3064] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_2_cxx.cxx.o
+[1986/3064] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_1_cxx.cxx.o
+[1987/3064] Building CXX object src/instrumentsscene/qml/MuseScore/InstrumentsScene/CMakeFiles/instrumentsscene_qml.dir/Unity/unity_2_cxx.cxx.o
+[1988/3064] Building CXX object src/instrumentsscene/qml/MuseScore/InstrumentsScene/CMakeFiles/instrumentsscene_qml.dir/.qt/rcc/qrc_qmake_MuseScore_InstrumentsScene.cpp.o
+[1989/3064] Building CXX object src/instrumentsscene/qml/MuseScore/InstrumentsScene/CMakeFiles/instrumentsscene_qml.dir/.qt/rcc/qrc_instrumentsscene_qml_raw_qml_0.cpp.o
+[1990/3064] Building CXX object src/instrumentsscene/qml/MuseScore/InstrumentsScene/CMakeFiles/instrumentsscene_qml.dir/.qt/rcc/qrc_instrumentsscene_qml_raw_qml_0_extra_qmldirs.cpp.o
+[1991/3064] Building CXX object src/musesounds/qml/MuseScore/MuseSounds/CMakeFiles/musesounds_qml.dir/Unity/unity_0_cxx.cxx.o
+[1992/3064] Building CXX object src/musesounds/qml/MuseScore/MuseSounds/CMakeFiles/musesounds_qml.dir/.qt/rcc/qrc_qmake_MuseScore_MuseSounds.cpp.o
+[1993/3064] Building CXX object src/musesounds/qml/MuseScore/MuseSounds/CMakeFiles/musesounds_qml.dir/.qt/rcc/qrc_musesounds_qml_raw_qml_0.cpp.o
+[1994/3064] Building CXX object src/musesounds/qml/MuseScore/MuseSounds/CMakeFiles/musesounds_qml.dir/.qt/rcc/qrc_musesounds_qml_raw_res_0.cpp.o
+[1995/3064] Building CXX object src/musesounds/qml/MuseScore/MuseSounds/CMakeFiles/musesounds_qml.dir/.qt/rcc/qrc_musesounds_qml_raw_qml_0_extra_qmldirs.cpp.o
+[1996/3064] Building CXX object src/inspector/qml/MuseScore/Inspector/CMakeFiles/inspector_qml.dir/Unity/unity_0_cxx.cxx.o
+[1997/3064] Building CXX object src/instrumentsscene/qml/MuseScore/InstrumentsScene/CMakeFiles/instrumentsscene_qml.dir/Unity/unity_1_cxx.cxx.o
+[1998/3064] Building CXX object src/palette/qml/MuseScore/Palette/CMakeFiles/palette_qml.dir/.qt/rcc/qrc_qmake_MuseScore_Palette.cpp.o
+[1999/3064] Building CXX object src/palette/qml/MuseScore/Palette/CMakeFiles/palette_qml.dir/.qt/rcc/qrc_palette_qml_raw_qml_0.cpp.o
+[2000/3064] Building CXX object src/palette/qml/MuseScore/Palette/CMakeFiles/palette_qml.dir/.qt/rcc/qrc_palette_qml_raw_qml_0_extra_qmldirs.cpp.o
+[2001/3064] Building CXX object src/palette/qml/MuseScore/Palette/CMakeFiles/palette_qml.dir/Unity/unity_1_cxx.cxx.o
+[2002/3064] Building CXX object src/playback/qml/MuseScore/Playback/CMakeFiles/playback_qml.dir/Unity/unity_3_cxx.cxx.o
+[2003/3064] Building CXX object src/instrumentsscene/qml/MuseScore/InstrumentsScene/CMakeFiles/instrumentsscene_qml.dir/Unity/unity_0_cxx.cxx.o
+[2004/3064] Building CXX object src/playback/qml/MuseScore/Playback/CMakeFiles/playback_qml.dir/Unity/unity_2_cxx.cxx.o
+[2005/3064] Building CXX object src/playback/qml/MuseScore/Playback/CMakeFiles/playback_qml.dir/.qt/rcc/qrc_qmake_MuseScore_Playback.cpp.o
+[2006/3064] Building CXX object src/playback/qml/MuseScore/Playback/CMakeFiles/playback_qml.dir/.qt/rcc/qrc_playback_qml_raw_qml_0.cpp.o
+[2007/3064] Building CXX object src/playback/qml/MuseScore/Playback/CMakeFiles/playback_qml.dir/.qt/rcc/qrc_playback_qml_raw_qml_0_extra_qmldirs.cpp.o
+[2008/3064] Building CXX object src/preferences/qml/MuseScore/Preferences/CMakeFiles/preferences_qml.dir/Unity/unity_7_cxx.cxx.o
+[2009/3064] Building CXX object src/preferences/qml/MuseScore/Preferences/CMakeFiles/preferences_qml.dir/Unity/unity_6_cxx.cxx.o
+[2010/3064] Building CXX object src/preferences/qml/MuseScore/Preferences/CMakeFiles/preferences_qml.dir/Unity/unity_5_cxx.cxx.o
+[2011/3064] Building CXX object src/palette/qml/MuseScore/Palette/CMakeFiles/palette_qml.dir/Unity/unity_0_cxx.cxx.o
+[2012/3064] Building CXX object src/preferences/qml/MuseScore/Preferences/CMakeFiles/preferences_qml.dir/Unity/unity_4_cxx.cxx.o
+[2013/3064] Building CXX object src/preferences/qml/MuseScore/Preferences/CMakeFiles/preferences_qml.dir/Unity/unity_3_cxx.cxx.o
+[2014/3064] Building CXX object src/preferences/qml/MuseScore/Preferences/CMakeFiles/preferences_qml.dir/Unity/unity_2_cxx.cxx.o
+[2015/3064] Building CXX object src/playback/qml/MuseScore/Playback/CMakeFiles/playback_qml.dir/Unity/unity_1_cxx.cxx.o
+[2016/3064] Building CXX object src/preferences/qml/MuseScore/Preferences/CMakeFiles/preferences_qml.dir/.qt/rcc/qrc_qmake_MuseScore_Preferences.cpp.o
+[2017/3064] Building CXX object src/preferences/qml/MuseScore/Preferences/CMakeFiles/preferences_qml.dir/.qt/rcc/qrc_preferences_qml_raw_qml_0.cpp.o
+[2018/3064] Building CXX object src/preferences/qml/MuseScore/Preferences/CMakeFiles/preferences_qml.dir/.qt/rcc/qrc_preferences_qml_raw_qml_0_extra_qmldirs.cpp.o
+[2019/3064] Building CXX object src/project/qml/MuseScore/Project/CMakeFiles/project_qml.dir/Unity/unity_14_cxx.cxx.o
+[2020/3064] Building CXX object src/preferences/qml/MuseScore/Preferences/CMakeFiles/preferences_qml.dir/Unity/unity_1_cxx.cxx.o
+[2021/3064] Building CXX object src/playback/qml/MuseScore/Playback/CMakeFiles/playback_qml.dir/Unity/unity_0_cxx.cxx.o
+[2022/3064] Building CXX object src/project/qml/MuseScore/Project/CMakeFiles/project_qml.dir/Unity/unity_13_cxx.cxx.o
+[2023/3064] Building CXX object src/preferences/qml/MuseScore/Preferences/CMakeFiles/preferences_qml.dir/Unity/unity_0_cxx.cxx.o
+[2024/3064] Building CXX object src/project/qml/MuseScore/Project/CMakeFiles/project_qml.dir/Unity/unity_10_cxx.cxx.o
+[2025/3064] Building CXX object src/project/qml/MuseScore/Project/CMakeFiles/project_qml.dir/Unity/unity_9_cxx.cxx.o
+[2026/3064] Building CXX object src/project/qml/MuseScore/Project/CMakeFiles/project_qml.dir/Unity/unity_11_cxx.cxx.o
+[2027/3064] Building CXX object src/project/qml/MuseScore/Project/CMakeFiles/project_qml.dir/Unity/unity_7_cxx.cxx.o
+[2028/3064] Building CXX object src/project/qml/MuseScore/Project/CMakeFiles/project_qml.dir/Unity/unity_8_cxx.cxx.o
+[2029/3064] Building CXX object src/project/qml/MuseScore/Project/CMakeFiles/project_qml.dir/Unity/unity_6_cxx.cxx.o
+[2030/3064] Building CXX object src/project/qml/MuseScore/Project/CMakeFiles/project_qml.dir/Unity/unity_12_cxx.cxx.o
+[2031/3064] Building CXX object src/project/qml/MuseScore/Project/CMakeFiles/project_qml.dir/Unity/unity_5_cxx.cxx.o
+[2032/3064] Building CXX object src/project/qml/MuseScore/Project/CMakeFiles/project_qml.dir/Unity/unity_1_cxx.cxx.o
+FAILED: [code=1] src/project/qml/MuseScore/Project/CMakeFiles/project_qml.dir/Unity/unity_1_cxx.cxx.o 
+/usr/bin/ccache /usr/bin/g++-10 -DKORS_LOGGER_QT_SUPPORT -DKORS_PROFILER_ENABLED -DNDEBUG -DQT_CORE_LIB -DQT_GUI_LIB -DQT_NETWORK_LIB -DQT_NO_DEBUG -DQT_OPENGL_LIB -DQT_QMLINTEGRATION_LIB -DQT_QML_LIB -DQT_QUICK_LIB -DQT_WIDGETS_LIB -I/home/runner/work/StarScore-Studio/StarScore-Studio/build.release/src/project/qml/MuseScore/Project -I/home/runner/work/StarScore-Studio/StarScore-Studio/src/project/qml/MuseScore/Project -I/home/runner/work/StarScore-Studio/StarScore-Studio/build.release -I/home/runner/work/StarScore-Studio/StarScore-Studio/src -I/home/runner/work/StarScore-Studio/StarScore-Studio -I/home/runner/work/StarScore-Studio/StarScore-Studio/framework -I/home/runner/work/StarScore-Studio/StarScore-Studio/framework/global -I/home/runner/work/StarScore-Studio/StarScore-Studio/framework/testing/thirdparty/googletest/googletest/include -I/home/runner/work/StarScore-Studio/StarScore-Studio/src/framework -I/home/runner/work/StarScore-Studio/StarScore-Studio/src/framework/global -I/home/runner/work/StarScore-Studio/StarScore-Studio/src/framework/testing/thirdparty/googletest/googletest/include -I/home/runner/work/StarScore-Studio/StarScore-Studio/src/project -I/home/runner/work/StarScore-Studio/StarScore-Studio/src/project/qml/MuseScore/Project/internal -I/home/runner/work/StarScore-Studio/StarScore-Studio/src/project/qml/MuseScore/Project/internal/Export -I/home/runner/work/StarScore-Studio/StarScore-Studio/src/project/qml/MuseScore/Project/internal/NewScore -I/home/runner/work/StarScore-Studio/StarScore-Studio/src/project/qml/MuseScore/Project/internal/Properties -I/home/runner/work/StarScore-Studio/StarScore-Studio/src/project/qml/MuseScore/Project/internal/ScoresPage -I/home/runner/work/StarScore-Studio/StarScore-Studio/src/project/qml/MuseScore/Project/internal/ConvertFileToScore -I/home/runner/work/StarScore-Studio/StarScore-Studio/src/project/qml/MuseScore/Project/internal/StarScore -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtQml -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtCore -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/mkspecs/linux-g++ -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtQmlIntegration -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtNetwork -isystem /home/runner/work/StarScore-Studio/StarScore-Studio/build.release/src/project/qml/MuseScore/Project/project_qml_autogen/include -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtGui -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtQuick -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtOpenGL -isystem /home/runner/work/StarScore-Studio/Qt/6.10.2/gcc_64/include/QtWidgets -O2 -g -DNDEBUG -std=gnu++17 -Wall -Wextra -fPIC -Winvalid-pch -include /home/runner/work/StarScore-Studio/StarScore-Studio/build.release/src/framework/pch/CMakeFiles/muse_pch.dir/cmake_pch.hxx -MD -MT src/project/qml/MuseScore/Project/CMakeFiles/project_qml.dir/Unity/unity_1_cxx.cxx.o -MF src/project/qml/MuseScore/Project/CMakeFiles/project_qml.dir/Unity/unity_1_cxx.cxx.o.d -o src/project/qml/MuseScore/Project/CMakeFiles/project_qml.dir/Unity/unity_1_cxx.cxx.o -c /home/runner/work/StarScore-Studio/StarScore-Studio/build.release/src/project/qml/MuseScore/Project/CMakeFiles/project_qml.dir/Unity/unity_1_cxx.cxx
+In file included from src/project/qml/MuseScore/Project/CMakeFiles/project_qml.dir/Unity/unity_1_cxx.cxx:28:
+/home/runner/work/StarScore-Studio/StarScore-Studio/src/project/qml/MuseScore/Project/internal/StarScore/starscorebarmodel.cpp: In member function ‘QVariantList mu::project::StarScoreBarModel::statusSubmenu(const QString&, int, bool) const’:
+/home/runner/work/StarScore-Studio/StarScore-Studio/src/project/qml/MuseScore/Project/internal/StarScore/starscorebarmodel.cpp:409:88: warning: unused parameter ‘rhythm’ [-Wunused-parameter]
+  409 | QVariantList StarScoreBarModel::statusSubmenu(const QString& prefix, int current, bool rhythm) const
+      |                                                                                   ~~~~~^~~~~~
+In file included from src/project/qml/MuseScore/Project/CMakeFiles/project_qml.dir/Unity/unity_1_cxx.cxx:34:
+/home/runner/work/StarScore-Studio/StarScore-Studio/src/project/qml/MuseScore/Project/internal/StarScore/songsettingsmodel.cpp: In constructor ‘mu::project::SongSettingsModel::SongSettingsModel(QObject*)’:
+/home/runner/work/StarScore-Studio/StarScore-Studio/src/project/qml/MuseScore/Project/internal/StarScore/songsettingsmodel.cpp:18:21: error: no matching function for call to ‘kors::modularity::Contextable::Contextable()’
+   18 |     : QObject(parent)
+      |                     ^
+In file included from ../src/framework/global/modularity/../thirdparty/kors_modularity/modularity/ioc.h:32,
+                 from ../src/framework/global/modularity/ioc.h:30,
+                 from /home/runner/work/StarScore-Studio/StarScore-Studio/src/project/qml/MuseScore/Project/internal/Properties/projectpropertiesmodel.h:31,
+                 from /home/runner/work/StarScore-Studio/StarScore-Studio/src/project/qml/MuseScore/Project/internal/Properties/projectpropertiesmodel.cpp:22,
+                 from src/project/qml/MuseScore/Project/CMakeFiles/project_qml.dir/Unity/unity_1_cxx.cxx:4:
+../src/framework/global/modularity/../thirdparty/kors_modularity/modularity/context.h:61:5: note: candidate: ‘kors::modularity::Contextable::Contextable(const kors::modularity::Contextable&)’
+   61 |     Contextable(const Contextable& i) = default;
+      |     ^~~~~~~~~~~
+../src/framework/global/modularity/../thirdparty/kors_modularity/modularity/context.h:61:5: note:   candidate expects 1 argument, 0 provided
+../src/framework/global/modularity/../thirdparty/kors_modularity/modularity/context.h:58:5: note: candidate: ‘kors::modularity::Contextable::Contextable(const GetContext&)’
+   58 |     Contextable(const GetContext& getCtx)
+      |     ^~~~~~~~~~~
+../src/framework/global/modularity/../thirdparty/kors_modularity/modularity/context.h:58:5: note:   candidate expects 1 argument, 0 provided
+../src/framework/global/modularity/../thirdparty/kors_modularity/modularity/context.h:55:5: note: candidate: ‘kors::modularity::Contextable::Contextable(const kors::modularity::Contextable*)’
+   55 |     Contextable(const Contextable* inj)
+      |     ^~~~~~~~~~~
+../src/framework/global/modularity/../thirdparty/kors_modularity/modularity/context.h:55:5: note:   candidate expects 1 argument, 0 provided
+../src/framework/global/modularity/../thirdparty/kors_modularity/modularity/context.h:52:5: note: candidate: ‘kors::modularity::Contextable::Contextable(const ContextPtr&)’
+   52 |     Contextable(const ContextPtr& ctx)
+      |     ^~~~~~~~~~~
+../src/framework/global/modularity/../thirdparty/kors_modularity/modularity/context.h:52:5: note:   candidate expects 1 argument, 0 provided
+[2033/3064] Building CXX object src/project/qml/MuseScore/Project/CMakeFiles/project_qml.dir/Unity/unity_2_cxx.cxx.o
+[2034/3064] Building CXX object src/project/qml/MuseScore/Project/CMakeFiles/project_qml.dir/Unity/unity_3_cxx.cxx.o
+[2035/3064] Building CXX object src/project/qml/MuseScore/Project/CMakeFiles/project_qml.dir/Unity/unity_4_cxx.cxx.o
+ninja: build stopped: subcommand failed.
+Build failed
+Build failed
