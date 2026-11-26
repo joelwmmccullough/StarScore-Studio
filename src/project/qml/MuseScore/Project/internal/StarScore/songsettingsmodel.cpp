@@ -15,7 +15,7 @@
 using namespace mu::project;
 
 SongSettingsModel::SongSettingsModel(QObject* parent)
-    : QObject(parent)
+    : QObject(parent), muse::Contextable(muse::iocCtxForQmlObject(this))
 {
 }
 
