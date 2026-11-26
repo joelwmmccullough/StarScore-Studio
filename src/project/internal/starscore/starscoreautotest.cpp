@@ -272,6 +272,23 @@ void StarScoreService::runAutotestSteps(QStringList steps, int reportNumber)
                 autotestLog(QString("  %1: %2 x %3").arg(path).arg(q->width()).arg(q->height()));
             }
         }
+    } else if (step.startsWith("shotdialog:")) {
+        // shotdialog:NAME (1.40.0): a picture of the open dialog (the smallest visible window that isn't the app's)
+        QQuickWindow* dlg = nullptr;
+        for (QWindow* w : QGuiApplication::topLevelWindows()) {
+            auto* q = qobject_cast<QQuickWindow*>(w);
+            if (q && q->isVisible() && q->objectName() != "ApplicationWindow"
+                && (!dlg || q->width() * q->height() < dlg->width() * dlg->height())) {
+                dlg = q;
+            }
+        }
+        if (!dlg) {
+            autotestLog("  no dialog");
+        } else {
+            const QString file = autotestDir() + "/" + step.mid(QString("shotdialog:").size()) + ".png";
+            autotestLog(QString("  dialog %1x%2 saved: %3").arg(dlg->width()).arg(dlg->height())
+                        .arg(dlg->grabWindow().save(file) ? "yes" : "no"));
+        }
     } else if (step.startsWith("window:") || step.startsWith("shot:")) {
         // the app window: "window:W:H" resizes it, "shot:NAME" saves a picture of it as NAME.png
         QQuickWindow* win = nullptr;
