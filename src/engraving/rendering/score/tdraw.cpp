@@ -20,6 +20,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include "tdraw.h"
+#include "measurelayout.h"
 
 #include "defer.h"
 
@@ -3236,6 +3237,13 @@ void TDraw::draw(const TimeSig* item, Painter* painter, const PaintOptions& opt)
         return;
     }
     if (!item->showOnThisStaff()) {
+        return;
+    }
+    // StarScore (1.41.1, Joel 27 Nov 2026 "weird bug"): the hidden time signatures inside an additive pattern ("6+7/4")
+    // take no space, so with View › Show invisible they were drawn grey on top of the notes. They aren't drawn; the
+    // pattern's shown time signature (and Format › StarScore › Additive time signature…) is how they're seen and changed.
+    if (!item->visible() && item->segment() && item->segment()->allElementsInvisible() && item->measure()
+        && MeasureLayout::additiveCycle(item->measure()) > 0) {
         return;
     }
     painter->setPen(item->curColor(opt));

@@ -6,6 +6,7 @@ Version numbers: the first number changes when files stop being compatible, the 
 
 ## 1.41.1
 - **A polychord's bass note is under the whole stack.** F/Eb/D is now drawn as F over Eb, then a tall slash beside both chords, then D. Before, the D was written after the Eb only (Eb/D), so it read as if only Eb was over D. Typing is unchanged: "F/Eb/D" or "F|Eb/D".
+- **Hidden time signatures inside an additive pattern aren't drawn over the notes.** With View › Show invisible on, the hidden 7/4 inside a "6+7/4" bar was drawn grey on top of the notes, because it takes no space. It isn't drawn now. The pattern's shown time signature and Format › StarScore › Additive time signature… are how you see and change it.
 - **Accidentals no longer cross a polychord's line.** The line is measured from the top of what's drawn, so a flat in the lower chord stays below it, and nothing in the upper chord reaches down into it.
 
 ## 1.41.0
