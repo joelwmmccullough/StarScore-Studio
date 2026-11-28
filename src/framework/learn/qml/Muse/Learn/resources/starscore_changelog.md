@@ -4,6 +4,10 @@ StarScore Studio is built on MuseScore Studio. Newest version first. Builds befo
 
 Version numbers: the first number changes when files stop being compatible, the second for new features, the third for fixes and small changes.
 
+## 1.41.1
+- **A polychord's bass note is under the whole stack.** F/Eb/D is now drawn as F over Eb, then a tall slash beside both chords, then D. Before, the D was written after the Eb only (Eb/D), so it read as if only Eb was over D. Typing is unchanged: "F/Eb/D" or "F|Eb/D".
+- **Accidentals no longer cross a polychord's line.** The line is measured from the top of what's drawn, so a flat in the lower chord stays below it, and nothing in the upper chord reaches down into it.
+
 ## 1.41.0
 - **Polychords.** How they're written:
   - **A horizontal line stacks chords.** The top chord is above the line and the next one below it. A stack can have more than two chords.

@@ -319,6 +319,12 @@ public:
         ld_field<double> harmonyHeight = { "[Harmony] harmonyHeight", 0.0 };    // used for calculating the height is frame while editing.
         ld_field<std::vector<LineF> > polychordDividerLines = { "[Harmony] polychordDividerLine", std::vector<LineF>() };
         ld_field<double> polychordDividerOffset = { "[Harmony] polychordDividerOffset", 0.0 };
+        // StarScore (1.41.1): a polychord over a bass note ("F/Eb/D") is the stacked chords, a tall slash beside the
+        // whole stack, then the bass. The slash (render coordinates, drawn moved by the offsets), the width the divider
+        // lines span (the stack's, not the bass's; 0 = the whole symbol) and the symbol's x offset.
+        ld_field<std::vector<LineF> > polychordSlash = { "[Harmony] polychordSlash", std::vector<LineF>() };
+        ld_field<double> polychordStackWidth = { "[Harmony] polychordStackWidth", 0.0 };
+        ld_field<double> polychordOffsetX = { "[Harmony] polychordOffsetX", 0.0 };
         ld_field<double> baseline = { "[Harmony] baseline", 0.0 };
         ld_field<std::vector<muse::draw::Font> > fontList = "[Harmony] fontList";          // temp values used in render()
         ld_field<std::vector<HarmonyRenderItem*> > renderItemList = "[Harmony] renderItemList";              // rendered chord

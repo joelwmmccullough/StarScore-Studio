@@ -2064,6 +2064,9 @@ void TDraw::draw(const Harmony* item, Painter* painter, const PaintOptions& opt)
         for (const LineF& line : ldata->polychordDividerLines()) {
             painter->drawLine(line.translated(PointF(0.0, ldata->polychordDividerOffset)));
         }
+        for (const LineF& slash : ldata->polychordSlash()) {   // StarScore: the tall slash before the bass
+            painter->drawLine(slash.translated(PointF(ldata->polychordOffsetX, ldata->polychordDividerOffset)));
+        }
     }
 }
 

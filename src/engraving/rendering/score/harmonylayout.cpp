@@ -68,9 +68,12 @@ void HarmonyLayout::layoutHarmony(Harmony* item, Harmony::LayoutData* ldata,
     PointF positionPoint = calculateBoundingRect(item, ldata, ctx);
 
     if (item->isPolychord()) {
+        // (StarScore 1.41.1: only as wide as the stacked chords when the bass follows a tall slash)
+        const double right = ldata->polychordStackWidth > 0.0 ? ldata->bbox().left() + ldata->polychordStackWidth
+                             : ldata->bbox().right();
         for (LineF& line : ldata->polychordDividerLines.mut_value()) {
             line.setP1(PointF(ldata->bbox().left(), line.y1()));
-            line.setP2(PointF(ldata->bbox().right(), line.y2()));
+            line.setP2(PointF(right, line.y2()));
         }
     }
 
@@ -117,6 +120,9 @@ PointF HarmonyLayout::calculateBoundingRect(const Harmony* item, Harmony::Layout
             if (renderItem->align()) {
                 hAlignBox.unite(tsBbox);
             }
+        }
+        for (const LineF& slash : item->ldata()->polychordSlash()) {   // StarScore: a polychord's tall slash
+            bb.unite(RectF(slash.p1(), slash.p2()).normalized());
         }
 
         double xx = 0.0;
@@ -169,6 +175,7 @@ PointF HarmonyLayout::calculateBoundingRect(const Harmony* item, Harmony::Layout
         }
 
         ldata->polychordDividerOffset = yy;
+        ldata->polychordOffsetX = xx;
 
         ldata->setBbox(bb.translated(xx, yy));
         ldata->harmonyHeight = ldata->bbox().height();
@@ -420,14 +427,29 @@ void HarmonyLayout::render(Harmony* item, Harmony::LayoutData* ldata, const Layo
     }
 
     ldata->polychordDividerLines.reset();
+    ldata->polychordSlash.reset();
+    ldata->polychordStackWidth = 0.0;
     HarmonyRenderCtx harmonyCtx;
+
+    // StarScore (1.41.1, Joel 27 Nov 2026: "I'd ideally like for the F and the Eb to ALL be over D"): a polychord's bass
+    // note goes after a tall slash beside the whole stack, not after the bottom chord. Not with capo chords (two
+    // spellings side by side).
+    const MStyle& polyStyle = ctx.conf().style();
+    HarmonyInfo* bottomInfo = item->chords().empty() ? nullptr : item->chords().back();
+    const bool tallSlash = item->isPolychord() && item->harmonyType() == HarmonyType::STANDARD && bottomInfo
+                           && tpcIsValid(bottomInfo->bassTpc()) && polyStyle.styleI(Sid::capoPosition) == 0;
+    const double dividerSpacing = polyStyle.styleS(Sid::polychordDividerSpacing).toMM(item->spatium());
+    const double dividerThickness = polyStyle.styleS(Sid::polychordDividerThickness).toMM(item->spatium());
+    double bottomBaselineY = 0.0;
 
     // Map of text segments and their final width
     std::multimap<double, std::vector<HarmonyRenderItem*> > chordTextSegments;
 
     for (size_t i = item->chords().size(); i > 0; i--) {
         harmonyCtx.info = item->chords().at(i - 1);
+        harmonyCtx.noBass = tallSlash && i == item->chords().size();
         renderSingleHarmony(item, ldata, harmonyCtx, ctx);
+        harmonyCtx.noBass = false;
 
         chordTextSegments.emplace(std::pair<double, std::vector<HarmonyRenderItem*> > { harmonyCtx.x(), harmonyCtx.renderItemList });
         ldata->renderItemList.mut_value().insert(ldata->renderItemList.mut_value().end(),
@@ -453,12 +475,28 @@ void HarmonyLayout::render(Harmony* item, Harmony::LayoutData* ldata, const Layo
         if (i == item->chords().size()) {
             // Set baseline for bottom chord
             ldata->baseline = -diff;
+            bottomBaselineY = harmonyCtx.renderItemList.empty() ? 0.0 : harmonyCtx.renderItemList.front()->y();
+        } else if (!ldata->polychordDividerLines.value().empty()) {
+            // StarScore (1.41.1): nothing in a chord above a divider line reaches down into the line's space
+            const double limit = ldata->polychordDividerLines.value().back().y1() - dividerThickness / 2 - dividerSpacing;
+            double lowest = -DBL_MAX;
+            for (const HarmonyRenderItem* renderItem : harmonyCtx.renderItemList) {
+                lowest = std::max(lowest, renderItem->tightBoundingRect().translated(renderItem->x(), renderItem->y()).bottom());
+            }
+            if (lowest > limit) {
+                for (HarmonyRenderItem* renderItem : harmonyCtx.renderItemList) {
+                    renderItem->movey(limit - lowest);
+                }
+            }
         }
 
+        // StarScore (1.41.1, Joel: "I don't like how the flats are clipping through the dividing line"): measured to
+        // the top of what's drawn (a flat reaches above the letters' cap height), not only the cap height
         double topCapHeight = DBL_MAX;
         for (const HarmonyRenderItem* renderItem : harmonyCtx.renderItemList) {
             if (const TextSegment* ts = dynamic_cast<const TextSegment*>(renderItem)) {
-                topCapHeight = std::min(topCapHeight, ts->y() - ts->capHeight());
+                const double drawnTop = ts->tightBoundingRect().translated(ts->x(), ts->y()).top();
+                topCapHeight = std::min(topCapHeight, std::min(ts->y() - ts->capHeight(), drawnTop));
             }
         }
 
@@ -484,6 +522,9 @@ void HarmonyLayout::render(Harmony* item, Harmony::LayoutData* ldata, const Layo
     // Align polychords
 
     if (item->align() == AlignH::LEFT) {
+        if (tallSlash) {
+            renderPolychordBass(item, ldata, bottomInfo, bottomBaselineY, ctx);
+        }
         return;
     }
 
@@ -514,6 +555,53 @@ void HarmonyLayout::render(Harmony* item, Harmony::LayoutData* ldata, const Layo
             seg->movex(diff);
         }
     }
+
+    if (tallSlash) {
+        renderPolychordBass(item, ldata, bottomInfo, bottomBaselineY, ctx);
+    }
+}
+
+// StarScore (1.41.1): a polychord's bass note after a tall slash that reaches from below the bottom chord's baseline to
+// the top of the stack, so the bass is under every chord in it ("F/Eb/D": F over Eb, both over D)
+void HarmonyLayout::renderPolychordBass(Harmony* item, Harmony::LayoutData* ldata, HarmonyInfo* bottomInfo, double bottomBaselineY,
+                                        const LayoutContext& ctx)
+{
+    ChordList* chordList = bottomInfo->chordList();
+    if (!chordList || ldata->renderItemList.value().empty()) {
+        return;
+    }
+    const MStyle& style = ctx.conf().style();
+    const double sp = item->spatium();
+
+    RectF stack;
+    for (const HarmonyRenderItem* renderItem : ldata->renderItemList.value()) {
+        stack.unite(renderItem->tightBoundingRect().translated(renderItem->x(), renderItem->y()));
+    }
+    const double bottom = bottomBaselineY + 0.3 * sp;
+    const double top = stack.top() - 0.1 * sp;
+    const double x0 = stack.right() + 0.3 * sp;
+    const double x1 = x0 + (bottom - top) * 0.3;
+    ldata->polychordSlash.mut_value().push_back(LineF(PointF(x0, bottom), PointF(x1, top)));
+    ldata->polychordStackWidth = stack.width();
+
+    int bassTpc = bottomInfo->bassTpc();
+    if (isStarsignChordFile(style)) {   // the easier name, as renderSingleHarmony writes it
+        while (bassTpc < int(Tpc::TPC_G_B)) {
+            bassTpc += TPC_DELTA_ENHARMONIC;
+        }
+        while (bassTpc > int(Tpc::TPC_A_S)) {
+            bassTpc -= TPC_DELTA_ENHARMONIC;
+        }
+    }
+    HarmonyRenderCtx bassCtx;
+    bassCtx.info = bottomInfo;
+    bassCtx.hAlign = false;
+    bassCtx.setx(x1 + 0.2 * sp);
+    bassCtx.sety(bottomBaselineY);
+    render(item, ldata, chordList->renderListRoot, bassCtx, ctx, bassTpc,
+           style.styleV(Sid::chordSymbolSpelling).value<NoteSpellingType>(), item->bassRenderCase(), item->bassScale());
+    ldata->renderItemList.mut_value().insert(ldata->renderItemList.mut_value().end(), bassCtx.renderItemList.begin(),
+                                             bassCtx.renderItemList.end());
 }
 
 void HarmonyLayout::renderRomanNumeral(Harmony* item, Harmony::LayoutData* ldata)
@@ -650,6 +738,9 @@ void HarmonyLayout::renderSingleHarmony(Harmony* item, Harmony::LayoutData* ldat
         };
         rootTpc = starscoreSimplerTpc(rootTpc);
         bassTpc = starscoreSimplerTpc(bassTpc);
+    }
+    if (harmonyCtx.noBass) {
+        bassTpc = Tpc::TPC_INVALID;
     }
 
     DisplayCapoChordType displayCapo = style.styleV(Sid::displayCapoChords).value<DisplayCapoChordType>();

@@ -47,6 +47,7 @@ private:
         // Reset every single chord
         bool hAlign = true;
         HarmonyInfo* info = nullptr;
+        bool noBass = false;   // StarScore: the bottom chord of a polychord whose bass goes after a tall slash
 
         // Reset every render() call
         std::stack<PointF> stack;
@@ -71,6 +72,8 @@ private:
     static void doRenderSingleHarmony(Harmony* item, Harmony::LayoutData* ldata, HarmonyRenderCtx& harmonyCtx, int rootTpc, int bassTpc,
                                       const LayoutContext& ctx);
     static void renderSingleHarmony(Harmony* item, Harmony::LayoutData* ldata, HarmonyRenderCtx& harmonyCtx, const LayoutContext& ctx);
+    static void renderPolychordBass(Harmony* item, Harmony::LayoutData* ldata, HarmonyInfo* bottomInfo, double bottomBaselineY,
+                                    const LayoutContext& ctx);
     static void renderRomanNumeral(Harmony* item, Harmony::LayoutData* ldata);
     static void render(Harmony* item, Harmony::LayoutData* ldata, const String& str, HarmonyRenderCtx& harmonyCtx);
     static void render(Harmony* item, Harmony::LayoutData* ldata, SymId sym, HarmonyRenderCtx& harmonyCtx, const LayoutContext& ctx);
